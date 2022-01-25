@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/RestartFU/gophig"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/justtaldevelops/oomph/util"
 	"github.com/justtaldevelops/oomph/virtual"
-	"github.com/pelletier/go-toml"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -24,6 +24,7 @@ import (
 
 func main() {
 	config := readConfig()
+	fmt.Println(config)
 	src := tokenSource()
 
 	p, err := minecraft.NewForeignStatusProvider(config.Connection.RemoteAddress)
@@ -158,33 +159,19 @@ type config struct {
 }
 
 func readConfig() config {
-	c := config{}
+	var c config
 	if _, err := os.Stat("config.toml"); os.IsNotExist(err) {
-		f, err := os.Create("config.toml")
-		if err != nil {
+		if err := gophig.SetConfComplex("./config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
 			log.Fatalf("error creating config: %v", err)
 		}
-		data, err := toml.Marshal(c)
-		if err != nil {
-			log.Fatalf("error encoding default config: %v", err)
-		}
-		if _, err := f.Write(data); err != nil {
-			log.Fatalf("error writing encoded default config: %v", err)
-		}
-		_ = f.Close()
 	}
-	data, err := ioutil.ReadFile("config.toml")
-	if err != nil {
+	if err := gophig.GetConfComplex("./config.toml", gophig.TOMLMarshaler{}, &c); err != nil {
 		log.Fatalf("error reading config: %v", err)
-	}
-	if err := toml.Unmarshal(data, &c); err != nil {
-		log.Fatalf("error decoding config: %v", err)
 	}
 	if c.Connection.LocalAddress == "" {
 		c.Connection.LocalAddress = "0.0.0.0:19132"
 	}
-	data, _ = toml.Marshal(c)
-	if err := ioutil.WriteFile("config.toml", data, 0644); err != nil {
+	if err := gophig.SetConfComplex("./config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
 		log.Fatalf("error writing config file: %v", err)
 	}
 	return c
