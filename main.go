@@ -24,7 +24,6 @@ import (
 
 func main() {
 	config := readConfig()
-	fmt.Println(config)
 	src := tokenSource()
 
 	p, err := minecraft.NewForeignStatusProvider(config.Connection.RemoteAddress)
@@ -164,17 +163,17 @@ type config struct {
 func readConfig() config {
 	var c config
 	if _, err := os.Stat("config.toml"); os.IsNotExist(err) {
-		if err := gophig.SetConfComplex("./config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
+		if err := gophig.SetConfComplex("config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
 			log.Fatalf("error creating config: %v", err)
 		}
 	}
-	if err := gophig.GetConfComplex("./config.toml", gophig.TOMLMarshaler{}, &c); err != nil {
+	if err := gophig.GetConfComplex("config.toml", gophig.TOMLMarshaler{}, &c); err != nil {
 		log.Fatalf("error reading config: %v", err)
 	}
 	if c.Connection.LocalAddress == "" {
 		c.Connection.LocalAddress = "0.0.0.0:19132"
 	}
-	if err := gophig.SetConfComplex("./config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
+	if err := gophig.SetConfComplex("config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
 		log.Fatalf("error writing config file: %v", err)
 	}
 	return c
