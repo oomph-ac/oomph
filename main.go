@@ -7,9 +7,7 @@ import (
 	"github.com/RestartFU/gophig"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/justtaldevelops/oomph/util"
-	"github.com/justtaldevelops/oomph/virtual"
+	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -55,6 +53,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 	if err != nil {
 		panic(err)
 	}
+
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
@@ -76,16 +75,9 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 	lg.Level = logrus.InfoLevel
 
 	viewDistance := int32(8)
+	p := player.NewPlayer(lg, world.Overworld, viewDistance, conn, serverConn)
 
-	data := conn.GameData()
-	rid := data.EntityRuntimeID
-	pos := util.Vec32To64(data.PlayerPosition)
-
-	w := virtual.NewWorld(lg, world.Overworld)
-	p := virtual.NewPlayer(w, viewDistance, pos, conn)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
+	g.Add(2)
 	go func() {
 		defer listener.Disconnect(conn, "connection lost")
 		defer serverConn.Close()
@@ -95,14 +87,14 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 				return
 			}
 			switch pk := pk.(type) {
-			case *packet.PlayerAuthInput:
-				p.Move(util.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Position()))
 			case *packet.Text:
 				if strings.HasPrefix(pk.Message, "blockunder") {
-					conn.WritePacket(&packet.Text{Message: fmt.Sprintf("You are standing on: %T", w.Block(cube.PosFromVec3(p.Position()).Side(cube.FaceDown)))})
+					conn.WritePacket(&packet.Text{Message: fmt.Sprintf("%v", p.Tick())})
+					conn.WritePacket(&packet.Text{Message: fmt.Sprintf("You are standing on: %T", p.Block(cube.PosFromVec3(p.Position()).Side(cube.FaceDown)))})
 					continue
 				}
 			}
+			p.Process(pk, conn)
 			if err := serverConn.WritePacket(pk); err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					_ = listener.Disconnect(conn, disconnect.Error())
@@ -110,7 +102,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 				return
 			}
 		}
-		wg.Done()
+		g.Done()
 	}()
 	go func() {
 		defer serverConn.Close()
@@ -123,33 +115,14 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 				}
 				return
 			}
-			switch pk := pk.(type) {
-			case *packet.MoveActorAbsolute:
-				if pk.EntityRuntimeID == rid {
-					p.Move(util.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Position()))
-				}
-			case *packet.MovePlayer:
-				if pk.EntityRuntimeID == rid {
-					p.Move(util.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Position()))
-				}
-			case *packet.LevelChunk:
-				chunkPos := world.ChunkPos{pk.ChunkX, pk.ChunkZ}
-				if !w.OutOfBounds(chunkPos, p.ChunkPos(), viewDistance) {
-					w.LoadRawChunk(chunkPos, pk.RawPayload, pk.SubChunkCount)
-				}
-			case *packet.UpdateBlock:
-				block, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
-				if ok {
-					w.SetBlock(util.CubePosFromProtocolBlockPos(pk.Position), block)
-				}
-			}
+			p.Process(pk, serverConn)
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}
 		}
-		wg.Done()
+		g.Done()
 	}()
-	wg.Wait()
+	g.Wait()
 	p.Close()
 }
 
