@@ -9,7 +9,7 @@ type Check interface {
 	Description() string
 	// Punishment will return the type of punishment to be issued.
 	Punishment() Punishment
-	// Violations will return the max violations before a punishment is issued.
+	// Violations will return the max violations allowed before a punishment is issued.
 	Violations() uint32
 	// Process will process the packet provided for the check.
 	Process(pk packet.Packet)
