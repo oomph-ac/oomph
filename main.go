@@ -138,7 +138,10 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 					w.LoadRawChunk(chunkPos, pk.RawPayload, pk.SubChunkCount)
 				}
 			case *packet.UpdateBlock:
-				w.SetBlockDirect(util.CubePosFromProtocolBlockPos(pk.Position), pk.NewBlockRuntimeID)
+				block, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
+				if ok {
+					w.SetBlock(util.CubePosFromProtocolBlockPos(pk.Position), block)
+				}
 			}
 			if err := conn.WritePacket(pk); err != nil {
 				return
