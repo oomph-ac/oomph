@@ -1,2 +1,2 @@
-# oomph
-the gophertunnel anticheat you didn't know you wanted
+# Oomph on top!
+## Oomph is heavily influenced by [Esoteric](https://github.com/ethaniccc/Esoteric). Thank you, ethaniccc for providing us with this!
