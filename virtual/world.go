@@ -108,15 +108,6 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 		return
 	}
 
-	w.SetBlockDirect(pos, rid)
-}
-
-// SetBlockDirect is similar to SetBlock, but allows direct altering of runtime IDs.
-func (w *World) SetBlockDirect(pos cube.Pos, rid uint32) {
-	if w == nil || pos.OutOfBounds(w.dimension.Range()) {
-		return
-	}
-
 	c, ok := w.Chunk(world.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if !ok {
 		w.log.Errorf("failed to query chunk at %v", pos)
