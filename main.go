@@ -44,20 +44,20 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 		ClientData:   conn.ClientData(),
 	}.Dial("raknet", config.Connection.RemoteAddress)
 	if err != nil {
-		panic(err)
+		return
 	}
 
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
 		if err := conn.StartGame(serverConn.GameData()); err != nil {
-			panic(err)
+			return
 		}
 		g.Done()
 	}()
 	go func() {
 		if err := serverConn.DoSpawn(); err != nil {
-			panic(err)
+			return
 		}
 		g.Done()
 	}()
