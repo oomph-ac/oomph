@@ -3,20 +3,16 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/RestartFU/gophig"
-	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 	"sync"
 )
 
@@ -85,14 +81,6 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 			pk, err := conn.ReadPacket()
 			if err != nil {
 				return
-			}
-			switch pk := pk.(type) {
-			case *packet.Text:
-				if strings.HasPrefix(pk.Message, "blockunder") {
-					conn.WritePacket(&packet.Text{Message: fmt.Sprintf("%v", p.Tick())})
-					conn.WritePacket(&packet.Text{Message: fmt.Sprintf("You are standing on: %T", p.Block(cube.PosFromVec3(p.Position()).Side(cube.FaceDown)))})
-					continue
-				}
 			}
 			p.Process(pk, conn)
 			if err := serverConn.WritePacket(pk); err != nil {
