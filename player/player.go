@@ -62,6 +62,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		chunks:    make(map[world.ChunkPos]*chunk.Chunk),
 		dimension: dimension,
 
+		entities: make(map[uint64]entity.Location),
+
 		ticker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
 			&check.AimAssistA{},

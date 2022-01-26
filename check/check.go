@@ -47,7 +47,7 @@ type check struct {
 }
 
 // TrackViolation ...
-func (t check) TrackViolation() {
+func (t *check) TrackViolation() {
 	t.violations++
 }
 
