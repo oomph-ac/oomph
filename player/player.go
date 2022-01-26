@@ -179,7 +179,7 @@ func (p *Player) Flag(check check.Check, params ...map[string]interface{}) {
 	check.TrackViolation()
 	if now, max := check.Violations(), check.MaxViolations(); now > max {
 		// TODO: Event handlers.
-		p.Disconnect(fmt.Sprintf("§c§lYou were banned by §6oomph§c for the reason: §6%s%s", name, variant))
+		p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
 	}
 
 	p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, prettyParams(params))
