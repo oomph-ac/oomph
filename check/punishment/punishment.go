@@ -1,5 +1,6 @@
 package punishment
 
+// Punishment specifies a variant of punishment that should be carried out for a detection.
 type Punishment struct {
 	punishment
 }

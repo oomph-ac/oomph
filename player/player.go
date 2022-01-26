@@ -8,6 +8,8 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/check"
+	"github.com/justtaldevelops/oomph/entity"
+	"github.com/justtaldevelops/oomph/omath"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -32,11 +34,14 @@ type Player struct {
 
 	acknowledgements map[int64]func()
 
-	pos       atomic.Value
+	loc       atomic.Value
 	dimension world.Dimension
 
 	ticker *time.Ticker
 	tick   uint64
+
+	entityMu sync.Mutex
+	entities map[uint64]entity.Location
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -62,26 +67,43 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			&check.TimerA{},
 		},
 	}
-	p.pos.Store(vec32to64(data.PlayerPosition))
+	p.loc.Store(entity.Location{
+		Position: omath.Vec32To64(data.PlayerPosition),
+		Rotation: omath.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
+	})
 	go p.startTicking()
 	return p
 }
 
 // Move moves the player to the given position.
 func (p *Player) Move(pos mgl64.Vec3) {
-	p.pos.Store(p.Position().Add(pos))
+	loc := p.Location()
+	loc.LastPosition = loc.Position
+	loc.Position = loc.Position.Add(pos)
+	p.loc.Store(loc)
+
 	p.cleanCache()
 }
 
-// Position returns the current position of the player.
-func (p *Player) Position() mgl64.Vec3 {
-	return p.pos.Load().(mgl64.Vec3)
+// MoveActor moves an actor to the given position.
+func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
+	loc, ok := p.EntityLocation(rid)
+	if ok {
+		loc.LastPosition = loc.Position
+		loc.Position = loc.Position.Add(pos)
+		p.UpdateLocation(rid, loc)
+	}
+}
+
+// Location returns the current location of the player.
+func (p *Player) Location() entity.Location {
+	return p.loc.Load().(entity.Location)
 }
 
 // ChunkPosition returns the chunk position of the player.
 func (p *Player) ChunkPosition() world.ChunkPos {
-	pos := p.Position()
-	return world.ChunkPos{int32(math.Floor(pos[0])) >> 4, int32(math.Floor(pos[2])) >> 4}
+	loc := p.Location()
+	return world.ChunkPos{int32(math.Floor(loc.Position[0])) >> 4, int32(math.Floor(loc.Position[2])) >> 4}
 }
 
 // Tick returns the current tick of the player.
@@ -108,7 +130,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 				f()
 			}
 		case *packet.PlayerAuthInput:
-			p.Move(vec32to64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Position()))
+			p.Move(omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position))
 		}
 
 		// Run all registered checks.
@@ -119,14 +141,19 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 		p.checkMu.Unlock()
 	case p.serverConn:
 		switch pk := pk.(type) {
+		case *packet.AddPlayer:
+			p.UpdateLocation(pk.EntityRuntimeID, entity.Location{
+				Position: omath.Vec32To64(pk.Position),
+				Rotation: omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
+			})
 		case *packet.MoveActorAbsolute:
-			if pk.EntityRuntimeID == p.rid {
-				p.Move(vec32to64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Position()))
+			rid := pk.EntityRuntimeID
+			pos := omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position)
+			if rid == p.rid {
+				p.Move(pos)
+				return
 			}
-		case *packet.MovePlayer:
-			if pk.EntityRuntimeID == p.rid {
-				p.Move(vec32to64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Position()))
-			}
+			p.MoveActor(rid, pos)
 		case *packet.LevelChunk:
 			p.LoadRawChunk(world.ChunkPos{pk.ChunkX, pk.ChunkZ}, pk.RawPayload, pk.SubChunkCount)
 		case *packet.UpdateBlock:
@@ -147,11 +174,13 @@ func (p *Player) Debug(check check.Check, params ...map[string]interface{}) {
 // Flag flags the given check data to the console and other relevant sources.
 func (p *Player) Flag(check check.Check, params ...map[string]interface{}) {
 	name, variant := check.Name()
-	p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, prettyParams(params))
-	if now, max := check.Track(); now > max {
+	check.TrackViolation()
+	if now, max := check.Violations(), check.MaxViolations(); now > max {
 		// TODO: Event handlers.
 		p.Disconnect(fmt.Sprintf("§c§lYou were banned by §6oomph§c for the reason: §6%s%s", name, variant))
 	}
+
+	p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, prettyParams(params))
 }
 
 // Name ...
@@ -196,11 +225,6 @@ func prettyParams(params []map[string]interface{}) string {
 	}
 	// Hacky but simple way to create a readable string.
 	return strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(fmt.Sprint(params[0]), "map"), " ", ", "), ":", "=")
-}
-
-// vec32to64 converts a mgl32.Vec3 to a mgl64.Vec3.
-func vec32to64(vec3 mgl32.Vec3) mgl64.Vec3 {
-	return mgl64.Vec3{float64(vec3[0]), float64(vec3[1]), float64(vec3[2])}
 }
 
 // protocolPosToCubePos converts a protocol.BlockPos to a cube.Pos.
