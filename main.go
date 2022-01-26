@@ -27,7 +27,7 @@ func main() {
 		panic(err)
 	}
 	defer listener.Close()
-	fmt.Printf("Oomph is now running on port %v and directing connections to port %v!", config.Connection.LocalAddress, config.Connection.RemoteAddress)
+	fmt.Printf("Oomph is now listening on port %v and directing connections to port %v!\n", config.Connection.LocalAddress, config.Connection.RemoteAddress)
 	for {
 		c, err := listener.Accept()
 		if err != nil {
