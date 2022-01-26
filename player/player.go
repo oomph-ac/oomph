@@ -66,7 +66,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		checks: []check.Check{
 			&check.AimAssistA{},
 			&check.TimerA{},
-			&check.AimAssistA{},
 		},
 	}
 	p.loc.Store(entity.Location{
