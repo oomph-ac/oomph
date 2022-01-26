@@ -1,16 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/RestartFU/gophig"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	"io/ioutil"
 	"log"
 	"os"
 	"sync"
@@ -18,7 +15,6 @@ import (
 
 func main() {
 	config := readConfig()
-	src := tokenSource()
 
 	p, err := minecraft.NewForeignStatusProvider(config.Connection.RemoteAddress)
 	if err != nil {
@@ -31,20 +27,21 @@ func main() {
 		panic(err)
 	}
 	defer listener.Close()
+	fmt.Printf("Oomph is now running on port %v and directing connections to port %v!", config.Connection.LocalAddress, config.Connection.RemoteAddress)
 	for {
 		c, err := listener.Accept()
 		if err != nil {
 			panic(err)
 		}
-		go handleConn(c.(*minecraft.Conn), listener, config, src)
+		go handleConn(c.(*minecraft.Conn), listener, config)
 	}
 }
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
-func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config config, src oauth2.TokenSource) {
+func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config config) {
 	serverConn, err := minecraft.Dialer{
-		TokenSource: src,
-		ClientData:  conn.ClientData(),
+		IdentityData: conn.IdentityData(),
+		ClientData:   conn.ClientData(),
 	}.Dial("raknet", config.Connection.RemoteAddress)
 	if err != nil {
 		panic(err)
@@ -134,39 +131,11 @@ func readConfig() config {
 	if c.Connection.LocalAddress == "" {
 		c.Connection.LocalAddress = "0.0.0.0:19132"
 	}
+	if c.Connection.RemoteAddress == "" {
+		c.Connection.RemoteAddress = "0.0.0.0:19133"
+	}
 	if err := gophig.SetConfComplex("config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
 		log.Fatalf("error writing config file: %v", err)
 	}
 	return c
-}
-
-// tokenSource returns a token source for using with a gophertunnel client. It either reads it from the
-// token.tok file if cached or requests logging in with a device code.
-func tokenSource() oauth2.TokenSource {
-	check := func(err error) {
-		if err != nil {
-			panic(err)
-		}
-	}
-	token := new(oauth2.Token)
-	tokenData, err := ioutil.ReadFile("token.tok")
-	if err == nil {
-		_ = json.Unmarshal(tokenData, token)
-	} else {
-		token, err = auth.RequestLiveToken()
-		check(err)
-	}
-	src := auth.RefreshTokenSource(token)
-	_, err = src.Token()
-	if err != nil {
-		// The cached refresh token expired and can no longer be used to obtain a new token. We require the
-		// user to log in again and use that token instead.
-		token, err = auth.RequestLiveToken()
-		check(err)
-		src = auth.RefreshTokenSource(token)
-	}
-	tok, _ := src.Token()
-	b, _ := json.Marshal(tok)
-	_ = ioutil.WriteFile("token.tok", b, 0644)
-	return src
 }
