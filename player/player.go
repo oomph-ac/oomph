@@ -64,9 +64,9 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 		ticker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
-			&check.TimerA{},
 			&check.AimAssistA{},
 			&check.KillAuraA{},
+			&check.TimerA{},
 		},
 	}
 	p.loc.Store(entity.Location{
