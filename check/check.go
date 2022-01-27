@@ -13,9 +13,9 @@ type Processor interface {
 
 	// Location returns the current location of the processor.
 	Location() entity.Location
-	// EntityLocation queries the processor for the location of entity, using the runtime ID specified. The second
+	// Entity queries the processor for an entity, using the runtime ID specified. The second
 	// return value is false if the entity is not loaded inside the processor's memory.
-	EntityLocation(rid uint64) (entity.Location, bool)
+	Entity(rid uint64) (entity.Entity, bool)
 
 	// Debug debugs the given parameters to the processor.
 	Debug(check Check, params ...map[string]interface{})

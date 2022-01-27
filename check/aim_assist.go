@@ -54,13 +54,13 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 		}
 	case *packet.PlayerAuthInput:
 		if a.waiting {
-			if loc, ok := processor.EntityLocation(a.target); ok {
+			if e, ok := processor.Entity(a.target); ok {
 				selfLoc := processor.Location()
 				yawDiff := math.Mod(selfLoc.Rotation.Y()-selfLoc.LastRotation.Y(), 180)
 				if yawDiff >= 180 {
 					yawDiff = 180 - math.Mod(yawDiff, 180)
 				}
-				xDist, zDist := loc.LastPosition.X()-a.attackPos.X(), loc.LastPosition.Z()-a.attackPos.Z()
+				xDist, zDist := e.LastPosition.X()-a.attackPos.X(), e.LastPosition.Z()-a.attackPos.Z()
 				botYaw := math.Mod(math.Atan2(zDist, xDist)/math.Pi*180-90, 180)
 				botDiff := botYaw - selfLoc.LastRotation.Y()
 				if botDiff >= 180 {

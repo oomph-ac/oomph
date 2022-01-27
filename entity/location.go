@@ -1,6 +1,8 @@
 package entity
 
-import "github.com/go-gl/mathgl/mgl64"
+import (
+	"github.com/go-gl/mathgl/mgl64"
+)
 
 // Location represents a location of an entity.
 type Location struct {
