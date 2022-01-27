@@ -49,13 +49,13 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 			s := processor.Session()
 			if s.Gamemode != 1 {
 				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok {
+					var add float32 = 1.54
+					if !s.HasFlag(session.FlagSneaking) {
+						add = 1.62
+					}
+					r.attackedEntity = data.TargetEntityRuntimeID
+					r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
 					if r.inputMode == packet.InputModeTouch {
-						var add float32 = 1.54
-						if !s.HasFlag(session.FlagSneaking) {
-							add = 1.62
-						}
-						r.attackedEntity = data.TargetEntityRuntimeID
-						r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
 						dist := omath.AABBVectorDistance(t.AABB, omath.Vec32To64(r.attackPos))
 						processor.Debug(r, map[string]interface{}{"dist": dist})
 						if dist > 3.1 {
