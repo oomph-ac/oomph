@@ -36,11 +36,13 @@ func (*KillAuraA) Punishment() punishment.Punishment {
 func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.Animate:
-		tickDiff := processor.Tick() - k.lastSwingTick
-		if tickDiff != 0 && tickDiff < 4 {
-			processor.Flag(k, map[string]interface{}{"tickDiff": tickDiff})
+		if pk.ActionType == packet.AnimateActionSwingArm {
+			tickDiff := processor.Tick() - k.lastSwingTick
+			if tickDiff != 0 && tickDiff < 4 {
+				processor.Flag(k, map[string]interface{}{"tickDiff": tickDiff})
+			}
+			k.lastSwingTick = processor.Tick()
 		}
-		k.lastSwingTick = processor.Tick()
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			tickDiff := processor.Tick() - k.lastSwingTick
