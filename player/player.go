@@ -77,6 +77,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			&check.AimAssistA{},
 			&check.KillAuraA{}, &check.KillAuraB{Entities: make(map[uint64]entity.Entity)},
 			&check.TimerA{},
+			&check.ReachA{},
 		},
 	}
 	p.s.Store(&session.Session{})
