@@ -15,4 +15,7 @@ type Location struct {
 	Rotation mgl64.Vec3
 	// LastRotation is the rotation that the entity was in right before Rotation was updated.
 	LastRotation mgl64.Vec3
+	// TODO: docs
+	TeleportTicks            uint32
+	NewPosRotationIncrements uint32
 }
