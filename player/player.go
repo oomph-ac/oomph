@@ -11,6 +11,7 @@ import (
 	"github.com/justtaldevelops/oomph/check"
 	"github.com/justtaldevelops/oomph/entity"
 	"github.com/justtaldevelops/oomph/omath"
+	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -35,11 +36,13 @@ type Player struct {
 
 	acknowledgements map[int64]func()
 
-	entityData atomic.Value
-	dimension  world.Dimension
+	dimension world.Dimension
 
 	ticker *time.Ticker
 	tick   uint64
+
+	// s holds the session of the player.
+	s atomic.Value
 
 	entityMu sync.Mutex
 	entities map[uint64]entity.Entity
@@ -76,7 +79,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			&check.TimerA{},
 		},
 	}
-	p.entityData.Store(entity.Entity{
+	p.s.Store(&session.Session{})
+	p.Session().EntityData.Store(entity.Entity{
 		Location: entity.Location{
 			Position: omath.Vec32To64(data.PlayerPosition),
 			Rotation: omath.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
@@ -88,10 +92,10 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 // Move moves the player to the given position.
 func (p *Player) Move(pos mgl64.Vec3) {
-	data := p.EntityData()
+	data := p.Session().GetEntityData()
 	data.LastPosition = data.Position
 	data.Position = data.Position.Add(pos)
-	p.entityData.Store(data)
+	p.Session().EntityData.Store(data)
 
 	p.cleanCache()
 }
@@ -106,14 +110,9 @@ func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
 	}
 }
 
-// EntityData returns the entity data of the player.
-func (p *Player) EntityData() entity.Entity {
-	return p.entityData.Load().(entity.Entity)
-}
-
 // Location returns the current location of the player.
 func (p *Player) Location() entity.Location {
-	return p.EntityData().Location
+	return p.Session().GetEntityData().Location
 }
 
 // ChunkPosition returns the chunk position of the player.
@@ -130,6 +129,11 @@ func (p *Player) Immobile() bool {
 // Tick returns the current tick of the player.
 func (p *Player) Tick() uint64 {
 	return p.tick
+}
+
+// Session returns the session assigned to the player.
+func (p *Player) Session() *session.Session {
+	return p.s.Load().(*session.Session)
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
@@ -152,6 +156,12 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 		case *packet.PlayerAuthInput:
 			p.Move(omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position))
+			hasFlag := func(flag uint64) bool {
+				return pk.InputData&flag != 0
+			}
+			if (hasFlag(packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (hasFlag(packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
+				p.Session().SetFlag(session.FlagSneaking)
+			}
 		}
 
 		// Run all registered checks.
@@ -197,10 +207,10 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
 						height = float64(f.(float32))
 					}
-					data := p.EntityData()
+					data := p.Session().GetEntityData()
 					pos := data.Position
 					data.AABB = physics.NewAABB(pos.Sub(mgl64.Vec3{width, height, width}), pos.Add(mgl64.Vec3{width, height, width}))
-					p.entityData.Store(data)
+					p.Session().EntityData.Store(data)
 					if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
 						p.immobile.Store(hasFlag(entity.DataFlagImmobile, f.(int64)))
 					}
@@ -218,6 +228,14 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 					p.UpdateEntity(pk.EntityRuntimeID, e)
 				}
 			}
+		case *packet.StartGame:
+			p.Acknowledgement(func() {
+				p.Session().Gamemode = pk.WorldGameMode
+			})
+		case *packet.SetPlayerGameType:
+			p.Acknowledgement(func() {
+				p.Session().Gamemode = pk.GameType
+			})
 		}
 	}
 }
@@ -232,7 +250,7 @@ func (p *Player) Debug(check check.Check, params ...map[string]interface{}) {
 func (p *Player) Flag(check check.Check, params ...map[string]interface{}) {
 	name, variant := check.Name()
 	check.TrackViolation()
-	if now, max := check.Violations(), check.MaxViolations(); now > max {
+	if now, max := check.Violations(), check.MaxViolations(); now > float64(max) {
 		// TODO: Event handlers.
 		p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
 	}
