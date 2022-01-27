@@ -13,7 +13,7 @@ func (p *Player) Entity(rid uint64) (entity.Entity, bool) {
 	return e, true
 }
 
-// UpdateEntity updates an entity using the runtime ID and the provided new location.
+// UpdateEntity updates an entity using the runtime ID and the provided new entity data.
 func (p *Player) UpdateEntity(rid uint64, e entity.Entity) {
 	p.entityMu.Lock()
 	defer p.entityMu.Unlock()
