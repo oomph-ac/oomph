@@ -37,10 +37,6 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.Animate:
 		if pk.ActionType == packet.AnimateActionSwingArm {
-			tickDiff := processor.Tick() - k.lastSwingTick
-			if tickDiff != 0 && tickDiff < 4 {
-				processor.Flag(k, map[string]interface{}{"tickDiff": tickDiff})
-			}
 			k.lastSwingTick = processor.Tick()
 		}
 	case *packet.InventoryTransaction:
