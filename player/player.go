@@ -187,7 +187,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 		case *packet.SetActorData:
 			if pk.EntityRuntimeID == p.rid {
 				p.Acknowledgement(func() {
-					hasFlag := func(flag uint32, data int) bool {
+					hasFlag := func(flag uint32, data int64) bool {
 						return (data & (1 << (flag % 64))) > 0
 					}
 					var width, height float64
@@ -202,7 +202,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 					data.AABB = physics.NewAABB(pos.Sub(mgl64.Vec3{width, height, width}), pos.Add(mgl64.Vec3{width, height, width}))
 					p.entityData.Store(data)
 					if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
-						p.immobile.Store(hasFlag(entity.DataFlagImmobile, f.(int)))
+						p.immobile.Store(hasFlag(entity.DataFlagImmobile, f.(int64)))
 					}
 				})
 			} else {
