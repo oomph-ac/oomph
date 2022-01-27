@@ -4,12 +4,12 @@ go 1.17
 
 require (
 	github.com/RestartFU/gophig v0.0.0-20220114004832-105ae125b823
+	github.com/davecgh/go-spew v1.1.1
 	github.com/df-mc/dragonfly v0.5.1
 	github.com/go-gl/mathgl v1.0.0
 	github.com/sandertv/gophertunnel v1.18.1
 	github.com/sirupsen/logrus v1.8.1
 	go.uber.org/atomic v1.9.0
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 )
 
 require (
@@ -23,6 +23,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
 	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
 	golang.org/x/net v0.0.0-20210716203947-853a461950ff // indirect
+	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
 	golang.org/x/text v0.3.6 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

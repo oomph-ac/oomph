@@ -3,6 +3,7 @@ package player
 import (
 	"fmt"
 	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
@@ -34,17 +35,19 @@ type Player struct {
 
 	acknowledgements map[int64]func()
 
-	loc       atomic.Value
-	dimension world.Dimension
+	entityData atomic.Value
+	dimension  world.Dimension
 
 	ticker *time.Ticker
 	tick   uint64
 
 	entityMu sync.Mutex
-	entities map[uint64]entity.Location
+	entities map[uint64]entity.Entity
 
 	checkMu sync.Mutex
 	checks  []check.Check
+
+	immobile atomic.Bool
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
@@ -62,18 +65,22 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		chunks:    make(map[world.ChunkPos]*chunk.Chunk),
 		dimension: dimension,
 
-		entities: make(map[uint64]entity.Location),
+		acknowledgements: make(map[int64]func()),
+
+		entities: make(map[uint64]entity.Entity),
 
 		ticker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
 			&check.AimAssistA{},
-			&check.KillAuraA{},
+			&check.KillAuraA{}, &check.KillAuraB{},
 			&check.TimerA{},
 		},
 	}
-	p.loc.Store(entity.Location{
-		Position: omath.Vec32To64(data.PlayerPosition),
-		Rotation: omath.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
+	p.entityData.Store(entity.Entity{
+		Location: entity.Location{
+			Position: omath.Vec32To64(data.PlayerPosition),
+			Rotation: omath.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
+		},
 	})
 	go p.startTicking()
 	return p
@@ -81,33 +88,43 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 // Move moves the player to the given position.
 func (p *Player) Move(pos mgl64.Vec3) {
-	loc := p.Location()
-	loc.LastPosition = loc.Position
-	loc.Position = loc.Position.Add(pos)
-	p.loc.Store(loc)
+	data := p.EntityData()
+	data.LastPosition = data.Position
+	data.Position = data.Position.Add(pos)
+	p.entityData.Store(data)
 
 	p.cleanCache()
 }
 
 // MoveActor moves an actor to the given position.
 func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
-	loc, ok := p.EntityLocation(rid)
+	e, ok := p.Entity(rid)
 	if ok {
-		loc.LastPosition = loc.Position
-		loc.Position = loc.Position.Add(pos)
-		p.UpdateLocation(rid, loc)
+		e.LastPosition = e.Position
+		e.Position = e.Position.Add(pos)
+		p.UpdateEntity(rid, e)
 	}
+}
+
+// EntityData returns the entity data of the player.
+func (p *Player) EntityData() entity.Entity {
+	return p.entityData.Load().(entity.Entity)
 }
 
 // Location returns the current location of the player.
 func (p *Player) Location() entity.Location {
-	return p.loc.Load().(entity.Location)
+	return p.EntityData().Location
 }
 
 // ChunkPosition returns the chunk position of the player.
 func (p *Player) ChunkPosition() world.ChunkPos {
 	loc := p.Location()
 	return world.ChunkPos{int32(math.Floor(loc.Position[0])) >> 4, int32(math.Floor(loc.Position[2])) >> 4}
+}
+
+// Immobile returns whether the player is immobile.
+func (p *Player) Immobile() bool {
+	return p.immobile.Load()
 }
 
 // Tick returns the current tick of the player.
@@ -146,9 +163,11 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 	case p.serverConn:
 		switch pk := pk.(type) {
 		case *packet.AddPlayer:
-			p.UpdateLocation(pk.EntityRuntimeID, entity.Location{
-				Position: omath.Vec32To64(pk.Position),
-				Rotation: omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
+			p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
+				Location: entity.Location{
+					Position: omath.Vec32To64(pk.Position),
+					Rotation: omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
+				},
 			})
 		case *packet.MoveActorAbsolute:
 			rid := pk.EntityRuntimeID
@@ -164,6 +183,40 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			block, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 			if ok {
 				p.SetBlock(protocolPosToCubePos(pk.Position), block)
+			}
+		case *packet.SetActorData:
+			if pk.EntityRuntimeID == p.rid {
+				p.Acknowledgement(func() {
+					hasFlag := func(flag uint32, data int) bool {
+						return (data & (1 << (flag % 64))) > 0
+					}
+					var width, height float64
+					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
+						width = float64(f.(float32)) / 2
+					}
+					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
+						height = float64(f.(float32))
+					}
+					data := p.EntityData()
+					pos := data.Position
+					data.AABB = physics.NewAABB(pos.Sub(mgl64.Vec3{width, height, width}), pos.Add(mgl64.Vec3{width, height, width}))
+					p.entityData.Store(data)
+					if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
+						p.immobile.Store(hasFlag(entity.DataFlagImmobile, f.(int)))
+					}
+				})
+			} else {
+				if e, ok := p.Entity(pk.EntityRuntimeID); ok {
+					var width, height float64
+					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
+						width = float64(f.(float32)) / 2
+					}
+					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
+						height = float64(f.(float32))
+					}
+					e.AABB = physics.NewAABB(e.Position.Sub(mgl64.Vec3{width, height, width}), e.Position.Add(mgl64.Vec3{width, height, width}))
+					p.UpdateEntity(pk.EntityRuntimeID, e)
+				}
 			}
 		}
 	}
