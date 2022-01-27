@@ -12,7 +12,7 @@ import (
 // KillAuraB checks if a player is attacking too many entities at once.
 type KillAuraB struct {
 	check
-	entities map[uint64]entity.Entity
+	Entities map[uint64]entity.Entity
 }
 
 // Name ...
@@ -41,23 +41,23 @@ func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			if e, ok := processor.Entity(data.TargetEntityRuntimeID); ok {
-				k.entities[data.TargetEntityRuntimeID] = e
+				k.Entities[data.TargetEntityRuntimeID] = e
 			}
 		}
 	case *packet.PlayerAuthInput:
-		if len(k.entities) > 1 {
+		if len(k.Entities) > 1 {
 			var minDist float64 = 69420
-			for id, data := range k.entities {
-				for subId, subData := range k.entities {
+			for id, data := range k.Entities {
+				for subId, subData := range k.Entities {
 					if subId != id {
 						minDist = math.Min(minDist, omath.AABBVectorDistance(data.AABB, subData.LastPosition))
 					}
 				}
 			}
 			if minDist != 69420 && minDist > 1.5 {
-				processor.Flag(k, map[string]interface{}{"mD": omath.Round(minDist, 2), "entities": len(k.entities)})
+				processor.Flag(k, map[string]interface{}{"mD": omath.Round(minDist, 2), "entities": len(k.Entities)})
 			}
 		}
-		k.entities = map[uint64]entity.Entity{}
+		k.Entities = map[uint64]entity.Entity{}
 	}
 }
