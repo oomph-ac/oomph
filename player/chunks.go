@@ -36,10 +36,12 @@ func (p *Player) UnloadChunk(pos world.ChunkPos) {
 // Chunk attempts to return a chunk in the player's memory. If it does not exist, the second return value will be false.
 func (p *Player) Chunk(pos world.ChunkPos) (*chunk.Chunk, bool) {
 	p.chunkMu.Lock()
-	c, ok := p.chunks[pos]
-	c.Lock()
-	p.chunkMu.Unlock()
-	return c, ok
+	defer p.chunkMu.Unlock()
+	if c, ok := p.chunks[pos]; ok {
+		c.Lock()
+		return c, ok
+	}
+	return nil, false
 }
 
 // Block reads a block from the position passed. If a chunk is not yet loaded at that position, it will return air.
