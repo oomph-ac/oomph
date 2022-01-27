@@ -42,9 +42,9 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			tickDiff := processor.Tick() - k.lastSwingTick
-			processor.Debug(k, map[string]interface{}{"tickDiff (transpacket)": tickDiff})
+			processor.Debug(k, map[string]interface{}{"tickDiff": tickDiff})
 			if tickDiff > 4 {
-				processor.Flag(k, map[string]interface{}{"tickDiff (transpacket)": tickDiff})
+				processor.Flag(k, map[string]interface{}{"tickDiff": tickDiff})
 			}
 		}
 	}
