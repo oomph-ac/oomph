@@ -78,6 +78,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			&check.KillAuraA{}, &check.KillAuraB{Entities: make(map[uint64]entity.Entity)},
 			&check.TimerA{},
 			&check.ReachA{},
+			&check.AutoclickerA{}, &check.AutoclickerB{}, &check.AutoclickerC{}, &check.AutoclickerD{},
 		},
 	}
 	p.s.Store(&session.Session{})
@@ -162,6 +163,14 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 			if (hasFlag(packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (hasFlag(packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
 				p.Session().SetFlag(session.FlagSneaking)
+			}
+		case *packet.LevelSoundEvent:
+			if pk.SoundType == packet.SoundEventAttackNoDamage {
+				p.Session().Click(p.Tick())
+			}
+		case *packet.InventoryTransaction:
+			if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+				p.Session().Click(p.Tick())
 			}
 		}
 

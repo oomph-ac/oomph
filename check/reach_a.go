@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
@@ -81,6 +82,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				aabb := t.AABB.Extend(mgl64.Vec3{0.1, 0.1, 0.1})
 				if !aabb.IntersectsWith(processor.Session().GetEntityData().AABB) {
 					vec64AttackPos := omath.Vec32To64(r.attackPos)
+					spew.Dump(processor.Location().Position, t.Position)
 					if raycast, ok := trace.AABBIntercept(aabb, vec64AttackPos, vec64AttackPos.Add(dv.Mul(20))); ok {
 						dist := omath.AABBVectorDistance(raycast.AABB(), vec64AttackPos)
 						processor.Debug(r, map[string]interface{}{"raycast": dist})
@@ -95,7 +97,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 					}
 				}
 			}
-			r.awaitingTick = true
+			r.awaitingTick = false
 		}
 	}
 }
