@@ -10,7 +10,7 @@ import (
 // AutoclickerC checks for an irregular clicking pattern using statistics.
 type AutoclickerC struct {
 	check
-	samples []uint64
+	samples []float64
 }
 
 // Name ...
@@ -36,13 +36,10 @@ func (*AutoclickerC) Punishment() punishment.Punishment {
 // Process ...
 func (a *AutoclickerC) Process(processor Processor, _ packet.Packet) {
 	if processor.Session().HasFlag(session.FlagClicking) {
+		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
 		if len(a.samples) == 20 {
 			cps := processor.Session().CPS()
-			var samples []float64
-			for _, sample := range a.samples {
-				samples = append(samples, float64(sample))
-			}
-			deviation, skewness := omath.StandardDeviation(samples), omath.Skewness(samples)
+			deviation, skewness := omath.StandardDeviation(a.samples), omath.Skewness(a.samples)
 			processor.Debug(a, map[string]interface{}{"deviation": deviation, "skewness": skewness, "cps": cps})
 			if deviation <= 20 && (skewness > 1 || skewness == 0.0) && cps >= 9 {
 				var e float64
@@ -57,7 +54,7 @@ func (a *AutoclickerC) Process(processor Processor, _ packet.Packet) {
 			} else {
 				a.buffer = 0
 			}
-			a.samples = []uint64{}
+			a.samples = []float64{}
 		}
 	}
 }

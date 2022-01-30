@@ -10,7 +10,7 @@ import (
 // AutoclickerD checks if a user has a constant and low standard deviation in their click data.
 type AutoclickerD struct {
 	check
-	samples []uint64
+	samples []float64
 }
 
 // Name ...
@@ -36,12 +36,9 @@ func (*AutoclickerD) Punishment() punishment.Punishment {
 // Process ...
 func (a *AutoclickerD) Process(processor Processor, _ packet.Packet) {
 	if processor.Session().HasFlag(session.FlagClicking) {
+		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
 		cps := processor.Session().CPS()
-		var samples []float64
-		for _, sample := range a.samples {
-			samples = append(samples, float64(sample))
-		}
-		kurtosis, skewness, outliers, deviation := omath.Kurtosis(samples), omath.Skewness(samples), omath.Outliers(samples), omath.StandardDeviation(samples)
+		kurtosis, skewness, outliers, deviation := omath.Kurtosis(a.samples), omath.Skewness(a.samples), omath.Outliers(a.samples), omath.StandardDeviation(a.samples)
 		processor.Debug(a, map[string]interface{}{"kurt": kurtosis, "skew": skewness, "outliers": outliers, "dev": deviation, "cps": cps})
 		if kurtosis <= 0.05 && skewness < 0 && outliers == 0 && deviation <= 25 && cps >= 9 {
 			if a.Buff(1, 2) > 1 {
@@ -50,5 +47,6 @@ func (a *AutoclickerD) Process(processor Processor, _ packet.Packet) {
 		} else {
 			a.Buff(-0.5)
 		}
+		a.samples = []float64{}
 	}
 }
