@@ -150,6 +150,9 @@ func (p *Player) Acknowledgement(f func()) {
 func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 	switch conn {
 	case p.conn:
+		if p.Session().HasFlag(session.FlagClicking) {
+			p.Session().SetFlag(session.FlagClicking)
+		}
 		switch pk := pk.(type) {
 		case *packet.NetworkStackLatency:
 			if f, ok := p.acknowledgements[pk.Timestamp]; ok {
