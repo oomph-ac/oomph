@@ -9,7 +9,7 @@ import (
 // AutoclickerB checks if the user is clicking above 16 cps with no double clicks.
 type AutoclickerB struct {
 	check
-	samples []uint64
+	samples []float64
 }
 
 // Name ...
@@ -35,7 +35,7 @@ func (*AutoclickerB) Punishment() punishment.Punishment {
 // Process ...
 func (a *AutoclickerB) Process(processor Processor, _ packet.Packet) {
 	if processor.Session().HasFlag(session.FlagClicking) {
-		a.samples = append(a.samples, processor.Session().ClickDelay())
+		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
 		if len(a.samples) == 20 {
 			processor.Debug(a, map[string]interface{}{"samples": a.samples})
 			if func() bool {
@@ -50,7 +50,7 @@ func (a *AutoclickerB) Process(processor Processor, _ packet.Packet) {
 			} else {
 				a.Buff(-0.025)
 			}
-			a.samples = []uint64{}
+			a.samples = []float64{}
 		}
 	}
 }
