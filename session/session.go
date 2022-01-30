@@ -44,7 +44,9 @@ func (s *Session) GetEntityData() entity.Entity {
 // Click will add a click to the players clicks.
 func (s *Session) Click(currentTick uint64) {
 	s.clickMu.Lock()
-	s.SetFlag(FlagClicking)
+	if !s.HasFlag(FlagClicking) {
+		s.SetFlag(FlagClicking)
+	}
 	if len(s.clicks) > 0 {
 		var max uint64
 		for _, tick := range s.clicks {
