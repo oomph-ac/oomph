@@ -55,7 +55,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				}
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
-				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok {
+				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
 					if r.inputMode == packet.InputModeTouch {
 						dist := omath.AABBVectorDistance(t.AABB, omath.Vec32To64(r.attackPos))
 						processor.Debug(r, map[string]interface{}{"dist": dist})
