@@ -35,7 +35,7 @@ func (s *Session) SetFlag(flag uint32) {
 
 // HasFlag returns whether the session has a specified bitflag.
 func (s *Session) HasFlag(flag uint32) bool {
-	return s.Flags&1 > 0
+	return s.Flags&(1<<flag) > 0
 }
 
 // GetEntityData returns the entity data of the session
