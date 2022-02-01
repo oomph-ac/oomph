@@ -1,6 +1,7 @@
 package session
 
 import (
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/justtaldevelops/oomph/entity"
 	"sync"
 	"sync/atomic"
@@ -17,13 +18,14 @@ type Session struct {
 		// Motion represents the ticks passed since the player has last moved.
 		Motion uint32
 	}
-	EntityData atomic.Value
-	Flags      uint64
-	Gamemode   int32
-	clickMu    sync.Mutex
-	clicks     []uint64
-	clickDelay uint64
-	cps        int
+	ServerSentMotion mgl32.Vec3 // todo: handle this in other places
+	EntityData       atomic.Value
+	Flags            uint64
+	Gamemode         int32
+	clickMu          sync.Mutex
+	clicks           []uint64
+	clickDelay       uint64
+	cps              int
 }
 
 // SetFlag sets a bit flag for the session, or unsets if the session already has the flag. A list of flags can be seen in flags.go

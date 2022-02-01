@@ -12,6 +12,7 @@ import (
 	"github.com/justtaldevelops/oomph/entity"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
+	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -161,11 +162,11 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 		case *packet.PlayerAuthInput:
 			p.Move(omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position))
-			hasFlag := func(flag uint64) bool {
-				return pk.InputData&flag != 0
-			}
-			if (hasFlag(packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (hasFlag(packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
+			if (utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
 				p.Session().SetFlag(session.FlagSneaking)
+			}
+			if p.Session().HasFlag(session.FlagTeleporting) {
+				p.Session().SetFlag(session.FlagTeleporting)
 			}
 		case *packet.LevelSoundEvent:
 			if pk.SoundType == packet.SoundEventAttackNoDamage {
@@ -197,6 +198,11 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			pos := omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position)
 			if rid == p.rid {
 				p.Move(pos)
+				p.Acknowledgement(func() {
+					if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
+						p.Session().SetFlag(session.FlagTeleporting)
+					}
+				})
 				return
 			}
 			p.MoveActor(rid, pos)
@@ -249,6 +255,13 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			p.Acknowledgement(func() {
 				p.Session().Gamemode = pk.GameType
 			})
+		case *packet.SetActorMotion:
+			if pk.EntityRuntimeID == p.rid {
+				p.Acknowledgement(func() {
+					p.Session().ServerSentMotion = pk.Velocity
+					p.Session().Ticks.Motion = 0
+				})
+			}
 		}
 	}
 }
@@ -302,6 +315,7 @@ func (p *Player) Close() {
 func (p *Player) startTicking() {
 	for range p.ticker.C {
 		p.tick++
+		p.handleBlockTicks()
 	}
 }
 
@@ -320,8 +334,49 @@ func protocolPosToCubePos(pos protocol.BlockPos) cube.Pos {
 	return cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())}
 }
 
+// vec3ToCubePos converts a mgl32.Vec3 to a cube.Pos
+func vec3ToCubePos(vec mgl32.Vec3) cube.Pos {
+	return cube.Pos{int(vec.X()), int(vec.Y()), int(vec.Z())}
+}
+
 // air returns the air runtime ID.
 func air() uint32 {
 	a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
 	return a
+}
+
+// handleBlockTicks should be called once every tick.
+func (p *Player) handleBlockTicks() {
+	var liquids, cobweb, climable uint32
+	var blocks []world.Block // todo: LevelChunk::blocksInAABBB69420
+	for _, v := range blocks {
+		if _, ok := v.(world.Liquid); ok {
+			liquids++
+		} else {
+			name, _ := v.EncodeBlock()
+			if name == "minecraft:ladder" || name == "minecraft:vine" {
+				climable++
+			} else if name == "minecraft:cobweb" {
+				cobweb++
+			}
+		}
+	}
+
+	s := p.Session()
+	if liquids == 0 {
+		s.Ticks.Liquid++
+	} else {
+		s.Ticks.Liquid = 0
+	}
+	if cobweb == 0 {
+		s.Ticks.Cobweb++
+	} else {
+		s.Ticks.Cobweb = 0
+	}
+	if climable == 0 {
+		s.Ticks.Climable++
+	} else {
+		s.Ticks.Climable = 0
+	}
+	s.Ticks.Motion++
 }
