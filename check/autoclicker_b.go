@@ -45,7 +45,7 @@ func (a *AutoclickerB) Process(processor Processor, _ packet.Packet) {
 					}
 				}
 				return true
-			}() && processor.Session().CPS() >= 16 {
+			}() && processor.Session().CPS() >= 18 {
 				processor.Flag(a, map[string]interface{}{"cps": processor.Session().CPS()})
 			} else {
 				a.Buff(-0.025)
