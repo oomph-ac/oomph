@@ -65,6 +65,7 @@ func (s *Session) Click(currentTick uint64) {
 			clicks = append(clicks, clickTick)
 		}
 	}
+	s.clicks = clicks
 	s.cps = len(s.clicks)
 	s.clickMu.Unlock()
 }
