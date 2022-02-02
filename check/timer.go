@@ -56,7 +56,6 @@ func (t *TimerA) Process(processor Processor, pk packet.Packet) {
 			processor.Flag(t, map[string]interface{}{"timer": omath.Round(t.clientTPS/float64(20), 4)})
 			t.balance = 0
 		}
-		processor.Debug(t, map[string]interface{}{"timer": omath.Round(t.clientTPS/float64(20), 4)})
 		t.lastTime = currentTime
 	}
 }

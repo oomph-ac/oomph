@@ -65,7 +65,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 
 	lg := logrus.New()
 	lg.Formatter = &logrus.TextFormatter{ForceColors: true}
-	lg.Level = logrus.InfoLevel
+	lg.Level = logrus.DebugLevel
 
 	viewDistance := int32(8)
 	p := player.NewPlayer(lg, world.Overworld, viewDistance, conn, serverConn)

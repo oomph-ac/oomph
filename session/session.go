@@ -24,6 +24,7 @@ type Session struct {
 	Gamemode         int32
 	clickMu          sync.Mutex
 	clicks           []uint64
+	lastClickTick    uint64
 	clickDelay       uint64
 	cps              int
 }
@@ -50,13 +51,7 @@ func (s *Session) Click(currentTick uint64) {
 		s.SetFlag(FlagClicking)
 	}
 	if len(s.clicks) > 0 {
-		var max uint64
-		for _, tick := range s.clicks {
-			if tick > max {
-				max = tick
-			}
-		}
-		s.clickDelay = currentTick - max*50
+		s.clickDelay = (currentTick - s.lastClickTick) * 50
 	} else {
 		s.clickDelay = 0
 	}
@@ -67,6 +62,7 @@ func (s *Session) Click(currentTick uint64) {
 			clicks = append(clicks, clickTick)
 		}
 	}
+	s.lastClickTick = currentTick
 	s.clicks = clicks
 	s.cps = len(s.clicks)
 	s.clickMu.Unlock()
