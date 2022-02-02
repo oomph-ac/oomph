@@ -6,7 +6,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoclickerB checks if the user is clicking above 16 cps with no double clicks.
+// AutoclickerB checks if the user is clicking above 18 cps with no double clicks.
 type AutoclickerB struct {
 	check
 	samples []uint64
@@ -19,7 +19,7 @@ func (*AutoclickerB) Name() (string, string) {
 
 // Description ...
 func (*AutoclickerB) Description() string {
-	return "This checks if the user is clicking above 16 cps with no double clicks."
+	return "This checks if the user is clicking above 18 cps with no double clicks."
 }
 
 // MaxViolations ...
