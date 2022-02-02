@@ -37,7 +37,7 @@ func (a *AutoclickerB) Process(processor Processor, _ packet.Packet) {
 	if processor.Session().HasFlag(session.FlagClicking) {
 		a.samples = append(a.samples, processor.Session().ClickDelay())
 		if len(a.samples) == 20 {
-			processor.Debug(a, map[string]interface{}{"samples": a.samples})
+			//processor.Debug(a, map[string]interface{}{"samples": a.samples})
 			if func() bool {
 				for _, v := range a.samples {
 					if v == 0 {
