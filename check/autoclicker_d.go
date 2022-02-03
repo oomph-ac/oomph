@@ -37,6 +37,9 @@ func (*AutoclickerD) Punishment() punishment.Punishment {
 func (a *AutoclickerD) Process(processor Processor, _ packet.Packet) {
 	if processor.Session().HasFlag(session.FlagClicking) {
 		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
+		if len(a.samples) < 20 {
+			return
+		}
 		cps := processor.Session().CPS()
 		kurtosis, skewness, outliers, deviation := omath.Kurtosis(a.samples), omath.Skewness(a.samples), omath.Outliers(a.samples), omath.StandardDeviation(a.samples)
 		processor.Debug(a, map[string]interface{}{"kurt": kurtosis, "skew": skewness, "outliers": outliers, "dev": deviation, "cps": cps})

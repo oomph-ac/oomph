@@ -1,6 +1,8 @@
 package check
 
 import (
+	"math"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/go-gl/mathgl/mgl32"
@@ -10,7 +12,6 @@ import (
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // ReachA checks if a player has an abnormal amount of reach.
@@ -60,7 +61,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 						dist := omath.AABBVectorDistance(t.AABB, omath.Vec32To64(r.attackPos))
 						processor.Debug(r, map[string]interface{}{"dist": dist})
 						if dist > 3.1 {
-							if r.Buff(r.updateAndGetViolationAfterTicks(processor.Tick(), 300)) >= 5 {
+							if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 300)) >= 5 {
 								processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 4)})
 							}
 						} else {
@@ -87,7 +88,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 						dist := omath.AABBVectorDistance(raycast.AABB(), vec64AttackPos)
 						processor.Debug(r, map[string]interface{}{"raycast": dist})
 						if dist > 3.04 {
-							if r.Buff(r.updateAndGetViolationAfterTicks(processor.Tick(), 100), 3.1) >= 3 {
+							if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 100), 3.1) >= 3 {
 								processor.Flag(r, map[string]interface{}{"raycast": omath.Round(dist, 2)})
 							}
 						} else {

@@ -41,8 +41,9 @@ type Player struct {
 
 	dimension world.Dimension
 
-	ticker *time.Ticker
-	tick   uint64
+	serverTicker *time.Ticker
+	clientTick   uint64
+	serverTick   uint64
 
 	// s holds the session of the player.
 	s atomic.Value
@@ -75,7 +76,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 		entities: make(map[uint64]entity.Entity),
 
-		ticker: time.NewTicker(time.Second / 20),
+		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
 			&check.AimAssistA{},
 			&check.KillAuraA{}, &check.KillAuraB{Entities: make(map[uint64]entity.Entity)},
@@ -131,9 +132,15 @@ func (p *Player) Immobile() bool {
 	return p.immobile.Load()
 }
 
-// Tick returns the current tick of the player.
-func (p *Player) Tick() uint64 {
-	return p.tick
+// ServerTick returns the current "server" tick.
+func (p *Player) ServerTick() uint64 {
+	return p.serverTick
+}
+
+// ClientTick returns the current client tick. This is measured by the amount of PlayerAuthInput packets the
+// client has sent (since the packet is sent every client tick)
+func (p *Player) ClientTick() uint64 {
+	return p.clientTick
 }
 
 // Session returns the session assigned to the player.
@@ -166,6 +173,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 				f()
 			}
 		case *packet.PlayerAuthInput:
+			p.clientTick += 1
 			p.Move(omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position))
 			if (utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
 				p.Session().SetFlag(session.FlagSneaking)
@@ -175,11 +183,11 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 		case *packet.LevelSoundEvent:
 			if pk.SoundType == packet.SoundEventAttackNoDamage {
-				p.Session().Click(p.Tick())
+				p.Session().Click(p.ClientTick())
 			}
 		case *packet.InventoryTransaction:
 			if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-				p.Session().Click(p.Tick())
+				p.Session().Click(p.ClientTick())
 			}
 		}
 
@@ -305,7 +313,7 @@ func (p *Player) Close() {
 	_, _ = p.conn.Flush(), p.serverConn.Flush()
 	_, _ = p.conn.Close(), p.serverConn.Close()
 
-	p.ticker.Stop()
+	p.serverTicker.Stop()
 
 	p.chunkMu.Lock()
 	p.chunks = nil
@@ -318,8 +326,8 @@ func (p *Player) Close() {
 
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
-	for range p.ticker.C {
-		p.tick++
+	for range p.serverTicker.C {
+		p.serverTick++
 		p.handleBlockTicks()
 	}
 }

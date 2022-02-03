@@ -1,17 +1,20 @@
 package check
 
 import (
+	"math"
+
 	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/entity"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // Processor represents a check processor, which can be used to process certain checks.
 type Processor interface {
-	// Tick returns the current tick of the processor.
-	Tick() uint64
+	// ServerTick returns the current "server" tick of the processor.
+	ServerTick() uint64
+	// ClientTick returns the current client tick of the processor
+	ClientTick() uint64
 	// Location returns the current location of the processor.
 	Location() entity.Location
 	// Entity queries the processor for an entity, using the runtime ID specified. The second
