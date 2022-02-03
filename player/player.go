@@ -144,7 +144,10 @@ func (p *Player) Session() *session.Session {
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
 func (p *Player) Acknowledgement(f func()) {
-	t := rand.Int63() * 1000
+	t := int64(rand.Int31()) * 1000 // ensure that we don't get screwed over because the number is too fat
+	if t < 0 {
+		t *= -1
+	}
 	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
 	p.acknowledgements[t] = f
 }
