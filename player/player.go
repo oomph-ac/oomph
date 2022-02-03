@@ -2,6 +2,12 @@ package player
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/world"
@@ -18,10 +24,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
-	"math"
-	"strings"
-	"sync"
-	"time"
 )
 
 // Player contains information about a player, such as its virtual world.
@@ -142,7 +144,7 @@ func (p *Player) Session() *session.Session {
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
 func (p *Player) Acknowledgement(f func()) {
-	t := time.Now().UnixMilli()
+	t := rand.Int63() * 1000
 	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
 	p.acknowledgements[t] = f
 }
@@ -168,6 +170,9 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			if p.Session().HasFlag(session.FlagTeleporting) {
 				p.Session().SetFlag(session.FlagTeleporting)
 			}
+			p.Acknowledgement(func() {
+				fmt.Println("hello world")
+			})
 		case *packet.LevelSoundEvent:
 			if pk.SoundType == packet.SoundEventAttackNoDamage {
 				p.Session().Click(p.Tick())
