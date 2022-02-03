@@ -170,9 +170,6 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			if p.Session().HasFlag(session.FlagTeleporting) {
 				p.Session().SetFlag(session.FlagTeleporting)
 			}
-			p.Acknowledgement(func() {
-				fmt.Println("hello world")
-			})
 		case *packet.LevelSoundEvent:
 			if pk.SoundType == packet.SoundEventAttackNoDamage {
 				p.Session().Click(p.Tick())
