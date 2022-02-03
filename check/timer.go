@@ -37,7 +37,7 @@ func (*TimerA) Punishment() punishment.Punishment {
 // Process ...
 func (t *TimerA) Process(processor Processor, pk packet.Packet) {
 	if _, ok := pk.(*packet.PlayerAuthInput); ok {
-		currentTime := processor.Tick()
+		currentTime := processor.ServerTick()
 		if t.lastTime == 0 {
 			t.lastTime = currentTime
 			return
