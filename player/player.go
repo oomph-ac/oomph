@@ -173,7 +173,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 				f()
 			}
 		case *packet.PlayerAuthInput:
-			p.clientTick += 1
+			p.clientTick++
 			p.Move(omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position))
 			if (utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
 				p.Session().SetFlag(session.FlagSneaking)
