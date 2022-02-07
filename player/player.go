@@ -48,8 +48,9 @@ type Player struct {
 	// s holds the session of the player.
 	s atomic.Value
 
-	entityMu sync.Mutex
-	entities map[uint64]entity.Entity
+	entityMu              sync.Mutex
+	entities              map[uint64]entity.Entity
+	queuedEntityLocations map[uint64]mgl64.Vec3
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -74,7 +75,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 		acknowledgements: make(map[int64]func()),
 
-		entities: make(map[uint64]entity.Entity),
+		entities:              make(map[uint64]entity.Entity),
+		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
 		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
@@ -108,11 +110,10 @@ func (p *Player) Move(pos mgl64.Vec3) {
 
 // MoveActor moves an actor to the given position.
 func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
-	e, ok := p.Entity(rid)
+	_, ok := p.Entity(rid)
 	if ok {
-		e.LastPosition = e.Position
-		e.Position = e.Position.Add(pos)
-		p.UpdateEntity(rid, e)
+		// if the entity is valid, we can queue the location for an update
+		p.queueEntityLocation(rid, pos)
 	}
 }
 
@@ -181,6 +182,8 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			if p.Session().HasFlag(session.FlagTeleporting) {
 				p.Session().SetFlag(session.FlagTeleporting)
 			}
+			p.handleBlockTicks()
+			p.tickEntityLocations()
 		case *packet.LevelSoundEvent:
 			if pk.SoundType == packet.SoundEventAttackNoDamage {
 				p.Session().Click(p.ClientTick())
@@ -202,8 +205,9 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 		case *packet.AddPlayer:
 			p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
 				Location: entity.Location{
-					Position: omath.Vec32To64(pk.Position),
-					Rotation: omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
+					Position:     omath.Vec32To64(pk.Position),
+					LastPosition: omath.Vec32To64(pk.Position),
+					Rotation:     omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
 				},
 			})
 		case *packet.MoveActorAbsolute:
@@ -327,8 +331,8 @@ func (p *Player) Close() {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
+		p.flushEntityLocations()
 		p.serverTick++
-		p.handleBlockTicks()
 	}
 }
 
@@ -358,7 +362,40 @@ func air() uint32 {
 	return a
 }
 
-// handleBlockTicks should be called once every tick.
+// queueEntityLocation is called when an entity location should be queued to update
+// and lag compensate with NSL
+func (p *Player) queueEntityLocation(rid uint64, pos mgl64.Vec3) {
+	p.queuedEntityLocations[rid] = pos
+}
+
+func (p *Player) tickEntityLocations() {
+	for _, e := range p.entities {
+		if e.NewPosRotationIncrements > 0 {
+			delta := e.RecievedPosition.Sub(e.LastPosition).Mul(float64(1 / e.NewPosRotationIncrements))
+			e.LastPosition = e.Position
+			e.Position = e.Position.Add(delta)
+		}
+		e.NewPosRotationIncrements--
+		e.TeleportTicks++
+	}
+}
+
+func (p *Player) flushEntityLocations() {
+	queue := p.queuedEntityLocations
+	p.queuedEntityLocations = make(map[uint64]mgl64.Vec3)
+	p.Acknowledgement(func() {
+		for rid, pos := range queue {
+			if e, valid := p.Entity(rid); valid {
+				e.RecievedPosition = pos
+				e.NewPosRotationIncrements = 3
+				p.UpdateEntity(rid, e)
+			}
+			// if the entity is not valid here, it must have already been removed from a remove actor/player
+		}
+	})
+}
+
+// handleBlockTicks is called once every client tick to update block ticks
 func (p *Player) handleBlockTicks() {
 	var liquids, cobweb, climable uint32
 	var blocks []world.Block // todo: LevelChunk::blocksInAABBB69420
