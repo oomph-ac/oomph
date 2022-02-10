@@ -103,10 +103,10 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data := p.Session().GetEntityData()
 	data.LastPosition = data.Position
-	data.Position = omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62}))
+	data.Position = omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62, 0}))
 	data.AABB = physics.NewAABB(data.Position.Sub(mgl64.Vec3{data.BBWidth, 0, data.BBWidth}), data.Position.Add(mgl64.Vec3{data.BBWidth, data.BBHeight, data.BBWidth}))
 	data.LastRotation = data.Rotation
-	data.Rotation = mgl64.Vec3{float64(math.Mod(float64(pk.Pitch), 360)), math.Mod(float64(pk.Yaw), 360), float64(pk.HeadYaw)}
+	data.Rotation = mgl64.Vec3{float64(pk.Pitch), float64(pk.Yaw), float64(pk.HeadYaw)}
 	data.TeleportTicks++
 	p.Session().EntityData.Store(data)
 
@@ -177,19 +177,13 @@ func (p *Player) SendAcknowledgement(f func()) {
 	p.ackMu.Unlock()
 }
 
-// getAcknowledgement gets the function from the acknowledgement map
-// the first return value is the function, and the second is a boolean for wether or not the acknowledgment exists
-func (p *Player) getAcknowledgement(t int64) (func(), bool) {
+func (p *Player) handleAcknowledgement(t int64) {
 	p.ackMu.Lock()
 	call, ok := p.acknowledgements[t]
-	p.ackMu.Unlock()
-	return call, ok
-}
-
-// deleteAcknowledgement deletes an acknowledgement from the map
-func (p *Player) deleteAcknowledgement(t int64) {
-	p.ackMu.Lock()
-	delete(p.acknowledgements, t)
+	if ok {
+		call()
+		delete(p.acknowledgements, t)
+	}
 	p.ackMu.Unlock()
 }
 
@@ -202,10 +196,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 		}
 		switch pk := pk.(type) {
 		case *packet.NetworkStackLatency:
-			if f, ok := p.getAcknowledgement(pk.Timestamp); ok {
-				p.deleteAcknowledgement(pk.Timestamp)
-				f()
-			}
+			p.handleAcknowledgement(pk.Timestamp)
 		case *packet.PlayerAuthInput:
 			p.clientTick++
 			p.Move(pk)
@@ -254,6 +245,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 					),
 					BBWidth:  0.3,
 					BBHeight: 1.8,
+					IsPlayer: true,
 				})
 			})
 		case *packet.AddActor:
@@ -275,6 +267,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 					),
 					BBWidth:  0.3,
 					BBHeight: 1.8,
+					IsPlayer: false,
 				})
 			})
 		case *packet.MoveActorAbsolute:
@@ -306,18 +299,13 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 			if pk.EntityRuntimeID == p.rid {
 				p.SendAcknowledgement(func() {
-					var width, height float64
+					data := p.Session().GetEntityData()
 					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
-						width = float64(f.(float32)) / 2
+						data.BBWidth = float64(f.(float32)) / 2
 					}
 					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
-						height = float64(f.(float32))
+						data.BBHeight = float64(f.(float32))
 					}
-					data := p.Session().GetEntityData()
-					pos := data.Position
-					data.AABB = physics.NewAABB(pos.Sub(mgl64.Vec3{width, 0, width}), pos.Add(mgl64.Vec3{width, height, width}))
-					data.BBWidth = width
-					data.BBHeight = height
 					p.Session().EntityData.Store(data)
 					if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
 						p.immobile.Store(hasFlag(entity.DataFlagImmobile, f.(int64)))
@@ -326,16 +314,12 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			} else {
 				p.SendAcknowledgement(func() {
 					if e, ok := p.Entity(pk.EntityRuntimeID); ok {
-						var width, height float64
 						if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
-							width = float64(f.(float32)) / 2
+							e.BBWidth = float64(f.(float32)) / 2
 						}
 						if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
-							height = float64(f.(float32))
+							e.BBHeight = float64(f.(float32))
 						}
-						e.AABB = physics.NewAABB(e.Position.Sub(mgl64.Vec3{width, 0, width}), e.Position.Add(mgl64.Vec3{width, height, width}))
-						e.BBWidth = width
-						e.BBHeight = height
 						p.UpdateEntity(pk.EntityRuntimeID, e)
 					}
 				})
