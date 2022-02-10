@@ -10,4 +10,5 @@ type Entity struct {
 	AABB     physics.AABB
 	BBWidth  float64
 	BBHeight float64
+	IsPlayer bool
 }
