@@ -20,6 +20,7 @@ func (p *Player) UpdateEntity(rid uint64, e entity.Entity) {
 	p.entities[rid] = e
 }
 
+// RemoveEntity removes an entity from the entity map using the runtime ID
 func (p *Player) RemoveEntity(rid uint64) {
 	p.entityMu.Lock()
 	delete(p.entities, rid)
