@@ -113,6 +113,7 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	p.cleanCache()
 }
 
+// Teleport sets the position of the player and resets the teleport ticks
 func (p *Player) Teleport(pk *packet.MoveActorAbsolute) {
 	data := p.Session().GetEntityData()
 	data.LastPosition = data.Position
@@ -177,6 +178,7 @@ func (p *Player) SendAcknowledgement(f func()) {
 	p.ackMu.Unlock()
 }
 
+// handleAcknowledgement handles an acknowledgement function in the acknowledgement map
 func (p *Player) handleAcknowledgement(t int64) {
 	p.ackMu.Lock()
 	call, ok := p.acknowledgements[t]
@@ -396,6 +398,7 @@ func (p *Player) Close() {
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
 		p.flushEntityLocations()
+		p.conn.Flush() // make sure the network stack latency packet gets to the client ASAP
 		p.serverTick++
 	}
 }
@@ -430,9 +433,9 @@ func air() uint32 {
 // and lag compensate with NSL
 func (p *Player) queueEntityLocation(rid uint64, pos mgl64.Vec3) {
 	p.queuedEntityLocations[rid] = pos
-	//fmt.Println("queue pos!", pos[0], pos[1], pos[2])
 }
 
+// tickEntityLocations ticks entity locations to simulate what the client would see for the
 func (p *Player) tickEntityLocations() {
 	for eid := range p.entities {
 		e, _ := p.Entity(eid)
@@ -451,6 +454,8 @@ func (p *Player) tickEntityLocations() {
 	}
 }
 
+// flushEntityLocations clears the queued entity location map, and sends an acknowledgement to the player
+// This allows us to know when the client has recieved positions of other entities
 func (p *Player) flushEntityLocations() {
 	queue := p.queuedEntityLocations
 	p.queuedEntityLocations = make(map[uint64]mgl64.Vec3)
