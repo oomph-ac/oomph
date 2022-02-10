@@ -30,9 +30,12 @@ func AABBVectorDistance(a physics.AABB, v mgl64.Vec3) float64 {
 
 // DirectionVectorFromValues returns a direction vector from the given yaw and pitch values.
 func DirectionVectorFromValues(yaw, pitch float64) mgl64.Vec3 {
-	y := -math.Sin(pitch * (math.Pi / 180))
-	xz := math.Cos(pitch * (math.Pi / 180))
-	x := -xz * math.Sin(yaw*(math.Pi/180))
-	z := xz * math.Cos(yaw*(math.Pi/180))
-	return mgl64.Vec3{x, y, z}.Normalize()
+	yawRad, pitchRad := mgl64.DegToRad(yaw), mgl64.DegToRad(pitch)
+	m := math.Cos(pitchRad)
+
+	return mgl64.Vec3{
+		-m * math.Sin(yawRad),
+		-math.Sin(pitchRad),
+		m * math.Cos(yawRad),
+	}
 }
