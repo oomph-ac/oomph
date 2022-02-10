@@ -444,17 +444,6 @@ func (p *Player) tickEntityLocations() {
 				e.Position.Sub(mgl64.Vec3{e.BBWidth, 0, e.BBWidth}),
 				e.Position.Add(mgl64.Vec3{e.BBWidth, e.BBHeight, e.BBWidth}),
 			)
-			p.conn.WritePacket(&packet.LevelEvent{
-				EventType: 0x4000 | 19,
-				Position:  mgl32.Vec3{float32(e.Position[0]), float32(e.Position[1]), float32(e.Position[2])},
-				EventData: 1,
-			})
-			//p.conn.WritePacket(&packet.LevelEvent{
-			//	EventType: 0x4000 | 19,
-			//	Position:  mgl32.Vec3{float32(e.AABB.Max().X() + 0.1), float32(e.AABB.Max().Y()), float32(e.AABB.Max().Z() + 0.1)},
-			//	EventData: 1,
-			//})
-			//fmt.Println("tick delta!", delta[0], delta[1], delta[2])
 			e.NewPosRotationIncrements--
 		}
 		e.TeleportTicks++
