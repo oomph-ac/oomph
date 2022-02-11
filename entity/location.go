@@ -10,7 +10,7 @@ type Location struct {
 	Position mgl64.Vec3
 	// LastPosition is the previous position of the entity in the world.
 	LastPosition mgl64.Vec3
-	// RecievedPosition is
+	// RecievedPosition is the position of the entity that the client sees on their side
 	RecievedPosition mgl64.Vec3
 	// Rotation represents the rotation of an entity. The first value is the pitch, and the second and third represent
 	// the yaw and head yaw, the latter of which only being applicable for certain entities, such as players.
