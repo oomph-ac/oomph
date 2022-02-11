@@ -37,6 +37,7 @@ type Player struct {
 	chunkMu sync.Mutex
 	chunks  map[world.ChunkPos]*chunk.Chunk
 
+	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
 
 	dimension world.Dimension
@@ -48,8 +49,9 @@ type Player struct {
 	// s holds the session of the player.
 	s atomic.Value
 
-	entityMu sync.Mutex
-	entities map[uint64]entity.Entity
+	entityMu              sync.Mutex
+	entities              map[uint64]entity.Entity
+	queuedEntityLocations map[uint64]mgl64.Vec3
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -74,7 +76,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 		acknowledgements: make(map[int64]func()),
 
-		entities: make(map[uint64]entity.Entity),
+		entities:              make(map[uint64]entity.Entity),
+		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
 		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
@@ -97,10 +100,25 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 }
 
 // Move moves the player to the given position.
-func (p *Player) Move(pos mgl64.Vec3) {
+func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data := p.Session().GetEntityData()
 	data.LastPosition = data.Position
-	data.Position = data.Position.Add(pos)
+	data.Position = omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62, 0}))
+	data.AABB = physics.NewAABB(data.Position.Sub(mgl64.Vec3{data.BBWidth, 0, data.BBWidth}), data.Position.Add(mgl64.Vec3{data.BBWidth, data.BBHeight, data.BBWidth}))
+	data.LastRotation = data.Rotation
+	data.Rotation = mgl64.Vec3{float64(pk.Pitch), float64(pk.Yaw), float64(pk.HeadYaw)}
+	data.TeleportTicks++
+	p.Session().EntityData.Store(data)
+
+	p.cleanCache()
+}
+
+// Teleport sets the position of the player and resets the teleport ticks
+func (p *Player) Teleport(pk *packet.MoveActorAbsolute) {
+	data := p.Session().GetEntityData()
+	data.LastPosition = data.Position
+	data.Position = omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62}))
+	data.TeleportTicks = 0
 	p.Session().EntityData.Store(data)
 
 	p.cleanCache()
@@ -108,11 +126,10 @@ func (p *Player) Move(pos mgl64.Vec3) {
 
 // MoveActor moves an actor to the given position.
 func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
-	e, ok := p.Entity(rid)
+	_, ok := p.Entity(rid)
 	if ok {
-		e.LastPosition = e.Position
-		e.Position = e.Position.Add(pos)
-		p.UpdateEntity(rid, e)
+		// if the entity is valid, we can queue the location for an update
+		p.queueEntityLocation(rid, pos)
 	}
 }
 
@@ -148,15 +165,28 @@ func (p *Player) Session() *session.Session {
 	return p.s.Load().(*session.Session)
 }
 
-// Acknowledgement runs a function after an acknowledgement from the client.
+// SendAcknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
-func (p *Player) Acknowledgement(f func()) {
+func (p *Player) SendAcknowledgement(f func()) {
 	t := int64(rand.Int31()) * 1000 // ensure that we don't get screwed over because the number is too fat
 	if t < 0 {
 		t *= -1
 	}
 	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
+	p.ackMu.Lock()
 	p.acknowledgements[t] = f
+	p.ackMu.Unlock()
+}
+
+// handleAcknowledgement handles an acknowledgement function in the acknowledgement map
+func (p *Player) handleAcknowledgement(t int64) {
+	p.ackMu.Lock()
+	call, ok := p.acknowledgements[t]
+	if ok {
+		call()
+		delete(p.acknowledgements, t)
+	}
+	p.ackMu.Unlock()
 }
 
 // Process processes the given packet.
@@ -168,19 +198,18 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 		}
 		switch pk := pk.(type) {
 		case *packet.NetworkStackLatency:
-			if f, ok := p.acknowledgements[pk.Timestamp]; ok {
-				delete(p.acknowledgements, pk.Timestamp)
-				f()
-			}
+			p.handleAcknowledgement(pk.Timestamp)
 		case *packet.PlayerAuthInput:
 			p.clientTick++
-			p.Move(omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position))
+			p.Move(pk)
 			if (utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
 				p.Session().SetFlag(session.FlagSneaking)
 			}
 			if p.Session().HasFlag(session.FlagTeleporting) {
 				p.Session().SetFlag(session.FlagTeleporting)
 			}
+			p.handleBlockTicks()
+			p.tickEntityLocations()
 		case *packet.LevelSoundEvent:
 			if pk.SoundType == packet.SoundEventAttackNoDamage {
 				p.Session().Click(p.ClientTick())
@@ -200,81 +229,122 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 	case p.serverConn:
 		switch pk := pk.(type) {
 		case *packet.AddPlayer:
-			p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
-				Location: entity.Location{
-					Position: omath.Vec32To64(pk.Position),
-					Rotation: omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
-				},
+			if pk.EntityRuntimeID == p.rid {
+				return
+			}
+			p.SendAcknowledgement(func() {
+				p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
+					Location: entity.Location{
+						Position:                 omath.Vec32To64(pk.Position),
+						LastPosition:             omath.Vec32To64(pk.Position),
+						RecievedPosition:         omath.Vec32To64(pk.Position).Add(omath.Vec32To64(pk.Velocity)),
+						NewPosRotationIncrements: 3,
+						Rotation:                 omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
+					},
+					AABB: physics.NewAABB(
+						omath.Vec32To64(pk.Position).Sub(mgl64.Vec3{0.3, 0, 0.3}),
+						omath.Vec32To64(pk.Position).Add(mgl64.Vec3{0.3, 1.8, 0.3}),
+					),
+					BBWidth:  0.3,
+					BBHeight: 1.8,
+					IsPlayer: true,
+				})
+			})
+		case *packet.AddActor:
+			if pk.EntityRuntimeID == p.rid {
+				return
+			}
+			p.SendAcknowledgement(func() {
+				p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
+					Location: entity.Location{
+						Position:                 omath.Vec32To64(pk.Position),
+						LastPosition:             omath.Vec32To64(pk.Position),
+						RecievedPosition:         omath.Vec32To64(pk.Position).Add(omath.Vec32To64(pk.Velocity)),
+						NewPosRotationIncrements: 3,
+						Rotation:                 omath.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
+					},
+					AABB: physics.NewAABB(
+						omath.Vec32To64(pk.Position).Sub(mgl64.Vec3{0.3, 0, 0.3}),
+						omath.Vec32To64(pk.Position).Add(mgl64.Vec3{0.3, 1.8, 0.3}),
+					),
+					BBWidth:  0.3,
+					BBHeight: 1.8,
+					IsPlayer: false,
+				})
 			})
 		case *packet.MoveActorAbsolute:
 			rid := pk.EntityRuntimeID
-			pos := omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62})).Sub(p.Location().Position)
 			if rid == p.rid {
-				p.Move(pos)
-				p.Acknowledgement(func() {
+				p.SendAcknowledgement(func() {
+					p.Teleport(pk)
 					if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
 						p.Session().SetFlag(session.FlagTeleporting)
 					}
 				})
 				return
 			}
-			p.MoveActor(rid, pos)
+			p.MoveActor(rid, omath.Vec32To64(pk.Position))
 		case *packet.LevelChunk:
-			p.LoadRawChunk(world.ChunkPos{pk.ChunkX, pk.ChunkZ}, pk.RawPayload, pk.SubChunkCount)
+			p.SendAcknowledgement(func() {
+				p.LoadRawChunk(world.ChunkPos{pk.ChunkX, pk.ChunkZ}, pk.RawPayload, pk.SubChunkCount)
+			})
 		case *packet.UpdateBlock:
 			block, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 			if ok {
-				p.SetBlock(protocolPosToCubePos(pk.Position), block)
+				p.SendAcknowledgement(func() {
+					p.SetBlock(protocolPosToCubePos(pk.Position), block)
+				})
 			}
 		case *packet.SetActorData:
+			hasFlag := func(flag uint32, data int64) bool {
+				return (data & (1 << (flag % 64))) > 0
+			}
 			if pk.EntityRuntimeID == p.rid {
-				p.Acknowledgement(func() {
-					hasFlag := func(flag uint32, data int64) bool {
-						return (data & (1 << (flag % 64))) > 0
-					}
-					var width, height float64
+				p.SendAcknowledgement(func() {
+					data := p.Session().GetEntityData()
 					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
-						width = float64(f.(float32)) / 2
+						data.BBWidth = float64(f.(float32)) / 2
 					}
 					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
-						height = float64(f.(float32))
+						data.BBHeight = float64(f.(float32))
 					}
-					data := p.Session().GetEntityData()
-					pos := data.Position
-					data.AABB = physics.NewAABB(pos.Sub(mgl64.Vec3{width, height, width}), pos.Add(mgl64.Vec3{width, height, width}))
 					p.Session().EntityData.Store(data)
 					if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
 						p.immobile.Store(hasFlag(entity.DataFlagImmobile, f.(int64)))
 					}
 				})
 			} else {
-				if e, ok := p.Entity(pk.EntityRuntimeID); ok {
-					var width, height float64
-					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
-						width = float64(f.(float32)) / 2
+				p.SendAcknowledgement(func() {
+					if e, ok := p.Entity(pk.EntityRuntimeID); ok {
+						if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
+							e.BBWidth = float64(f.(float32)) / 2
+						}
+						if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
+							e.BBHeight = float64(f.(float32))
+						}
+						p.UpdateEntity(pk.EntityRuntimeID, e)
 					}
-					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
-						height = float64(f.(float32))
-					}
-					e.AABB = physics.NewAABB(e.Position.Sub(mgl64.Vec3{width, height, width}), e.Position.Add(mgl64.Vec3{width, height, width}))
-					p.UpdateEntity(pk.EntityRuntimeID, e)
-				}
+				})
 			}
 		case *packet.StartGame:
-			p.Acknowledgement(func() {
+			p.SendAcknowledgement(func() {
 				p.Session().Gamemode = pk.WorldGameMode
 			})
 		case *packet.SetPlayerGameType:
-			p.Acknowledgement(func() {
+			p.SendAcknowledgement(func() {
 				p.Session().Gamemode = pk.GameType
 			})
 		case *packet.SetActorMotion:
 			if pk.EntityRuntimeID == p.rid {
-				p.Acknowledgement(func() {
+				p.SendAcknowledgement(func() {
 					p.Session().ServerSentMotion = pk.Velocity
 					p.Session().Ticks.Motion = 0
 				})
 			}
+		case *packet.RemoveActor:
+			p.SendAcknowledgement(func() {
+				p.RemoveEntity(uint64(pk.EntityUniqueID))
+			})
 		}
 	}
 }
@@ -327,8 +397,9 @@ func (p *Player) Close() {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
+		p.flushEntityLocations()
+		p.conn.Flush() // make sure the network stack latency packet gets to the client ASAP
 		p.serverTick++
-		p.handleBlockTicks()
 	}
 }
 
@@ -358,7 +429,48 @@ func air() uint32 {
 	return a
 }
 
-// handleBlockTicks should be called once every tick.
+// queueEntityLocation is called when an entity location should be queued to update
+// and lag compensate with NSL
+func (p *Player) queueEntityLocation(rid uint64, pos mgl64.Vec3) {
+	p.queuedEntityLocations[rid] = pos
+}
+
+// tickEntityLocations ticks entity locations to simulate what the client would see for the
+func (p *Player) tickEntityLocations() {
+	for eid := range p.entities {
+		e, _ := p.Entity(eid)
+		if e.NewPosRotationIncrements > 0 {
+			delta := e.RecievedPosition.Sub(e.LastPosition).Mul(1 / float64(e.NewPosRotationIncrements))
+			e.LastPosition = e.Position
+			e.Position = e.Position.Add(delta)
+			e.AABB = physics.NewAABB(
+				e.Position.Sub(mgl64.Vec3{e.BBWidth, 0, e.BBWidth}),
+				e.Position.Add(mgl64.Vec3{e.BBWidth, e.BBHeight, e.BBWidth}),
+			)
+			e.NewPosRotationIncrements--
+		}
+		e.TeleportTicks++
+		p.UpdateEntity(eid, e)
+	}
+}
+
+// flushEntityLocations clears the queued entity location map, and sends an acknowledgement to the player
+// This allows us to know when the client has recieved positions of other entities
+func (p *Player) flushEntityLocations() {
+	queue := p.queuedEntityLocations
+	p.queuedEntityLocations = make(map[uint64]mgl64.Vec3)
+	p.SendAcknowledgement(func() {
+		for rid, pos := range queue {
+			if e, valid := p.Entity(rid); valid {
+				e.RecievedPosition = pos
+				e.NewPosRotationIncrements = 3
+				p.UpdateEntity(rid, e)
+			}
+		}
+	})
+}
+
+// handleBlockTicks is called once every client tick to update block ticks
 func (p *Player) handleBlockTicks() {
 	var liquids, cobweb, climable uint32
 	var blocks []world.Block // todo: LevelChunk::blocksInAABBB69420

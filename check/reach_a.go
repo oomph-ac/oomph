@@ -3,7 +3,7 @@ package check
 import (
 	"math"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
@@ -57,18 +57,17 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
 				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
-					if r.inputMode == packet.InputModeTouch {
-						dist := omath.AABBVectorDistance(t.AABB, omath.Vec32To64(r.attackPos))
-						processor.Debug(r, map[string]interface{}{"dist": dist})
-						if dist > 3.1 {
-							if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 300)) >= 5 {
-								processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 4)})
-							}
-						} else {
-							r.Buff(-0.05)
-							r.violations = math.Max(r.violations-0.01, 0)
+					dist := omath.AABBVectorDistance(t.AABB.GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), omath.Vec32To64(r.attackPos))
+					processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raw"})
+					if dist > 3.15 {
+						if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 300)) >= 5 {
+							processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 4), "type": "raw"})
 						}
 					} else {
+						r.Buff(-0.05)
+						r.violations = math.Max(r.violations-0.01, 0)
+					}
+					if r.inputMode != packet.InputModeTouch {
 						r.awaitingTick = true
 					}
 				}
@@ -77,19 +76,22 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 	case *packet.PlayerAuthInput:
 		r.inputMode = pk.InputMode
 		if r.awaitingTick {
-			if t, ok := processor.Entity(r.attackedEntity); ok {
+			if t, ok := processor.Entity(r.attackedEntity); ok && t.IsPlayer {
 				rot := processor.Location().Rotation
 				dv := omath.DirectionVectorFromValues(rot.Y(), rot.X())
-				aabb := t.AABB.Extend(mgl64.Vec3{0.1, 0.1, 0.1})
+				width, height := (t.AABB.Width()/2)+0.1, t.AABB.Height()+0.1
+				aabb := physics.NewAABB(
+					t.LastPosition.Sub(mgl64.Vec3{width, 0.1, width}),
+					t.LastPosition.Add(mgl64.Vec3{width, height, width}),
+				)
 				if !aabb.IntersectsWith(processor.Session().GetEntityData().AABB) {
 					vec64AttackPos := omath.Vec32To64(r.attackPos)
-					spew.Dump(processor.Location().Position, t.Position)
-					if raycast, ok := trace.AABBIntercept(aabb, vec64AttackPos, vec64AttackPos.Add(dv.Mul(20))); ok {
-						dist := omath.AABBVectorDistance(raycast.AABB(), vec64AttackPos)
-						processor.Debug(r, map[string]interface{}{"raycast": dist})
-						if dist > 3.04 {
+					if raycast, ok := trace.AABBIntercept(aabb, vec64AttackPos, vec64AttackPos.Add(dv.Mul(14.0))); ok {
+						dist := raycast.Position().Sub(vec64AttackPos).Len()
+						processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raycast"})
+						if dist >= 3.1 && math.Abs(dist-omath.AABBVectorDistance(aabb, vec64AttackPos)) < 0.4 {
 							if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 100), 3.1) >= 3 {
-								processor.Flag(r, map[string]interface{}{"raycast": omath.Round(dist, 2)})
+								processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 2), "type": "raycast"})
 							}
 						} else {
 							r.Buff(-0.01)
