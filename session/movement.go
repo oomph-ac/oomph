@@ -139,7 +139,9 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 		if cz {
 			z = 0
 		}
-		y = (y - m.Gravity) * utils.GravityMultiplication * var1 * var2
+		y -= (y - m.Gravity) * utils.GravityMultiplication
+		x *= var1
+		z *= var1
 		m.ServerPredictedMotion = mgl64.Vec3{x, y, z}
 	}
 }
