@@ -39,3 +39,8 @@ func DirectionVectorFromValues(yaw, pitch float64) mgl64.Vec3 {
 		m * math.Cos(yawRad),
 	}
 }
+
+// FloorVec64 will floor all the values of a 64 bit vector3 and return a new vector.
+func FloorVec64(vec mgl64.Vec3) mgl64.Vec3 {
+	return mgl64.Vec3{math.Floor(vec.X()), math.Floor(vec.Y()), math.Floor(vec.Z())}
+}

@@ -1,7 +1,6 @@
 package session
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/justtaldevelops/oomph/entity"
 	"sync"
 	"sync/atomic"
@@ -17,26 +16,59 @@ type Session struct {
 		Liquid uint32
 		// Motion represents the ticks passed since the player has last moved.
 		Motion uint32
+		// Spawn represents the ticks passed since the player last respawned.
+		Spawn uint32
 	}
-	ServerSentMotion mgl32.Vec3 // todo: handle this in other places
-	EntityData       atomic.Value
-	Flags            uint64
-	Gamemode         int32
-	clickMu          sync.Mutex
-	clicks           []uint64
-	lastClickTick    uint64
-	clickDelay       uint64
-	cps              int
+	Movement      *Movement
+	EntityData    atomic.Value
+	Flags         uint64
+	Gamemode      int32
+	clickMu       sync.Mutex
+	clicks        []uint64
+	lastClickTick uint64
+	clickDelay    uint64
+	cps           int
 }
 
-// SetFlag sets a bit flag for the session, or unsets if the session already has the flag. A list of flags can be seen in flags.go
-func (s *Session) SetFlag(flag uint32) {
-	s.Flags ^= 1 << flag
+// setFlag sets a bit flag for the session, or unsets if the session already has the flag. A list of flags can be seen in flags.go
+func (s *Session) setFlag(flag uint64) {
+	s.Flags ^= flag
+}
+
+// SetFlag will set or remove a bit flag based on the value of set.
+func (s *Session) SetFlag(set bool, flag uint64) {
+	if set {
+		if !s.HasFlag(flag) {
+			s.setFlag(flag)
+		}
+	} else if s.HasFlag(flag) {
+		s.setFlag(flag)
+	}
 }
 
 // HasFlag returns whether the session has a specified bitflag.
-func (s *Session) HasFlag(flag uint32) bool {
-	return s.Flags&(1<<flag) > 0
+func (s *Session) HasFlag(flag uint64) bool {
+	return s.Flags&flag > 0
+}
+
+// HasAnyFlag returns whether the session has any of the specified bitflags.
+func (s *Session) HasAnyFlag(flags ...uint64) bool {
+	for _, flag := range flags {
+		if s.HasFlag(flag) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasAllFlags returns true if the session has all the flags specified.
+func (s *Session) HasAllFlags(flags ...uint64) bool {
+	for _, flag := range flags {
+		if !s.HasFlag(flag) {
+			return false
+		}
+	}
+	return true
 }
 
 // GetEntityData returns the entity data of the session
@@ -47,9 +79,7 @@ func (s *Session) GetEntityData() entity.Entity {
 // Click will add a click to the players clicks.
 func (s *Session) Click(currentTick uint64) {
 	s.clickMu.Lock()
-	if !s.HasFlag(FlagClicking) {
-		s.SetFlag(FlagClicking)
-	}
+	s.SetFlag(true, FlagClicking)
 	if len(s.clicks) > 0 {
 		s.clickDelay = (currentTick - s.lastClickTick) * 50
 	} else {
