@@ -248,7 +248,7 @@ func (m *Movement) moveFlying(friction float64) {
 		if var1 < 1 {
 			var1 = 1
 		}
-		var1 /= friction
+		var1 = friction / var1
 		forward := m.MoveForward * var1
 		strafe := m.MoveStrafe * var1
 		yaw := m.Session.GetEntityData().Rotation.X()
