@@ -79,7 +79,7 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 			var3 = m.MovementSpeed * var2
 		}
 		m.moveFlying(var3)
-		b := player.Block(cube.PosFromVec3(entityData.LastRotation))
+		b := player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))
 		if utils.BlockClimable(b) {
 			f6 := 0.2
 			var yMotion float64
