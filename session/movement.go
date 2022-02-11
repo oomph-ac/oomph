@@ -81,14 +81,14 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 		m.moveFlying(var3)
 		if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) {
 			f6 := 0.2
-			var yMotion float64
+			yMotion := m.ServerPredictedMotion.Y()
 			if yMotion < -0.2 {
 				yMotion = -0.2
 			}
 			if s.HasFlag(FlagSneaking) && yMotion < 0 {
 				yMotion = 0
 			}
-			m.ServerPredictedMotion = mgl64.Vec3{omath.ClampFloat(m.Motion.Z(), -f6, f6), yMotion, omath.ClampFloat(m.Motion.Z(), -f6, f6)}
+			m.ServerPredictedMotion = mgl64.Vec3{omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6), yMotion, omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6)}
 		}
 		cx, cz := m.moveEntity(player)
 		if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) && s.HasFlag(FlagCollidedHorizontally) {
