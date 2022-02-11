@@ -50,7 +50,7 @@ func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
 			for id, data := range k.Entities {
 				for subId, subData := range k.Entities {
 					if subId != id {
-						minDist = math.Min(minDist, omath.AABBVectorDistance(data.AABB, subData.LastPosition))
+						minDist = math.Min(minDist, omath.AABBVectorDistance(data.AABB.Translate(data.LastPosition), subData.LastPosition))
 					}
 				}
 			}

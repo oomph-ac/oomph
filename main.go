@@ -72,8 +72,11 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 
 	g.Add(2)
 	go func() {
-		defer listener.Disconnect(conn, "connection lost")
-		defer serverConn.Close()
+		defer func() {
+			_ = listener.Disconnect(conn, "connection lost")
+			_ = serverConn.Close()
+			g.Done()
+		}()
 		for {
 			pk, err := conn.ReadPacket()
 			if err != nil {
@@ -87,11 +90,13 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 				return
 			}
 		}
-		g.Done()
 	}()
 	go func() {
-		defer serverConn.Close()
-		defer listener.Disconnect(conn, "connection lost")
+		defer func() {
+			_ = serverConn.Close()
+			_ = listener.Disconnect(conn, "connection lost")
+			g.Done()
+		}()
 		for {
 			pk, err := serverConn.ReadPacket()
 			if err != nil {
@@ -105,7 +110,6 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 				return
 			}
 		}
-		g.Done()
 	}()
 	g.Wait()
 	p.Close()

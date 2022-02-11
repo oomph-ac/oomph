@@ -32,13 +32,14 @@ type Player struct {
 	conn, serverConn *minecraft.Conn
 
 	rid      uint64
+	uid      int64
 	viewDist int32
 
 	chunkMu sync.Mutex
 	chunks  map[world.ChunkPos]*chunk.Chunk
 
-	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
+	ackMu            sync.Mutex
 
 	dimension world.Dimension
 
@@ -53,10 +54,11 @@ type Player struct {
 	entities              map[uint64]entity.Entity
 	queuedEntityLocations map[uint64]mgl64.Vec3
 
+	effects   map[int32]*effect
+	effectsMu sync.Mutex
+
 	checkMu sync.Mutex
 	checks  []check.Check
-
-	immobile atomic.Bool
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
@@ -69,6 +71,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		serverConn: serverConn,
 
 		rid:      data.EntityRuntimeID,
+		uid:      data.EntityUniqueID,
 		viewDist: viewDist,
 
 		chunks:    make(map[world.ChunkPos]*chunk.Chunk),
@@ -86,9 +89,17 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			&check.TimerA{},
 			&check.ReachA{},
 			&check.AutoclickerA{}, &check.AutoclickerB{}, &check.AutoclickerC{}, &check.AutoclickerD{},
+			&check.VelocityA{}, &check.VelocityB{},
 		},
 	}
-	p.s.Store(&session.Session{})
+	s := &session.Session{}
+	s.Movement = &session.Movement{
+		Session:       s,
+		JumpVelocity:  utils.DefaultJumpMotion,
+		Gravity:       utils.NormalGravity,
+		MovementSpeed: utils.NormalMovementSpeed,
+	}
+	p.s.Store(s)
 	p.Session().EntityData.Store(entity.Entity{
 		Location: entity.Location{
 			Position: omath.Vec32To64(data.PlayerPosition),
@@ -124,6 +135,14 @@ func (p *Player) Teleport(pk *packet.MoveActorAbsolute) {
 	p.cleanCache()
 }
 
+// Rotate rot is a Vector3 holding the rotation values (pitch, yaw, headyaw)
+func (p *Player) Rotate(rot mgl32.Vec3) {
+	data := p.Session().GetEntityData()
+	data.LastRotation = data.Rotation
+	data.Rotation = omath.Vec32To64(rot)
+	p.Session().EntityData.Store(data)
+}
+
 // MoveActor moves an actor to the given position.
 func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
 	_, ok := p.Entity(rid)
@@ -144,11 +163,6 @@ func (p *Player) ChunkPosition() world.ChunkPos {
 	return world.ChunkPos{int32(math.Floor(loc.Position[0])) >> 4, int32(math.Floor(loc.Position[2])) >> 4}
 }
 
-// Immobile returns whether the player is immobile.
-func (p *Player) Immobile() bool {
-	return p.immobile.Load()
-}
-
 // ServerTick returns the current "server" tick.
 func (p *Player) ServerTick() uint64 {
 	return p.serverTick
@@ -165,9 +179,9 @@ func (p *Player) Session() *session.Session {
 	return p.s.Load().(*session.Session)
 }
 
-// SendAcknowledgement runs a function after an acknowledgement from the client.
+// Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
-func (p *Player) SendAcknowledgement(f func()) {
+func (p *Player) Acknowledgement(f func()) {
 	t := int64(rand.Int31()) * 1000 // ensure that we don't get screwed over because the number is too fat
 	if t < 0 {
 		t *= -1
@@ -193,21 +207,66 @@ func (p *Player) handleAcknowledgement(t int64) {
 func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 	switch conn {
 	case p.conn:
-		if p.Session().HasFlag(session.FlagClicking) {
-			p.Session().SetFlag(session.FlagClicking)
-		}
+		p.Session().SetFlag(false, session.FlagClicking)
 		switch pk := pk.(type) {
 		case *packet.NetworkStackLatency:
 			p.handleAcknowledgement(pk.Timestamp)
 		case *packet.PlayerAuthInput:
 			p.clientTick++
 			p.Move(pk)
-			if (utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) && !p.Session().HasFlag(session.FlagSneaking)) || (utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) && p.Session().HasFlag(session.FlagSneaking)) {
-				p.Session().SetFlag(session.FlagSneaking)
+			p.Rotate(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw})
+			s := p.Session()
+
+			for inputFlags, sessionFlag := range session.InputFlagMap {
+				if utils.HasFlag(pk.InputData, inputFlags[0]) {
+					s.SetFlag(true, sessionFlag)
+				} else if utils.HasFlag(pk.InputData, inputFlags[1]) {
+					s.SetFlag(false, sessionFlag)
+				}
 			}
-			if p.Session().HasFlag(session.FlagTeleporting) {
-				p.Session().SetFlag(session.FlagTeleporting)
+
+			s.SetFlag(utils.HasFlag(pk.InputData, packet.InputFlagStartJumping), session.FlagJumping)
+
+			s.Movement.JumpVelocity = utils.DefaultJumpMotion
+			s.Movement.Gravity = utils.NormalGravity
+			s.Movement.MovementSpeed = utils.NormalMovementSpeed
+
+			p.effectsMu.Lock()
+			for effectId, effect := range p.effects {
+				effect.Duration--
+				if effect.Duration <= 0 {
+					delete(p.effects, effectId)
+				} else {
+					switch effectId {
+					case packet.EffectJumpBoost:
+						s.Movement.JumpVelocity = utils.DefaultJumpMotion + (float64(effect.Amplifier) / 10)
+					case 27: // slow falling effect id
+						s.Movement.Gravity = utils.SlowFallingGravity
+					case packet.EffectSpeed:
+						s.Movement.MovementSpeed += 0.02 * float64(effect.Amplifier)
+					case packet.EffectSlowness:
+						s.Movement.MovementSpeed -= 0.015 * float64(effect.Amplifier) // TODO: Correctly account when both slowness and speed effects are applied
+					}
+				}
 			}
+			p.effectsMu.Unlock()
+
+			s.SetFlag(false, session.FlagTeleporting)
+			loc := p.Location()
+			s.SetFlag(loc.Position.Y() <= utils.VoidLevel, session.FlagInVoid)
+
+			s.Movement.MoveStrafe = float64(pk.MoveVector.X() * 0.98)
+			s.Movement.MoveForward = float64(pk.MoveVector.Y() * 0.98)
+
+			if s.HasFlag(session.FlagSprinting) {
+				s.Movement.MovementSpeed *= 1.3
+			}
+			s.Movement.MovementSpeed = math.Max(0, s.Movement.MovementSpeed)
+
+			_, ok := p.Chunk(world.ChunkPos{int32(loc.Position.X()) >> 4, int32(loc.Position.Z()) >> 4})
+			s.SetFlag(!ok, session.FlagInUnloadedChunk)
+
+			p.Session().Movement.Execute(p)
 			p.handleBlockTicks()
 			p.tickEntityLocations()
 		case *packet.LevelSoundEvent:
@@ -217,6 +276,12 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 		case *packet.InventoryTransaction:
 			if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 				p.Session().Click(p.ClientTick())
+			}
+		case *packet.AdventureSettings:
+			p.Session().SetFlag(utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying), session.FlagFlying)
+		case *packet.Respawn:
+			if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
+				p.Session().SetFlag(false, session.FlagDead)
 			}
 		}
 
@@ -232,7 +297,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			if pk.EntityRuntimeID == p.rid {
 				return
 			}
-			p.SendAcknowledgement(func() {
+			p.Acknowledgement(func() {
 				p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
 					Location: entity.Location{
 						Position:                 omath.Vec32To64(pk.Position),
@@ -254,7 +319,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			if pk.EntityRuntimeID == p.rid {
 				return
 			}
-			p.SendAcknowledgement(func() {
+			p.Acknowledgement(func() {
 				p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
 					Location: entity.Location{
 						Position:                 omath.Vec32To64(pk.Position),
@@ -275,33 +340,33 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 		case *packet.MoveActorAbsolute:
 			rid := pk.EntityRuntimeID
 			if rid == p.rid {
-				p.SendAcknowledgement(func() {
+				p.Acknowledgement(func() {
 					p.Teleport(pk)
 					if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
-						p.Session().SetFlag(session.FlagTeleporting)
+						p.Session().SetFlag(true, session.FlagTeleporting)
 					}
 				})
 				return
 			}
 			p.MoveActor(rid, omath.Vec32To64(pk.Position))
 		case *packet.LevelChunk:
-			p.SendAcknowledgement(func() {
+			p.Acknowledgement(func() {
 				p.LoadRawChunk(world.ChunkPos{pk.ChunkX, pk.ChunkZ}, pk.RawPayload, pk.SubChunkCount)
 			})
 		case *packet.UpdateBlock:
 			block, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 			if ok {
-				p.SendAcknowledgement(func() {
+				p.Acknowledgement(func() {
 					p.SetBlock(protocolPosToCubePos(pk.Position), block)
 				})
 			}
 		case *packet.SetActorData:
-			hasFlag := func(flag uint32, data int64) bool {
-				return (data & (1 << (flag % 64))) > 0
-			}
 			if pk.EntityRuntimeID == p.rid {
-				p.SendAcknowledgement(func() {
+				p.Acknowledgement(func() {
 					data := p.Session().GetEntityData()
+					hasFlag := func(flag uint32, data int64) bool {
+						return (data & (1 << (flag % 64))) > 0
+					}
 					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
 						data.BBWidth = float64(f.(float32)) / 2
 					}
@@ -310,11 +375,11 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 					}
 					p.Session().EntityData.Store(data)
 					if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
-						p.immobile.Store(hasFlag(entity.DataFlagImmobile, f.(int64)))
+						p.Session().SetFlag(hasFlag(entity.DataFlagImmobile, f.(int64)), session.FlagImmobile)
 					}
 				})
 			} else {
-				p.SendAcknowledgement(func() {
+				p.Acknowledgement(func() {
 					if e, ok := p.Entity(pk.EntityRuntimeID); ok {
 						if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
 							e.BBWidth = float64(f.(float32)) / 2
@@ -327,24 +392,52 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 				})
 			}
 		case *packet.StartGame:
-			p.SendAcknowledgement(func() {
+			p.Acknowledgement(func() {
 				p.Session().Gamemode = pk.WorldGameMode
 			})
 		case *packet.SetPlayerGameType:
-			p.SendAcknowledgement(func() {
+			p.Acknowledgement(func() {
 				p.Session().Gamemode = pk.GameType
 			})
 		case *packet.SetActorMotion:
 			if pk.EntityRuntimeID == p.rid {
-				p.SendAcknowledgement(func() {
-					p.Session().ServerSentMotion = pk.Velocity
+				p.Acknowledgement(func() {
+					p.Session().Movement.ServerSentMotion = pk.Velocity
 					p.Session().Ticks.Motion = 0
 				})
 			}
 		case *packet.RemoveActor:
-			p.SendAcknowledgement(func() {
-				p.RemoveEntity(uint64(pk.EntityUniqueID))
-			})
+			if pk.EntityUniqueID != p.uid {
+				p.Acknowledgement(func() {
+					p.RemoveEntity(uint64(pk.EntityUniqueID))
+				})
+			}
+		case *packet.UpdateAttributes:
+			if pk.EntityRuntimeID == p.rid {
+				p.Acknowledgement(func() {
+					for _, a := range pk.Attributes {
+						if a.Name == "minecraft:health" && a.Value <= 0 {
+							p.Session().SetFlag(true, session.FlagDead)
+						}
+					}
+				})
+			}
+		case *packet.MobEffect:
+			if pk.EntityRuntimeID == p.rid {
+				p.Acknowledgement(func() {
+					switch pk.Operation {
+					case packet.MobEffectAdd:
+						p.AddEffect(pk.EffectType, &effect{pk.Amplifier + 1, pk.Duration})
+					case packet.MobEffectModify:
+						if effect, ok := p.GetEffect(pk.EffectType); ok {
+							effect.Amplifier = pk.Amplifier + 1
+							effect.Duration = pk.Duration
+						}
+					case packet.MobEffectRemove:
+						p.RemoveEffect(pk.EffectType)
+					}
+				})
+			}
 		}
 	}
 }
@@ -418,11 +511,6 @@ func protocolPosToCubePos(pos protocol.BlockPos) cube.Pos {
 	return cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())}
 }
 
-// vec3ToCubePos converts a mgl32.Vec3 to a cube.Pos
-func vec3ToCubePos(vec mgl32.Vec3) cube.Pos {
-	return cube.Pos{int(vec.X()), int(vec.Y()), int(vec.Z())}
-}
-
 // air returns the air runtime ID.
 func air() uint32 {
 	a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
@@ -459,7 +547,7 @@ func (p *Player) tickEntityLocations() {
 func (p *Player) flushEntityLocations() {
 	queue := p.queuedEntityLocations
 	p.queuedEntityLocations = make(map[uint64]mgl64.Vec3)
-	p.SendAcknowledgement(func() {
+	p.Acknowledgement(func() {
 		for rid, pos := range queue {
 			if e, valid := p.Entity(rid); valid {
 				e.RecievedPosition = pos
@@ -473,8 +561,7 @@ func (p *Player) flushEntityLocations() {
 // handleBlockTicks is called once every client tick to update block ticks
 func (p *Player) handleBlockTicks() {
 	var liquids, cobweb, climable uint32
-	var blocks []world.Block // todo: LevelChunk::blocksInAABBB69420
-	for _, v := range blocks {
+	for _, v := range utils.DefaultCheckBlockSettings(p.Session().GetEntityData().AABB.Grow(0.2), p).SearchAll() {
 		if _, ok := v.(world.Liquid); ok {
 			liquids++
 		} else {
@@ -503,5 +590,37 @@ func (p *Player) handleBlockTicks() {
 	} else {
 		s.Ticks.Climable = 0
 	}
+
+	if !s.HasFlag(session.FlagDead) {
+		s.Ticks.Spawn++
+	} else {
+		s.Ticks.Spawn = 0
+	}
+
 	s.Ticks.Motion++
+}
+
+func (p *Player) AddEffect(effectId int32, effect *effect) {
+	p.effectsMu.Lock()
+	p.effects[effectId] = effect
+	p.effectsMu.Unlock()
+}
+
+func (p *Player) GetEffect(effectId int32) (*effect, bool) {
+	p.effectsMu.Lock()
+	effect, ok := p.effects[effectId]
+	p.effectsMu.Unlock()
+	return effect, ok
+}
+
+func (p *Player) RemoveEffect(effectId int32) {
+	p.effectsMu.Lock()
+	if _, ok := p.effects[effectId]; ok {
+		delete(p.effects, effectId)
+	}
+	p.effectsMu.Unlock()
+}
+
+func (p *Player) AABB() physics.AABB {
+	return p.Session().GetEntityData().AABB
 }
