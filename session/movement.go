@@ -54,96 +54,96 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 				m.Motion = mgl64.Vec3{m.Motion.X(), m.JumpVelocity, m.Motion.Z()}
 			}
 		}
-
-		var1 := 0.91
-		var var3 float64
-		if s.HasFlag(FlagOnGround) {
-			if s.HasFlag(FlagJumping) {
-				m.jump()
-			}
-			if b, ok := player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition.Sub(mgl64.Vec3{0, 1})))).(block.Frictional); ok {
-				var1 *= b.Friction()
-			} else {
-				var1 *= 0.6
-			}
-		} else {
-			if s.HasFlag(FlagSprinting) {
-				var3 = 0.026
-			} else {
-				var3 = 0.02
-			}
-		}
-		// refer to https://media.discordapp.net/attachments/727159224320131133/868630080316928050/unknown.png
-		var2 := math.Pow(0.546/var1, 3)
-		if s.HasFlag(FlagOnGround) {
-			var3 = m.MovementSpeed * var2
-		}
-		m.moveFlying(var3)
-		if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) {
-			f6 := 0.2
-			yMotion := m.ServerPredictedMotion.Y()
-			if yMotion < -0.2 {
-				yMotion = -0.2
-			}
-			if s.HasFlag(FlagSneaking) && yMotion < 0 {
-				yMotion = 0
-			}
-			m.ServerPredictedMotion = mgl64.Vec3{omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6), yMotion, omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6)}
-		}
-		cx, cz := m.moveEntity(player)
-		if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) && s.HasFlag(FlagCollidedHorizontally) {
-			m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X(), 0.2, m.ServerPredictedMotion.Z()}
-		}
-		m.PreviousServerPredictedMotion = m.ServerPredictedMotion
-
-		//	TODO: Find a method that completes full compensation for stairs.
-		//	These 4 lines are shitty hacks to compensate for an improper and incomplete stair prediction.
-		//	In Minecraft bedrock, it seems that the player clips into the stairs, making the minecraft java
-		//	movement code obsolete for this case.
-		var hasStair bool
-		for _, b := range utils.DefaultCheckBlockSettings(entityData.AABB.Grow(0.2), player).SearchAll() {
-			if _, ok := b.Model().(model.Stair); ok {
-				hasStair = true
-				break
-			}
-		}
-
-		if m.ySize > 1e-5 || hasStair && m.ServerPredictedMotion.Y() >= 0 && m.ServerPredictedMotion.Y() < 0.6 && m.Motion.Y() > -1e-6 && m.Motion.Y() < 1 {
-			s.SetFlag(true, FlagOnGround)
-			m.PreviousServerPredictedMotion = m.Motion
-			m.ServerPredictedMotion = m.Motion
-		}
-
-		if s.HasFlag(FlagTeleporting) {
-			m.TeleportOffset = 2
-		}
-
-		if m.TeleportOffset > 0 {
-			yMotion := float64(m.ServerSentMotion.Y())
-			if s.HasFlag(FlagJumping) {
-				yMotion = m.JumpVelocity
-				m.TeleportOffset = 1
-			}
-			s.SetFlag(true, FlagOnGround)
-			m.TeleportOffset--
-			m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X(), yMotion, m.ServerPredictedMotion.Z()}
-		}
-
-		x, y, z := m.ServerPredictedMotion.X(), m.ServerPredictedMotion.Y(), m.ServerPredictedMotion.Z()
-		if cx {
-			x = 0
-		}
-		if s.HasFlag(FlagCollidedVertically) {
-			y = 0
-		}
-		if cz {
-			z = 0
-		}
-		y -= (y - m.Gravity) * utils.GravityMultiplication
-		x *= var1
-		z *= var1
-		m.ServerPredictedMotion = mgl64.Vec3{x, y, z}
 	}
+
+	var1 := 0.91
+	var var3 float64
+	if s.HasFlag(FlagOnGround) {
+		if s.HasFlag(FlagJumping) {
+			m.jump()
+		}
+		if b, ok := player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition.Sub(mgl64.Vec3{0, 1})))).(block.Frictional); ok {
+			var1 *= b.Friction()
+		} else {
+			var1 *= 0.6
+		}
+	} else {
+		if s.HasFlag(FlagSprinting) {
+			var3 = 0.026
+		} else {
+			var3 = 0.02
+		}
+	}
+	// refer to https://media.discordapp.net/attachments/727159224320131133/868630080316928050/unknown.png
+	var2 := math.Pow(0.546/var1, 3)
+	if s.HasFlag(FlagOnGround) {
+		var3 = m.MovementSpeed * var2
+	}
+	m.moveFlying(var3)
+	if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) {
+		f6 := 0.2
+		yMotion := m.ServerPredictedMotion.Y()
+		if yMotion < -0.2 {
+			yMotion = -0.2
+		}
+		if s.HasFlag(FlagSneaking) && yMotion < 0 {
+			yMotion = 0
+		}
+		m.ServerPredictedMotion = mgl64.Vec3{omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6), yMotion, omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6)}
+	}
+	cx, cz := m.moveEntity(player)
+	if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) && s.HasFlag(FlagCollidedHorizontally) {
+		m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X(), 0.2, m.ServerPredictedMotion.Z()}
+	}
+	m.PreviousServerPredictedMotion = m.ServerPredictedMotion
+
+	//	TODO: Find a method that completes full compensation for stairs.
+	//	These 4 lines are shitty hacks to compensate for an improper and incomplete stair prediction.
+	//	In Minecraft bedrock, it seems that the player clips into the stairs, making the minecraft java
+	//	movement code obsolete for this case.
+	var hasStair bool
+	for _, b := range utils.DefaultCheckBlockSettings(entityData.AABB.Grow(0.2), player).SearchAll() {
+		if _, ok := b.Model().(model.Stair); ok {
+			hasStair = true
+			break
+		}
+	}
+
+	if m.ySize > 1e-5 || hasStair && m.ServerPredictedMotion.Y() >= 0 && m.ServerPredictedMotion.Y() < 0.6 && m.Motion.Y() > -1e-6 && m.Motion.Y() < 1 {
+		s.SetFlag(true, FlagOnGround)
+		m.PreviousServerPredictedMotion = m.Motion
+		m.ServerPredictedMotion = m.Motion
+	}
+
+	if s.HasFlag(FlagTeleporting) {
+		m.TeleportOffset = 2
+	}
+
+	if m.TeleportOffset > 0 {
+		yMotion := float64(m.ServerSentMotion.Y())
+		if s.HasFlag(FlagJumping) {
+			yMotion = m.JumpVelocity
+			m.TeleportOffset = 1
+		}
+		s.SetFlag(true, FlagOnGround)
+		m.TeleportOffset--
+		m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X(), yMotion, m.ServerPredictedMotion.Z()}
+	}
+
+	x, y, z := m.ServerPredictedMotion.X(), m.ServerPredictedMotion.Y(), m.ServerPredictedMotion.Z()
+	if cx {
+		x = 0
+	}
+	if s.HasFlag(FlagCollidedVertically) {
+		y = 0
+	}
+	if cz {
+		z = 0
+	}
+	y -= (y - m.Gravity) * utils.GravityMultiplication
+	x *= var1
+	z *= var1
+	m.ServerPredictedMotion = mgl64.Vec3{x, y, z}
 }
 
 func (m *Movement) moveEntity(player utils.HasWorld) (bool, bool) {
