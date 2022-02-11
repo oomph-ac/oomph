@@ -32,8 +32,7 @@ func (m *Movement) Execute(player utils.HasWorld) {
 		s.SetFlag(true, FlagOnGround)
 		s.SetFlag(false, FlagCollidedVertically)
 		m.PreviousServerPredictedMotion = m.Motion
-		serverPredictedMotion := mgl64.Vec3{m.Motion.X(), (m.Motion.Y() - m.Gravity) * utils.GravityMultiplication * (0.6 * 0.91) * (0.6 * 0.91), m.Motion.Z()}
-		m.ServerPredictedMotion = serverPredictedMotion
+		m.ServerPredictedMotion = mgl64.Vec3{m.Motion.X() * (0.6 * 0.91), (m.Motion.Y() - m.Gravity) * utils.GravityMultiplication, m.Motion.Z() * (0.6 * 0.91)}
 	} else {
 		m.moveEntityWithHeading(player)
 	}
