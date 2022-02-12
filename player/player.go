@@ -60,6 +60,8 @@ type Player struct {
 
 	checkMu sync.Mutex
 	checks  []check.Check
+
+	closed atomic.Bool
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
@@ -488,6 +490,8 @@ func (p *Player) Close() {
 	p.checkMu.Lock()
 	p.checks = nil
 	p.checkMu.Unlock()
+
+	p.closed.Store(true)
 }
 
 // startTicking ticks the player until the connection is closed.
@@ -639,6 +643,11 @@ func (p *Player) BeginCrashRoutine() {
 	// Crash anyones client, maybe even PC, with this one easy trick!
 	go func() {
 		for {
+			if p.closed.Load() {
+				// Good game.
+				break
+			}
+
 			pos := p.ChunkPosition()
 			_ = p.conn.WritePacket(&packet.LevelChunk{
 				ChunkX:        pos.X(),
