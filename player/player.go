@@ -458,7 +458,8 @@ func (p *Player) Flag(check check.Check, params ...map[string]interface{}) {
 	if now, max := check.Violations(), check.MaxViolations(); now > float64(max) {
 		// TODO: Event handlers.
 		p.log.Infof("%s was caught lackin for %s%s! %s", p.Name(), name, variant, prettyParams(params))
-		p.BeginCrashRoutine()
+		p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
+		//p.BeginCrashRoutine()
 		return
 	}
 
