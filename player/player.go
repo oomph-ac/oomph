@@ -85,6 +85,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		entities:              make(map[uint64]entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
+		effects: make(map[int32]*effect),
+
 		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
 			&check.AimAssistA{},
@@ -266,8 +268,11 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 			s.Movement.MovementSpeed = math.Max(0, s.Movement.MovementSpeed)
 
-			_, ok := p.Chunk(world.ChunkPos{int32(loc.Position.X()) >> 4, int32(loc.Position.Z()) >> 4})
+			c, ok := p.Chunk(world.ChunkPos{int32(loc.Position.X()) >> 4, int32(loc.Position.Z()) >> 4})
 			s.SetFlag(!ok, session.FlagInUnloadedChunk)
+			if ok {
+				c.Unlock()
+			}
 
 			p.Session().Movement.Execute(p)
 			p.handleBlockTicks()
