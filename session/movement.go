@@ -1,14 +1,16 @@
 package session
 
 import (
+	"math"
+
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
+	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/utils"
-	"math"
 )
 
 type Movement struct {
@@ -153,7 +155,10 @@ func (m *Movement) moveEntity(player utils.HasWorld) (bool, bool) {
 	// TODO: Prediction with collision on cobweb
 	m.ySize *= 0.4
 
-	oldBB := entityData.AABB.Translate(entityData.LastPosition)
+	oldBB := physics.NewAABB(
+		entityData.LastPosition.Sub(mgl64.Vec3{entityData.BBWidth, 0, entityData.BBWidth}),
+		entityData.LastPosition.Add(mgl64.Vec3{entityData.BBWidth, entityData.BBHeight, entityData.BBWidth}),
+	)
 	oldBB = oldBB.GrowVec3(mgl64.Vec3{-0.0025, 0, -0.0025})
 	oldBBClone := oldBB
 
