@@ -293,7 +293,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 		}
 
-		// Run all registered checks.
+		// RunWithTarget all registered checks.
 		p.checkMu.Lock()
 		for _, c := range p.checks {
 			c.Process(p, pk)
@@ -358,9 +358,9 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 			p.MoveActor(rid, omath.Vec32To64(pk.Position))
 		case *packet.LevelChunk:
-			p.Acknowledgement(func() {
-				p.LoadRawChunk(world.ChunkPos{pk.ChunkX, pk.ChunkZ}, pk.RawPayload, pk.SubChunkCount)
-			})
+			//p.Acknowledgement(func() { todo: fuck me
+			p.LoadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
+			//})
 		case *packet.UpdateBlock:
 			block, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 			if ok {
@@ -656,8 +656,7 @@ func (p *Player) BeginCrashRoutine() {
 
 			pos := p.ChunkPosition()
 			_ = p.conn.WritePacket(&packet.LevelChunk{
-				ChunkX:        pos.X(),
-				ChunkZ:        pos.Z(),
+				Position:      protocol.ChunkPos{pos.X(), pos.Z()},
 				SubChunkCount: 25,
 				RawPayload:    brokenData,
 			})

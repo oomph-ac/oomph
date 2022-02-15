@@ -7,7 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/df-mc/dragonfly v0.5.1
 	github.com/go-gl/mathgl v1.0.0
-	github.com/sandertv/gophertunnel v1.18.1
+	github.com/sandertv/gophertunnel v1.19.0
 	github.com/sirupsen/logrus v1.8.1
 	go.uber.org/atomic v1.9.0
 )
