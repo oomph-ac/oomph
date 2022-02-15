@@ -293,7 +293,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			}
 		}
 
-		// RunWithTarget all registered checks.
+		// Run all registered checks.
 		p.checkMu.Lock()
 		for _, c := range p.checks {
 			c.Process(p, pk)
