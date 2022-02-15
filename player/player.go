@@ -130,10 +130,10 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 }
 
 // Teleport sets the position of the player and resets the teleport ticks
-func (p *Player) Teleport(pk *packet.MoveActorAbsolute) {
+func (p *Player) Teleport(pos mgl32.Vec3) {
 	data := p.Session().GetEntityData()
 	data.LastPosition = data.Position
-	data.Position = omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62}))
+	data.Position = omath.Vec32To64(pos.Sub(mgl32.Vec3{0, 1.62}))
 	data.TeleportTicks = 0
 	p.Session().EntityData.Store(data)
 
@@ -349,7 +349,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			rid := pk.EntityRuntimeID
 			if rid == p.rid {
 				p.Acknowledgement(func() {
-					p.Teleport(pk)
+					p.Teleport(pk.Position)
 					if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
 						p.Session().SetFlag(true, session.FlagTeleporting)
 					}
@@ -357,10 +357,19 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 				return
 			}
 			p.MoveActor(rid, omath.Vec32To64(pk.Position))
+		case *packet.MovePlayer:
+			if pk.EntityRuntimeID == p.rid {
+				p.Acknowledgement(func() {
+					p.Teleport(pk.Position)
+					if pk.Mode == packet.MoveModeTeleport {
+						p.Session().SetFlag(true, session.FlagTeleporting)
+					}
+				})
+			}
 		case *packet.LevelChunk:
-			//p.Acknowledgement(func() { todo: fuck me
-			p.LoadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
-			//})
+			p.Acknowledgement(func() {
+				p.LoadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
+			})
 		case *packet.UpdateBlock:
 			block, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 			if ok {
