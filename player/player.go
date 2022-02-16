@@ -656,8 +656,8 @@ func (p *Player) AABB() physics.AABB {
 	return p.Session().GetEntityData().AABB
 }
 
-// SetHandler sets the handler of the player.
-func (p *Player) SetHandler(h Handler) {
+// Handle sets the handler of the player.
+func (p *Player) Handle(h Handler) {
 	p.hMutex.Lock()
 	p.h = h
 	p.hMutex.Unlock()
