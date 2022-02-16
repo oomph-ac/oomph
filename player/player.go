@@ -3,11 +3,12 @@ package player
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/df-mc/dragonfly/server/event"
 	"math"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/df-mc/dragonfly/server/event"
 
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/physics"
