@@ -291,6 +291,8 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 				p.Session().SetFlag(false, session.FlagDead)
 			}
+		case *packet.Text:
+			pk.XUID = ""
 		}
 
 		// Run all registered checks.
