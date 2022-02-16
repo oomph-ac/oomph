@@ -122,14 +122,16 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 // Move moves the player to the given position.
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
-	data := p.Session().GetEntityData()
+	s := p.Session()
+	data := s.GetEntityData()
 	data.LastPosition = data.Position
 	data.Position = omath.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62, 0}))
 	data.AABB = physics.NewAABB(data.Position.Sub(mgl64.Vec3{data.BBWidth, 0, data.BBWidth}), data.Position.Add(mgl64.Vec3{data.BBWidth, data.BBHeight, data.BBWidth}))
 	data.LastRotation = data.Rotation
 	data.Rotation = mgl64.Vec3{float64(pk.Pitch), float64(pk.Yaw), float64(pk.HeadYaw)}
 	data.TeleportTicks++
-	p.Session().EntityData.Store(data)
+	s.EntityData.Store(data)
+	s.Movement.Motion = data.Position.Sub(data.LastPosition)
 
 	p.cleanCache()
 }
