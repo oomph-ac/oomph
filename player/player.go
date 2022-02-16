@@ -491,7 +491,7 @@ func (p *Player) Flag(check check.Check, params map[string]interface{}) {
 
 	if now, max := check.Violations(), check.MaxViolations(); now > float64(max) {
 		ctx := event.C()
-		p.handler().HandlePunishment(ctx, check, params)
+		p.handler().HandlePunishment(ctx, check)
 		ctx.Continue(func() {
 			p.log.Infof("%s was caught lackin for %s%s!", p.Name(), name, variant)
 			p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
