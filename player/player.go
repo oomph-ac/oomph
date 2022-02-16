@@ -482,21 +482,23 @@ func (p *Player) Debug(check check.Check, params map[string]interface{}) {
 func (p *Player) Flag(check check.Check, params map[string]interface{}) {
 	name, variant := check.Name()
 	check.TrackViolation()
+
 	ctx := event.C()
+	p.handler().HandleFlag(ctx, check, params)
+	ctx.Continue(func() {
+		p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, utils.PrettyParams(params))
+	})
+
 	if now, max := check.Violations(), check.MaxViolations(); now > float64(max) {
+		ctx := event.C()
 		p.handler().HandlePunishment(ctx, check, params)
 		ctx.Continue(func() {
-			p.log.Infof("%s was caught lackin for %s%s! %s", p.Name(), name, variant, utils.PrettyParams(params))
+			p.log.Infof("%s was caught lackin for %s%s!", p.Name(), name, variant)
 			p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
 			//p.BeginCrashRoutine()
 		})
 		return
 	}
-
-	p.handler().HandleFlag(ctx, check, params)
-	ctx.Continue(func() {
-		p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, utils.PrettyParams(params))
-	})
 }
 
 // Name ...
