@@ -58,7 +58,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
 				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
 					dist := omath.AABBVectorDistance(t.AABB.GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), omath.Vec32To64(r.attackPos))
-					processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raw"})
+					//processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raw"})
 					if dist > 3.15 {
 						if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 300)) >= 5 {
 							processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 4), "type": "raw"})
@@ -88,7 +88,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 					vec64AttackPos := omath.Vec32To64(r.attackPos)
 					if raycast, ok := trace.AABBIntercept(aabb, vec64AttackPos, vec64AttackPos.Add(dv.Mul(14.0))); ok {
 						dist := raycast.Position().Sub(vec64AttackPos).Len()
-						processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raycast"})
+						//processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raycast"})
 						if dist >= 3.1 && math.Abs(dist-omath.AABBVectorDistance(aabb, vec64AttackPos)) < 0.4 {
 							if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 100), 3.1) >= 3 {
 								processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 2), "type": "raycast"})
