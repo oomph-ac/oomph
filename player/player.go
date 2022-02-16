@@ -458,7 +458,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 				})
 			}
 		}
-		fmt.Printf("received packet: %T\n", pk)
+		p.log.Debugf("received packet: %T\n", pk)
 	}
 }
 
