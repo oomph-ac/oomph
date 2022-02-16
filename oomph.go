@@ -1,49 +1,73 @@
-package main
+package oomph
 
 import (
 	"errors"
 	"fmt"
-	"github.com/RestartFU/gophig"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
-	"log"
-	"os"
 	"sync"
 )
 
-func main() {
-	config := readConfig()
+type Oomph struct {
+	playerMutex sync.Mutex
+	playerChan  chan *player.Player
+	players     map[string]*player.Player
+}
 
-	p, err := minecraft.NewForeignStatusProvider(config.Connection.RemoteAddress)
+// New returns a new Oomph instance.
+func New() *Oomph {
+	return &Oomph{
+		players:    make(map[string]*player.Player),
+		playerChan: make(chan *player.Player),
+	}
+}
+
+// Accept accepts an incoming player into the server. It blocks until a player connects to the server.
+// Accept returns an error if the Server is no longer available.
+func (o *Oomph) Accept() (*player.Player, error) {
+	p, ok := <-o.playerChan
+	if !ok {
+		return nil, errors.New("oomph shutdown")
+	}
+	o.playerMutex.Lock()
+	o.players[p.Name()] = p
+	o.playerMutex.Unlock()
+	return p, nil
+}
+
+// Start will start oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
+// Addresses should be formatted in the following format: "ip:port", ex: "127.0.0.1:19132"
+func (o *Oomph) Start(remoteAddr, localAddr string) error {
+	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
 		panic(err)
 	}
 	listener, err := minecraft.ListenConfig{
 		StatusProvider: p,
-	}.Listen("raknet", config.Connection.LocalAddress)
+	}.Listen("raknet", localAddr)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer listener.Close()
-	fmt.Printf("Oomph is now listening on %v and directing connections to %v!\n", config.Connection.LocalAddress, config.Connection.RemoteAddress)
+	fmt.Printf("Oomph is now listening on %v and directing connections to %v!\n", localAddr, remoteAddr)
 	for {
 		c, err := listener.Accept()
 		if err != nil {
 			panic(err)
 		}
-		go handleConn(c.(*minecraft.Conn), listener, config)
+		go o.handleConn(c.(*minecraft.Conn), listener, remoteAddr)
 	}
 }
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
-func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config config) {
+func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, remoteAddr string) {
 	serverConn, err := minecraft.Dialer{
 		IdentityData:      conn.IdentityData(),
 		ClientData:        conn.ClientData(),
 		EnableClientCache: true,
-	}.Dial("raknet", config.Connection.RemoteAddress)
+	}.Dial("raknet", remoteAddr)
 	if err != nil {
 		return
 	}
@@ -70,6 +94,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 
 	viewDistance := int32(8)
 	p := player.NewPlayer(lg, world.Overworld, viewDistance, conn, serverConn)
+	o.playerChan <- p
 
 	g.Add(2)
 	go func() {
@@ -114,33 +139,4 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener, config confi
 	}()
 	g.Wait()
 	p.Close()
-}
-
-type config struct {
-	Connection struct {
-		LocalAddress  string
-		RemoteAddress string
-	}
-}
-
-func readConfig() config {
-	var c config
-	if _, err := os.Stat("config.toml"); os.IsNotExist(err) {
-		if err := gophig.SetConfComplex("config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
-			log.Fatalf("error creating config: %v", err)
-		}
-	}
-	if err := gophig.GetConfComplex("config.toml", gophig.TOMLMarshaler{}, &c); err != nil {
-		log.Fatalf("error reading config: %v", err)
-	}
-	if c.Connection.LocalAddress == "" {
-		c.Connection.LocalAddress = "0.0.0.0:19132"
-	}
-	if c.Connection.RemoteAddress == "" {
-		c.Connection.RemoteAddress = "0.0.0.0:19133"
-	}
-	if err := gophig.SetConfComplex("config.toml", gophig.TOMLMarshaler{}, c, 0777); err != nil {
-		log.Fatalf("error writing config file: %v", err)
-	}
-	return c
 }
