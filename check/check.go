@@ -23,9 +23,9 @@ type Processor interface {
 	// Session returns the session assigned to the processor.
 	Session() *session.Session
 	// Debug debugs the given parameters to the processor.
-	Debug(check Check, params ...map[string]interface{})
+	Debug(check Check, params map[string]interface{})
 	// Flag flags the given check with the given parameters.
-	Flag(check Check, params ...map[string]interface{})
+	Flag(check Check, params map[string]interface{})
 }
 
 // Check represents any form of detection model which can process packets for unexpected behaviour.

@@ -3,9 +3,9 @@ package player
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/df-mc/dragonfly/server/event"
 	"math"
 	"math/rand"
-	"strings"
 	"sync"
 	"time"
 
@@ -50,6 +50,10 @@ type Player struct {
 
 	// s holds the session of the player.
 	s atomic.Value
+
+	// h holds the current handler of the player. It may be changed at any time by calling the Start method.
+	h      Handler
+	hMutex sync.RWMutex
 
 	entityMu              sync.Mutex
 	entities              map[uint64]entity.Entity
@@ -463,24 +467,34 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 }
 
 // Debug debugs the given check data to the console and other relevant sources.
-func (p *Player) Debug(check check.Check, params ...map[string]interface{}) {
+func (p *Player) Debug(check check.Check, params map[string]interface{}) {
 	name, variant := check.Name()
-	p.log.Debugf("%s (%s%s): %s", p.Name(), name, variant, prettyParams(params))
+	ctx := event.C()
+	p.handler().HandleDebug(ctx, check, params)
+	ctx.Continue(func() {
+		p.log.Debugf("%s (%s%s): %s", p.Name(), name, variant, utils.PrettyParams(params))
+	})
 }
 
 // Flag flags the given check data to the console and other relevant sources.
-func (p *Player) Flag(check check.Check, params ...map[string]interface{}) {
+func (p *Player) Flag(check check.Check, params map[string]interface{}) {
 	name, variant := check.Name()
 	check.TrackViolation()
+	ctx := event.C()
 	if now, max := check.Violations(), check.MaxViolations(); now > float64(max) {
-		// TODO: Event handlers.
-		p.log.Infof("%s was caught lackin for %s%s! %s", p.Name(), name, variant, prettyParams(params))
-		p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
-		//p.BeginCrashRoutine()
+		p.handler().HandlePunishment(ctx, check, params)
+		ctx.Continue(func() {
+			p.log.Infof("%s was caught lackin for %s%s! %s", p.Name(), name, variant, utils.PrettyParams(params))
+			p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
+			//p.BeginCrashRoutine()
+		})
 		return
 	}
 
-	p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, prettyParams(params))
+	p.handler().HandleFlag(ctx, check, params)
+	ctx.Continue(func() {
+		p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, utils.PrettyParams(params))
+	})
 }
 
 // Name ...
@@ -519,16 +533,6 @@ func (p *Player) startTicking() {
 		p.conn.Flush() // make sure the network stack latency packet gets to the client ASAP
 		p.serverTick++
 	}
-}
-
-// prettyParams converts the given parameters to a readable string.
-func prettyParams(params []map[string]interface{}) string {
-	if len(params) == 0 {
-		// Don't waste our time if there are no parameters.
-		return "[]"
-	}
-	// Hacky but simple way to create a readable string.
-	return strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(fmt.Sprint(params[0]), "map"), " ", ", "), ":", "=")
 }
 
 // protocolPosToCubePos converts a protocol.BlockPos to a cube.Pos.
@@ -648,6 +652,20 @@ func (p *Player) RemoveEffect(effectId int32) {
 
 func (p *Player) AABB() physics.AABB {
 	return p.Session().GetEntityData().AABB
+}
+
+// SetHandler sets the handler of the player.
+func (p *Player) SetHandler(h Handler) {
+	p.hMutex.Lock()
+	p.h = h
+	p.hMutex.Unlock()
+}
+
+// handler returns the handler of the player.
+func (p *Player) handler() Handler {
+	p.hMutex.Lock()
+	defer p.hMutex.Unlock()
+	return p.h
 }
 
 var brokenData []byte
