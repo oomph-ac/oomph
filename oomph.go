@@ -64,9 +64,8 @@ func (o *Oomph) Start(remoteAddr, localAddr string) error {
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
 func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, remoteAddr string) {
 	serverConn, err := minecraft.Dialer{
-		IdentityData:      conn.IdentityData(),
-		ClientData:        conn.ClientData(),
-		EnableClientCache: true,
+		IdentityData: conn.IdentityData(),
+		ClientData:   conn.ClientData(),
 	}.Dial("raknet", remoteAddr)
 	if err != nil {
 		return
