@@ -85,6 +85,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		chunks:    make(map[world.ChunkPos]*chunk.Chunk),
 		dimension: dimension,
 
+		h: NopHandler{},
+
 		acknowledgements: make(map[int64]func()),
 
 		entities:              make(map[uint64]entity.Entity),
