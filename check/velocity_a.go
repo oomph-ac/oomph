@@ -42,7 +42,7 @@ func (v *VelocityA) Process(processor Processor, pk packet.Packet) {
 		}
 		velo := s.Movement.Motion.Y() / s.Movement.PreviousServerPredictedMotion.Y()
 		processor.Debug(v, map[string]interface{}{"velo": velo})
-		if velo < 0.99999 || velo > 1.1 {
+		if velo <= 0.99999 || velo >= 1.1 {
 			if v.Buff(1) >= 12 {
 				processor.Flag(v, map[string]interface{}{"velo": velo})
 			} else {
