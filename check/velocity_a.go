@@ -2,6 +2,7 @@ package check
 
 import (
 	"github.com/justtaldevelops/oomph/check/punishment"
+	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"math"
@@ -41,10 +42,10 @@ func (v *VelocityA) Process(processor Processor, pk packet.Packet) {
 			return
 		}
 		velo := s.Movement.Motion.Y() / s.Movement.PreviousServerPredictedMotion.Y()
-		processor.Debug(v, map[string]interface{}{"velo": velo})
+		//processor.Debug(v, map[string]interface{}{"velo": velo})
 		if velo <= 0.99999 || velo >= 1.1 {
 			if v.Buff(1) >= 12 {
-				processor.Flag(v, map[string]interface{}{"velo": velo})
+				processor.Flag(v, map[string]interface{}{"velo": omath.Round(velo, 6)})
 			} else {
 				v.Buff(-0.05)
 				v.violations = math.Max(v.violations-0.025, 0)
