@@ -1,11 +1,12 @@
 package check
 
 import (
+	"math"
+
 	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // VelocityB checks if a player is taking an abnormal amount of vertical knockback.
@@ -44,7 +45,7 @@ func (v *VelocityB) Process(processor Processor, pk packet.Packet) {
 			zVal := m.Motion.Z() / m.PreviousServerPredictedMotion.Z()
 			if (xVal <= 0.9999 && zVal <= 0.9999) || (xVal >= 1.5 || zVal >= 1.5) && !s.HasFlag(session.FlagTeleporting) {
 				if v.updateAndGetViolationAfterTicks(processor.ClientTick(), 400) >= 3 {
-					processor.Flag(v, map[string]interface{}{"x": omath.Round(xVal, 5), "z": omath.Round(zVal, 5)})
+					processor.Flag(v, map[string]interface{}{"x": omath.Round(xVal, 6), "z": omath.Round(zVal, 6)})
 				}
 			} else {
 				v.Buff(-0.1)
