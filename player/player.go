@@ -283,7 +283,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 				c.Unlock()
 			}
 
-			p.Session().Movement.Execute(p)
+			s.Movement.Execute(p)
 			p.handleBlockTicks()
 			p.tickEntityLocations()
 		case *packet.LevelSoundEvent:

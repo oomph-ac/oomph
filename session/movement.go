@@ -94,7 +94,7 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 	}
 	cx, cz := m.moveEntity(player)
 	if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) && s.HasFlag(FlagCollidedHorizontally) {
-		m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X(), 0.2, m.ServerPredictedMotion.Z()}
+		m.ServerPredictedMotion[1] = 0.2
 	}
 	m.PreviousServerPredictedMotion = m.ServerPredictedMotion
 
@@ -141,7 +141,7 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 	if cz {
 		z = 0
 	}
-	y -= (y - m.Gravity) * utils.GravityMultiplication
+	y = (y - m.Gravity) * utils.GravityMultiplication
 	x *= var1
 	z *= var1
 	m.ServerPredictedMotion = mgl64.Vec3{x, y, z}
@@ -159,7 +159,6 @@ func (m *Movement) moveEntity(player utils.HasWorld) (bool, bool) {
 		entityData.LastPosition.Sub(mgl64.Vec3{entityData.BBWidth, 0, entityData.BBWidth}),
 		entityData.LastPosition.Add(mgl64.Vec3{entityData.BBWidth, entityData.BBHeight, entityData.BBWidth}),
 	)
-	oldBB = oldBB.GrowVec3(mgl64.Vec3{-0.0025, 0, -0.0025})
 	oldBBClone := oldBB
 
 	if s.HasAllFlags(FlagOnGround, FlagSneaking) {
@@ -186,16 +185,16 @@ func (m *Movement) moveEntity(player utils.HasWorld) (bool, bool) {
 
 	list := utils.GetCollisionBBList(oldBB.Extend(mgl64.Vec3{dx, dy, dz}), player)
 	for _, b := range list {
-		dy = b.CalculateYOffset(oldBB, dy)
+		dy = oldBB.CalculateYOffset(b, dy)
 	}
 	oldBB = oldBB.Translate(mgl64.Vec3{0, dy, 0})
 	notFallingFlag := s.HasFlag(FlagOnGround) || (movY != dy && movY < 0)
 	for _, b := range list {
-		dx = b.CalculateXOffset(oldBB, dx)
+		dx = oldBB.CalculateXOffset(b, dx)
 	}
 	oldBB = oldBB.Translate(mgl64.Vec3{dx, 0, 0})
 	for _, b := range list {
-		dz = b.CalculateZOffset(oldBB, dz)
+		dz = oldBB.CalculateZOffset(b, dz)
 	}
 	oldBB = oldBB.Translate(mgl64.Vec3{0, 0, dz})
 
@@ -209,24 +208,24 @@ func (m *Movement) moveEntity(player utils.HasWorld) (bool, bool) {
 
 		list = utils.GetCollisionBBList(oldBB.Extend(mgl64.Vec3{dx, dy, dz}), player)
 		for _, b := range list {
-			dy = b.CalculateYOffset(oldBB, dy)
+			dy = oldBB.CalculateYOffset(b, dy)
 		}
 
 		oldBB = oldBB.Translate(mgl64.Vec3{0, dy, 0})
 		for _, b := range list {
-			dx = b.CalculateYOffset(oldBB, dx)
+			dx = oldBB.CalculateYOffset(b, dx)
 		}
 
 		oldBB = oldBB.Translate(mgl64.Vec3{dx, 0, 0})
 		for _, b := range list {
-			dz = b.CalculateYOffset(oldBB, dz)
+			dz = oldBB.CalculateYOffset(b, dz)
 		}
 
 		oldBB = oldBB.Translate(mgl64.Vec3{0, 0, dz})
 
 		reverseDY := -dy
 		for _, b := range list {
-			reverseDY = b.CalculateYOffset(oldBB, reverseDY)
+			reverseDY = oldBB.CalculateYOffset(b, reverseDY)
 		}
 		dy = 0
 		oldBB = oldBB.Translate(mgl64.Vec3{0, reverseDY, 0})
@@ -256,17 +255,18 @@ func (m *Movement) moveFlying(friction float64) {
 		var1 = friction / var1
 		forward := m.MoveForward * var1
 		strafe := m.MoveStrafe * var1
-		yaw := m.Session.GetEntityData().Rotation.X()
+		yaw := m.Session.GetEntityData().Rotation.Y()
 		var2 := omath.MCSin(yaw * math.Pi / 180)
 		var3 := omath.MCCos(yaw * math.Pi / 180)
-		m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X() + (strafe*var3 - forward*var2), m.ServerPredictedMotion.Y(), m.ServerPredictedMotion.Z() + (forward*var3 + strafe*var2)}
+		m.ServerPredictedMotion[0] += (strafe*var3 - forward*var2)
+		m.ServerPredictedMotion[2] += (forward*var3 + strafe*var2)
 	}
 }
 
 func (m *Movement) jump() {
 	m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X(), m.JumpVelocity, m.ServerPredictedMotion.Z()}
 	if m.Session.HasFlag(FlagSprinting) {
-		f := m.Session.GetEntityData().Rotation.X() * 0.017453292
+		f := m.Session.GetEntityData().Rotation.Y() * 0.017453292
 		m.ServerPredictedMotion = mgl64.Vec3{m.ServerPredictedMotion.X() - omath.MCSin(f)*0.2, m.ServerPredictedMotion.Y(), m.ServerPredictedMotion.Z() + omath.MCCos(f)*0.2}
 	}
 }
