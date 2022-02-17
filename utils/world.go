@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"math"
+
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
@@ -108,16 +110,19 @@ func (c CheckBlock) SearchTransparent() (blocks []world.Block) {
 }
 
 func GetCollisionBBList(aabb physics.AABB, w HasWorld) (list []physics.AABB) {
-	aabb = aabb.Grow(1)
-	min, max := aabb.Min(), aabb.Max()
-	for z := min.Z(); z <= max.Z(); z++ {
-		for x := min.X(); x <= max.X(); x++ {
-			for y := min.Y(); y <= max.Y(); y++ {
+	cloneBB := aabb.Grow(1)
+	min, max := cloneBB.Min(), cloneBB.Max()
+	for z := math.Floor(min.Z()); z <= math.Ceil(max.Z()); z++ {
+		for x := math.Floor(min.X()); x <= math.Ceil(max.X()); x++ {
+			for y := math.Floor(min.Y()); y <= math.Ceil(max.Y()); y++ {
 				pos := cube.Pos{int(x), int(y), int(z)}
 				b := w.Block(pos)
-				if CanPassThroughBlock(b, pos, w) {
+				if !CanPassThroughBlock(b, pos, w) {
 					for _, bb := range GetAABBS(b, pos, w) {
-						bb = bb.GrowVec3(mgl64.Vec3{0.001, 0, 0.001})
+						bb = physics.NewAABB(
+							pos.Vec3().Sub(mgl64.Vec3{bb.Width(), 0, bb.Width()}),
+							pos.Vec3().Add(mgl64.Vec3{bb.Width(), bb.Height(), bb.Width()}),
+						)
 						if bb.IntersectsWith(aabb) {
 							list = append(list, bb)
 						}

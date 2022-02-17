@@ -1,3 +1,4 @@
 .idea/
 config.toml
 token.tok
+tests/*
