@@ -1,11 +1,12 @@
 package check
 
 import (
+	"math"
+
 	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // VelocityB checks if a player is taking an abnormal amount of vertical knockback.
