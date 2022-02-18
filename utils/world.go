@@ -112,15 +112,15 @@ func (c CheckBlock) SearchTransparent() (blocks []world.Block) {
 func GetCollisionBBList(aabb physics.AABB, w HasWorld) (list []physics.AABB) {
 	cloneBB := aabb.Grow(1)
 	min, max := cloneBB.Min(), cloneBB.Max()
-	for z := math.Floor(min.Z()); z <= math.Ceil(max.Z()); z++ {
-		for x := math.Floor(min.X()); x <= math.Ceil(max.X()); x++ {
-			for y := math.Floor(min.Y()); y <= math.Ceil(max.Y()); y++ {
+	for z := math.Floor(min.Z()); z <= math.Floor(max.Z()); z++ {
+		for x := math.Floor(min.X()); x <= math.Floor(max.X()); x++ {
+			for y := math.Floor(min.Y()); y <= math.Floor(max.Y()); y++ {
 				pos := cube.Pos{int(x), int(y), int(z)}
 				b := w.Block(pos)
 				if !CanPassThroughBlock(b, pos, w) {
 					for _, bb := range GetAABBS(b, pos, w) {
 						bb = physics.NewAABB(
-							pos.Vec3().Sub(mgl64.Vec3{bb.Width(), 0, bb.Width()}),
+							pos.Vec3(),
 							pos.Vec3().Add(mgl64.Vec3{bb.Width(), bb.Height(), bb.Width()}),
 						)
 						if bb.IntersectsWith(aabb) {

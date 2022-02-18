@@ -57,7 +57,7 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 		}
 	}
 
-	var1 := 0.91
+	var1 := 0.98
 	var var3 float64
 	if s.HasFlag(FlagOnGround) {
 		if s.HasFlag(FlagJumping) {
@@ -80,7 +80,9 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 	if s.HasFlag(FlagOnGround) {
 		var3 = m.MovementSpeed * var2
 	}
+
 	m.moveFlying(var3)
+
 	if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) {
 		f6 := 0.2
 		yMotion := m.ServerPredictedMotion.Y()
@@ -92,7 +94,9 @@ func (m *Movement) moveEntityWithHeading(player utils.HasWorld) {
 		}
 		m.ServerPredictedMotion = mgl64.Vec3{omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6), yMotion, omath.ClampFloat(m.ServerPredictedMotion.Z(), -f6, f6)}
 	}
+
 	cx, cz := m.moveEntity(player)
+
 	if utils.BlockClimable(player.Block(cube.PosFromVec3(omath.FloorVec64(entityData.LastPosition)))) && s.HasFlag(FlagCollidedHorizontally) {
 		m.ServerPredictedMotion[1] = 0.2
 	}
@@ -183,12 +187,14 @@ func (m *Movement) moveEntity(player utils.HasWorld) (bool, bool) {
 		}
 	}
 
-	list := utils.GetCollisionBBList(oldBB.Extend(mgl64.Vec3{dx, dy, dz}), player)
+	clone := oldBB
+	list := utils.GetCollisionBBList(clone.Extend(mgl64.Vec3{dx, dy, dz}), player)
 	for _, b := range list {
 		dy = oldBB.CalculateYOffset(b, dy)
 	}
 	oldBB = oldBB.Translate(mgl64.Vec3{0, dy, 0})
 	notFallingFlag := s.HasFlag(FlagOnGround) || (movY != dy && movY < 0)
+
 	for _, b := range list {
 		dx = oldBB.CalculateXOffset(b, dx)
 	}
@@ -213,12 +219,12 @@ func (m *Movement) moveEntity(player utils.HasWorld) (bool, bool) {
 
 		oldBB = oldBB.Translate(mgl64.Vec3{0, dy, 0})
 		for _, b := range list {
-			dx = oldBB.CalculateYOffset(b, dx)
+			dx = oldBB.CalculateXOffset(b, dx)
 		}
 
 		oldBB = oldBB.Translate(mgl64.Vec3{dx, 0, 0})
 		for _, b := range list {
-			dz = oldBB.CalculateYOffset(b, dz)
+			dz = oldBB.CalculateZOffset(b, dz)
 		}
 
 		oldBB = oldBB.Translate(mgl64.Vec3{0, 0, dz})
