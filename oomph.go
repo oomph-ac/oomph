@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/justtaldevelops/oomph/oomph"
 	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
@@ -14,6 +15,8 @@ type Oomph struct {
 	playerMutex sync.Mutex
 	playerChan  chan *player.Player
 	players     map[string]*player.Player
+	allower     oomph.Allower
+	closer      oomph.Closer
 }
 
 // New returns a new Oomph instance.
@@ -35,6 +38,17 @@ func (o *Oomph) Accept() (*player.Player, error) {
 	o.players[p.Name()] = p
 	o.playerMutex.Unlock()
 	return p, nil
+}
+
+// SetAllower makes Oomph filter which connections to the Server are accepted. Connections on which the Allower returns
+// false are rejected immediately. If nil is passed, all connections are accepted.
+func (o *Oomph) SetAllower(a oomph.Allower) {
+	o.allower = a
+}
+
+// SetCloser lets you handle players that leave before they fully join.
+func (o *Oomph) SetCloser(c oomph.Closer) {
+	o.closer = c
 }
 
 // Start will start oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
@@ -69,6 +83,17 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}.Dial("raknet", remoteAddr)
 	if err != nil {
 		return
+	}
+
+	if o.closer != nil {
+		defer o.closer.Close(conn)
+	}
+
+	if o.allower != nil {
+		if dc, ok := o.allower.Allow(conn.RemoteAddr(), conn.IdentityData(), conn.ClientData()); !ok {
+			_ = listener.Disconnect(conn, dc)
+			return
+		}
 	}
 
 	var g sync.WaitGroup
