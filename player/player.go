@@ -305,7 +305,9 @@ func (p *Player) Process(pk packet.Packet, fromClient bool) {
 				p.Session().SetFlag(false, session.FlagDead)
 			}
 		case *packet.Text:
-			pk.XUID = ""
+			if p.serverConn != nil {
+				pk.XUID = ""
+			}
 		}
 
 		// Run all registered checks.
