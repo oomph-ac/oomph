@@ -16,7 +16,7 @@ type listener struct {
 
 // Listener should be used in place of New for dragonfly servers. This allows you to have the proxy and server
 // both use a single Gophertunnel connection.
-func Listener(o *Oomph) server.Listener {
+func (o *Oomph) Listener() server.Listener {
 	return listener{o: o}
 }
 
