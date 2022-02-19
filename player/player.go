@@ -656,9 +656,7 @@ func (p *Player) GetEffect(effectId int32) (*effect, bool) {
 
 func (p *Player) RemoveEffect(effectId int32) {
 	p.effectsMu.Lock()
-	if _, ok := p.effects[effectId]; ok {
-		delete(p.effects, effectId)
-	}
+	delete(p.effects, effectId)
 	p.effectsMu.Unlock()
 }
 
