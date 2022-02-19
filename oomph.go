@@ -20,6 +20,7 @@ type Oomph struct {
 }
 
 // New returns a new Oomph instance.
+// If your server is using Dragonfly, be sure to use the Listener function instead.
 func New() *Oomph {
 	return &Oomph{
 		players:    make(map[string]*player.Player),
@@ -116,8 +117,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	lg.Formatter = &logrus.TextFormatter{ForceColors: true}
 	lg.Level = logrus.DebugLevel
 
-	viewDistance := int32(8)
-	p := player.NewPlayer(lg, world.Overworld, viewDistance, conn, serverConn)
+	p := player.NewPlayer(lg, world.Overworld, 8, conn, serverConn)
 	o.playerChan <- p
 
 	g.Add(2)
@@ -132,7 +132,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			if err != nil {
 				return
 			}
-			p.Process(pk, conn)
+			p.Process(pk, true)
 			if err := serverConn.WritePacket(pk); err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					_ = listener.Disconnect(conn, disconnect.Error())
@@ -155,12 +155,12 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				}
 				return
 			}
-			p.Process(pk, serverConn)
+			p.Process(pk, false)
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}
 		}
 	}()
 	g.Wait()
-	p.Close()
+	p.ClosePlayer()
 }

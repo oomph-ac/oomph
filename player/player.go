@@ -223,9 +223,8 @@ func (p *Player) handleAcknowledgement(t int64) {
 }
 
 // Process processes the given packet.
-func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
-	switch conn {
-	case p.conn:
+func (p *Player) Process(pk packet.Packet, fromClient bool) {
+	if fromClient {
 		p.Session().SetFlag(false, session.FlagClicking)
 		switch pk := pk.(type) {
 		case *packet.NetworkStackLatency:
@@ -315,7 +314,7 @@ func (p *Player) Process(pk packet.Packet, conn *minecraft.Conn) {
 			c.Process(p, pk)
 		}
 		p.checkMu.Unlock()
-	case p.serverConn:
+	} else {
 		switch pk := pk.(type) {
 		case *packet.AddPlayer:
 			if pk.EntityRuntimeID == p.rid {
@@ -516,13 +515,15 @@ func (p *Player) Name() string {
 // Disconnect disconnects the player for the reason provided.
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
-	p.Close()
+	p.ClosePlayer()
 }
 
-// Close closes the player.
-func (p *Player) Close() {
-	_, _ = p.conn.Flush(), p.serverConn.Flush()
-	_, _ = p.conn.Close(), p.serverConn.Close()
+// ClosePlayer closes the player.
+func (p *Player) ClosePlayer() {
+	_ = p.conn.Close()
+	if p.serverConn != nil {
+		_ = p.serverConn.Close()
+	}
 
 	p.serverTicker.Stop()
 
