@@ -54,7 +54,8 @@ func (o *Oomph) SetCloser(c oomph.Closer) {
 }
 
 // Start will start oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
-// Addresses should be formatted in the following format: "ip:port", ex: "127.0.0.1:19132"
+// Addresses should be formatted in the following format: "ip:port", ex: "127.0.0.1:19132".
+// If you're using dragonfly, use Listen instead of Start.
 func (o *Oomph) Start(remoteAddr, localAddr string) error {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
