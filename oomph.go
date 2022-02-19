@@ -3,12 +3,13 @@ package oomph
 import (
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/justtaldevelops/oomph/oomph"
 	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 type Oomph struct {

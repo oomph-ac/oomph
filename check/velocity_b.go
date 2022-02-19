@@ -43,8 +43,8 @@ func (v *VelocityB) Process(processor Processor, pk packet.Packet) {
 		if s.Ticks.Motion == 1 && math.Abs(m.PreviousServerPredictedMotion.X()) > 0.01 && math.Abs(m.PreviousServerPredictedMotion.Z()) > 0.01 {
 			xVal := m.Motion.X() / m.PreviousServerPredictedMotion.X()
 			zVal := m.Motion.Z() / m.PreviousServerPredictedMotion.Z()
-			if (xVal <= 0.9999 && zVal <= 0.9999) || (xVal >= 1.5 || zVal >= 1.5) && !s.HasFlag(session.FlagTeleporting) {
-				if v.updateAndGetViolationAfterTicks(processor.ClientTick(), 400) >= 3 {
+			if ((xVal <= 0.9999 && zVal <= 0.9999) || (xVal >= 1.5 || zVal >= 1.5)) && !s.HasFlag(session.FlagTeleporting) && !s.HasFlag(session.FlagCollidedHorizontally) {
+				if v.Buff(v.updateAndGetViolationAfterTicks(processor.ClientTick(), 400)) >= 3 {
 					processor.Flag(v, map[string]interface{}{"x": omath.Round(xVal, 6), "z": omath.Round(zVal, 6)})
 				}
 			} else {

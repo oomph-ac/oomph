@@ -1,11 +1,12 @@
 package check
 
 import (
+	"math"
+
 	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // VelocityA checks if a player is taking an abnormal amount of vertical knockback.
@@ -38,7 +39,7 @@ func (v *VelocityA) Process(processor Processor, pk packet.Packet) {
 	switch pk.(type) {
 	case *packet.PlayerAuthInput:
 		s := processor.Session()
-		if s.Ticks.Motion != 1 || s.Ticks.Climable < 10 || s.Ticks.Cobweb < 10 || s.Ticks.Liquid < 10 || s.HasFlag(session.FlagTeleporting) || s.Movement.PreviousServerPredictedMotion.Y() < 0.005 {
+		if s.Ticks.Motion != 1 || s.Ticks.Climable < 10 || s.Ticks.Cobweb < 10 || s.Ticks.Liquid < 10 || s.HasFlag(session.FlagTeleporting) || s.HasFlag(session.FlagCollidedVertically) || s.Movement.PreviousServerPredictedMotion.Y() < 0.005 {
 			return
 		}
 		velo := s.Movement.Motion.Y() / s.Movement.PreviousServerPredictedMotion.Y()
