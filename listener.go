@@ -11,12 +11,13 @@ import (
 
 type listener struct {
 	*minecraft.Listener
+	o *Oomph
 }
 
-// NewListener should be used in place of New for dragonfly servers. This allows you to have the proxy and server
+// Listener should be used in place of New for dragonfly servers. This allows you to have the proxy and server
 // both use a single Gophertunnel connection.
-func NewListener() server.Listener {
-	return listener{}
+func Listener(o *Oomph) server.Listener {
+	return listener{o: o}
 }
 
 // Accept blocks until the next connection is established and returns it. An error is returned if the Listener was
@@ -32,6 +33,7 @@ func (l listener) Accept() (session.Conn, error) {
 	lg.Level = logrus.DebugLevel
 
 	p := player.NewPlayer(lg, world.Overworld, 8, c.(*minecraft.Conn), nil)
+	l.o.playerChan <- p
 	return p, err
 }
 
