@@ -60,20 +60,20 @@ func (o *Oomph) Start(remoteAddr, localAddr string) error {
 	if err != nil {
 		panic(err)
 	}
-	listener, err := minecraft.ListenConfig{
+	l, err := minecraft.ListenConfig{
 		StatusProvider: p,
 	}.Listen("raknet", localAddr)
 	if err != nil {
 		return err
 	}
-	defer listener.Close()
+	defer l.Close()
 	fmt.Printf("Oomph is now listening on %v and directing connections to %v!\n", localAddr, remoteAddr)
 	for {
-		c, err := listener.Accept()
+		c, err := l.Accept()
 		if err != nil {
 			panic(err)
 		}
-		go o.handleConn(c.(*minecraft.Conn), listener, remoteAddr)
+		go o.handleConn(c.(*minecraft.Conn), l, remoteAddr)
 	}
 }
 
