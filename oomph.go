@@ -89,7 +89,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}
 
 	if o.closer != nil {
-		defer o.closer.Close(conn)
+		defer o.closer.Close(conn.IdentityData())
 	}
 
 	if o.allower != nil {
