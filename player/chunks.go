@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
@@ -15,6 +16,7 @@ func (p *Player) LoadRawChunk(pos world.ChunkPos, data []byte, subChunkCount uin
 		p.log.Errorf("failed to parse chunk at %v: %v", pos, err)
 		return
 	}
+	fmt.Println("loaded chunk:", pos)
 	ch.Compact()
 	p.LoadChunk(pos, ch)
 }
