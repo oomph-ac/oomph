@@ -1,7 +1,6 @@
 package oomph
 
 import (
-	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"net"
 )
@@ -21,5 +20,5 @@ type Allower interface {
 type Closer interface {
 	// Close allows you to handle the player leaving the server. This is necessary incase you're using Allower
 	// and the player leaves before they fully join, it allows you to unset anything you may have saved such as a player session.
-	Close(c *minecraft.Conn)
+	Close(d login.IdentityData)
 }

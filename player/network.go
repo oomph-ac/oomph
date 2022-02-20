@@ -9,41 +9,41 @@ import (
 	"time"
 )
 
-// Close closes the Conn and its underlying connection. Before closing, it also calls Flush() so that any
+// Close closes the conn and its underlying connection. Before closing, it also calls Flush() so that any
 // packets currently pending are sent out.
 func (p *Player) Close() error {
 	p.ClosePlayer()
 	return p.conn.Close()
 }
 
-// IdentityData returns the login.IdentityData of a Conn. It contains the UUID, XUID and username of the connection.
+// IdentityData returns the login.IdentityData of a conn. It contains the UUID, XUID and username of the connection.
 func (p *Player) IdentityData() login.IdentityData {
 	return p.conn.IdentityData()
 }
 
-// ClientData returns the login.ClientData of a Conn. This includes less sensitive data of the player like its skin,
+// ClientData returns the login.ClientData of a conn. This includes less sensitive data of the player like its skin,
 // language code and other non-essential information.
 func (p *Player) ClientData() login.ClientData {
 	return p.conn.ClientData()
 }
 
-// ClientCacheEnabled specifies if the Conn has the client cache, used for caching chunks client-side, enabled or
+// ClientCacheEnabled specifies if the conn has the client cache, used for caching chunks client-side, enabled or
 // not. Some platforms, like the Nintendo Switch, have this disabled at all times.
 func (p *Player) ClientCacheEnabled() bool {
 	return p.conn.ClientCacheEnabled()
 }
 
-// ChunkRadius returns the chunk radius as requested by the client at the other end of the Conn.
+// ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
 func (p *Player) ChunkRadius() int {
 	return p.conn.ChunkRadius()
 }
 
-// Latency returns the current latency measured over the Conn.
+// Latency returns the current latency measured over the conn.
 func (p *Player) Latency() time.Duration {
 	return p.conn.Latency()
 }
 
-// Flush flushes the packets buffered by the Conn, sending all of them out immediately.
+// Flush flushes the packets buffered by the conn, sending all of them out immediately.
 func (p *Player) Flush() error {
 	return p.conn.Flush()
 }
@@ -71,7 +71,7 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 	return pk, err
 }
 
-// StartGameContext starts the game for the Conn with a context to cancel it.
+// StartGameContext starts the game for the conn with a context to cancel it.
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
 	return p.conn.StartGameContext(ctx, data)
 }

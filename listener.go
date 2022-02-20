@@ -7,6 +7,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,8 +55,13 @@ func (l listener) Accept() (session.Conn, error) {
 
 // Disconnect disconnects a connection from the Listener with a reason.
 func (l listener) Disconnect(conn session.Conn, reason string) error {
+	l.o.playerMutex.Lock()
 	if l.o.closer != nil {
-		l.o.closer.Close(conn.(*minecraft.Conn))
+		l.o.closer.Close(conn.IdentityData())
 	}
-	return l.Listener.Disconnect(conn.(*minecraft.Conn), reason)
+	_ = conn.WritePacket(&packet.Disconnect{
+		HideDisconnectionScreen: reason == "",
+		Message:                 reason,
+	})
+	return conn.Close()
 }
