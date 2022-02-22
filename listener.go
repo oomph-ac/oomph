@@ -6,7 +6,6 @@ import (
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/justtaldevelops/oomph/player"
-	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -23,9 +22,13 @@ func (o *Oomph) Listen(s *server.Server, remoteAddr, localAddr string) error {
 	if err != nil {
 		panic(err)
 	}
+	serverConn, err := minecraft.Dialer{}.Dial("raknet", remoteAddr)
+	if err != nil {
+		panic(err)
+	}
 	l, err := minecraft.ListenConfig{
 		StatusProvider: p,
-		ResourcePacks:  utils.GetResourcePacks(),
+		ResourcePacks:  serverConn.ResourcePacks(),
 	}.Listen("raknet", localAddr)
 
 	if err != nil {
