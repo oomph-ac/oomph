@@ -22,13 +22,9 @@ func (o *Oomph) Listen(s *server.Server, remoteAddr, localAddr string) error {
 	if err != nil {
 		panic(err)
 	}
-	if err != nil {
-		panic(err)
-	}
 	l, err := minecraft.ListenConfig{
 		StatusProvider: p,
 	}.Listen("raknet", localAddr)
-
 	if err != nil {
 		return err
 	}
