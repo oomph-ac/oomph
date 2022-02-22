@@ -3,6 +3,7 @@ package oomph
 import (
 	"errors"
 	"fmt"
+	"github.com/justtaldevelops/oomph/utils"
 	"sync"
 
 	"github.com/df-mc/dragonfly/server/world"
@@ -63,6 +64,7 @@ func (o *Oomph) Start(remoteAddr, localAddr string) error {
 	}
 	l, err := minecraft.ListenConfig{
 		StatusProvider: p,
+		ResourcePacks:  utils.GetResourcePacks(),
 	}.Listen("raknet", localAddr)
 	if err != nil {
 		return err
