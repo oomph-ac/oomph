@@ -25,6 +25,7 @@ func (o *Oomph) Listen(s *server.Server, remoteAddr, localAddr string) error {
 	}
 	l, err := minecraft.ListenConfig{
 		StatusProvider: p,
+		ResourcePacks:  utils.GetResourcePacks(),
 	}.Listen("raknet", localAddr)
 
 	if err != nil {
@@ -36,7 +37,6 @@ func (o *Oomph) Listen(s *server.Server, remoteAddr, localAddr string) error {
 		o:        o,
 	})
 
-	utils.LoadResourcePacks(s)
 	return nil
 }
 
