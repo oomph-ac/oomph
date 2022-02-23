@@ -1,13 +1,13 @@
 package check
 
 import (
+	"github.com/justtaldevelops/oomph/settings"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -33,14 +33,9 @@ func (*ReachA) Description() string {
 	return "This checks if a player has an abnormal amount of reach."
 }
 
-// MaxViolations ...
-func (*ReachA) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*ReachA) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*ReachA) BaseSettings() settings.BaseSettings {
+	return settings.Settings.Reach.A.BaseSettings
 }
 
 // Process ...
@@ -59,7 +54,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
 					dist := omath.AABBVectorDistance(t.AABB.GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), omath.Vec32To64(r.attackPos))
 					//processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raw"})
-					if dist > 3.15 {
+					if dist >= 3.15 {
 						if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 300)) >= 5 {
 							processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 4), "type": "raw"})
 						}
