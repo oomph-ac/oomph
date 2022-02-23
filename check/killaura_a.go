@@ -1,7 +1,7 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/check/punishment"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -22,14 +22,9 @@ func (*KillAuraA) Description() string {
 	return "This checks if a player is attacking without swinging their arm."
 }
 
-// MaxViolations ...
-func (*KillAuraA) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*KillAuraA) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*KillAuraA) BaseSettings() settings.BaseSettings {
+	return settings.Settings.KillAura.A
 }
 
 // Process ...

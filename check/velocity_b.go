@@ -1,9 +1,9 @@
 package check
 
 import (
+	"github.com/justtaldevelops/oomph/settings"
 	"math"
 
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -24,14 +24,9 @@ func (*VelocityB) Description() string {
 	return "This checks if a player is taking an abnormal amount of horizontal knockback."
 }
 
-// MaxViolations ...
-func (*VelocityB) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*VelocityB) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*VelocityB) BaseSettings() settings.BaseSettings {
+	return settings.Settings.Velocity.B.BaseSettings
 }
 
 // Process ...

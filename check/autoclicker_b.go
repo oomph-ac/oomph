@@ -1,8 +1,8 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/session"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -22,14 +22,9 @@ func (*AutoclickerB) Description() string {
 	return "This checks if the user is clicking above 18 cps with no double clicks."
 }
 
-// MaxViolations ...
-func (*AutoclickerB) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*AutoclickerB) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*AutoclickerB) BaseSettings() settings.BaseSettings {
+	return settings.Settings.AutoClicker.B
 }
 
 // Process ...

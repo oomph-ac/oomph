@@ -3,9 +3,9 @@ package check
 import (
 	"math"
 
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/entity"
 	"github.com/justtaldevelops/oomph/omath"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -26,14 +26,9 @@ func (*KillAuraB) Description() string {
 	return "This checks if a player is attacking more than one entity at once."
 }
 
-// MaxViolations ...
-func (*KillAuraB) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*KillAuraB) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*KillAuraB) BaseSettings() settings.BaseSettings {
+	return settings.Settings.KillAura.B
 }
 
 // Process ...
