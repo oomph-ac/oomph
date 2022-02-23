@@ -60,8 +60,8 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 					dist := omath.AABBVectorDistance(t.AABB.GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), omath.Vec32To64(r.attackPos))
 					//processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raw"})
 					if dist > 3.15 {
-						if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 300)) >= 5 {
-							processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 4), "type": "raw"})
+						if r.Buff(1, 10) >= 5 {
+							processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{"dist": omath.Round(dist, 4), "type": "raw"})
 						}
 					} else {
 						r.Buff(-0.05)
@@ -90,8 +90,8 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 						dist := raycast.Position().Sub(vec64AttackPos).Len()
 						//processor.Debug(r, map[string]interface{}{"dist": dist, "type": "raycast"})
 						if dist >= 3.1 && math.Abs(dist-omath.AABBVectorDistance(aabb, vec64AttackPos)) < 0.4 {
-							if r.Buff(r.updateAndGetViolationAfterTicks(processor.ClientTick(), 100), 3.1) >= 3 {
-								processor.Flag(r, map[string]interface{}{"dist": omath.Round(dist, 2), "type": "raycast"})
+							if r.Buff(1, 10) >= 3 {
+								processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{"dist": omath.Round(dist, 2), "type": "raycast"})
 							}
 						} else {
 							r.Buff(-0.01)

@@ -46,7 +46,7 @@ func (v *VelocityA) Process(processor Processor, pk packet.Packet) {
 		//processor.Debug(v, map[string]interface{}{"velo": velo})
 		if velo <= 0.9999 || velo >= 1.1 {
 			if v.Buff(1) >= 12 {
-				processor.Flag(v, map[string]interface{}{"velo": omath.Round(velo, 6)})
+				processor.Flag(v, v.updateAndGetViolationAfterTicks(processor.ClientTick(), 100), map[string]interface{}{"velo": omath.Round(velo, 6)})
 			} else {
 				v.Buff(-0.05)
 				v.violations = math.Max(v.violations-0.025, 0)

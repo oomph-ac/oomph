@@ -25,7 +25,7 @@ type Processor interface {
 	// Debug debugs the given parameters to the processor.
 	Debug(check Check, params map[string]interface{})
 	// Flag flags the given check with the given parameters.
-	Flag(check Check, params map[string]interface{})
+	Flag(check Check, violations float64, params map[string]interface{})
 }
 
 // Check represents any form of detection model which can process packets for unexpected behaviour.
