@@ -1,10 +1,11 @@
 package check
 
 import (
+	"math"
+
 	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // AutoclickerA checks if the player cps is over a certain threshold.
@@ -36,7 +37,7 @@ func (*AutoclickerA) Punishment() punishment.Punishment {
 func (a *AutoclickerA) Process(processor Processor, _ packet.Packet) {
 	if processor.Session().HasFlag(session.FlagClicking) {
 		if processor.Session().CPS() > 22 {
-			processor.Flag(a, map[string]interface{}{"cps": processor.Session().CPS()})
+			processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 40), map[string]interface{}{"cps": processor.Session().CPS()})
 		} else {
 			a.violations = math.Max(a.violations-0.0075, 0)
 		}

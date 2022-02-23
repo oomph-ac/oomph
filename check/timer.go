@@ -53,7 +53,7 @@ func (t *TimerA) Process(processor Processor, pk packet.Packet) {
 		// timeDiff should be 1, so we subtract 1 from the timeDiff and add it to the balance.
 		t.balance += int64(timeDiff) - 1
 		if t.balance == -5 {
-			processor.Flag(t, map[string]interface{}{"timer": omath.Round(t.clientTPS/float64(20), 4)})
+			processor.Flag(t, 1, map[string]interface{}{"timer": omath.Round(t.clientTPS/float64(20), 4)})
 			t.balance = 0
 		}
 		t.lastTime = currentTime

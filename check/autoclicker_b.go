@@ -46,9 +46,7 @@ func (a *AutoclickerB) Process(processor Processor, _ packet.Packet) {
 				}
 				return true
 			}() && processor.Session().CPS() >= 18 {
-				processor.Flag(a, map[string]interface{}{"cps": processor.Session().CPS()})
-			} else {
-				a.Buff(-0.025)
+				processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 300), map[string]interface{}{"cps": processor.Session().CPS()})
 			}
 			a.samples = []uint64{}
 		}

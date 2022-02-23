@@ -45,7 +45,7 @@ func (v *VelocityB) Process(processor Processor, pk packet.Packet) {
 			zVal := m.Motion.Z() / m.PreviousServerPredictedMotion.Z()
 			if ((xVal <= 0.9999 && zVal <= 0.9999) || (xVal >= 1.5 || zVal >= 1.5)) && !s.HasFlag(session.FlagTeleporting) && !s.HasFlag(session.FlagCollidedHorizontally) {
 				if v.Buff(v.updateAndGetViolationAfterTicks(processor.ClientTick(), 400)) >= 3 {
-					processor.Flag(v, map[string]interface{}{"x": omath.Round(xVal, 6), "z": omath.Round(zVal, 6)})
+					processor.Flag(v, v.updateAndGetViolationAfterTicks(processor.ClientTick(), 100), map[string]interface{}{"x": omath.Round(xVal, 6), "z": omath.Round(zVal, 6)})
 				}
 			} else {
 				v.Buff(-0.1)

@@ -43,7 +43,7 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			tickDiff := processor.ClientTick() - k.lastSwingTick
 			if tickDiff > 4 {
-				processor.Flag(k, map[string]interface{}{"tickDiff": tickDiff})
+				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{"tickDiff": tickDiff})
 			}
 		}
 	}

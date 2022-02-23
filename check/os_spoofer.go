@@ -45,7 +45,7 @@ func (o *OSSpoofer) Process(processor Processor, _ packet.Packet) {
 		if exp, ok := oomph.DeviceOSToString[expected]; ok {
 			expectedString = exp
 		}
-		processor.Flag(o, map[string]interface{}{"Title ID": o.TitleID, "Given OS": givenString, "Expected OS": expectedString})
+		processor.Flag(o, 1, map[string]interface{}{"Title ID": o.TitleID, "Given OS": givenString, "Expected OS": expectedString})
 	} else if !ok {
 		processor.Debug(o, map[string]interface{}{"Unknown Title ID": o.TitleID, "Given OS": givenString})
 	}

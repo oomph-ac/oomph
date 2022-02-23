@@ -49,7 +49,7 @@ func (a *AutoclickerC) Process(processor Processor, _ packet.Packet) {
 					e = 5
 				}
 				if a.Buff(1) >= e {
-					processor.Flag(a, map[string]interface{}{"cps": cps, "dv": omath.Round(deviation, 3), "sk": omath.Round(skewness, 3)})
+					processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 400), map[string]interface{}{"cps": cps, "dv": omath.Round(deviation, 3), "sk": omath.Round(skewness, 3)})
 				}
 			} else {
 				a.buffer = 0

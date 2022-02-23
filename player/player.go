@@ -487,7 +487,11 @@ func (p *Player) Debug(check check.Check, params map[string]interface{}) {
 }
 
 // Flag flags the given check data to the console and other relevant sources.
-func (p *Player) Flag(check check.Check, params map[string]interface{}) {
+func (p *Player) Flag(check check.Check, violations float64, params map[string]interface{}) {
+	if violations <= 1e-5 {
+		return
+	}
+
 	name, variant := check.Name()
 	check.TrackViolation()
 

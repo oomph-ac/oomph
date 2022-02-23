@@ -1,12 +1,13 @@
 package check
 
 import (
+	"math"
+
 	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/entity"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // KillAuraB checks if a player is attacking too many entities at once.
@@ -55,7 +56,7 @@ func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
 				}
 			}
 			if minDist != 69420 && minDist > 1.5 {
-				processor.Flag(k, map[string]interface{}{"mD": omath.Round(minDist, 2), "entities": len(k.Entities)})
+				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 40), map[string]interface{}{"mD": omath.Round(minDist, 2), "entities": len(k.Entities)})
 			}
 		}
 		k.Entities = map[uint64]entity.Entity{}

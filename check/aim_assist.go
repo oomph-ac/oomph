@@ -1,12 +1,13 @@
 package check
 
 import (
+	"math"
+
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // AimAssistA checks the correlation coefficient between expected aim-bot rotation values and actual rotation values.
@@ -73,7 +74,7 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 				if len(a.realRotationSamples) == 40 || len(a.botRotationSamples) == 40 {
 					cc := omath.CorrelationCoefficient(a.realRotationSamples, a.botRotationSamples)
 					if cc > 0.99 {
-						processor.Flag(a, map[string]interface{}{"correlation": omath.Round(cc, 2)})
+						processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 200), map[string]interface{}{"correlation": omath.Round(cc, 2)})
 					}
 					a.realRotationSamples, a.botRotationSamples = []float64{}, []float64{}
 				}

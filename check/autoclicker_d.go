@@ -45,7 +45,7 @@ func (a *AutoclickerD) Process(processor Processor, _ packet.Packet) {
 		processor.Debug(a, map[string]interface{}{"kurt": kurtosis, "skew": skewness, "outliers": outliers, "dev": deviation, "cps": cps})
 		if kurtosis <= 0.05 && skewness < 0 && outliers == 0 && deviation <= 25 && cps >= 9 {
 			if a.Buff(1, 2) > 1 {
-				processor.Flag(a, map[string]interface{}{"kurtosis": omath.Round(kurtosis, 2), "skewness": omath.Round(skewness, 2), "cps": cps})
+				processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 400), map[string]interface{}{"kurtosis": omath.Round(kurtosis, 2), "skewness": omath.Round(skewness, 2), "cps": cps})
 			}
 		} else {
 			a.Buff(-0.5)
