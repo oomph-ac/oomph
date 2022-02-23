@@ -3,11 +3,12 @@ package check
 import (
 	"math"
 
+	"github.com/justtaldevelops/oomph/settings"
+
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -33,14 +34,9 @@ func (*ReachA) Description() string {
 	return "This checks if a player has an abnormal amount of reach."
 }
 
-// MaxViolations ...
-func (*ReachA) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*ReachA) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*ReachA) BaseSettings() settings.BaseSettings {
+	return settings.Settings.Reach.A.BaseSettings
 }
 
 // Process ...

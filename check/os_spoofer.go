@@ -1,8 +1,8 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/oomph"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -24,14 +24,9 @@ func (*OSSpoofer) Description() string {
 	return "This checks if the player is faking their device os."
 }
 
-// MaxViolations ...
-func (*OSSpoofer) MaxViolations() uint32 {
-	return 1
-}
-
-// Punishment ...
-func (*OSSpoofer) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*OSSpoofer) BaseSettings() settings.BaseSettings {
+	return settings.Settings.OSSpoofer.A
 }
 
 // Process ...

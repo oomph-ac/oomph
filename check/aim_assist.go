@@ -4,8 +4,8 @@ import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -30,14 +30,9 @@ func (*AimAssistA) Description() string {
 	return "This checks if a player is using a cheat to assist with their aim."
 }
 
-// MaxViolations ...
-func (*AimAssistA) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*AimAssistA) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*AimAssistA) BaseSettings() settings.BaseSettings {
+	return settings.Settings.AimAssist.A
 }
 
 // Process ...

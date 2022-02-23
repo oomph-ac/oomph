@@ -5,19 +5,19 @@ type Punishment struct {
 	punishment
 }
 
-type punishment uint8
+type punishment string
 
 // None will do nothing if the player reaches the max violations of a check.
 func None() Punishment {
-	return Punishment{0}
+	return Punishment{"none"}
 }
 
 // Kick will kick the player if the player reaches the max violations of a check.
 func Kick() Punishment {
-	return Punishment{1}
+	return Punishment{"kick"}
 }
 
 // Ban will ban the player if the player reaches the max violations of a check.
 func Ban() Punishment {
-	return Punishment{2}
+	return Punishment{"ban"}
 }

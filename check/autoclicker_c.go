@@ -1,9 +1,9 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -23,14 +23,8 @@ func (*AutoclickerC) Description() string {
 	return "This checks for an irregular clicking pattern."
 }
 
-// MaxViolations ...
-func (*AutoclickerC) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*AutoclickerC) Punishment() punishment.Punishment {
-	return punishment.Ban()
+func (*AutoclickerC) BaseSettings() settings.BaseSettings {
+	return settings.Settings.AutoClicker.C
 }
 
 // Process ...

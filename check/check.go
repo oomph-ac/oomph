@@ -1,9 +1,9 @@
 package check
 
 import (
+	"github.com/justtaldevelops/oomph/settings"
 	"math"
 
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/entity"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -36,12 +36,10 @@ type Check interface {
 	Description() string
 	// Violations will return the violations the check has currently tracked.
 	Violations() float64
-	// MaxViolations will return the amount of violations before a punishment is issued.
-	MaxViolations() uint32
+	// BaseSettings will return the base settings of the check.
+	BaseSettings() settings.BaseSettings
 	// TrackViolation will increment the violations on the check by one.
 	TrackViolation()
-	// Punishment will return the type of punishment to be issued.
-	Punishment() punishment.Punishment
 	// Process will process the packet provided for the check.
 	Process(processor Processor, pk packet.Packet)
 }

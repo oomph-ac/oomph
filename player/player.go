@@ -102,12 +102,23 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			&check.ReachA{},
 			&check.AutoclickerA{}, &check.AutoclickerB{}, &check.AutoclickerC{}, &check.AutoclickerD{},
 			&check.VelocityA{}, &check.VelocityB{},
+			&check.InvalidMovementA{}, &check.InvalidMovementB{}, &check.InvalidMovementC{},
 		},
 	}
 
+	var checks []check.Check
+	for _, c := range p.checks {
+		if c.BaseSettings().Enabled {
+			checks = append(checks, c)
+		}
+	}
+	p.checks = checks
+
 	// Validate device OS
 	osCheck := &check.OSSpoofer{GivenOS: conn.ClientData().DeviceOS, TitleID: conn.IdentityData().TitleID}
-	osCheck.Process(p, nil)
+	if osCheck.BaseSettings().Enabled {
+		osCheck.Process(p, nil)
+	}
 
 	s := &session.Session{}
 	s.Movement = &session.Movement{
@@ -501,7 +512,7 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 		p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, utils.PrettyParams(params))
 	})
 
-	if now, max := check.Violations(), check.MaxViolations(); now >= float64(max) {
+	if now, max := check.Violations(), check.BaseSettings().MaxViolations; now >= float64(max) {
 		ctx := event.C()
 		p.handler().HandlePunishment(ctx, check)
 		ctx.Continue(func() {

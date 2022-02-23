@@ -1,8 +1,8 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -24,14 +24,9 @@ func (*TimerA) Description() string {
 	return "This checks if a player is sending movement packets too fast."
 }
 
-// MaxViolations ...
-func (*TimerA) MaxViolations() uint32 {
-	return 10
-}
-
-// Punishment ...
-func (*TimerA) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*TimerA) BaseSettings() settings.BaseSettings {
+	return settings.Settings.Timer.A
 }
 
 // Process ...

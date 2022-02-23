@@ -1,9 +1,9 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/check/punishment"
 	"github.com/justtaldevelops/oomph/omath"
 	"github.com/justtaldevelops/oomph/session"
+	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -23,14 +23,9 @@ func (*AutoclickerD) Description() string {
 	return "This checks if a user has a constant and low standard deviation in their click data."
 }
 
-// MaxViolations ...
-func (*AutoclickerD) MaxViolations() uint32 {
-	return 15
-}
-
-// Punishment ...
-func (*AutoclickerD) Punishment() punishment.Punishment {
-	return punishment.Ban()
+// BaseSettings ...
+func (*AutoclickerD) BaseSettings() settings.BaseSettings {
+	return settings.Settings.AutoClicker.D
 }
 
 // Process ...
