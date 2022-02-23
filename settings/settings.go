@@ -48,6 +48,11 @@ type settings struct {
 		A BaseSettings
 		B BaseSettings
 	}
+	InvalidMovement struct {
+		A BaseSettings
+		B BaseSettings
+		C BaseSettings
+	}
 	OSSpoofer struct {
 		A BaseSettings
 	}
@@ -104,6 +109,13 @@ func defaultSettings() settings {
 	s.KillAura.A.MaxViolations = 15
 	s.KillAura.B = base
 	s.KillAura.B.MaxViolations = 15
+	// InvalidMovement
+	s.InvalidMovement.A = base
+	s.InvalidMovement.A.MaxViolations = 50
+	s.InvalidMovement.B = base
+	s.InvalidMovement.B.MaxViolations = 50
+	s.InvalidMovement.C = base
+	s.InvalidMovement.C.MaxViolations = 10
 	// OS Spoofer
 	s.OSSpoofer.A = base
 	s.OSSpoofer.A.MaxViolations = 1

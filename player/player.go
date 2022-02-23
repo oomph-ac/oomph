@@ -102,6 +102,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			&check.ReachA{},
 			&check.AutoclickerA{}, &check.AutoclickerB{}, &check.AutoclickerC{}, &check.AutoclickerD{},
 			&check.VelocityA{}, &check.VelocityB{},
+			&check.InvalidMovementA{}, &check.InvalidMovementB{}, &check.InvalidMovementC{},
 		},
 	}
 
