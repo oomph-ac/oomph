@@ -10,8 +10,8 @@ import (
 
 // KillAuraB checks if a player is attacking too many entities at once.
 type KillAuraB struct {
-	entities map[uint64]entity.Entity
 	check
+	entities map[uint64]entity.Entity
 }
 
 // NewKillAuraB creates a new KillAuraB check.
