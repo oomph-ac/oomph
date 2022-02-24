@@ -1,13 +1,11 @@
 package check
 
 import (
-	"math"
-
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/omath"
-	"github.com/justtaldevelops/oomph/settings"
+	"github.com/justtaldevelops/oomph/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"math"
 )
 
 // AimAssistA checks the correlation coefficient between expected aim-bot rotation values and actual rotation values.
@@ -20,6 +18,11 @@ type AimAssistA struct {
 	botRotationSamples  []float64
 }
 
+// NewAimAssistA creates a new AimAssistA check.
+func NewAimAssistA() *AimAssistA {
+	return &AimAssistA{}
+}
+
 // Name ...
 func (*AimAssistA) Name() (string, string) {
 	return "AimAssist", "A"
@@ -28,11 +31,6 @@ func (*AimAssistA) Name() (string, string) {
 // Description ...
 func (*AimAssistA) Description() string {
 	return "This checks if a player is using a cheat to assist with their aim."
-}
-
-// BaseSettings ...
-func (*AimAssistA) BaseSettings() settings.BaseSettings {
-	return settings.Settings.AimAssist.A
 }
 
 // Process ...
@@ -45,13 +43,13 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 				return
 			}
 			a.target = data.TargetEntityRuntimeID
-			a.attackPos = omath.Vec32To64(data.Position)
+			a.attackPos = minecraft.Vec32To64(data.Position)
 			a.realRotationSamples, a.botRotationSamples = []float64{}, []float64{}
 		}
 	case *packet.PlayerAuthInput:
 		if a.waiting {
 			if e, ok := processor.Entity(a.target); ok {
-				selfLoc := processor.Location()
+				selfLoc := processor.Session().Entity()
 				yawDiff := math.Mod(selfLoc.Rotation.Y()-selfLoc.LastRotation.Y(), 180)
 				if yawDiff >= 180 {
 					yawDiff = 180 - math.Mod(yawDiff, 180)
@@ -67,9 +65,11 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 					a.botRotationSamples = append(a.botRotationSamples, botYaw)
 				}
 				if len(a.realRotationSamples) == 40 || len(a.botRotationSamples) == 40 {
-					cc := omath.CorrelationCoefficient(a.realRotationSamples, a.botRotationSamples)
+					cc := minecraft.CorrelationCoefficient(a.realRotationSamples, a.botRotationSamples)
 					if cc > 0.99 {
-						processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 200), map[string]interface{}{"correlation": omath.Round(cc, 2)})
+						processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 200), map[string]interface{}{
+							"Correlation": minecraft.Round(cc, 2)},
+						)
 					}
 					a.realRotationSamples, a.botRotationSamples = []float64{}, []float64{}
 				}

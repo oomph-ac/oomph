@@ -2,7 +2,6 @@ package check
 
 import (
 	"github.com/justtaldevelops/oomph/session"
-	"github.com/justtaldevelops/oomph/settings"
 	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -13,6 +12,11 @@ type InvalidMovementC struct {
 	jumpTicks int32
 }
 
+// NewInvalidMovementC creates a new InvalidMovementC check.
+func NewInvalidMovementC() *InvalidMovementC {
+	return &InvalidMovementC{}
+}
+
 // Name ...
 func (*InvalidMovementC) Name() (string, string) {
 	return "InvalidMovement", "C"
@@ -21,11 +25,6 @@ func (*InvalidMovementC) Name() (string, string) {
 // Description ...
 func (*InvalidMovementC) Description() string {
 	return "This checks if the delay between a users jumps is invalid, this can detect things such as airjump or sometimes bhop."
-}
-
-// BaseSettings ...
-func (*InvalidMovementC) BaseSettings() settings.BaseSettings {
-	return settings.Settings.InvalidMovement.C
 }
 
 // Process ...
@@ -40,7 +39,10 @@ func (i *InvalidMovementC) Process(processor Processor, pk packet.Packet) {
 		}
 		if s.HasFlag(session.FlagJumping) {
 			if i.jumpTicks > 0 || !isHoldingJump {
-				processor.Flag(i, 1, map[string]interface{}{"jumpTicks": i.jumpTicks, "jumping": isHoldingJump})
+				processor.Flag(i, 1, map[string]interface{}{
+					"Jumping Ticks": i.jumpTicks,
+					"Jumping":       isHoldingJump,
+				})
 			}
 			i.jumpTicks = 10
 		}

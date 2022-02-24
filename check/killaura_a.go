@@ -1,7 +1,6 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -12,6 +11,11 @@ type KillAuraA struct {
 	lastSwingTick uint64
 }
 
+// NewKillAuraA creates a new KillAuraA check.
+func NewKillAuraA() *KillAuraA {
+	return &KillAuraA{}
+}
+
 // Name ...
 func (*KillAuraA) Name() (string, string) {
 	return "KillAura", "A"
@@ -20,11 +24,6 @@ func (*KillAuraA) Name() (string, string) {
 // Description ...
 func (*KillAuraA) Description() string {
 	return "This checks if a player is attacking without swinging their arm."
-}
-
-// BaseSettings ...
-func (*KillAuraA) BaseSettings() settings.BaseSettings {
-	return settings.Settings.KillAura.A
 }
 
 // Process ...
@@ -38,7 +37,9 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			tickDiff := processor.ClientTick() - k.lastSwingTick
 			if tickDiff > 4 {
-				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{"tickDiff": tickDiff})
+				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
+					"Tick Difference": tickDiff,
+				})
 			}
 		}
 	}

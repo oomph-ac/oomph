@@ -5,10 +5,10 @@ import (
 	"strings"
 )
 
-// PrettyParams converts the given parameters to a readable string.
-func PrettyParams(params map[string]interface{}) string {
+// PrettyParameters converts the given parameters to a readable string.
+func PrettyParameters(params map[string]interface{}) string {
 	if len(params) == 0 {
-		// Don't waste our time if there are no parameters.
+		// Don't waste time if there aren't any parameters.
 		return "[]"
 	}
 	// Hacky but simple way to create a readable string.

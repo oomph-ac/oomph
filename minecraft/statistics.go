@@ -1,4 +1,4 @@
-package omath
+package minecraft
 
 import (
 	"math"

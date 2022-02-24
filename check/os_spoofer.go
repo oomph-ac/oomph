@@ -2,7 +2,6 @@ package check
 
 import (
 	"github.com/justtaldevelops/oomph/oomph"
-	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -24,24 +23,36 @@ func (*OSSpoofer) Description() string {
 	return "This checks if the player is faking their device os."
 }
 
-// BaseSettings ...
-func (*OSSpoofer) BaseSettings() settings.BaseSettings {
-	return settings.Settings.OSSpoofer.A
-}
-
 // Process ...
 func (o *OSSpoofer) Process(processor Processor, _ packet.Packet) {
 	givenString := "Unknown"
 	if given, ok := oomph.DeviceOSToString[o.GivenOS]; ok {
 		givenString = given
 	}
-	if expected, ok := oomph.TitleIds[o.TitleID]; ok && expected != o.GivenOS {
+	if expected, ok := map[string]protocol.DeviceOS{
+		"1739947436": protocol.DeviceAndroid,
+		"1810924247": protocol.DeviceIOS,
+		"1944307183": protocol.DeviceFireOS,
+		"896928775":  protocol.DeviceWin10,
+		"2044456598": protocol.DeviceOrbis,
+		"2047319603": protocol.DeviceNX,
+		"1828326430": protocol.DeviceXBOX,
+		"1916611344": protocol.DeviceWP,
+		// TODO: Add more title IDs.
+	}[o.TitleID]; ok && expected != o.GivenOS {
 		expectedString := "Unknown"
 		if exp, ok := oomph.DeviceOSToString[expected]; ok {
 			expectedString = exp
 		}
-		processor.Flag(o, 1, map[string]interface{}{"Title ID": o.TitleID, "Given OS": givenString, "Expected OS": expectedString})
+		processor.Flag(o, 1, map[string]interface{}{
+			"Title ID":    o.TitleID,
+			"Given OS":    givenString,
+			"Expected OS": expectedString,
+		})
 	} else if !ok {
-		processor.Debug(o, map[string]interface{}{"Unknown Title ID": o.TitleID, "Given OS": givenString})
+		processor.Debug(o, map[string]interface{}{
+			"Unknown Title ID": o.TitleID,
+			"Given OS":         givenString,
+		})
 	}
 }

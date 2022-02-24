@@ -1,49 +1,55 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/omath"
+	"github.com/justtaldevelops/oomph/minecraft"
 	"github.com/justtaldevelops/oomph/session"
-	"github.com/justtaldevelops/oomph/settings"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoclickerC checks for an irregular clicking pattern using statistics.
-type AutoclickerC struct {
+// AutoClickerC checks for an irregular clicking pattern using statistics.
+type AutoClickerC struct {
 	check
 	samples []float64
 }
 
+// NewAutoClickerC creates a new AutoClickerC check.
+func NewAutoClickerC() *AutoClickerC {
+	return &AutoClickerC{}
+}
+
 // Name ...
-func (*AutoclickerC) Name() (string, string) {
-	return "Autoclicker", "C"
+func (*AutoClickerC) Name() (string, string) {
+	return "AutoClicker", "C"
 }
 
 // Description ...
-func (*AutoclickerC) Description() string {
+func (*AutoClickerC) Description() string {
 	return "This checks for an irregular clicking pattern."
 }
 
-func (*AutoclickerC) BaseSettings() settings.BaseSettings {
-	return settings.Settings.AutoClicker.C
-}
-
 // Process ...
-func (a *AutoclickerC) Process(processor Processor, _ packet.Packet) {
+func (a *AutoClickerC) Process(processor Processor, _ packet.Packet) {
 	if processor.Session().HasFlag(session.FlagClicking) {
 		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
 		if len(a.samples) == 20 {
 			cps := processor.Session().CPS()
-			deviation, skewness := omath.StandardDeviation(a.samples), omath.Skewness(a.samples)
-			processor.Debug(a, map[string]interface{}{"deviation": deviation, "skewness": skewness, "cps": cps})
+			deviation, skewness := minecraft.StandardDeviation(a.samples), minecraft.Skewness(a.samples)
+			processor.Debug(a, map[string]interface{}{
+				"Deviation": minecraft.Round(deviation, 3),
+				"Skewness":  minecraft.Round(skewness, 3),
+				"CPS":       cps,
+			})
 			if deviation <= 20 && (skewness > 1 || skewness == 0.0) && cps >= 9 {
-				var e float64
+				e := 5.0
 				if skewness == 0.0 {
-					e = 1
-				} else {
-					e = 5
+					e = 1.0
 				}
 				if a.Buff(1) >= e {
-					processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 400), map[string]interface{}{"cps": cps, "dv": omath.Round(deviation, 3), "sk": omath.Round(skewness, 3)})
+					processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 400), map[string]interface{}{
+						"Deviation": minecraft.Round(deviation, 3),
+						"Skewness":  minecraft.Round(skewness, 3),
+						"CPS":       cps,
+					})
 				}
 			} else {
 				a.buffer = 0

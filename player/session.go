@@ -1,4 +1,4 @@
-package session
+package player
 
 import (
 	"github.com/justtaldevelops/oomph/entity"
@@ -19,10 +19,10 @@ type Session struct {
 		// Spawn represents the ticks passed since the player last respawned.
 		Spawn uint32
 	}
-	Movement      *Movement
-	EntityData    atomic.Value
-	Flags         uint64
-	Gamemode      int32
+	EntityData atomic.Value
+	Flags      uint64
+	GameMode   int32
+
 	clickMu       sync.Mutex
 	clicks        []uint64
 	lastClickTick uint64
@@ -30,19 +30,10 @@ type Session struct {
 	cps           int
 }
 
-// setFlag sets a bit flag for the session, or unsets if the session already has the flag. A list of flags can be seen in flags.go
-func (s *Session) setFlag(flag uint64) {
-	s.Flags ^= flag
-}
-
 // SetFlag will set or remove a bit flag based on the value of set.
 func (s *Session) SetFlag(set bool, flag uint64) {
-	if set {
-		if !s.HasFlag(flag) {
-			s.setFlag(flag)
-		}
-	} else if s.HasFlag(flag) {
-		s.setFlag(flag)
+	if s.HasFlag(flag) || (set && !s.HasFlag(flag)) {
+		s.Flags ^= flag
 	}
 }
 
@@ -71,8 +62,8 @@ func (s *Session) HasAllFlags(flags ...uint64) bool {
 	return true
 }
 
-// GetEntityData returns the entity data of the session
-func (s *Session) GetEntityData() entity.Entity {
+// Entity returns the entity data of the session,
+func (s *Session) Entity() entity.Entity {
 	return s.EntityData.Load().(entity.Entity)
 }
 

@@ -10,12 +10,14 @@ import (
 
 // LoadRawChunk loads a chunk to the player's memory from raw sub chunk data.
 func (p *Player) LoadRawChunk(pos world.ChunkPos, data []byte, subChunkCount uint32) {
-	ch, err := chunk.NetworkDecode(air(), data, int(subChunkCount), p.dimension.Range())
+	a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+	ch, err := chunk.NetworkDecode(a, data, int(subChunkCount), p.dimension.Range())
 	if err != nil {
 		p.log.Errorf("failed to parse chunk at %v: %v", pos, err)
 		return
 	}
 	ch.Compact()
+
 	p.LoadChunk(pos, ch)
 }
 
@@ -82,12 +84,13 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	c.Unlock()
 }
 
-// cleanCache removes all cached chunks that are no longer in the player's view.
-func (p *Player) cleanCache() {
+// cleanChunks removes all cached chunks that are no longer in the player's view.
+func (p *Player) cleanChunks() {
 	p.chunkMu.Lock()
 	defer p.chunkMu.Unlock()
 
-	activePos := p.ChunkPosition()
+	loc := p.Location()
+	activePos := world.ChunkPos{int32(math.Floor(loc.Position[0])) >> 4, int32(math.Floor(loc.Position[2])) >> 4}
 	for pos := range p.chunks {
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
 		dist := math.Sqrt(float64(diffX*diffX) + float64(diffZ*diffZ))

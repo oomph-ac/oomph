@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// listener is a Dragonfly listener implementation for direct Oomph.
 type listener struct {
 	*minecraft.Listener
 	o *Oomph
@@ -33,7 +34,6 @@ func (o *Oomph) Listen(s *server.Server, remoteAddr, localAddr string) error {
 		Listener: l,
 		o:        o,
 	})
-
 	return nil
 }
 
@@ -57,9 +57,6 @@ func (l listener) Accept() (session.Conn, error) {
 // Disconnect disconnects a connection from the Listener with a reason.
 func (l listener) Disconnect(conn session.Conn, reason string) error {
 	l.o.playerMutex.Lock()
-	if l.o.closer != nil {
-		l.o.closer.Close(conn.IdentityData())
-	}
 	_ = conn.WritePacket(&packet.Disconnect{
 		HideDisconnectionScreen: reason == "",
 		Message:                 reason,

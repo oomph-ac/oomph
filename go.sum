@@ -48,8 +48,6 @@ github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGX
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/df-mc/dragonfly v0.5.1 h1:rrLQk0HWeQOmkEMV276wprJ6XVGjbX6f7dVQO0zXB4Q=
-github.com/df-mc/dragonfly v0.5.1/go.mod h1:n/ZtuBD7m9RilP4alZ3B8T93ZWnGF7ZEpTJ4zbyePZw=
 github.com/df-mc/dragonfly v0.5.2-0.20220219205354-a94f34a6073d h1:mZB9EJrWIGXluh+ikg+VR2sashiiqj22VZYY8ue0Rds=
 github.com/df-mc/dragonfly v0.5.2-0.20220219205354-a94f34a6073d/go.mod h1:y5jDxXEMIFqRSWW8R7zCOkruk8FbGGlIMoSWGOjZdIU=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
@@ -151,8 +149,6 @@ github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/sandertv/go-raknet v1.10.2 h1:aVwwSOhZQND6fo6aBJbJ4TSWIpfJWoxZMY//StAk7h4=
 github.com/sandertv/go-raknet v1.10.2/go.mod h1:s1lD7LTts74R9csTeI4WlGcp6PmXAGX+DeJlQF3KMlg=
-github.com/sandertv/gophertunnel v1.18.1/go.mod h1:cu9ZDQVTXY1RJO/te3syrPvCeCAzKt9eB4jkSzXljTw=
-github.com/sandertv/gophertunnel v1.19.0 h1:407Zvi6wXhkbeRgI6Vx7S5bLLIwZmbtPLXvERsEu9to=
 github.com/sandertv/gophertunnel v1.19.0/go.mod h1:cu9ZDQVTXY1RJO/te3syrPvCeCAzKt9eB4jkSzXljTw=
 github.com/sandertv/gophertunnel v1.19.1-0.20220219014023-6970df76a596 h1:5Nk4KtIMNJmeYbB9YyBpiWVHTeHhFTFMdoJTMMSzxdo=
 github.com/sandertv/gophertunnel v1.19.1-0.20220219014023-6970df76a596/go.mod h1:cu9ZDQVTXY1RJO/te3syrPvCeCAzKt9eB4jkSzXljTw=

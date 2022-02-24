@@ -1,4 +1,4 @@
-package session
+package player
 
 import "github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 

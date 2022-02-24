@@ -9,13 +9,6 @@ import (
 	"time"
 )
 
-// Close closes the conn and its underlying connection. Before closing, it also calls Flush() so that any
-// packets currently pending are sent out.
-func (p *Player) Close() error {
-	p.ClosePlayer()
-	return p.conn.Close()
-}
-
 // IdentityData returns the login.IdentityData of a conn. It contains the UUID, XUID and username of the connection.
 func (p *Player) IdentityData() login.IdentityData {
 	return p.conn.IdentityData()

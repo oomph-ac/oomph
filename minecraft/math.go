@@ -1,4 +1,4 @@
-package omath
+package minecraft
 
 import (
 	"math"
@@ -28,8 +28,8 @@ func AABBVectorDistance(a physics.AABB, v mgl64.Vec3) float64 {
 	return math.Sqrt((x * x) + (y * y) + (z * z))
 }
 
-// DirectionVectorFromValues returns a direction vector from the given yaw and pitch values.
-func DirectionVectorFromValues(yaw, pitch float64) mgl64.Vec3 {
+// DirectionVector returns a direction vector from the given yaw and pitch values.
+func DirectionVector(yaw, pitch float64) mgl64.Vec3 {
 	yawRad, pitchRad := mgl64.DegToRad(yaw), mgl64.DegToRad(pitch)
 	m := math.Cos(pitchRad)
 
