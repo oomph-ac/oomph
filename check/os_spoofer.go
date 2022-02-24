@@ -1,7 +1,7 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/oomph"
+	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -9,6 +9,7 @@ import (
 // OSSpoofer checks if the player's device os does not equal the one that matches with their title id.
 type OSSpoofer struct {
 	check
+	// TODO: Make this better.
 	GivenOS protocol.DeviceOS
 	TitleID string
 }
@@ -25,10 +26,6 @@ func (*OSSpoofer) Description() string {
 
 // Process ...
 func (o *OSSpoofer) Process(processor Processor, _ packet.Packet) {
-	givenString := "Unknown"
-	if given, ok := oomph.DeviceOSToString[o.GivenOS]; ok {
-		givenString = given
-	}
 	if expected, ok := map[string]protocol.DeviceOS{
 		"1739947436": protocol.DeviceAndroid,
 		"1810924247": protocol.DeviceIOS,
@@ -40,19 +37,15 @@ func (o *OSSpoofer) Process(processor Processor, _ packet.Packet) {
 		"1916611344": protocol.DeviceWP,
 		// TODO: Add more title IDs.
 	}[o.TitleID]; ok && expected != o.GivenOS {
-		expectedString := "Unknown"
-		if exp, ok := oomph.DeviceOSToString[expected]; ok {
-			expectedString = exp
-		}
 		processor.Flag(o, 1, map[string]interface{}{
 			"Title ID":    o.TitleID,
-			"Given OS":    givenString,
-			"Expected OS": expectedString,
+			"Given OS":    utils.Device(o.GivenOS),
+			"Expected OS": utils.Device(expected),
 		})
 	} else if !ok {
 		processor.Debug(o, map[string]interface{}{
 			"Unknown Title ID": o.TitleID,
-			"Given OS":         givenString,
+			"Given OS":         utils.Device(o.GivenOS),
 		})
 	}
 }

@@ -24,7 +24,7 @@ func (*InvalidMovementC) Name() (string, string) {
 
 // Description ...
 func (*InvalidMovementC) Description() string {
-	return "This checks if the delay between a users jumps is invalid, this can detect things such as airjump or sometimes bhop."
+	return "This checks if the delay between a users jumps is invalid. This can detect things such as air-jump or sometimes bunny hop."
 }
 
 // Process ...

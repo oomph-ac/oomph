@@ -45,6 +45,8 @@ type Player struct {
 	hMutex sync.RWMutex
 	h      Handler
 
+	entity entity.Entity
+
 	entityMu sync.Mutex
 	entities map[uint64]entity.Entity
 
