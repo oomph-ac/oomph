@@ -33,7 +33,7 @@ func (p *Player) tickEntityLocations() {
 	for eid := range p.entities {
 		e, _ := p.Entity(eid)
 		if e.NewPosRotationIncrements > 0 {
-			delta := e.RecievedPosition.Sub(e.LastPosition).Mul(1 / float64(e.NewPosRotationIncrements))
+			delta := e.ReceivedPosition.Sub(e.LastPosition).Mul(1 / float64(e.NewPosRotationIncrements))
 			e.LastPosition = e.Position
 			e.Position = e.Position.Add(delta)
 			e.NewPosRotationIncrements--
@@ -52,7 +52,7 @@ func (p *Player) flushEntityLocations() {
 	p.Acknowledgement(func() {
 		for rid, pos := range queue {
 			if e, valid := p.Entity(rid); valid {
-				e.RecievedPosition = pos
+				e.ReceivedPosition = pos
 				e.NewPosRotationIncrements = 3
 				p.UpdateEntity(rid, e)
 			}

@@ -119,7 +119,7 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	s := p.Session()
 	data := s.Entity()
 	data.LastPosition = data.Position
-	data.Position = minecraft.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62, 0}))
+	data.Position = minecraft.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62}))
 	data.LastRotation = data.Rotation
 	data.Rotation = mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)}
 	data.TeleportTicks++
