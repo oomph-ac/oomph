@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
-// IdentityData returns the login.IdentityData of a conn. It contains the UUID, XUID and username of the connection.
+// IdentityData returns the login.IdentityData of a player. It contains the UUID, XUID and username of the connection.
 func (p *Player) IdentityData() login.IdentityData {
 	return p.conn.IdentityData()
 }
 
-// ClientData returns the login.ClientData of a conn. This includes less sensitive data of the player like its skin,
+// ClientData returns the login.ClientData of a player. This includes less sensitive data of the player like its skin,
 // language code and other non-essential information.
 func (p *Player) ClientData() login.ClientData {
 	return p.conn.ClientData()

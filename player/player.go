@@ -88,6 +88,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 			check.NewAutoClickerA(), check.NewAutoClickerB(), check.NewAutoClickerC(), check.NewAutoClickerD(),
 			check.NewInvalidMovementC(),
 			check.NewKillAuraA(), check.NewKillAuraB(),
+			check.NewOSSpoofer(),
 			check.NewReachA(),
 			check.NewTimerA(),
 		},
@@ -101,12 +102,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 		}
 	}
 	p.checks = checks
-
-	// Validate device OS
-	osCheck := &check.OSSpoofer{GivenOS: conn.ClientData().DeviceOS, TitleID: conn.IdentityData().TitleID}
-	if osCheck.BaseSettings().Enabled {
-		osCheck.Process(p, nil)
-	}
 
 	p.entity = entity.Entity{
 		Position: minecraft.Vec32To64(data.PlayerPosition),

@@ -42,6 +42,7 @@ func Device(os protocol.DeviceOS) string {
 }
 
 // PrettyParameters converts the given parameters to a readable string.
+// TODO: Make this better.
 func PrettyParameters(params map[string]interface{}) string {
 	if len(params) == 0 {
 		// Don't waste time if there aren't any parameters.

@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"math"
 
 	"github.com/justtaldevelops/oomph/entity"
@@ -14,8 +15,14 @@ type Processor interface {
 	// ClientTick returns the current client tick of the processor
 	ClientTick() uint64
 
-	// Entity queries the processor for an entity, using the runtime ID specified. The second
-	// return value is false if the entity is not loaded inside the processor's memory.
+	// IdentityData returns the login.IdentityData of a player. It contains the UUID, XUID and username of the connection.
+	IdentityData() login.IdentityData
+	// ClientData returns the login.ClientData of a player. This includes less sensitive data of the player like its skin,
+	// language code and other non-essential information.
+	ClientData() login.ClientData
+
+	// Entity queries the processor for an entity, using the runtime ID specified. The second return value is false if
+	// the entity is not loaded inside the processor's memory.
 	Entity(runtimeID uint64) (entity.Entity, bool)
 
 	// Debug debugs the given parameters to the processor.
