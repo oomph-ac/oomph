@@ -89,12 +89,12 @@ func (p *Player) cleanChunks() {
 	p.chunkMu.Lock()
 	defer p.chunkMu.Unlock()
 
-	loc := p.Location()
-	activePos := world.ChunkPos{int32(math.Floor(loc.Position[0])) >> 4, int32(math.Floor(loc.Position[2])) >> 4}
+	loc := p.Entity().Position()
+	activePos := world.ChunkPos{int32(math.Floor(loc[0])) >> 4, int32(math.Floor(loc[2])) >> 4}
 	for pos := range p.chunks {
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
 		dist := math.Sqrt(float64(diffX*diffX) + float64(diffZ*diffZ))
-		if int32(dist) > p.viewDist {
+		if int32(dist) > p.settings.Oomph.ViewDistance {
 			delete(p.chunks, pos)
 		}
 	}

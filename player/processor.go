@@ -2,12 +2,10 @@ package player
 
 import (
 	"github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/entity"
-	"github.com/justtaldevelops/oomph/minecraft"
+	"github.com/justtaldevelops/oomph/game"
 	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -16,6 +14,7 @@ import (
 // ClientProcess processes the given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) {
 	p.Session().SetFlag(false, session.FlagClicking)
+
 	switch pk := pk.(type) {
 	case *packet.NetworkStackLatency:
 		p.ackMu.Lock()
@@ -76,54 +75,44 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.rid {
+			// We are the player.
 			return
 		}
+
 		p.Acknowledgement(func() {
-			p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
-				Location: entity.Location{
-					Position:                 minecraft.Vec32To64(pk.Position),
-					LastPosition:             minecraft.Vec32To64(pk.Position),
-					RecievedPosition:         minecraft.Vec32To64(pk.Position).Add(minecraft.Vec32To64(pk.Velocity)),
-					NewPosRotationIncrements: 3,
-					Rotation:                 minecraft.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
-				},
-				AABB: physics.NewAABB(
-					mgl64.Vec3{-0.3, 0, -0.3},
-					mgl64.Vec3{0.3, 1.8, 0.3},
-				),
-				Player: true,
-			})
+			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
+				game.Vec32To64(pk.Position),
+				game.Vec32To64(pk.Velocity),
+				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
+				true,
+			))
 		})
 	case *packet.AddActor:
 		if pk.EntityRuntimeID == p.rid {
+			// We are the player.
 			return
 		}
+
 		p.Acknowledgement(func() {
-			p.UpdateEntity(pk.EntityRuntimeID, entity.Entity{
-				Location: entity.Location{
-					Position:                 minecraft.Vec32To64(pk.Position),
-					LastPosition:             minecraft.Vec32To64(pk.Position),
-					RecievedPosition:         minecraft.Vec32To64(pk.Position).Add(minecraft.Vec32To64(pk.Velocity)),
-					NewPosRotationIncrements: 3,
-					Rotation:                 minecraft.Vec32To64(mgl32.Vec3{pk.Pitch, pk.Yaw, pk.HeadYaw}),
-				},
-				AABB: physics.NewAABB(
-					mgl64.Vec3{-0.3, 0, -0.3},
-					mgl64.Vec3{0.3, 1.8, 0.3},
-				),
-			})
+			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
+				game.Vec32To64(pk.Position),
+				game.Vec32To64(pk.Velocity),
+				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
+				false,
+			))
 		})
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
 				p.Teleport(pk.Position)
 				if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
-					p.Session().SetFlag(true, session.FlagTeleporting)
+					p.Session().ASetFlag(true, session.FlagTeleporting)
 				}
 			})
 			return
 		}
-		p.MoveActor(pk.EntityRuntimeID, minecraft.Vec32To64(pk.Position))
+
+		p.MoveActor(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
@@ -132,7 +121,10 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 					p.Session().SetFlag(true, session.FlagTeleporting)
 				}
 			})
+			return
 		}
+
+		p.MoveActor(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
 			p.LoadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
@@ -145,37 +137,18 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 			})
 		}
 	case *packet.SetActorData:
-		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				data := p.Session().Entity()
-				hasFlag := func(flag uint32, data int64) bool {
-					return (data & (1 << (flag % 64))) > 0
-				}
-				if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
-					data.BBWidth = float64(f.(float32)) / 2
-				}
-				if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
-					data.BBHeight = float64(f.(float32))
-				}
-				p.Session().EntityData.Store(data)
-				if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
-					p.Session().SetFlag(hasFlag(entity.DataFlagImmobile, f.(int64)), session.FlagImmobile)
-				}
-			})
-		} else {
-			p.Acknowledgement(func() {
-				if e, ok := p.Entity(pk.EntityRuntimeID); ok {
-					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]; ok {
-						e.BBWidth = float64(f.(float32)) / 2
-					}
-					if f, ok := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]; ok {
-						e.BBHeight = float64(f.(float32))
-					}
-					p.UpdateEntity(pk.EntityRuntimeID, e)
-				}
-			})
-		}
-	case *packet.StartGame:
+		p.Acknowledgement(func() {
+			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
+			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
+			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && widthExists && heightExists {
+				e.SetAABB(game.AABBFromDimensions(float64(width.(float32)), float64(height.(float32))))
+			}
+
+			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
+				p.Session().SetFlag(hasFlag(entity.DataFlagImmobile, f.(int64)), session.FlagImmobile)
+			}
+		})
+	case *packet.StartGame: // TODO: Change this, as it won't work; start game isn't sent after login.
 		p.Acknowledgement(func() {
 			p.Session().GameMode = pk.WorldGameMode
 		})
@@ -186,7 +159,6 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
-				p.Session().Movement.ServerSentMotion = pk.Velocity
 				p.Session().Ticks.Motion = 0
 			})
 		}

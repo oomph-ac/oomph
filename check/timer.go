@@ -1,7 +1,6 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -49,7 +48,7 @@ func (t *TimerA) Process(processor Processor, pk packet.Packet) {
 		t.balance += int64(timeDiff) - 1
 		if t.balance == -5 {
 			processor.Flag(t, 1, map[string]interface{}{
-				"Timer": minecraft.Round(t.clientTPS/float64(20), 4)},
+				"Timer": game.Round(t.clientTPS/float64(20), 4)},
 			)
 			t.balance = 0
 		}

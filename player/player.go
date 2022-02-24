@@ -9,6 +9,7 @@ import (
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/check"
 	"github.com/justtaldevelops/oomph/entity"
+	"github.com/justtaldevelops/oomph/game"
 	"github.com/justtaldevelops/oomph/settings"
 	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -45,10 +46,10 @@ type Player struct {
 	hMutex sync.RWMutex
 	h      Handler
 
-	entity entity.Entity
+	entity *entity.Entity
 
 	entityMu sync.Mutex
-	entities map[uint64]entity.Entity
+	entities map[uint64]*entity.Entity
 
 	queuedEntityLocations map[uint64]mgl64.Vec3
 
@@ -79,7 +80,13 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 
 		acknowledgements: make(map[int64]func()),
 
-		entities:              make(map[uint64]entity.Entity),
+		entity: entity.NewEntity(
+			game.Vec32To64(data.PlayerPosition),
+			mgl64.Vec3{},
+			game.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
+			true,
+		),
+		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
 		serverTicker: time.NewTicker(time.Second / 20),
@@ -103,46 +110,38 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 	}
 	p.checks = checks
 
-	p.entity = entity.Entity{
-		Position: minecraft.Vec32To64(data.PlayerPosition),
-		Rotation: minecraft.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
-	}
 	go p.startTicking()
 	return p
 }
 
 // Move moves the player to the given position.
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
-	s := p.Session()
-	data := s.Entity()
-	data.LastPosition = data.Position
-	data.Position = minecraft.Vec32To64(pk.Position.Sub(mgl32.Vec3{0, 1.62}))
-	data.LastRotation = data.Rotation
-	data.Rotation = mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)}
-	data.TeleportTicks++
-	s.EntityData.Store(data)
-	s.Movement.Motion = data.Position.Sub(data.LastPosition)
-
+	data := p.Entity()
+	data.Move(game.Vec32To64(pk.Position))
+	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
+	data.IncrementTeleportationTicks()
 	p.cleanChunks()
 }
 
 // Teleport sets the position of the player and resets the teleport ticks
 func (p *Player) Teleport(pos mgl32.Vec3) {
-	data := p.Session().Entity()
-	data.LastPosition = data.Position
-	data.Position = minecraft.Vec32To64(pos.Sub(mgl32.Vec3{0, 1.62}))
-	data.TeleportTicks = 0
-	p.Session().EntityData.Store(data)
-
+	data := p.Entity()
+	data.Move(game.Vec32To64(pos))
+	data.ResetTeleportationTicks()
 	p.cleanChunks()
 }
 
 // MoveActor moves an actor to the given position.
 func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
 	// If the entity exists, we can queue the location for an update.
-	if _, ok := p.Entity(rid); ok {
+	if _, ok := p.SearchEntity(rid); ok {
 		p.queuedEntityLocations[rid] = pos
 	}
+}
+
+// Entity returns the entity data of the player.
+func (p *Player) Entity() *entity.Entity {
+	return p.entity
 }
 
 // ServerTick returns the current server tick.
@@ -217,7 +216,7 @@ func (p *Player) Name() string {
 // Disconnect disconnects the player for the reason provided.
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
-	p.Close()
+	_ = p.Close()
 }
 
 // Close closes the player.

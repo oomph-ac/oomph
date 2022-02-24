@@ -51,7 +51,7 @@ func (p *Player) WritePacket(pk packet.Packet) error {
 	if err := p.conn.WritePacket(pk); err != nil {
 		return err
 	}
-	p.Process(pk, false)
+	p.ServerProcess(pk)
 	return nil
 }
 
@@ -60,7 +60,7 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 	if pk, err = p.conn.ReadPacket(); err != nil {
 		return pk, err
 	}
-	p.Process(pk, true)
+	p.ClientProcess(pk)
 	return pk, err
 }
 

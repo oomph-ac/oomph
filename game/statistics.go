@@ -1,4 +1,4 @@
-package minecraft
+package game
 
 import (
 	"math"

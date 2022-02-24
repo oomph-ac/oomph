@@ -1,7 +1,6 @@
 package player
 
 import (
-	"github.com/justtaldevelops/oomph/entity"
 	"sync"
 	"sync/atomic"
 )
@@ -60,11 +59,6 @@ func (s *Session) HasAllFlags(flags ...uint64) bool {
 		}
 	}
 	return true
-}
-
-// Entity returns the entity data of the session,
-func (s *Session) Entity() entity.Entity {
-	return s.EntityData.Load().(entity.Entity)
 }
 
 // Click will add a click to the players clicks.

@@ -2,7 +2,6 @@ package check
 
 import (
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"math"
@@ -43,7 +42,7 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 				return
 			}
 			a.target = data.TargetEntityRuntimeID
-			a.attackPos = minecraft.Vec32To64(data.Position)
+			a.attackPos = game.Vec32To64(data.Position)
 			a.realRotationSamples, a.botRotationSamples = []float64{}, []float64{}
 		}
 	case *packet.PlayerAuthInput:
@@ -65,10 +64,10 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 					a.botRotationSamples = append(a.botRotationSamples, botYaw)
 				}
 				if len(a.realRotationSamples) == 40 || len(a.botRotationSamples) == 40 {
-					cc := minecraft.CorrelationCoefficient(a.realRotationSamples, a.botRotationSamples)
+					cc := game.CorrelationCoefficient(a.realRotationSamples, a.botRotationSamples)
 					if cc > 0.99 {
 						processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 200), map[string]interface{}{
-							"Correlation": minecraft.Round(cc, 2)},
+							"Correlation": game.Round(cc, 2)},
 						)
 					}
 					a.realRotationSamples, a.botRotationSamples = []float64{}, []float64{}

@@ -1,7 +1,6 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/minecraft"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/entity/physics"
@@ -51,11 +50,11 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
 				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
-					dist := minecraft.AABBVectorDistance(t.AABB.GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), minecraft.Vec32To64(r.attackPos))
+					dist := game.AABBVectorDistance(t.AABB.GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), game.Vec32To64(r.attackPos))
 					if dist > 3.15 {
 						if r.Buff(1, 10) >= 5 {
 							processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
-								"Distance": minecraft.Round(dist, 4),
+								"Distance": game.Round(dist, 4),
 								"Type":     "Raw",
 							})
 						}
@@ -74,20 +73,20 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 		if r.awaitingTick {
 			if t, ok := processor.Entity(r.attackedEntity); ok && t.Player {
 				rot := processor.Location().Rotation
-				dv := minecraft.DirectionVector(rot.Y(), rot.X())
+				dv := game.DirectionVector(rot.Y(), rot.X())
 				width, height := (t.AABB.Width()/2)+0.1, t.AABB.Height()+0.1
 				aabb := physics.NewAABB(
 					t.LastPosition.Sub(mgl64.Vec3{width, 0.1, width}),
 					t.LastPosition.Add(mgl64.Vec3{width, height, width}),
 				)
 				if !aabb.IntersectsWith(processor.Session().Entity().AABB) {
-					vec64AttackPos := minecraft.Vec32To64(r.attackPos)
+					vec64AttackPos := game.Vec32To64(r.attackPos)
 					if ray, ok := trace.AABBIntercept(aabb, vec64AttackPos, vec64AttackPos.Add(dv.Mul(14.0))); ok {
 						dist := ray.Position().Sub(vec64AttackPos).Len()
-						if dist >= 3.1 && math.Abs(dist-minecraft.AABBVectorDistance(aabb, vec64AttackPos)) < 0.4 {
+						if dist >= 3.1 && math.Abs(dist-game.AABBVectorDistance(aabb, vec64AttackPos)) < 0.4 {
 							if r.Buff(1, 10) >= 3 {
 								processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
-									"Distance": minecraft.Round(dist, 2),
+									"Distance": game.Round(dist, 2),
 									"Type":     "Raycast",
 								})
 							}

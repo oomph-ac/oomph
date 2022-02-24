@@ -1,7 +1,6 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/minecraft"
 	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -33,10 +32,10 @@ func (a *AutoClickerC) Process(processor Processor, _ packet.Packet) {
 		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
 		if len(a.samples) == 20 {
 			cps := processor.Session().CPS()
-			deviation, skewness := minecraft.StandardDeviation(a.samples), minecraft.Skewness(a.samples)
+			deviation, skewness := game.StandardDeviation(a.samples), game.Skewness(a.samples)
 			processor.Debug(a, map[string]interface{}{
-				"Deviation": minecraft.Round(deviation, 3),
-				"Skewness":  minecraft.Round(skewness, 3),
+				"Deviation": game.Round(deviation, 3),
+				"Skewness":  game.Round(skewness, 3),
 				"CPS":       cps,
 			})
 			if deviation <= 20 && (skewness > 1 || skewness == 0.0) && cps >= 9 {
@@ -46,8 +45,8 @@ func (a *AutoClickerC) Process(processor Processor, _ packet.Packet) {
 				}
 				if a.Buff(1) >= e {
 					processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 400), map[string]interface{}{
-						"Deviation": minecraft.Round(deviation, 3),
-						"Skewness":  minecraft.Round(skewness, 3),
+						"Deviation": game.Round(deviation, 3),
+						"Skewness":  game.Round(skewness, 3),
 						"CPS":       cps,
 					})
 				}

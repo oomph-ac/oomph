@@ -21,9 +21,11 @@ type Processor interface {
 	// language code and other non-essential information.
 	ClientData() login.ClientData
 
-	// Entity queries the processor for an entity, using the runtime ID specified. The second return value is false if
-	// the entity is not loaded inside the processor's memory.
-	Entity(runtimeID uint64) (entity.Entity, bool)
+	// SearchEntity queries the processor for an entity, using the runtime ID specified. The second return value is false
+	// if the entity is not loaded inside the processor memory.
+	SearchEntity(rid uint64) (*entity.Entity, bool)
+	// Entity returns the entity data of the processor.
+	Entity() *entity.Entity
 
 	// Debug debugs the given parameters to the processor.
 	Debug(check Check, params map[string]interface{})
