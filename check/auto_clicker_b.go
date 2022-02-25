@@ -4,34 +4,34 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoclickerB checks if the user is clicking above 18 cps with no double clicks.
-type AutoclickerB struct {
+// AutoClickerB checks if the user is clicking above 18 cps with no double clicks.
+type AutoClickerB struct {
 	basic
 	samples []uint64
 }
 
-// NewAutoClickerB creates a new AutoclickerB check.
-func NewAutoClickerB() *AutoclickerB {
-	return &AutoclickerB{}
+// NewAutoClickerB creates a new AutoClickerB check.
+func NewAutoClickerB() *AutoClickerB {
+	return &AutoClickerB{}
 }
 
 // Name ...
-func (*AutoclickerB) Name() (string, string) {
-	return "Autoclicker", "B"
+func (*AutoClickerB) Name() (string, string) {
+	return "AutoClicker", "B"
 }
 
 // Description ...
-func (*AutoclickerB) Description() string {
+func (*AutoClickerB) Description() string {
 	return "This checks if the user is clicking above 18 cps with no double clicks."
 }
 
 // MaxViolations ...
-func (*AutoclickerB) MaxViolations() float64 {
+func (*AutoClickerB) MaxViolations() float64 {
 	return 15
 }
 
 // Process ...
-func (a *AutoclickerB) Process(processor Processor, _ packet.Packet) {
+func (a *AutoClickerB) Process(processor Processor, _ packet.Packet) {
 	if processor.Clicking() {
 		a.samples = append(a.samples, processor.ClickDelay())
 		if len(a.samples) == 20 {
@@ -46,7 +46,7 @@ func (a *AutoclickerB) Process(processor Processor, _ packet.Packet) {
 }
 
 // verifySamples verifies the existing samples for any violations.
-func (a *AutoclickerB) verifySamples() bool {
+func (a *AutoClickerB) verifySamples() bool {
 	for _, v := range a.samples {
 		if v == 0 {
 			return false
