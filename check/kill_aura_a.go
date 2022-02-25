@@ -37,6 +37,9 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 	case *packet.Animate:
 		if pk.ActionType == packet.AnimateActionSwingArm {
 			k.lastSwingTick = processor.ClientTick()
+			processor.Debug(k, map[string]interface{}{
+				"Last Swing Client Tick": k.lastSwingTick,
+			})
 		}
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
@@ -44,7 +47,6 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 			if tickDiff > 4 {
 				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
 					"Tick Difference": tickDiff,
-					"Client Tick":     processor.ClientTick(),
 				})
 			}
 		}
