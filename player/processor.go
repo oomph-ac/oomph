@@ -21,6 +21,8 @@ func (p *Player) ClientProcess(pk packet.Packet) {
 		call, ok := p.acknowledgements[pk.Timestamp]
 		if ok {
 			delete(p.acknowledgements, pk.Timestamp)
+			p.ackMu.Unlock()
+
 			call()
 			return
 		}
