@@ -11,3 +11,5 @@ specific one.
 ## credits
 oomph is heavily influenced by [Esoteric](https://github.com/ethaniccc/Esoteric) and [Lumine](https://github.com/ethaniccc/Lumine).
 thank you, ethaniccc for providing us with these!
+
+eat my dick prim
