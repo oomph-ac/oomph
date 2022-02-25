@@ -160,6 +160,11 @@ func (p *Player) ClientTick() uint64 {
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
 func (p *Player) Acknowledgement(f func()) {
+	if p.closed.Load() {
+		// Don't request an acknowledgement if the player is already closed.
+		return
+	}
+
 	t := int64(rand.Int31()) * 1000 // Ensure that we don't get screwed over because the number is too fat.
 	if t < 0 {
 		t *= -1
