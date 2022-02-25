@@ -110,7 +110,25 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		gameMode: *atomic.NewInt32(data.PlayerGameMode),
 
 		serverTicker: time.NewTicker(time.Second / 20),
-		checks:       check.Checks(),
+		checks: []check.Check{
+			check.NewAimAssistA(),
+
+			check.NewAutoClickerA(),
+			check.NewAutoClickerB(),
+			check.NewAutoClickerC(),
+			check.NewAutoClickerD(),
+
+			check.NewInvalidMovementC(),
+
+			check.NewKillAuraA(),
+			check.NewKillAuraB(),
+
+			check.NewOSSpoofer(),
+
+			check.NewReachA(),
+
+			check.NewTimerA(),
+		},
 	}
 	go p.startTicking()
 	return p

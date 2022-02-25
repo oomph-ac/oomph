@@ -49,6 +49,7 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 				processor.Flag(k, k.updateAndGetViolationAfterTicks(currentTick, 600), map[string]interface{}{
 					"Tick Difference": tickDiff,
 					"Current Tick":    currentTick,
+					"Last Tick":       k.lastSwingTick,
 				})
 			}
 		}

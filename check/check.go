@@ -21,21 +21,3 @@ type Check interface {
 	// Process will process the packet provided for the check.
 	Process(processor Processor, pk packet.Packet)
 }
-
-// registeredChecks maps the name of a check to the check itself.
-var registeredChecks = make(map[string]Check)
-
-// RegisterCheck registers the provided check.
-func RegisterCheck(check Check) {
-	name, suffix := check.Name()
-	registeredChecks[name+suffix] = check
-}
-
-// Checks returns a slice of all registered checks.
-func Checks() []Check {
-	checks := make([]Check, 0, len(registeredChecks))
-	for _, check := range registeredChecks {
-		checks = append(checks, check)
-	}
-	return checks
-}
