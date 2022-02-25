@@ -2,7 +2,6 @@ package oomph
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/df-mc/dragonfly/server/world"
@@ -14,18 +13,24 @@ import (
 // Oomph represents an instance of the Oomph proxy.
 type Oomph struct {
 	players chan *player.Player
+	log     *logrus.Logger
+	addr    string
 }
 
 // New returns a new Oomph instance.
 // If your server is using Dragonfly, be sure to use the Listener function instead.
-func New() *Oomph {
-	return &Oomph{players: make(chan *player.Player)}
+func New(log *logrus.Logger, addr string) *Oomph {
+	return &Oomph{
+		players: make(chan *player.Player),
+		addr:    addr,
+		log:     log,
+	}
 }
 
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
 // Addresses should be formatted in the following format: "ip:port", ex: "127.0.0.1:19132".
 // If you're using dragonfly, use Listen instead of Start.
-func (o *Oomph) Start(remoteAddr, localAddr string) error {
+func (o *Oomph) Start(remoteAddr string) error {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
 		panic(err)
@@ -37,12 +42,12 @@ func (o *Oomph) Start(remoteAddr, localAddr string) error {
 	l, err := minecraft.ListenConfig{
 		StatusProvider: p,
 		ResourcePacks:  serverConn.ResourcePacks(),
-	}.Listen("raknet", localAddr)
+	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
 	}
 	defer l.Close()
-	fmt.Printf("Oomph is now listening on %v and directing connections to %v!\n", localAddr, remoteAddr)
+	o.log.Printf("Oomph is now listening on %v and directing connections to %v!\n", o.addr, remoteAddr)
 	for {
 		c, err := l.Accept()
 		if err != nil {
@@ -78,11 +83,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 
-	lg := logrus.New()
-	lg.Formatter = &logrus.TextFormatter{ForceColors: true}
-	lg.Level = logrus.DebugLevel
-
-	p := player.NewPlayer(lg, world.Overworld, 8, conn, serverConn)
+	p := player.NewPlayer(o.log, world.Overworld, 8, conn, serverConn)
 	o.players <- p
 
 	g.Add(2)
