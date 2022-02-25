@@ -7,7 +7,7 @@ import (
 
 // KillAuraA checks if a player is attacking an entity without swinging their arm.
 type KillAuraA struct {
-	check
+	basic
 	lastSwingTick uint64
 }
 
@@ -24,6 +24,11 @@ func (*KillAuraA) Name() (string, string) {
 // Description ...
 func (*KillAuraA) Description() string {
 	return "This checks if a player is attacking without swinging their arm."
+}
+
+// MaxViolations ...
+func (*KillAuraA) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...

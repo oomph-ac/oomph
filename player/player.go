@@ -10,7 +10,6 @@ import (
 	"github.com/justtaldevelops/oomph/check"
 	"github.com/justtaldevelops/oomph/entity"
 	"github.com/justtaldevelops/oomph/game"
-	"github.com/justtaldevelops/oomph/settings"
 	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -29,7 +28,7 @@ type Player struct {
 	rid uint64
 	uid int64
 
-	settings settings.Settings
+	viewDist int32
 
 	chunkMu sync.Mutex
 	chunks  map[world.ChunkPos]*chunk.Chunk
@@ -39,9 +38,8 @@ type Player struct {
 
 	dimension world.Dimension
 
-	serverTicker *time.Ticker
-	clientTick   uint64
-	serverTick   uint64
+	serverTicker           *time.Ticker
+	clientTick, serverTick uint64
 
 	hMutex sync.RWMutex
 	h      Handler
@@ -80,7 +78,7 @@ type Player struct {
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
-func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.Settings, conn, serverConn *minecraft.Conn) *Player {
+func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, conn, serverConn *minecraft.Conn) *Player {
 	data := conn.GameData()
 	p := &Player{
 		log: log,
@@ -91,7 +89,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 		rid: data.EntityRuntimeID,
 		uid: data.EntityUniqueID,
 
-		settings: settings,
+		viewDist: viewDist,
 
 		chunks:    make(map[world.ChunkPos]*chunk.Chunk),
 		dimension: dimension,
@@ -122,17 +120,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 			check.NewTimerA(),
 		},
 	}
-
-	// TODO: Make a check registry to make this less ugly.
-	var checks []check.Check
-	for _, c := range p.checks {
-		if c.BaseSettings().Enabled {
-			checks = append(checks, c)
-		}
-	}
-	p.checks = checks
-
 	go p.startTicking()
+
 	return p
 }
 
@@ -145,7 +134,7 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	p.cleanChunks()
 }
 
-// Teleport sets the position of the player and resets the teleport ticks
+// Teleport sets the position of the player and resets the teleport ticks of the player.
 func (p *Player) Teleport(pos mgl32.Vec3) {
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos))
@@ -219,7 +208,7 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 		p.log.Infof("%s was flagged for %s%s! %s", p.Name(), name, variant, utils.PrettyParameters(params))
 	})
 
-	if now, max := check.Violations(), check.BaseSettings().MaxViolations; now >= float64(max) {
+	if now, max := check.Violations(), check.MaxViolations(); now >= max {
 		ctx := event.C()
 		p.handler().HandlePunishment(ctx, check)
 		ctx.Continue(func() {

@@ -7,7 +7,7 @@ import (
 
 // AutoClickerC checks for an irregular clicking pattern using statistics.
 type AutoClickerC struct {
-	check
+	basic
 	samples []float64
 }
 
@@ -24,6 +24,11 @@ func (*AutoClickerC) Name() (string, string) {
 // Description ...
 func (*AutoClickerC) Description() string {
 	return "This checks for an irregular clicking pattern."
+}
+
+// MaxViolations ...
+func (*AutoClickerC) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...

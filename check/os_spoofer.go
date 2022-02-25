@@ -8,7 +8,7 @@ import (
 
 // OSSpoofer checks if the player's device os does not equal the one that matches with their title id.
 type OSSpoofer struct {
-	check
+	basic
 }
 
 // NewOSSpoofer creates a new OSSpoofer check.
@@ -24,6 +24,11 @@ func (*OSSpoofer) Name() (string, string) {
 // Description ...
 func (*OSSpoofer) Description() string {
 	return "This checks if the player is faking their device os."
+}
+
+// MaxViolations ...
+func (*OSSpoofer) MaxViolations() float64 {
+	return 1
 }
 
 // Process ...

@@ -7,7 +7,7 @@ import (
 
 // InvalidMovementC checks if the delay between the users jumps is invalid.
 type InvalidMovementC struct {
-	check
+	basic
 	jumpTicks int32
 }
 
@@ -24,6 +24,11 @@ func (*InvalidMovementC) Name() (string, string) {
 // Description ...
 func (*InvalidMovementC) Description() string {
 	return "This checks if the delay between a users jumps is invalid. This can detect things such as air-jump or sometimes bunny hop."
+}
+
+// MaxViolations ...
+func (*InvalidMovementC) MaxViolations() float64 {
+	return 10
 }
 
 // Process ...

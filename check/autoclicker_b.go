@@ -6,7 +6,7 @@ import (
 
 // AutoClickerB checks if the user is clicking above 18 cps with no double clicks.
 type AutoClickerB struct {
-	check
+	basic
 	samples []uint64
 }
 
@@ -23,6 +23,11 @@ func (*AutoClickerB) Name() (string, string) {
 // Description ...
 func (*AutoClickerB) Description() string {
 	return "This checks if the user is clicking above 18 cps with no double clicks."
+}
+
+// MaxViolations ...
+func (*AutoClickerB) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...

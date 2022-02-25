@@ -59,10 +59,10 @@ func (p *Player) ClientProcess(pk packet.Packet) {
 
 	// Run all registered checks.
 	p.checkMu.Lock()
+	defer p.checkMu.Unlock()
 	for _, c := range p.checks {
 		c.Process(p, pk)
 	}
-	p.checkMu.Unlock()
 }
 
 // ServerProcess processes the given packet from the server.

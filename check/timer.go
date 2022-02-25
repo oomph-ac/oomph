@@ -7,7 +7,7 @@ import (
 
 // TimerA checks for the timer cheat by using a balance system.
 type TimerA struct {
-	check
+	basic
 	balance   int64
 	lastTime  uint64
 	clientTPS float64
@@ -26,6 +26,11 @@ func (*TimerA) Name() (string, string) {
 // Description ...
 func (*TimerA) Description() string {
 	return "This checks if a player is sending movement packets too fast."
+}
+
+// MaxViolations ...
+func (*TimerA) MaxViolations() float64 {
+	return 10
 }
 
 // Process ...

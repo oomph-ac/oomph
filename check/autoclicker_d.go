@@ -7,7 +7,7 @@ import (
 
 // AutoClickerD checks if a user has a constant and low standard deviation in their click data.
 type AutoClickerD struct {
-	check
+	basic
 	samples []float64
 }
 
@@ -24,6 +24,11 @@ func (*AutoClickerD) Name() (string, string) {
 // Description ...
 func (*AutoClickerD) Description() string {
 	return "This checks if a user has a constant and low standard deviation in their click data."
+}
+
+// MaxViolations ...
+func (*AutoClickerD) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...

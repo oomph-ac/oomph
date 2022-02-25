@@ -6,7 +6,7 @@ import (
 
 // AutoClickerA checks if the player cps is over a certain threshold.
 type AutoClickerA struct {
-	check
+	basic
 }
 
 // NewAutoClickerA creates a new AutoClickerA check.
@@ -22,6 +22,11 @@ func (*AutoClickerA) Name() (string, string) {
 // Description ...
 func (*AutoClickerA) Description() string {
 	return "This checks if a players cps is over a certain threshold."
+}
+
+// MaxViolations ...
+func (*AutoClickerA) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...

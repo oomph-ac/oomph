@@ -10,7 +10,7 @@ import (
 
 // AimAssistA checks the correlation coefficient between expected aim-bot rotation values and actual rotation values.
 type AimAssistA struct {
-	check
+	basic
 	waiting             bool
 	target              uint64
 	attackPos           mgl64.Vec3
@@ -31,6 +31,11 @@ func (*AimAssistA) Name() (string, string) {
 // Description ...
 func (*AimAssistA) Description() string {
 	return "This checks if a player is using a cheat to assist with their aim."
+}
+
+// MaxViolations ...
+func (*AimAssistA) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...

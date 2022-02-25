@@ -10,7 +10,7 @@ import (
 
 // KillAuraB checks if a player is attacking too many entities at once.
 type KillAuraB struct {
-	check
+	basic
 	entities map[uint64]*entity.Entity
 }
 
@@ -27,6 +27,11 @@ func (*KillAuraB) Name() (string, string) {
 // Description ...
 func (*KillAuraB) Description() string {
 	return "This checks if a player is attacking more than one entity at once."
+}
+
+// MaxViolations ...
+func (*KillAuraB) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...

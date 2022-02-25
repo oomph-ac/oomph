@@ -13,7 +13,7 @@ import (
 
 // ReachA checks if a player has an abnormal amount of reach.
 type ReachA struct {
-	check
+	basic
 	awaitingTick   bool
 	inputMode      uint32
 	attackPos      mgl32.Vec3
@@ -33,6 +33,11 @@ func (*ReachA) Name() (string, string) {
 // Description ...
 func (*ReachA) Description() string {
 	return "This checks if a player has an abnormal amount of reach."
+}
+
+// MaxViolations ...
+func (*ReachA) MaxViolations() float64 {
+	return 15
 }
 
 // Process ...
