@@ -12,7 +12,7 @@ import (
 )
 
 // ClientProcess processes the given packet from the client.
-func (p *Player) ClientProcess(pk packet.Packet) {
+func (p *Player) ClientProcess(pk packet.Packet) bool {
 	p.clicking.Store(false)
 
 	switch pk := pk.(type) {
@@ -24,7 +24,7 @@ func (p *Player) ClientProcess(pk packet.Packet) {
 			p.ackMu.Unlock()
 
 			call()
-			return
+			return true
 		}
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
@@ -66,15 +66,16 @@ func (p *Player) ClientProcess(pk packet.Packet) {
 	for _, c := range p.checks {
 		c.Process(p, pk)
 	}
+	return false
 }
 
 // ServerProcess processes the given packet from the server.
-func (p *Player) ServerProcess(pk packet.Packet) {
+func (p *Player) ServerProcess(pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.rid {
 			// We are the player.
-			return
+			return false
 		}
 
 		p.Acknowledgement(func() {
@@ -88,7 +89,7 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 	case *packet.AddActor:
 		if pk.EntityRuntimeID == p.rid {
 			// We are the player.
-			return
+			return false
 		}
 
 		p.Acknowledgement(func() {
@@ -107,7 +108,7 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 					p.teleporting.Store(true)
 				}
 			})
-			return
+			return false
 		}
 
 		p.MoveActor(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
@@ -119,7 +120,7 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 					p.teleporting.Store(true)
 				}
 			})
-			return
+			return false
 		}
 
 		p.MoveActor(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
@@ -167,4 +168,5 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 			})
 		}
 	}
+	return false
 }
