@@ -1,5 +1,7 @@
 package entity
 
+// TODO: (somehow) make this neater?
+
 const (
 	DataKeyFlags             = iota
 	DataKeyBoundingBoxWidth  = 53
