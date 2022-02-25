@@ -27,6 +27,32 @@ type Processor interface {
 	// Entity returns the entity data of the processor.
 	Entity() *entity.Entity
 
+	// ClickDelay returns the delay between the current click and the last one.
+	ClickDelay() uint64
+	// Click adds a click to the processor's click history.
+	Click()
+	// CPS returns the clicks per second of the processor.
+	CPS() int
+
+	// GameMode returns the current game mode of the player.
+	GameMode() int32
+	// Sneaking returns true if the player is currently sneaking.
+	Sneaking() bool
+	// Sprinting returns true if the player is currently sprinting.
+	Sprinting() bool
+	// Teleporting returns true if the player is currently teleporting.
+	Teleporting() bool
+	// Jumping returns true if the player is currently jumping.
+	Jumping() bool
+	// Immobile returns true if the player is currently immobile.
+	Immobile() bool
+	// Flying returns true if the player is currently flying.
+	Flying() bool
+	// Dead returns true if the player is currently dead.
+	Dead() bool
+	// Clicking returns true if the player is clicking.
+	Clicking() bool
+
 	// Debug debugs the given parameters to the processor.
 	Debug(check Check, params map[string]interface{})
 	// Flag flags the given check with the given parameters.

@@ -1,7 +1,6 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -28,12 +27,12 @@ func (*AutoClickerB) Description() string {
 
 // Process ...
 func (a *AutoClickerB) Process(processor Processor, _ packet.Packet) {
-	if processor.Session().HasFlag(session.FlagClicking) {
-		a.samples = append(a.samples, processor.Session().ClickDelay())
+	if processor.Clicking() {
+		a.samples = append(a.samples, processor.ClickDelay())
 		if len(a.samples) == 20 {
-			if a.verifySamples() && processor.Session().CPS() >= 18 {
+			if a.verifySamples() && processor.CPS() >= 18 {
 				processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 300), map[string]interface{}{
-					"CPS": processor.Session().CPS(),
+					"CPS": processor.CPS(),
 				})
 			}
 			a.samples = make([]uint64, 0)

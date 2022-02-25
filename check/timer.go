@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/justtaldevelops/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 

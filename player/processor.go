@@ -13,7 +13,7 @@ import (
 
 // ClientProcess processes the given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) {
-	p.Session().SetFlag(false, session.FlagClicking)
+	p.clicking.Store(false)
 
 	switch pk := pk.(type) {
 	case *packet.NetworkStackLatency:
@@ -28,32 +28,27 @@ func (p *Player) ClientProcess(pk packet.Packet) {
 		p.clientTick++
 		p.Move(pk)
 
-		s := p.Session()
-
-		for inputFlags, sessionFlag := range session.InputFlagMap {
-			if utils.HasFlag(pk.InputData, inputFlags[0]) {
-				s.SetFlag(true, sessionFlag)
-			} else if utils.HasFlag(pk.InputData, inputFlags[1]) {
-				s.SetFlag(false, sessionFlag)
-			}
+		if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+			p.sprinting.Toggle()
+		} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+			p.sneaking.Toggle()
 		}
 
-		s.SetFlag(utils.HasFlag(pk.InputData, packet.InputFlagStartJumping), session.FlagJumping)
-
+		p.jumping.Store(utils.HasFlag(pk.InputData, packet.InputFlagStartJumping))
 		p.tickEntityLocations()
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
-			p.Session().Click(p.ClientTick())
+			p.Click()
 		}
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-			p.Session().Click(p.ClientTick())
+			p.Click()
 		}
 	case *packet.AdventureSettings:
-		p.Session().SetFlag(utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying), session.FlagFlying)
+		p.flying.Store(utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying))
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
-			p.Session().SetFlag(false, session.FlagDead)
+			p.dead.Store(false)
 		}
 	case *packet.Text:
 		if p.serverConn != nil {
@@ -106,7 +101,7 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 			p.Acknowledgement(func() {
 				p.Teleport(pk.Position)
 				if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
-					p.Session().ASetFlag(true, session.FlagTeleporting)
+					p.teleporting.Store(true)
 				}
 			})
 			return
@@ -118,7 +113,7 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 			p.Acknowledgement(func() {
 				p.Teleport(pk.Position)
 				if pk.Mode == packet.MoveModeTeleport {
-					p.Session().SetFlag(true, session.FlagTeleporting)
+					p.teleporting.Store(true)
 				}
 			})
 			return
@@ -145,23 +140,13 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 			}
 
 			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
-				p.Session().SetFlag(hasFlag(entity.DataFlagImmobile, f.(int64)), session.FlagImmobile)
+				p.immobile.Store(utils.HasDataFlag(entity.DataFlagImmobile, f.(int64)))
 			}
-		})
-	case *packet.StartGame: // TODO: Change this, as it won't work; start game isn't sent after login.
-		p.Acknowledgement(func() {
-			p.Session().GameMode = pk.WorldGameMode
 		})
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
-			p.Session().GameMode = pk.GameType
+			p.gameMode.Store(pk.GameType)
 		})
-	case *packet.SetActorMotion:
-		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				p.Session().Ticks.Motion = 0
-			})
-		}
 	case *packet.RemoveActor:
 		if pk.EntityUniqueID != p.uid {
 			p.Acknowledgement(func() {
@@ -173,7 +158,7 @@ func (p *Player) ServerProcess(pk packet.Packet) {
 			p.Acknowledgement(func() {
 				for _, a := range pk.Attributes {
 					if a.Name == "minecraft:health" && a.Value <= 0 {
-						p.Session().SetFlag(true, session.FlagDead)
+						p.dead.Store(true)
 					}
 				}
 			})

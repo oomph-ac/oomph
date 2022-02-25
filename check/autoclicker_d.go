@@ -1,7 +1,7 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/session"
+	"github.com/justtaldevelops/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -28,14 +28,14 @@ func (*AutoClickerD) Description() string {
 
 // Process ...
 func (a *AutoClickerD) Process(processor Processor, _ packet.Packet) {
-	if processor.Session().HasFlag(session.FlagClicking) {
-		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
+	if processor.Clicking() {
+		a.samples = append(a.samples, float64(processor.ClickDelay()))
 		if len(a.samples) < 20 {
 			// Not enough samples, wait until we have more.
 			return
 		}
 
-		cps := processor.Session().CPS()
+		cps := processor.CPS()
 		kurtosis, skewness, outliers, deviation := game.Kurtosis(a.samples), game.Skewness(a.samples), game.Outliers(a.samples), game.StandardDeviation(a.samples)
 		processor.Debug(a, map[string]interface{}{
 			"Kurtosis":  game.Round(kurtosis, 2),

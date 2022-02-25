@@ -7,7 +7,6 @@ import (
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/session"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -41,14 +40,14 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
-			s := processor.Session()
-			if s.GameMode != 1 {
-				add := float32(1.54)
-				if !s.HasFlag(session.FlagSneaking) {
-					add = 1.62
+			if processor.GameMode() == packet.GameTypeSurvival || processor.GameMode() == packet.GameTypeAdventure {
+				offset := float32(1.62)
+				if processor.Sneaking() {
+					offset = 1.54
 				}
+
 				r.attackedEntity = data.TargetEntityRuntimeID
-				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
+				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, offset})
 				if t, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
 					dist := game.AABBVectorDistance(t.AABB().GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), game.Vec32To64(r.attackPos))
 					if dist > 3.15 {

@@ -53,6 +53,26 @@ type Player struct {
 
 	queuedEntityLocations map[uint64]mgl64.Vec3
 
+	gameMode atomic.Int32
+
+	sneaking  atomic.Bool
+	sprinting atomic.Bool
+
+	teleporting atomic.Bool
+	jumping     atomic.Bool
+
+	immobile atomic.Bool
+	flying   atomic.Bool
+	dead     atomic.Bool
+
+	clicking atomic.Bool
+
+	clickMu       sync.Mutex
+	clicks        []uint64
+	lastClickTick uint64
+	clickDelay    uint64
+	cps           int
+
 	checkMu sync.Mutex
 	checks  []check.Check
 
@@ -89,6 +109,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
+		gameMode: *atomic.NewInt32(serverConn.GameData().PlayerGameMode),
+
 		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
 			check.NewAimAssistA(),
@@ -101,7 +123,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, settings settings.
 		},
 	}
 
-	// TODO: Make a check registry.
+	// TODO: Make a check registry to make this less ugly.
 	var checks []check.Check
 	for _, c := range p.checks {
 		if c.BaseSettings().Enabled {
@@ -206,6 +228,85 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 		})
 		return
 	}
+}
+
+// GameMode returns the current game mode of the player.
+func (p *Player) GameMode() int32 {
+	return p.gameMode.Load()
+}
+
+// Sneaking returns true if the player is currently sneaking.
+func (p *Player) Sneaking() bool {
+	return p.sneaking.Load()
+}
+
+// Sprinting returns true if the player is currently sprinting.
+func (p *Player) Sprinting() bool {
+	return p.sprinting.Load()
+}
+
+// Teleporting returns true if the player is currently teleporting.
+func (p *Player) Teleporting() bool {
+	return p.teleporting.Load()
+}
+
+// Jumping returns true if the player is currently jumping.
+func (p *Player) Jumping() bool {
+	return p.jumping.Load()
+}
+
+// Immobile returns true if the player is currently immobile.
+func (p *Player) Immobile() bool {
+	return p.immobile.Load()
+}
+
+// Flying returns true if the player is currently flying.
+func (p *Player) Flying() bool {
+	return p.flying.Load()
+}
+
+// Dead returns true if the player is currently dead.
+func (p *Player) Dead() bool {
+	return p.dead.Load()
+}
+
+// Clicking returns true if the player is clicking.
+func (p *Player) Clicking() bool {
+	return p.clicking.Load()
+}
+
+// Click adds a click to the player's click history.
+func (p *Player) Click() {
+	currentTick := p.ClientTick()
+
+	p.clickMu.Lock()
+	p.clicking.Store(true)
+	if len(p.clicks) > 0 {
+		p.clickDelay = (currentTick - p.lastClickTick) * 50
+	} else {
+		p.clickDelay = 0
+	}
+	p.clicks = append(p.clicks, currentTick)
+	var clicks []uint64
+	for _, clickTick := range p.clicks {
+		if currentTick-clickTick <= 20 {
+			clicks = append(clicks, clickTick)
+		}
+	}
+	p.lastClickTick = currentTick
+	p.clicks = clicks
+	p.cps = len(p.clicks)
+	p.clickMu.Unlock()
+}
+
+// CPS returns the clicks per second of the player.
+func (p *Player) CPS() int {
+	return p.cps
+}
+
+// ClickDelay returns the delay between the current click and the last one.
+func (p *Player) ClickDelay() uint64 {
+	return p.clickDelay
 }
 
 // Name returns the player's display name.

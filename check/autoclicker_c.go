@@ -1,7 +1,7 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/session"
+	"github.com/justtaldevelops/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -28,10 +28,10 @@ func (*AutoClickerC) Description() string {
 
 // Process ...
 func (a *AutoClickerC) Process(processor Processor, _ packet.Packet) {
-	if processor.Session().HasFlag(session.FlagClicking) {
-		a.samples = append(a.samples, float64(processor.Session().ClickDelay()))
+	if processor.Clicking() {
+		a.samples = append(a.samples, float64(processor.ClickDelay()))
 		if len(a.samples) == 20 {
-			cps := processor.Session().CPS()
+			cps := processor.CPS()
 			deviation, skewness := game.StandardDeviation(a.samples), game.Skewness(a.samples)
 			processor.Debug(a, map[string]interface{}{
 				"Deviation": game.Round(deviation, 3),
