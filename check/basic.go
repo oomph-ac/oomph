@@ -11,7 +11,7 @@ type basic struct {
 
 // Buff adds to the buffer and returns the new one.
 func (t *basic) Buff(n float64, max ...float64) float64 {
-	var m float64 = 15
+	m := float64(15)
 	if len(max) > 0 {
 		m = max[0]
 	}

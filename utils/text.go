@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"strings"
 )
 
 // Device returns the device name from the DeviceOS.
@@ -44,10 +43,5 @@ func Device(os protocol.DeviceOS) string {
 // PrettyParameters converts the given parameters to a readable string.
 // TODO: Make this better.
 func PrettyParameters(params map[string]interface{}) string {
-	if len(params) == 0 {
-		// Don't waste time if there aren't any parameters.
-		return "[]"
-	}
-	// Hacky but simple way to create a readable string.
-	return strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(fmt.Sprint(params), "map"), " ", ", "), ":", "=")
+	return fmt.Sprint(params)
 }
