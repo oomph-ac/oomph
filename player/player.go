@@ -201,6 +201,8 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 	})
 
 	if now, max := check.Violations(), check.MaxViolations(); now >= max {
+		p.checkMu.Unlock()
+
 		ctx := event.C()
 		p.handler().HandlePunishment(ctx, check)
 		ctx.Continue(func() {
@@ -313,21 +315,16 @@ func (p *Player) Close() error {
 		}
 	}
 
-	// TODO: Remove the debug here.
-	p.log.Debugf("Stopped server ticker")
 	p.serverTicker.Stop()
 
-	p.log.Debugf("Stopped checks")
 	p.checkMu.Lock()
 	p.checks = nil
 	p.checkMu.Unlock()
 
-	p.log.Debugf("Stopped chunks")
 	p.chunkMu.Lock()
 	p.chunks = nil
 	p.chunkMu.Unlock()
 
-	p.log.Debugf("Closed")
 	p.closed.Store(true)
 	return nil
 }
