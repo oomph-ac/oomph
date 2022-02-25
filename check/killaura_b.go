@@ -8,34 +8,34 @@ import (
 	"math"
 )
 
-// KillAuraB checks if a player is attacking too many entities at once.
-type KillAuraB struct {
+// KillauraB checks if a player is attacking too many entities at once.
+type KillauraB struct {
 	basic
 	entities map[uint64]*entity.Entity
 }
 
-// NewKillAuraB creates a new KillAuraB check.
-func NewKillAuraB() *KillAuraB {
-	return &KillAuraB{entities: make(map[uint64]*entity.Entity)}
+// NewKillAuraB creates a new KillauraB check.
+func NewKillAuraB() *KillauraB {
+	return &KillauraB{entities: make(map[uint64]*entity.Entity)}
 }
 
 // Name ...
-func (*KillAuraB) Name() (string, string) {
-	return "KillAura", "B"
+func (*KillauraB) Name() (string, string) {
+	return "Killaura", "B"
 }
 
 // Description ...
-func (*KillAuraB) Description() string {
+func (*KillauraB) Description() string {
 	return "This checks if a player is attacking more than one entity at once."
 }
 
 // MaxViolations ...
-func (*KillAuraB) MaxViolations() float64 {
+func (*KillauraB) MaxViolations() float64 {
 	return 15
 }
 
 // Process ...
-func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
+func (k *KillauraB) Process(processor Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
