@@ -5,34 +5,34 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoclickerD checks if a user has a constant and low standard deviation in their click data.
-type AutoclickerD struct {
+// AutoClickerD checks if a user has a constant and low standard deviation in their click data.
+type AutoClickerD struct {
 	basic
 	samples []float64
 }
 
-// NewAutoClickerD creates a new AutoclickerD check.
-func NewAutoClickerD() *AutoclickerD {
-	return &AutoclickerD{}
+// NewAutoClickerD creates a new AutoClickerD check.
+func NewAutoClickerD() *AutoClickerD {
+	return &AutoClickerD{}
 }
 
 // Name ...
-func (*AutoclickerD) Name() (string, string) {
-	return "Autoclicker", "D"
+func (*AutoClickerD) Name() (string, string) {
+	return "AutoClicker", "D"
 }
 
 // Description ...
-func (*AutoclickerD) Description() string {
+func (*AutoClickerD) Description() string {
 	return "This checks if a user has a constant and low standard deviation in their click data."
 }
 
 // MaxViolations ...
-func (*AutoclickerD) MaxViolations() float64 {
+func (*AutoClickerD) MaxViolations() float64 {
 	return 15
 }
 
 // Process ...
-func (a *AutoclickerD) Process(processor Processor, _ packet.Packet) {
+func (a *AutoClickerD) Process(processor Processor, _ packet.Packet) {
 	if processor.Clicking() {
 		a.samples = append(a.samples, float64(processor.ClickDelay()))
 		if len(a.samples) < 20 {
