@@ -31,8 +31,8 @@ func TestOomphDirect(t *testing.T) {
 	}
 
 	go func() {
-		oomph := New()
-		if err := oomph.Listen(srv, log, ":19131", ":19132"); err != nil {
+		oomph := New(log, ":19132")
+		if err := oomph.Listen(srv, ":19131"); err != nil {
 			log.Fatalln(err)
 		}
 

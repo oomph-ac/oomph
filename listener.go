@@ -7,32 +7,29 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/justtaldevelops/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sirupsen/logrus"
 )
 
 // listener is a Dragonfly listener implementation for direct Oomph.
 type listener struct {
 	*minecraft.Listener
-	log *logrus.Logger
-	o   *Oomph
+	o *Oomph
 }
 
 // Listen listens for oomph connections, this should be used instead of Start for dragonfly servers.
-func (o *Oomph) Listen(s *server.Server, log *logrus.Logger, mainAddr, oomphAddr string) error {
-	p, err := minecraft.NewForeignStatusProvider(mainAddr)
+func (o *Oomph) Listen(s *server.Server, remoteAddr string) error {
+	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
 		panic(err)
 	}
 	l, err := minecraft.ListenConfig{
 		StatusProvider: p,
-	}.Listen("raknet", oomphAddr)
+	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
 	}
-	log.Infof("Oomph is now listening on %v and directing connections to %v!\n", oomphAddr, mainAddr)
+	o.log.Infof("oomph is now listening on %v and directing connections to %v!\n", o.addr, remoteAddr)
 	s.Listen(listener{
 		Listener: l,
-		log:      log,
 		o:        o,
 	})
 	return nil
@@ -56,7 +53,7 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 
-	p := player.NewPlayer(l.log, world.Overworld, 8, c.(*minecraft.Conn), nil)
+	p := player.NewPlayer(l.o.log, world.Overworld, 8, c.(*minecraft.Conn), nil)
 	l.o.players <- p
 	return p, err
 }
