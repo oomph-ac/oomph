@@ -27,7 +27,7 @@ func (o *Oomph) Listen(s *server.Server, remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-	o.log.Infof("oomph is now listening on %v and directing connections to %v!\n", o.addr, remoteAddr)
+	o.log.Infof("Oomph is now listening on %v and directing connections to %v!\n", o.addr, remoteAddr)
 	s.Listen(listener{
 		Listener: l,
 		o:        o,
