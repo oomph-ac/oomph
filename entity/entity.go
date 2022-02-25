@@ -42,11 +42,11 @@ var defaultAABB = physics.NewAABB(
 // NewEntity creates a new entity with the provided parameters.
 func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
 	return &Entity{
-		position:                 position,
-		lastPosition:             position,
-		receivedPosition:         position.Add(velocity),
-		rotation:                 rotation,
-		lastRotation:             rotation,
+		position:         position,
+		lastPosition:     position,
+		receivedPosition: position.Add(velocity),
+		rotation:         rotation,
+		//lastRotation:             rotation,
 		aabb:                     defaultAABB,
 		player:                   player,
 		newPosRotationIncrements: 3,
