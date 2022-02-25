@@ -48,10 +48,9 @@ func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
 			minDist := math.MaxFloat64
 			for id, data := range k.entities {
 				for subId, subData := range k.entities {
-					if subId == id {
-						continue
+					if subId != id {
+						minDist = math.Min(minDist, game.AABBVectorDistance(data.AABB().Grow(0.1).Translate(data.LastPosition()), subData.LastPosition()))
 					}
-					minDist = math.Min(minDist, game.AABBVectorDistance(data.AABB().Translate(data.LastPosition()), subData.LastPosition()))
 				}
 			}
 			if minDist < math.MaxFloat64 && minDist > 1.5 {
