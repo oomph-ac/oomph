@@ -1,7 +1,6 @@
 package oomph
 
 import (
-	"fmt"
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/df-mc/dragonfly/server/world"
@@ -29,7 +28,7 @@ func (o *Oomph) Listen(s *server.Server, log *logrus.Logger, mainAddr, oomphAddr
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Oomph is now listening on %v and directing connections to %v!\n", oomphAddr, mainAddr)
+	log.Infof("Oomph is now listening on %v and directing connections to %v!\n", oomphAddr, mainAddr)
 	s.Listen(listener{
 		Listener: l,
 		lg:       log,

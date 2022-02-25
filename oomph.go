@@ -13,9 +13,8 @@ import (
 
 // Oomph represents an instance of the Oomph proxy.
 type Oomph struct {
-	playerMutex sync.Mutex
-	playerChan  chan *player.Player
-	players     map[string]*player.Player
+	playerChan chan *player.Player
+	players    map[string]*player.Player
 }
 
 // New returns a new Oomph instance.
@@ -27,20 +26,7 @@ func New() *Oomph {
 	}
 }
 
-// Accept accepts an incoming player into the server. It blocks until a player connects to the server.
-// Accept returns an error if the Server is no longer available.
-func (o *Oomph) Accept() (*player.Player, error) {
-	p, ok := <-o.playerChan
-	if !ok {
-		return nil, errors.New("oomph shutdown")
-	}
-	o.playerMutex.Lock()
-	o.players[p.Name()] = p
-	o.playerMutex.Unlock()
-	return p, nil
-}
-
-// Start will start oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
+// Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
 // Addresses should be formatted in the following format: "ip:port", ex: "127.0.0.1:19132".
 // If you're using dragonfly, use Listen instead of Start.
 func (o *Oomph) Start(remoteAddr, localAddr string) error {
@@ -115,7 +101,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			if err != nil {
 				return
 			}
-			p.ClientProcess(pk)
+			if p.ClientProcess(pk) {
+				continue
+			}
 			if err := serverConn.WritePacket(pk); err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					_ = listener.Disconnect(conn, disconnect.Error())
@@ -138,7 +126,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				}
 				return
 			}
-			p.ServerProcess(pk)
+			if p.ServerProcess(pk) {
+				continue
+			}
 			if err := conn.WritePacket(pk); err != nil {
 				return
 			}

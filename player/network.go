@@ -48,19 +48,23 @@ func (p *Player) RemoteAddr() net.Addr {
 
 // WritePacket will call minecraft.Conn.WritePacket and process the packet with oomph.
 func (p *Player) WritePacket(pk packet.Packet) error {
+	if p.ServerProcess(pk) {
+		return nil
+	}
 	if err := p.conn.WritePacket(pk); err != nil {
 		return err
 	}
-	p.ServerProcess(pk)
 	return nil
 }
 
 // ReadPacket will call minecraft.Conn.ReadPacket and process the packet with oomph.
 func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 	if pk, err = p.conn.ReadPacket(); err != nil {
-		return pk, err
+		return nil, err
 	}
-	p.ClientProcess(pk)
+	if p.ClientProcess(pk) {
+		return p.ReadPacket()
+	}
 	return pk, err
 }
 
