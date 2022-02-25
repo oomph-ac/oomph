@@ -94,7 +94,7 @@ func (p *Player) cleanChunks() {
 	for pos := range p.chunks {
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
 		dist := math.Sqrt(float64(diffX*diffX) + float64(diffZ*diffZ))
-		if int32(dist) > p.settings.Oomph.ViewDistance {
+		if int32(dist) > p.viewDist {
 			delete(p.chunks, pos)
 		}
 	}
