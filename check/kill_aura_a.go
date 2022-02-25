@@ -44,6 +44,7 @@ func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
 			if tickDiff > 4 {
 				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
 					"Tick Difference": tickDiff,
+					"Client Tick":     processor.ClientTick(),
 				})
 			}
 		}
