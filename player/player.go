@@ -248,8 +248,8 @@ func (p *Player) Close() error {
 // Handle sets the handler of the player.
 func (p *Player) Handle(h Handler) {
 	p.hMutex.Lock()
+	defer p.hMutex.Unlock()
 	p.h = h
-	p.hMutex.Unlock()
 }
 
 // startTicking ticks the player until the connection is closed.
