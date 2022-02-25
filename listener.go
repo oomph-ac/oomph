@@ -1,6 +1,7 @@
 package oomph
 
 import (
+	"errors"
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/df-mc/dragonfly/server/world"
@@ -37,6 +38,16 @@ func (o *Oomph) Listen(s *server.Server, log *logrus.Logger, mainAddr, oomphAddr
 	return nil
 }
 
+// Accept accepts an incoming player into the server. It blocks until a player connects to the server.
+// Accept returns an error if the Server is no longer available.
+func (o *Oomph) Accept() (*player.Player, error) {
+	p, ok := <-o.players
+	if !ok {
+		return nil, errors.New("oomph shutdown")
+	}
+	return p, nil
+}
+
 // Accept blocks until the next connection is established and returns it. An error is returned if the Listener was
 // closed using Close.
 func (l listener) Accept() (session.Conn, error) {
@@ -46,7 +57,7 @@ func (l listener) Accept() (session.Conn, error) {
 	}
 
 	p := player.NewPlayer(l.lg, world.Overworld, 8, c.(*minecraft.Conn), nil)
-	l.o.playerChan <- p
+	l.o.players <- p
 	return p, err
 }
 
@@ -58,6 +69,6 @@ func (l listener) Disconnect(conn session.Conn, reason string) error {
 // Close closes the Listener.
 func (l listener) Close() error {
 	_ = l.Listener.Close()
-	close(l.o.playerChan)
+	close(l.o.players)
 	return nil
 }
