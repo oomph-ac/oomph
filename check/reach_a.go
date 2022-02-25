@@ -52,8 +52,8 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, offset})
-				if t, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
-					dist := game.AABBVectorDistance(t.AABB().Grow(0.1), game.Vec32To64(r.attackPos))
+				if t, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
+					dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), game.Vec32To64(r.attackPos))
 					if dist > 3.15 {
 						if r.Buff(1, 10) >= 5 {
 							processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
