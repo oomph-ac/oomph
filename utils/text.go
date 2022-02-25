@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/kr/pretty"
+	"fmt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"strings"
 )
@@ -42,7 +42,20 @@ func Device(os protocol.DeviceOS) string {
 }
 
 // PrettyParameters converts the given parameters to a readable string.
-// TODO: Make this better.
 func PrettyParameters(params map[string]interface{}) string {
-	return strings.TrimPrefix(pretty.Sprint(params), "map[string]interface {}")
+	if len(params) == 0 {
+		// Don't waste time if there are no parameters.
+		return "[]"
+	}
+
+	sb := &strings.Builder{}
+	sb.WriteString("[\n")
+	for k, v := range params {
+		sb.WriteString("\t\"" + k + "\"")
+		sb.WriteString(": ")
+		sb.WriteString(fmt.Sprint(v))
+		sb.WriteString(",\n")
+	}
+	sb.WriteString("]")
+	return sb.String()
 }
