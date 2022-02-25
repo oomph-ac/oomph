@@ -21,7 +21,7 @@ func NewKillAuraB() *KillauraB {
 
 // Name ...
 func (*KillauraB) Name() (string, string) {
-	return "KillAura", "B"
+	return "Killaura", "B"
 }
 
 // Description ...
