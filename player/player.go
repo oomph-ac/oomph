@@ -113,7 +113,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		checks:       check.Checks(),
 	}
 	go p.startTicking()
-
 	return p
 }
 
@@ -201,15 +200,14 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 	})
 
 	if now, max := check.Violations(), check.MaxViolations(); now >= max {
-		p.checkMu.Unlock()
-
-		ctx := event.C()
-		p.handler().HandlePunishment(ctx, check)
-		ctx.Continue(func() {
-			p.log.Infof("%s was caught lackin for %s%s!", p.Name(), name, variant)
-			p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
-		})
-		return
+		go func() {
+			ctx := event.C()
+			p.handler().HandlePunishment(ctx, check)
+			ctx.Continue(func() {
+				p.log.Infof("%s was caught lackin for %s%s!", p.Name(), name, variant)
+				p.Disconnect(fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant))
+			})
+		}()
 	}
 }
 
@@ -324,6 +322,10 @@ func (p *Player) Close() error {
 	p.chunkMu.Lock()
 	p.chunks = nil
 	p.chunkMu.Unlock()
+
+	p.ackMu.Lock()
+	p.acknowledgements = nil
+	p.ackMu.Unlock()
 
 	p.closed.Store(true)
 	return nil
