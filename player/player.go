@@ -107,7 +107,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
-		gameMode: *atomic.NewInt32(serverConn.GameData().PlayerGameMode),
+		gameMode: *atomic.NewInt32(data.PlayerGameMode),
 
 		serverTicker: time.NewTicker(time.Second / 20),
 		checks:       check.Checks(),
