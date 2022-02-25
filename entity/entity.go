@@ -9,7 +9,7 @@ import (
 // Entity represents an entity in a world with a *player.Player.
 type Entity struct {
 	// mu protects all the following fields.
-	mu sync.RWMutex
+	mu sync.Mutex
 	// position is the current position of the entity in the world.
 	position mgl64.Vec3
 	// lastPosition is the previous position of the entity in the world.
@@ -55,15 +55,15 @@ func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
 
 // Position returns the position of the entity.
 func (e *Entity) Position() mgl64.Vec3 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.position
 }
 
 // LastPosition returns the last position of the entity.
 func (e *Entity) LastPosition() mgl64.Vec3 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.lastPosition
 }
 
@@ -77,8 +77,8 @@ func (e *Entity) Move(pos mgl64.Vec3) {
 
 // ReceivedPosition returns the position of the entity that the client sees.
 func (e *Entity) ReceivedPosition() mgl64.Vec3 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.receivedPosition
 }
 
@@ -91,15 +91,15 @@ func (e *Entity) UpdateReceivedPosition(position mgl64.Vec3) {
 
 // Rotation returns the rotation of the entity.
 func (e *Entity) Rotation() mgl64.Vec3 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.rotation
 }
 
 // LastRotation returns the last rotation of the entity.
 func (e *Entity) LastRotation() mgl64.Vec3 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.lastRotation
 }
 
@@ -113,8 +113,8 @@ func (e *Entity) Rotate(rotation mgl64.Vec3) {
 
 // TeleportationTicks returns the amount of ticks that have passed since the entity has teleported.
 func (e *Entity) TeleportationTicks() uint32 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.teleportTicks
 }
 
@@ -134,8 +134,8 @@ func (e *Entity) IncrementTeleportationTicks() {
 
 // NewPositionRotationIncrements returns the amount of ticks the entity's position should be smoothed out by.
 func (e *Entity) NewPositionRotationIncrements() uint32 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.newPosRotationIncrements
 }
 
@@ -155,10 +155,17 @@ func (e *Entity) ResetNewPositionRotationIncrements() {
 	e.newPosRotationIncrements = 3
 }
 
+// Player returns true if the entity is a player.
+func (e *Entity) Player() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.player
+}
+
 // AABB returns the AABB of the entity.
 func (e *Entity) AABB() physics.AABB {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	return e.aabb
 }
 

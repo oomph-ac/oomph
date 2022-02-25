@@ -1,9 +1,9 @@
 package check
 
 import (
+	"github.com/justtaldevelops/oomph/game"
 	"math"
 
-	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
@@ -43,14 +43,14 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			s := processor.Session()
 			if s.GameMode != 1 {
-				var add float32 = 1.54
+				add := float32(1.54)
 				if !s.HasFlag(session.FlagSneaking) {
 					add = 1.62
 				}
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, add})
-				if t, ok := processor.Entity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
-					dist := game.AABBVectorDistance(t.AABB.GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), game.Vec32To64(r.attackPos))
+				if t, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok { // todo: && $target->teleportTicks >= 40
+					dist := game.AABBVectorDistance(t.AABB().GrowVec3(mgl64.Vec3{0.1, 0.1, 0.1}), game.Vec32To64(r.attackPos))
 					if dist > 3.15 {
 						if r.Buff(1, 10) >= 5 {
 							processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
@@ -71,19 +71,19 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 	case *packet.PlayerAuthInput:
 		r.inputMode = pk.InputMode
 		if r.awaitingTick {
-			if t, ok := processor.Entity(r.attackedEntity); ok && t.Player {
-				rot := processor.Location().Rotation
+			if t, ok := processor.SearchEntity(r.attackedEntity); ok && t.Player() {
+				e := processor.Entity()
+				rot := e.Rotation()
 				dv := game.DirectionVector(rot.Y(), rot.X())
-				width, height := (t.AABB.Width()/2)+0.1, t.AABB.Height()+0.1
-				aabb := physics.NewAABB(
-					t.LastPosition.Sub(mgl64.Vec3{width, 0.1, width}),
-					t.LastPosition.Add(mgl64.Vec3{width, height, width}),
-				)
-				if !aabb.IntersectsWith(processor.Session().Entity().AABB) {
+
+				aabb := e.AABB().Translate(e.LastPosition())
+				targetAABB := t.AABB().Translate(t.LastPosition()).Grow(0.1)
+
+				if !aabb.IntersectsWith(targetAABB) {
 					vec64AttackPos := game.Vec32To64(r.attackPos)
 					if ray, ok := trace.AABBIntercept(aabb, vec64AttackPos, vec64AttackPos.Add(dv.Mul(14.0))); ok {
 						dist := ray.Position().Sub(vec64AttackPos).Len()
-						if dist >= 3.1 && math.Abs(dist-game.AABBVectorDistance(aabb, vec64AttackPos)) < 0.4 {
+						if dist >= 3.1 && math.Abs(dist-game.AABBVectorDistance(targetAABB, vec64AttackPos)) < 0.4 {
 							if r.Buff(1, 10) >= 3 {
 								processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
 									"Distance": game.Round(dist, 2),
