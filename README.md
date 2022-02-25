@@ -9,4 +9,4 @@ this allows for oomph to run on any server software, unlike traditional anti-che
 specific one.
 
 ## credits
-Oomph is heavily influenced by [Esoteric](https://github.com/ethaniccc/Esoteric). Thank you, ethaniccc for providing us with this!
+oomph is heavily influenced by [Esoteric](https://github.com/ethaniccc/Esoteric). thank you, ethaniccc for providing us with this!
