@@ -50,6 +50,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/df-mc/dragonfly v0.5.2-0.20220219205354-a94f34a6073d h1:mZB9EJrWIGXluh+ikg+VR2sashiiqj22VZYY8ue0Rds=
 github.com/df-mc/dragonfly v0.5.2-0.20220219205354-a94f34a6073d/go.mod h1:y5jDxXEMIFqRSWW8R7zCOkruk8FbGGlIMoSWGOjZdIU=
+github.com/df-mc/dragonfly v0.5.2-0.20220224003022-3486e97cbdb3 h1:G1rjYZ+0sHNRN105tItRON7AfLLjKJNlKyrAT6Pq63o=
+github.com/df-mc/dragonfly v0.5.2-0.20220224003022-3486e97cbdb3/go.mod h1:xWCJ8LqWe2Fd05uwR5w+HrYWn2cQtkDFzO6IaIbObdg=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
@@ -152,6 +154,8 @@ github.com/sandertv/go-raknet v1.10.2/go.mod h1:s1lD7LTts74R9csTeI4WlGcp6PmXAGX+
 github.com/sandertv/gophertunnel v1.19.0/go.mod h1:cu9ZDQVTXY1RJO/te3syrPvCeCAzKt9eB4jkSzXljTw=
 github.com/sandertv/gophertunnel v1.19.1-0.20220219014023-6970df76a596 h1:5Nk4KtIMNJmeYbB9YyBpiWVHTeHhFTFMdoJTMMSzxdo=
 github.com/sandertv/gophertunnel v1.19.1-0.20220219014023-6970df76a596/go.mod h1:cu9ZDQVTXY1RJO/te3syrPvCeCAzKt9eB4jkSzXljTw=
+github.com/sandertv/gophertunnel v1.19.1 h1:qaiqOSFtBc5VjyMZD8RUdPJHSzGmaG4XplJB9q133II=
+github.com/sandertv/gophertunnel v1.19.1/go.mod h1:cu9ZDQVTXY1RJO/te3syrPvCeCAzKt9eB4jkSzXljTw=
 github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
