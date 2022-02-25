@@ -18,7 +18,7 @@ func NewAutoClickerC() *AutoClickerC {
 
 // Name ...
 func (*AutoClickerC) Name() (string, string) {
-	return "AutoClicker", "C"
+	return "Autoclicker", "C"
 }
 
 // Description ...
