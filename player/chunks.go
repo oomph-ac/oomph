@@ -10,6 +10,11 @@ import (
 
 // LoadRawChunk loads a chunk to the player's memory from raw sub chunk data.
 func (p *Player) LoadRawChunk(pos world.ChunkPos, data []byte, subChunkCount uint32) {
+	if p.closed.Load() {
+		// Don't load a chunk if the player is already closed.
+		return
+	}
+
 	a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
 	ch, err := chunk.NetworkDecode(a, data, int(subChunkCount), p.dimension.Range())
 	if err != nil {
@@ -23,6 +28,11 @@ func (p *Player) LoadRawChunk(pos world.ChunkPos, data []byte, subChunkCount uin
 
 // LoadChunk loads a chunk to the player's memory.
 func (p *Player) LoadChunk(pos world.ChunkPos, c *chunk.Chunk) {
+	if p.closed.Load() {
+		// Don't load a chunk if the player is already closed.
+		return
+	}
+
 	p.chunkMu.Lock()
 	p.chunks[pos] = c
 	p.chunkMu.Unlock()
@@ -86,6 +96,11 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 
 // cleanChunks removes all cached chunks that are no longer in the player's view.
 func (p *Player) cleanChunks() {
+	if p.closed.Load() {
+		// Don't clean chunks if the player is already closed.
+		return
+	}
+
 	p.chunkMu.Lock()
 	defer p.chunkMu.Unlock()
 
