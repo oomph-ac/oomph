@@ -17,8 +17,8 @@ func AABBFromDimensions(width, height float64) physics.AABB {
 
 // AABBVectorDistance calculates the distance between an AABB and a vector.
 func AABBVectorDistance(a physics.AABB, v mgl64.Vec3) float64 {
-	x, y, z := math.Max(a.Min().X()-v.X(), math.Max(0, v.X()-a.Max().X())),
-		math.Max(a.Min().Y()-v.Y(), math.Max(0, v.Y()-a.Max().Y())),
-		math.Max(a.Min().Z()-v.Z(), math.Max(0, v.Z()-a.Max().Z()))
-	return math.Sqrt((x * x) + (y * y) + (z * z))
+	x := math.Max(a.Min().X()-v.X(), math.Max(0, v.X()-a.Max().X()))
+	y := math.Max(a.Min().Y()-v.Y(), math.Max(0, v.Y()-a.Max().Y()))
+	z := math.Max(a.Min().Z()-v.Z(), math.Max(0, v.Z()-a.Max().Z()))
+	return math.Sqrt(math.Pow(x, 2) + math.Pow(y, 2) + math.Pow(z, 2))
 }
