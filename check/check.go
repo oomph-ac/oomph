@@ -39,14 +39,3 @@ func Checks() []Check {
 	}
 	return checks
 }
-
-// FilteredChecks returns a slice of all registered checks that match the provided filter.
-func FilteredChecks(filter string) []Check {
-	checks := make([]Check, 0, len(registeredChecks))
-	for name, check := range registeredChecks {
-		if name == filter {
-			checks = append(checks, check)
-		}
-	}
-	return checks
-}
