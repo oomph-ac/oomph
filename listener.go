@@ -13,8 +13,8 @@ import (
 // listener is a Dragonfly listener implementation for direct Oomph.
 type listener struct {
 	*minecraft.Listener
-	lg *logrus.Logger
-	o  *Oomph
+	log *logrus.Logger
+	o   *Oomph
 }
 
 // Listen listens for oomph connections, this should be used instead of Start for dragonfly servers.
@@ -32,7 +32,7 @@ func (o *Oomph) Listen(s *server.Server, log *logrus.Logger, mainAddr, oomphAddr
 	log.Infof("Oomph is now listening on %v and directing connections to %v!\n", oomphAddr, mainAddr)
 	s.Listen(listener{
 		Listener: l,
-		lg:       log,
+		log:      log,
 		o:        o,
 	})
 	return nil
@@ -56,7 +56,7 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 
-	p := player.NewPlayer(l.lg, world.Overworld, 8, c.(*minecraft.Conn), nil)
+	p := player.NewPlayer(l.log, world.Overworld, 8, c.(*minecraft.Conn), nil)
 	l.o.players <- p
 	return p, err
 }

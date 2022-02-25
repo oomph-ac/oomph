@@ -13,17 +13,13 @@ import (
 
 // Oomph represents an instance of the Oomph proxy.
 type Oomph struct {
-	playerChan chan *player.Player
-	players    map[string]*player.Player
+	players chan *player.Player
 }
 
 // New returns a new Oomph instance.
 // If your server is using Dragonfly, be sure to use the Listener function instead.
 func New() *Oomph {
-	return &Oomph{
-		players:    make(map[string]*player.Player),
-		playerChan: make(chan *player.Player),
-	}
+	return &Oomph{players: make(chan *player.Player)}
 }
 
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
@@ -87,7 +83,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	lg.Level = logrus.DebugLevel
 
 	p := player.NewPlayer(lg, world.Overworld, 8, conn, serverConn)
-	o.playerChan <- p
+	o.players <- p
 
 	g.Add(2)
 	go func() {
