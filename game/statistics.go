@@ -1,4 +1,4 @@
-package omath
+package game
 
 import (
 	"math"
@@ -140,7 +140,6 @@ func Outliers(collection []float64) int {
 	highThreshold := q3 + 1.5*iqr
 
 	var x, y []float64
-
 	for _, value := range collection {
 		if value < lowThreshold {
 			x = append(x, value)

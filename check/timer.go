@@ -1,17 +1,21 @@
 package check
 
 import (
-	"github.com/justtaldevelops/oomph/omath"
-	"github.com/justtaldevelops/oomph/settings"
+	"github.com/justtaldevelops/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // TimerA checks for the timer cheat by using a balance system.
 type TimerA struct {
-	check
+	basic
 	balance   int64
 	lastTime  uint64
 	clientTPS float64
+}
+
+// NewTimerA creates a new TimerA check.
+func NewTimerA() *TimerA {
+	return &TimerA{}
 }
 
 // Name ...
@@ -24,9 +28,9 @@ func (*TimerA) Description() string {
 	return "This checks if a player is sending movement packets too fast."
 }
 
-// BaseSettings ...
-func (*TimerA) BaseSettings() settings.BaseSettings {
-	return settings.Settings.Timer.A
+// MaxViolations ...
+func (*TimerA) MaxViolations() float64 {
+	return 10
 }
 
 // Process ...
@@ -43,12 +47,15 @@ func (t *TimerA) Process(processor Processor, pk packet.Packet) {
 			t.clientTPS++
 		}
 
-		// get how many ticks have passed since the last input packet.
+		// Get how many ticks have passed since the last input packet.
 		timeDiff := currentTime - t.lastTime
-		// timeDiff should be 1, so we subtract 1 from the timeDiff and add it to the balance.
+
+		// The time difference should be one, so we subtract one from the time difference and add it to the balance.
 		t.balance += int64(timeDiff) - 1
 		if t.balance == -5 {
-			processor.Flag(t, 1, map[string]interface{}{"timer": omath.Round(t.clientTPS/float64(20), 4)})
+			processor.Flag(t, 1, map[string]interface{}{
+				"Timer": game.Round(t.clientTPS/float64(20), 4)},
+			)
 			t.balance = 0
 		}
 		t.lastTime = currentTime
