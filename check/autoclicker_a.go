@@ -4,33 +4,33 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoClickerA checks if the player cps is over a certain threshold.
-type AutoClickerA struct {
+// AutoclickerA checks if the player cps is over a certain threshold.
+type AutoclickerA struct {
 	basic
 }
 
-// NewAutoClickerA creates a new AutoClickerA check.
-func NewAutoClickerA() *AutoClickerA {
-	return &AutoClickerA{}
+// NewAutoClickerA creates a new AutoclickerA check.
+func NewAutoClickerA() *AutoclickerA {
+	return &AutoclickerA{}
 }
 
 // Name ...
-func (*AutoClickerA) Name() (string, string) {
-	return "AutoClicker", "A"
+func (*AutoclickerA) Name() (string, string) {
+	return "Autoclicker", "A"
 }
 
 // Description ...
-func (*AutoClickerA) Description() string {
+func (*AutoclickerA) Description() string {
 	return "This checks if a players cps is over a certain threshold."
 }
 
 // MaxViolations ...
-func (*AutoClickerA) MaxViolations() float64 {
+func (*AutoclickerA) MaxViolations() float64 {
 	return 15
 }
 
 // Process ...
-func (a *AutoClickerA) Process(processor Processor, _ packet.Packet) {
+func (a *AutoclickerA) Process(processor Processor, _ packet.Packet) {
 	if processor.Clicking() && processor.CPS() > 22 {
 		processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 40), map[string]interface{}{
 			"CPS": processor.CPS(),
