@@ -54,7 +54,7 @@ func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
 					minDist = math.Min(minDist, game.AABBVectorDistance(data.AABB().Translate(data.LastPosition()), subData.LastPosition()))
 				}
 			}
-			if minDist > 0.0 && minDist > 1.5 {
+			if minDist < math.MaxFloat64 && minDist > 1.5 {
 				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 40), map[string]interface{}{
 					"Minimum Distance": game.Round(minDist, 2),
 					"Entities":         len(k.entities),
