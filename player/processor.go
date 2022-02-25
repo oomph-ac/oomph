@@ -20,8 +20,9 @@ func (p *Player) ClientProcess(pk packet.Packet) {
 		p.ackMu.Lock()
 		call, ok := p.acknowledgements[pk.Timestamp]
 		if ok {
-			call()
 			delete(p.acknowledgements, pk.Timestamp)
+			call()
+			return
 		}
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
