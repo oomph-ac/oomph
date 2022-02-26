@@ -49,7 +49,7 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 				return
 			}
 			a.target = data.TargetEntityRuntimeID
-			a.attackPos = game.Vec32To64(data.Position.Sub(mgl32.Vec3{0, 1.62}))
+			a.attackPos = game.Vec32To64(data.Position.Sub(mgl32.Vec3{0, 1.621}))
 			a.realRotationSamples, a.botRotationSamples = []float64{}, []float64{}
 		}
 	case *packet.PlayerAuthInput:

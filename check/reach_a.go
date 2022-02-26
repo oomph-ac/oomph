@@ -48,7 +48,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			if processor.GameMode() == packet.GameTypeSurvival || processor.GameMode() == packet.GameTypeAdventure {
 				r.attackedEntity = data.TargetEntityRuntimeID
-				r.attackPos = game.Vec32To64(data.Position.Sub(mgl32.Vec3{0, 1.62}))
+				r.attackPos = game.Vec32To64(data.Position.Sub(mgl32.Vec3{0, 1.621}))
 				if t, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
 					if r.inputMode == packet.InputModeTouch {
 						dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)

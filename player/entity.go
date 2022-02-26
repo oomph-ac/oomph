@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/entity"
 )
@@ -35,15 +34,10 @@ func (p *Player) RemoveEntity(rid uint64) {
 
 // tickEntityLocations ticks entity locations to simulate what the client would see.
 func (p *Player) tickEntityLocations() {
-	for eid := range p.entities {
-		e, _ := p.SearchEntity(eid)
+	for _, e := range p.entities {
 		if increments := e.NewLocationIncrements(); increments > 0 {
-			fmt.Println("New Pos/Rot Increments:", e.NewLocationIncrements())
-			fmt.Println("Received Position versus Position:", e.ReceivedPosition(), e.Position())
 			delta := e.ReceivedPosition().Sub(e.LastPosition()).Mul(1 / float64(e.NewLocationIncrements()))
-			fmt.Println("Delta:", delta)
 			e.Move(e.Position().Add(delta))
-			fmt.Println("Received Position versus Position:", e.ReceivedPosition(), e.Position())
 			e.DecrementNewLocationIncrements()
 		}
 		e.IncrementTeleportationTicks()
