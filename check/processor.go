@@ -31,6 +31,9 @@ type Processor interface {
 	// CPS returns the clicks per second of the processor.
 	CPS() int
 
+	// Ready returns true if the player is ready/spawned in.
+	Ready() bool
+
 	// GameMode returns the current game mode of the player.
 	GameMode() int32
 	// Sneaking returns true if the player is currently sneaking.

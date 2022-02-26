@@ -126,6 +126,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.MoveActor(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
+			p.ready.Store(true)
 			p.LoadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
 		})
 	case *packet.UpdateBlock:
