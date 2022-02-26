@@ -221,7 +221,7 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 	ctx := event.C()
 	p.handler().HandleFlag(ctx, check, params)
 	ctx.Continue(func() {
-		p.log.Infof("%s was flagged for using %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params))
+		p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params))
 		if now, max := check.Violations(), check.MaxViolations(); now >= max {
 			go func() {
 				message := fmt.Sprintf("§7[§6oomph§7] §bCaught lackin!\n§6Reason: §b%s%s", name, variant)
