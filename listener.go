@@ -60,7 +60,7 @@ func (l listener) Accept() (session.Conn, error) {
 
 // Disconnect disconnects a connection from the Listener with a reason.
 func (l listener) Disconnect(conn session.Conn, reason string) error {
-	return l.Listener.Disconnect(conn.(*minecraft.Conn), reason)
+	return l.Listener.Disconnect(conn.(*player.Player).Conn(), reason)
 }
 
 // Close closes the Listener.
