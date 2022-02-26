@@ -43,14 +43,13 @@ var defaultAABB = physics.NewAABB(
 func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
 	offsetPos := position.Sub(mgl64.Vec3{0, 1.62})
 	return &Entity{
-		position:              offsetPos,
-		lastPosition:          offsetPos,
-		receivedPosition:      offsetPos.Add(velocity),
-		rotation:              rotation,
-		lastRotation:          rotation,
-		aabb:                  defaultAABB,
-		player:                player,
-		newLocationIncrements: 3,
+		position:         offsetPos,
+		lastPosition:     offsetPos,
+		receivedPosition: offsetPos.Add(velocity),
+		rotation:         rotation,
+		lastRotation:     rotation,
+		aabb:             defaultAABB,
+		player:           player,
 	}
 }
 
@@ -87,6 +86,7 @@ func (e *Entity) ReceivedPosition() mgl64.Vec3 {
 func (e *Entity) UpdateReceivedPosition(pos mgl64.Vec3) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
 	e.receivedPosition = pos.Sub(mgl64.Vec3{0, 1.62})
 }
 
