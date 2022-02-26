@@ -136,6 +136,11 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 	return p
 }
 
+// Conn returns the connection of the player.
+func (p *Player) Conn() *minecraft.Conn {
+	return p.conn
+}
+
 // Move moves the player to the given position.
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data := p.Entity()
