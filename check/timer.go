@@ -6,7 +6,6 @@ import (
 )
 
 // TimerA checks for the timer cheat by using a balance system.
-// TODO: Fix falses on join.
 type TimerA struct {
 	basic
 	balance   int64
