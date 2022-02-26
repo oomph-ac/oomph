@@ -37,7 +37,7 @@ func (p *Player) tickEntityLocations() {
 	for _, e := range p.entities {
 		if increments := e.NewLocationIncrements(); increments > 0 {
 			delta := e.ReceivedPosition().Sub(e.LastPosition()).Mul(1 / float64(e.NewLocationIncrements()))
-			e.Move(e.Position().Add(delta))
+			e.Move(e.Position().Add(delta), false)
 			e.DecrementNewLocationIncrements()
 		}
 		e.IncrementTeleportationTicks()
