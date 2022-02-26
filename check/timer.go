@@ -36,6 +36,11 @@ func (*TimerA) MaxViolations() float64 {
 
 // Process ...
 func (t *TimerA) Process(processor Processor, pk packet.Packet) {
+	if !processor.Ready() {
+		// Wait until we're spawned in to prevent falses on join.
+		return
+	}
+
 	if _, ok := pk.(*packet.PlayerAuthInput); ok {
 		currentTime := processor.ServerTick()
 		if t.lastTime == 0 {

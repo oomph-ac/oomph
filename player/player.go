@@ -51,6 +51,8 @@ type Player struct {
 
 	queuedEntityLocations map[uint64]mgl64.Vec3
 
+	ready atomic.Bool
+
 	gameMode atomic.Int32
 
 	sneaking  atomic.Bool
@@ -232,6 +234,11 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 			})
 		}()
 	}
+}
+
+// Ready returns true if the player is ready/spawned in.
+func (p *Player) Ready() bool {
+	return p.ready.Load()
 }
 
 // GameMode returns the current game mode of the player.
