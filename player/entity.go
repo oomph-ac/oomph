@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/entity"
 )
@@ -32,14 +33,18 @@ func (p *Player) RemoveEntity(rid uint64) {
 	p.entityMu.Unlock()
 }
 
-// tickEntityLocations ticks entity locations to simulate what the client would see for the
+// tickEntityLocations ticks entity locations to simulate what the client would see.
 func (p *Player) tickEntityLocations() {
 	for eid := range p.entities {
 		e, _ := p.SearchEntity(eid)
-		if e.NewPositionRotationIncrements() > 0 {
-			delta := e.ReceivedPosition().Sub(e.LastPosition()).Mul(1 / float64(e.NewPositionRotationIncrements()))
+		if increments := e.NewLocationIncrements(); increments > 0 {
+			fmt.Println("New Pos/Rot Increments:", e.NewLocationIncrements())
+			fmt.Println("Received Position versus Position:", e.ReceivedPosition(), e.Position())
+			delta := e.ReceivedPosition().Sub(e.LastPosition()).Mul(1 / float64(e.NewLocationIncrements()))
+			fmt.Println("Delta:", delta)
 			e.Move(e.Position().Add(delta))
-			e.DecrementNewPositionRotationIncrements()
+			fmt.Println("Received Position versus Position:", e.ReceivedPosition(), e.Position())
+			e.DecrementNewLocationIncrements()
 		}
 		e.IncrementTeleportationTicks()
 	}
@@ -55,7 +60,7 @@ func (p *Player) flushEntityLocations() {
 		for rid, pos := range queue {
 			if e, valid := p.SearchEntity(rid); valid {
 				e.UpdateReceivedPosition(pos)
-				e.ResetNewPositionRotationIncrements()
+				e.ResetNewLocationIncrements()
 			}
 		}
 	})

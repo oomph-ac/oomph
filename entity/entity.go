@@ -27,10 +27,10 @@ type Entity struct {
 	aabb physics.AABB
 	// player is true if the entity is a player.
 	player bool
-	// newPosRotationIncrements is the amount of ticks the entity's position should be smoothed out by.
+	// newLocationIncrements is the amount of ticks the entity's position should be smoothed out by.
 	// Every client tick, this value will be de-incremented, and whenever the client receives a position for an
 	// entity, this value will be reset to 3.
-	newPosRotationIncrements uint32
+	newLocationIncrements uint32
 }
 
 // defaultAABB is the default AABB for newly created entities.
@@ -41,15 +41,16 @@ var defaultAABB = physics.NewAABB(
 
 // NewEntity creates a new entity with the provided parameters.
 func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
+	offsetPos := position.Sub(mgl64.Vec3{0, 1.62})
 	return &Entity{
-		position:         position,
-		lastPosition:     position,
-		receivedPosition: position.Add(velocity),
-		rotation:         rotation,
-		//lastRotation:             rotation,
-		aabb:                     defaultAABB,
-		player:                   player,
-		newPosRotationIncrements: 3,
+		position:              offsetPos,
+		lastPosition:          offsetPos,
+		receivedPosition:      offsetPos.Add(velocity),
+		rotation:              rotation,
+		lastRotation:          rotation,
+		aabb:                  defaultAABB,
+		player:                player,
+		newLocationIncrements: 3,
 	}
 }
 
@@ -83,10 +84,10 @@ func (e *Entity) ReceivedPosition() mgl64.Vec3 {
 }
 
 // UpdateReceivedPosition updates the position of the entity that the client sees.
-func (e *Entity) UpdateReceivedPosition(position mgl64.Vec3) {
+func (e *Entity) UpdateReceivedPosition(pos mgl64.Vec3) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.receivedPosition = position
+	e.receivedPosition = pos.Sub(mgl64.Vec3{0, 1.62})
 }
 
 // Rotation returns the rotation of the entity.
@@ -132,27 +133,27 @@ func (e *Entity) IncrementTeleportationTicks() {
 	e.teleportTicks++
 }
 
-// NewPositionRotationIncrements returns the amount of ticks the entity's position should be smoothed out by.
-func (e *Entity) NewPositionRotationIncrements() uint32 {
+// NewLocationIncrements returns the amount of ticks the entity's position should be smoothed out by.
+func (e *Entity) NewLocationIncrements() uint32 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.newPosRotationIncrements
+	return e.newLocationIncrements
 }
 
-// DecrementNewPositionRotationIncrements decrements the amount of ticks the entity's position should be smoothed
+// DecrementNewLocationIncrements decrements the amount of ticks the entity's position should be smoothed
 // out by.
-func (e *Entity) DecrementNewPositionRotationIncrements() {
+func (e *Entity) DecrementNewLocationIncrements() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.newPosRotationIncrements--
+	e.newLocationIncrements--
 }
 
-// ResetNewPositionRotationIncrements resets the amount of ticks the entity's position should be smoothed out by to
+// ResetNewLocationIncrements resets the amount of ticks the entity's position should be smoothed out by to
 // three.
-func (e *Entity) ResetNewPositionRotationIncrements() {
+func (e *Entity) ResetNewLocationIncrements() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.newPosRotationIncrements = 3
+	e.newLocationIncrements = 3
 }
 
 // Player returns true if the entity is a player.

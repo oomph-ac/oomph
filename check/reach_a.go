@@ -2,12 +2,12 @@ package check
 
 import (
 	"fmt"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/game"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -47,13 +47,8 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			if processor.GameMode() == packet.GameTypeSurvival || processor.GameMode() == packet.GameTypeAdventure {
-				offset := float32(1.62)
-				if processor.Sneaking() {
-					offset = 1.54
-				}
-
 				r.attackedEntity = data.TargetEntityRuntimeID
-				r.attackPos = game.Vec32To64(data.Position.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, offset}))
+				r.attackPos = game.Vec32To64(data.Position.Sub(mgl32.Vec3{0, 1.62}))
 				if t, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
 					if r.inputMode == packet.InputModeTouch {
 						dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
@@ -85,10 +80,17 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				aabb := e.AABB().Translate(e.LastPosition())
 				targetAABB := t.AABB().Grow(0.1).Translate(t.LastPosition())
 
+				fmt.Printf("Target AABB: %v\n", targetAABB)
+				fmt.Printf("Target Last Position: %v\n", t.LastPosition())
+				fmt.Printf("Attack Pos: %v\n", r.attackPos)
+				fmt.Printf("Direction Vector: %v\n", dv)
+				fmt.Printf("Yaw: %v\n", rot.Z())
+				fmt.Printf("Pitch: %v\n", rot.X())
+
 				if !aabb.IntersectsWith(targetAABB) {
 					if ray, ok := trace.AABBIntercept(targetAABB, r.attackPos, r.attackPos.Add(dv.Mul(14.0))); ok {
 						dist := ray.Position().Sub(r.attackPos).Len()
-						fmt.Println(dist)
+						fmt.Println("Distance:", dist)
 						if dist >= 3.1 && math.Abs(dist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
 							if r.Buff(1, 10) >= 3 {
 								processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
