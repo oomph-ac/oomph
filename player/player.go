@@ -138,7 +138,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 // Move moves the player to the given position.
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data := p.Entity()
-	data.Move(game.Vec32To64(pk.Position))
+	data.Move(game.Vec32To64(pk.Position), true)
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 	p.cleanChunks()
@@ -147,7 +147,7 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 // Teleport sets the position of the player and resets the teleport ticks of the player.
 func (p *Player) Teleport(pos mgl32.Vec3) {
 	data := p.Entity()
-	data.Move(game.Vec32To64(pos))
+	data.Move(game.Vec32To64(pos), true)
 	data.ResetTeleportationTicks()
 	p.cleanChunks()
 }
@@ -365,6 +365,18 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
+		// TODO: remove this
+		if p.serverTick%2 == 0 {
+			for _, e := range p.entities {
+				pos := e.Position()
+				_ = p.conn.WritePacket(&packet.SpawnParticleEffect{
+					EntityUniqueID: -1,
+					Position:       mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])},
+					ParticleName:   "minecraft:endrod",
+				})
+			}
+		}
+
 		p.flushEntityLocations()
 		p.serverTick++
 	}

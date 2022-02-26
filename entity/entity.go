@@ -41,11 +41,10 @@ var defaultAABB = physics.NewAABB(
 
 // NewEntity creates a new entity with the provided parameters.
 func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
-	offsetPos := position.Sub(mgl64.Vec3{0, 1.621})
 	return &Entity{
-		position:         offsetPos,
-		lastPosition:     offsetPos,
-		receivedPosition: offsetPos.Add(velocity),
+		position:         position,
+		lastPosition:     position,
+		receivedPosition: position.Add(velocity),
 		rotation:         rotation,
 		lastRotation:     rotation,
 		aabb:             defaultAABB,
@@ -68,11 +67,14 @@ func (e *Entity) LastPosition() mgl64.Vec3 {
 }
 
 // Move moves the entity to the provided position.
-func (e *Entity) Move(pos mgl64.Vec3) {
+func (e *Entity) Move(pos mgl64.Vec3, offset bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.lastPosition = e.position
-	e.position = pos.Sub(mgl64.Vec3{0, 1.621})
+	e.position = pos
+	if offset {
+		e.position = e.position.Sub(mgl64.Vec3{0, 1.621})
+	}
 }
 
 // ReceivedPosition returns the position of the entity that the client sees.

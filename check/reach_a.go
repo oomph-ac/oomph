@@ -88,6 +88,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 				fmt.Printf("Pitch: %v\n", rot.X())
 
 				if !aabb.IntersectsWith(targetAABB) {
+					fmt.Println("No intersection!")
 					if ray, ok := trace.AABBIntercept(targetAABB, r.attackPos, r.attackPos.Add(dv.Mul(14.0))); ok {
 						dist := ray.Position().Sub(r.attackPos).Len()
 						fmt.Println("Distance:", dist)
