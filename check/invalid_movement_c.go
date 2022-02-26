@@ -36,10 +36,12 @@ func (i *InvalidMovementC) Process(processor Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.PlayerAuthInput:
 		i.jumpTicks--
+
 		isHoldingJump := utils.HasFlag(pk.InputData, packet.InputFlagJumping)
 		if !isHoldingJump {
 			i.jumpTicks = 0
 		}
+
 		if processor.Jumping() {
 			if i.jumpTicks > 0 || !isHoldingJump {
 				processor.Flag(i, 1, map[string]interface{}{

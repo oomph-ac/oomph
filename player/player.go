@@ -127,7 +127,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 
 			check.NewReachA(),
 
-			// TODO: fix timer
 			check.NewTimerA(),
 		},
 	}
