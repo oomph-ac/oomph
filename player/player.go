@@ -159,8 +159,8 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 	p.cleanChunks()
 }
 
-// MoveActor moves an actor to the given position.
-func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
+// MoveEntity moves an entity to the given position.
+func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3) {
 	// If the entity exists, we can queue the location for an update.
 	if _, ok := p.SearchEntity(rid); ok {
 		p.queueMu.Lock()

@@ -111,7 +111,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.MoveActor(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
+		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
@@ -123,7 +123,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.MoveActor(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
+		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
 			p.ready.Store(true)
