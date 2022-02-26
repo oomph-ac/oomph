@@ -107,6 +107,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 			game.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
 			true,
 		),
+
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 

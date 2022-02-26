@@ -48,9 +48,13 @@ func (p *Player) tickEntityLocations() {
 // This allows us to know when the client has received positions of other entities.
 func (p *Player) flushEntityLocations() {
 	p.queueMu.Lock()
-	queue := p.queuedEntityLocations
+	defer p.queueMu.Unlock()
+
+	queue := make(map[uint64]mgl64.Vec3)
+	for rid, pos := range p.queuedEntityLocations {
+		queue[rid] = pos
+	}
 	p.queuedEntityLocations = make(map[uint64]mgl64.Vec3)
-	p.queueMu.Unlock()
 
 	p.Acknowledgement(func() {
 		for rid, pos := range queue {
