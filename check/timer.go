@@ -6,6 +6,7 @@ import (
 )
 
 // TimerA checks for the timer cheat by using a balance system.
+// TODO: Fix falses on join.
 type TimerA struct {
 	basic
 	balance   int64
@@ -36,12 +37,6 @@ func (*TimerA) MaxViolations() float64 {
 // Process ...
 func (t *TimerA) Process(processor Processor, pk packet.Packet) {
 	if _, ok := pk.(*packet.PlayerAuthInput); ok {
-		if processor.ClientTick() < 50 {
-			// Ignore the first few dozen ticks, as the client is retarded right now.
-			// TODO: figure out if this is actually a good way to do this
-			return
-		}
-
 		currentTime := processor.ServerTick()
 		if t.lastTime == 0 {
 			t.lastTime = currentTime
