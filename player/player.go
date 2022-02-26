@@ -365,18 +365,6 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
-		// TODO: remove this
-		if p.serverTick%2 == 0 {
-			for _, e := range p.entities {
-				pos := e.Position()
-				_ = p.conn.WritePacket(&packet.SpawnParticleEffect{
-					EntityUniqueID: -1,
-					Position:       mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])},
-					ParticleName:   "minecraft:endrod",
-				})
-			}
-		}
-
 		p.flushEntityLocations()
 		p.serverTick++
 	}
