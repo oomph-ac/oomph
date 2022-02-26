@@ -10,7 +10,7 @@ import (
 type Handler interface {
 	// HandlePunishment handles when a player should receive a punishment. Oomph doesn't punish players by default so
 	// this should be used if you want to punish players.
-	HandlePunishment(ctx *event.Context, check check.Check)
+	HandlePunishment(ctx *event.Context, check check.Check, message *string)
 	// HandleFlag handles when a player gets flagged for a check.
 	HandleFlag(ctx *event.Context, check check.Check, params map[string]interface{})
 	// HandleDebug handles check debug messages. These are logged by default and ctx.Cancel should be used to cancel them.
@@ -26,7 +26,7 @@ type NopHandler struct{}
 var _ Handler = (*NopHandler)(nil)
 
 // HandlePunishment ...
-func (NopHandler) HandlePunishment(*event.Context, check.Check) {}
+func (NopHandler) HandlePunishment(*event.Context, check.Check, *string) {}
 
 // HandleFlag ...
 func (NopHandler) HandleFlag(*event.Context, check.Check, map[string]interface{}) {}
