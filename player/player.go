@@ -49,6 +49,7 @@ type Player struct {
 	entityMu sync.Mutex
 	entities map[uint64]*entity.Entity
 
+	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]mgl64.Vec3
 
 	ready atomic.Bool
@@ -162,7 +163,9 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 func (p *Player) MoveActor(rid uint64, pos mgl64.Vec3) {
 	// If the entity exists, we can queue the location for an update.
 	if _, ok := p.SearchEntity(rid); ok {
+		p.queueMu.Lock()
 		p.queuedEntityLocations[rid] = pos
+		p.queueMu.Unlock()
 	}
 }
 
