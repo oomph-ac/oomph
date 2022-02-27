@@ -1,4 +1,4 @@
-module github.com/justtaldevelops/oomph
+module github.com/oomph-ac/oomph
 
 go 1.17
 
