@@ -37,7 +37,7 @@ func (o *Oomph) Listen(s *server.Server, name string) error {
 func (o *Oomph) Accept() (*player.Player, error) {
 	p, ok := <-o.players
 	if !ok {
-		return nil, errors.New("oomph shutdown")
+		return nil, errors.New("could not accept player: oomph stopped")
 	}
 	return p, nil
 }
