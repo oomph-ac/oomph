@@ -16,18 +16,15 @@ type listener struct {
 }
 
 // Listen listens for oomph connections, this should be used instead of Start for dragonfly servers.
-func (o *Oomph) Listen(s *server.Server, remoteAddr string) error {
-	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
-	if err != nil {
-		panic(err)
-	}
+func (o *Oomph) Listen(s *server.Server, name string) error {
 	l, err := minecraft.ListenConfig{
-		StatusProvider: p,
+		StatusProvider: minecraft.NewStatusProvider(name),
 	}.Listen("raknet", o.addr)
+	s.PlayerCount()
 	if err != nil {
 		return err
 	}
-	o.log.Infof("Oomph is now listening on %v and directing connections to %v!\n", o.addr, remoteAddr)
+	o.log.Infof("Oomph is now listening on %v.\n", o.addr)
 	s.Listen(listener{
 		Listener: l,
 		o:        o,
