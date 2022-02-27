@@ -10,7 +10,7 @@ import (
 
 // LoadRawChunk loads a chunk to the player's memory from raw sub chunk data.
 func (p *Player) LoadRawChunk(pos world.ChunkPos, data []byte, subChunkCount uint32) {
-	if p.closed.Load() {
+	if p.closed {
 		// Don't load a chunk if the player is already closed.
 		return
 	}
@@ -28,7 +28,7 @@ func (p *Player) LoadRawChunk(pos world.ChunkPos, data []byte, subChunkCount uin
 
 // LoadChunk loads a chunk to the player's memory.
 func (p *Player) LoadChunk(pos world.ChunkPos, c *chunk.Chunk) {
-	if p.closed.Load() {
+	if p.closed {
 		// Don't load a chunk if the player is already closed.
 		return
 	}
@@ -94,9 +94,39 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	c.Unlock()
 }
 
+// tickNearbyBlocks is called once every client tick to update block ticks.
+func (p *Player) tickNearbyBlocks() {
+	aabb := p.Entity().AABB().Grow(0.2).Translate(p.Entity().Position())
+
+	var liquids, climbables uint32
+	for _, v := range utils.DefaultCheckBlockSettings(aabb, p).SearchAll() {
+		// TODO: Also check for vines and cobwebs when added in DF.
+		switch v.(type) {
+		case world.Liquid:
+			liquids++
+		case block.Ladder:
+			climbables++
+		}
+	}
+
+	p.spawnTicks++
+	p.liquidTicks++
+	p.motionTicks++
+	p.climbableTicks++
+	if p.dead {
+		p.spawnTicks = 0
+	}
+	if liquids > 0 {
+		p.liquidTicks = 0
+	}
+	if climbables > 0 {
+		p.climbableTicks = 0
+	}
+}
+
 // cleanChunks removes all cached chunks that are no longer in the player's view.
 func (p *Player) cleanChunks() {
-	if p.closed.Load() {
+	if p.closed {
 		// Don't clean chunks if the player is already closed.
 		return
 	}

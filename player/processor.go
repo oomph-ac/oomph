@@ -2,6 +2,7 @@ package player
 
 import (
 	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/justtaldevelops/oomph/entity"
@@ -9,11 +10,13 @@ import (
 	"github.com/justtaldevelops/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"math"
+	"time"
 )
 
 // ClientProcess processes the given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) bool {
-	p.clicking.Store(false)
+	p.clicking = false
 
 	switch pk := pk.(type) {
 	case *packet.NetworkStackLatency:
@@ -32,12 +35,38 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Move(pk)
 
 		if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-			p.sprinting.Toggle()
+			p.sprinting = !p.sprinting
 		} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-			p.sneaking.Toggle()
+			p.sneaking = !p.sneaking
 		}
 
-		p.jumping.Store(utils.HasFlag(pk.InputData, packet.InputFlagStartJumping))
+		pos := p.Entity().Position()
+
+		p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+		p.inVoid = pos.Y() <= game.VoidLevel
+		p.teleporting = false
+
+		p.jumpVelocity = game.DefaultJumpMotion
+		p.speed = game.NormalMovementSpeed
+		p.gravity = game.NormalGravity
+
+		p.tickEffects()
+
+		p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
+		p.moveForward = float64(pk.MoveVector.Y() * 0.98)
+
+		if p.Sprinting() {
+			p.speed *= 1.3
+		}
+		p.speed = math.Max(0, p.speed)
+
+		p.chunkMu.Lock()
+		_, ok := p.chunks[world.ChunkPos{int32(pos.X()) >> 4, int32(pos.Z()) >> 4}]
+		p.inUnloadedChunk = !ok
+		p.chunkMu.Unlock()
+
+		p.tickMovement()
+		p.tickNearbyBlocks()
 		p.tickEntityLocations()
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
@@ -48,10 +77,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.Click()
 		}
 	case *packet.AdventureSettings:
-		p.flying.Store(utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying))
+		p.flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
-			p.dead.Store(false)
+			p.dead = false
 		}
 	case *packet.Text:
 		if p.serverConn != nil {
@@ -105,7 +134,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.Acknowledgement(func() {
 				p.Teleport(pk.Position)
 				if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
-					p.teleporting.Store(true)
+					p.teleporting = true
 				}
 			})
 			return false
@@ -117,7 +146,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.Acknowledgement(func() {
 				p.Teleport(pk.Position)
 				if pk.Mode == packet.MoveModeTeleport {
-					p.teleporting.Store(true)
+					p.teleporting = true
 				}
 			})
 			return false
@@ -126,7 +155,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
-			p.ready.Store(true)
+			p.ready = true
 			p.LoadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
 		})
 	case *packet.UpdateBlock:
@@ -145,12 +174,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}
 
 			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
-				p.immobile.Store(utils.HasDataFlag(entity.DataFlagImmobile, f.(int64)))
+				p.immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
 			}
 		})
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
-			p.gameMode.Store(pk.GameType)
+			p.gameMode = pk.GameType
 		})
 	case *packet.RemoveActor:
 		if pk.EntityUniqueID != p.uid {
@@ -163,8 +192,24 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.Acknowledgement(func() {
 				for _, a := range pk.Attributes {
 					if a.Name == "minecraft:health" && a.Value <= 0 {
-						p.dead.Store(true)
+						p.dead = true
 					}
+				}
+			})
+		}
+	case *packet.MobEffect:
+		if pk.EntityRuntimeID == p.rid {
+			p.Acknowledgement(func() {
+				switch pk.Operation {
+				case packet.MobEffectAdd, packet.MobEffectModify:
+					if t, ok := effect.ByID(int(pk.EffectType)); ok {
+						if t, ok := t.(effect.LastingType); ok {
+							eff := effect.New(t, int(pk.Amplifier+1), time.Duration(pk.Duration*50)*time.Millisecond)
+							p.SetEffect(pk.EffectType, eff)
+						}
+					}
+				case packet.MobEffectRemove:
+					p.RemoveEffect(pk.EffectType)
 				}
 			})
 		}
