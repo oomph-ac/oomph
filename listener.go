@@ -20,7 +20,6 @@ func (o *Oomph) Listen(s *server.Server, name string) error {
 	l, err := minecraft.ListenConfig{
 		StatusProvider: minecraft.NewStatusProvider(name),
 	}.Listen("raknet", o.addr)
-	s.PlayerCount()
 	if err != nil {
 		return err
 	}
