@@ -2,7 +2,7 @@ package player
 
 import (
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/game"
+	"github.com/oomph-ac/oomph/game"
 	"math"
 )
 

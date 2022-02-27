@@ -2,7 +2,7 @@ package player
 
 import (
 	"github.com/df-mc/dragonfly/server/entity/effect"
-	"github.com/justtaldevelops/oomph/game"
+	"github.com/oomph-ac/oomph/game"
 )
 
 // SetEffect adds or overrides the given effect to the player.
