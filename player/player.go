@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
@@ -14,13 +15,12 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 	"math/rand"
 	"sync"
 	"time"
 )
 
-// Player contains information about a player, such as its virtual world.
+// Player contains information about a player, such as its virtual world or AABB.
 type Player struct {
 	log              *logrus.Logger
 	conn, serverConn *minecraft.Conn
@@ -33,8 +33,8 @@ type Player struct {
 	chunkMu sync.Mutex
 	chunks  map[world.ChunkPos]*chunk.Chunk
 
-	acknowledgements map[int64]func()
 	ackMu            sync.Mutex
+	acknowledgements map[int64]func()
 
 	dimension world.Dimension
 
@@ -52,23 +52,40 @@ type Player struct {
 	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]mgl64.Vec3
 
-	ready atomic.Bool
+	effectsMu sync.Mutex
+	effects   map[int32]effect.Effect
 
-	gameMode atomic.Int32
+	ready    bool
+	gameMode int32
 
-	sneaking  atomic.Bool
-	sprinting atomic.Bool
+	moveForward, moveStrafe float64
+	jumpVelocity            float64
+	gravity                 float64
+	speed                   float64
+	ySize                   float64
 
-	teleporting atomic.Bool
-	jumping     atomic.Bool
+	motion, serverSentMotion      mgl64.Vec3
+	serverPredictedMotion         mgl64.Vec3
+	previousServerPredictedMotion mgl64.Vec3
 
-	immobile atomic.Bool
-	flying   atomic.Bool
-	dead     atomic.Bool
+	teleportOffset uint8
 
-	clicking atomic.Bool
+	sneaking, sprinting     bool
+	teleporting, jumping    bool
+	inVoid, inUnloadedChunk bool
+	immobile, flying, dead  bool
+	collidedHorizontally    bool
+	collidedVertically      bool
+	onGround                bool
+
+	climbableTicks uint32
+	cobwebTicks    uint32
+	liquidTicks    uint32
+	motionTicks    uint32
+	spawnTicks     uint32
 
 	clickMu       sync.Mutex
+	clicking      bool
 	clicks        []uint64
 	lastClickTick uint64
 	clickDelay    uint64
@@ -77,7 +94,7 @@ type Player struct {
 	checkMu sync.Mutex
 	checks  []check.Check
 
-	closed atomic.Bool
+	closed bool
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
@@ -111,7 +128,9 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
-		gameMode: *atomic.NewInt32(data.PlayerGameMode),
+		effects: make(map[int32]effect.Effect),
+
+		gameMode: data.PlayerGameMode,
 
 		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
@@ -189,7 +208,7 @@ func (p *Player) ClientTick() uint64 {
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
 func (p *Player) Acknowledgement(f func()) {
-	if p.closed.Load() {
+	if p.closed {
 		// Don't request an acknowledgement if the player is already closed.
 		return
 	}
@@ -248,52 +267,52 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 
 // Ready returns true if the player is ready/spawned in.
 func (p *Player) Ready() bool {
-	return p.ready.Load()
+	return p.ready
 }
 
 // GameMode returns the current game mode of the player.
 func (p *Player) GameMode() int32 {
-	return p.gameMode.Load()
+	return p.gameMode
 }
 
 // Sneaking returns true if the player is currently sneaking.
 func (p *Player) Sneaking() bool {
-	return p.sneaking.Load()
+	return p.sneaking
 }
 
 // Sprinting returns true if the player is currently sprinting.
 func (p *Player) Sprinting() bool {
-	return p.sprinting.Load()
+	return p.sprinting
 }
 
 // Teleporting returns true if the player is currently teleporting.
 func (p *Player) Teleporting() bool {
-	return p.teleporting.Load()
+	return p.teleporting
 }
 
 // Jumping returns true if the player is currently jumping.
 func (p *Player) Jumping() bool {
-	return p.jumping.Load()
+	return p.jumping
 }
 
 // Immobile returns true if the player is currently immobile.
 func (p *Player) Immobile() bool {
-	return p.immobile.Load()
+	return p.immobile
 }
 
 // Flying returns true if the player is currently flying.
 func (p *Player) Flying() bool {
-	return p.flying.Load()
+	return p.flying
 }
 
 // Dead returns true if the player is currently dead.
 func (p *Player) Dead() bool {
-	return p.dead.Load()
+	return p.dead
 }
 
 // Clicking returns true if the player is clicking.
 func (p *Player) Clicking() bool {
-	return p.clicking.Load()
+	return p.clicking
 }
 
 // Click adds a click to the player's click history.
@@ -301,7 +320,7 @@ func (p *Player) Click() {
 	currentTick := p.ClientTick()
 
 	p.clickMu.Lock()
-	p.clicking.Store(true)
+	p.clicking = true
 	if len(p.clicks) > 0 {
 		p.clickDelay = (currentTick - p.lastClickTick) * 50
 	} else {
@@ -367,7 +386,7 @@ func (p *Player) Close() error {
 	p.acknowledgements = nil
 	p.ackMu.Unlock()
 
-	p.closed.Store(true)
+	p.closed = true
 	return nil
 }
 
