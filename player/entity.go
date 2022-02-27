@@ -2,7 +2,7 @@ package player
 
 import (
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/entity"
+	"github.com/oomph-ac/oomph/entity"
 )
 
 // SearchEntity queries the player for an entity, using the runtime ID specified. The second return value is false if

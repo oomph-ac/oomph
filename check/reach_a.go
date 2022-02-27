@@ -3,7 +3,7 @@ package check
 import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/justtaldevelops/oomph/game"
+	"github.com/oomph-ac/oomph/game"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
