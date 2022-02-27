@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/justtaldevelops/oomph/game"
 	"math"
@@ -83,7 +84,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 
 				if !aabb.IntersectsWith(targetAABB) {
 					if ray, ok := trace.AABBIntercept(targetAABB, r.attackPos, r.attackPos.Add(dv.Mul(14.0))); ok {
-						dist := ray.Position().Sub(r.attackPos).Len()
+						dist := world.Distance(ray.Position(), r.attackPos)
 						if dist >= 3.1 && math.Abs(dist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
 							if r.Buff(1, 10) >= 3 {
 								processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
