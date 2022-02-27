@@ -5,9 +5,10 @@ import (
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/justtaldevelops/oomph/entity"
-	"github.com/justtaldevelops/oomph/game"
-	"github.com/justtaldevelops/oomph/utils"
+	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/utils"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"math"
