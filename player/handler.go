@@ -2,7 +2,7 @@ package player
 
 import (
 	"github.com/df-mc/dragonfly/server/event"
-	"github.com/justtaldevelops/oomph/check"
+	"github.com/oomph-ac/oomph/check"
 )
 
 // Handler handles events that are called by a player. Implementations of Handler may be used to listen to

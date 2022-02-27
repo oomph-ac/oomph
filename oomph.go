@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/justtaldevelops/oomph/player"
+	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
 )
