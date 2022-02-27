@@ -3,6 +3,7 @@ package oomph
 import (
 	"fmt"
 	"github.com/df-mc/dragonfly/server"
+	"github.com/df-mc/dragonfly/server/player"
 	"github.com/df-mc/dragonfly/server/player/chat"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/pelletier/go-toml"
@@ -32,7 +33,7 @@ func TestOomphDirect(t *testing.T) {
 
 	go func() {
 		oomph := New(log, ":19132")
-		if err := oomph.Listen(srv, ":19131"); err != nil {
+		if err := oomph.Listen(srv, config.Server.Name); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -47,7 +48,7 @@ func TestOomphDirect(t *testing.T) {
 		if p, err := srv.Accept(); err == nil {
 			p.ShowCoordinates()
 			p.SetGameMode(world.GameModeSurvival)
-			//p.World().AddEntity(player.New(p.Name(), p.Skin(), p.Position()))
+			p.World().AddEntity(player.New(p.Name(), p.Skin(), p.Position()))
 		}
 	}
 }
