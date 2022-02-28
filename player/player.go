@@ -453,6 +453,10 @@ func (p *Player) Disconnect(reason string) {
 
 // Close closes the player.
 func (p *Player) Close() error {
+	if p.closed {
+		// Already closed, do nothing.
+		return nil
+	}
 	p.closed = true
 
 	if err := p.conn.Close(); err != nil {

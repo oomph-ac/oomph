@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
@@ -12,9 +13,10 @@ import (
 
 // tickMovement ticks the player's movement server-side and ensures it matches up with the client.
 func (p *Player) tickMovement() {
+	fmt.Println("On Ground:", p.onGround)
 	if !p.ready || p.inVoid || p.immobile || p.flying || p.gameMode > 0 || p.spawnTicks < 10 {
 		p.onGround = true
-		p.collidedVertically = true
+		p.collidedVertically = false
 		p.previousServerPredictedMotion = p.motion
 		p.serverPredictedMotion = mgl64.Vec3{
 			p.motion.X() * (0.6 * 0.91),
@@ -23,6 +25,7 @@ func (p *Player) tickMovement() {
 		}
 		return
 	}
+	fmt.Println("Moving with heading...")
 	p.moveWithHeading()
 }
 
@@ -50,16 +53,15 @@ func (p *Player) moveWithHeading() {
 		if p.jumping {
 			p.jump()
 		}
-		if b, ok := w.Block(cube.PosFromVec3(game.FloorVec64(e.LastPosition().Sub(mgl64.Vec3{0, 1})))).(block.Frictional); ok {
+		if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok {
 			var1 *= b.Friction()
 		} else {
 			var1 *= 0.6
 		}
 	} else {
+		var3 = 0.02
 		if p.sprinting {
 			var3 = 0.026
-		} else {
-			var3 = 0.02
 		}
 	}
 
@@ -70,7 +72,7 @@ func (p *Player) moveWithHeading() {
 
 	p.moveFlying(var3)
 
-	if utils.BlockClimbable(w.Block(cube.PosFromVec3(game.FloorVec64(e.LastPosition())))) {
+	if utils.BlockClimbable(w.Block(cube.PosFromVec3(e.LastPosition()))) {
 		f6 := 0.2
 		yMotion := p.serverPredictedMotion.Y()
 		if yMotion < -0.2 {
@@ -87,7 +89,7 @@ func (p *Player) moveWithHeading() {
 	}
 
 	cx, cz := p.move()
-	if utils.BlockClimbable(w.Block(cube.PosFromVec3(game.FloorVec64(e.LastPosition())))) && p.collidedHorizontally {
+	if utils.BlockClimbable(w.Block(cube.PosFromVec3(e.LastPosition()))) && p.collidedHorizontally {
 		p.serverPredictedMotion[1] = 0.2
 	}
 	p.previousServerPredictedMotion = p.serverPredictedMotion
@@ -136,6 +138,8 @@ func (p *Player) moveWithHeading() {
 		z = 0
 	}
 
+	// 0.98000001907349 * -0.08
+
 	p.serverPredictedMotion = mgl64.Vec3{
 		x * var1,
 		(y - p.gravity) * game.GravityMultiplier,
@@ -167,17 +171,20 @@ func (p *Player) move() (bool, bool) {
 	dx, dy, dz := p.serverPredictedMotion.X(), p.serverPredictedMotion.Y(), p.serverPredictedMotion.Z()
 	movX, movY, movZ := dx, dy, dz
 
-	oldPos := p.Entity().LastPosition()
-	aabb := p.AABB()
-	w := p.World()
-
 	// TODO: Prediction with collision on cobweb
 	p.ySize *= 0.4
 
+	pos := p.Entity().LastPosition()
+	w := p.World()
+
+	fmt.Println(pos)
+
+	aabb := p.AABB()
+	oldClone := aabb
+
 	if p.onGround && p.sneaking {
-		clone := aabb
 		mov := 0.05
-		for ; dx != 0.0 && len(utils.BlocksNearby(oldPos, clone.Translate(mgl64.Vec3{dx, -1, 0}), w)) == 0; movX = dx {
+		for ; dx != 0.0 && len(utils.BlocksNearby(pos, aabb.Translate(mgl64.Vec3{dx, -1, 0}), w)) == 0; movX = dx {
 			if dx < mov && dx >= -mov {
 				dx = 0
 			} else if dx > 0 {
@@ -186,7 +193,7 @@ func (p *Player) move() (bool, bool) {
 				dx += mov
 			}
 		}
-		for ; dz != 0.0 && len(utils.BlocksNearby(oldPos, clone.Translate(mgl64.Vec3{0, -1, dz}), w)) == 0; movZ = dz {
+		for ; dz != 0.0 && len(utils.BlocksNearby(pos, aabb.Translate(mgl64.Vec3{0, -1, dz}), w)) == 0; movZ = dz {
 			if dz < mov && dz >= -mov {
 				dz = 0
 			} else if dz > 0 {
@@ -199,46 +206,48 @@ func (p *Player) move() (bool, bool) {
 
 	clone := aabb
 	list := utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), p.Position(), w)
+	fmt.Println(len(list))
 	for _, b := range list {
-		dy = clone.CalculateYOffset(b, dy)
+		dy = aabb.CalculateYOffset(b, dy)
 	}
-	clone = clone.Translate(mgl64.Vec3{0, dy, 0})
+	aabb = aabb.Translate(mgl64.Vec3{0, dy, 0})
 	for _, b := range list {
-		dx = clone.CalculateXOffset(b, dx)
+		dx = aabb.CalculateXOffset(b, dx)
 	}
-	clone = clone.Translate(mgl64.Vec3{dx, 0, 0})
+	aabb = aabb.Translate(mgl64.Vec3{dx, 0, 0})
 	for _, b := range list {
-		dz = clone.CalculateZOffset(b, dz)
+		dz = aabb.CalculateZOffset(b, dz)
 	}
-	clone = clone.Translate(mgl64.Vec3{0, 0, dz})
+	aabb = aabb.Translate(mgl64.Vec3{0, 0, dz})
 
 	if (p.onGround || (movY != dy && movY < 0)) && (movX != dx || movZ != dz) {
 		cx, cz := dx, dz
 		cy := dy
 		dx, dy, dz = movX, game.StepHeight, movZ
 
-		clone = aabb
-		list = utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), p.Position(), w)
+		aabb = oldClone
+		list = utils.CollidingBlocks(aabb.Extend(mgl64.Vec3{dx, dy, dz}), p.Position(), w)
 		for _, b := range list {
-			dy = clone.CalculateYOffset(b, dy)
+			dy = aabb.CalculateYOffset(b, dy)
 		}
-		clone = clone.Translate(mgl64.Vec3{0, dy, 0})
+		fmt.Println(movY, dy)
+		aabb = aabb.Translate(mgl64.Vec3{0, dy, 0})
 		for _, b := range list {
-			dx = clone.CalculateXOffset(b, dx)
+			dx = aabb.CalculateXOffset(b, dx)
 		}
-		clone = clone.Translate(mgl64.Vec3{dx, 0, 0})
+		aabb = aabb.Translate(mgl64.Vec3{dx, 0, 0})
 		for _, b := range list {
-			dz = clone.CalculateZOffset(b, dz)
+			dz = aabb.CalculateZOffset(b, dz)
 		}
-		clone = clone.Translate(mgl64.Vec3{0, 0, dz})
+		aabb = aabb.Translate(mgl64.Vec3{0, 0, dz})
 
-		dy = 0
 		reverseDY := -dy
 		for _, b := range list {
-			reverseDY = clone.CalculateYOffset(b, reverseDY)
+			reverseDY = aabb.CalculateYOffset(b, reverseDY)
 		}
-		clone = clone.Translate(mgl64.Vec3{0, reverseDY, 0})
+		aabb = aabb.Translate(mgl64.Vec3{0, reverseDY, 0})
 
+		dy = 0
 		if (math.Pow(cx, 2) + math.Pow(cz, 2)) >= (math.Pow(dx, 2) + math.Pow(dz, 2)) {
 			dx, dy, dz = cx, cy, cz
 		}

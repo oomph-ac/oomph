@@ -23,13 +23,14 @@ func BlockClimbable(b world.Block) bool {
 func BlocksNearby(pos mgl64.Vec3, aabb physics.AABB, w *world.World) []world.Block {
 	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
-	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
-	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
-	blocks := make([]world.Block, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
+	minX, minY, minZ := min[0], min[1], min[2]
+	maxX, maxY, maxZ := max[0], max[1], max[2]
+
+	var blocks []world.Block
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
-				blocks = append(blocks, w.Block(cube.PosFromVec3(pos).Add(cube.Pos{x, y, z})))
+				blocks = append(blocks, w.Block(cube.PosFromVec3(pos).Add(cube.Pos{int(x), int(y), int(z)})))
 			}
 		}
 	}
@@ -41,7 +42,7 @@ func CollidingBlocks(aabb physics.AABB, pos mgl64.Vec3, w *world.World) []physic
 	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
-	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
+	maxX, maxY, maxZ := int(math.Floor(max[0])), int(math.Floor(max[1])), int(math.Floor(max[2]))
 
 	blockAABBs := make([]physics.AABB, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
 	for y := minY; y <= maxY; y++ {

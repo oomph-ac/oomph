@@ -178,6 +178,13 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				p.immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
 			}
 		})
+	case *packet.SetActorMotion:
+		if pk.EntityRuntimeID == p.rid {
+			p.Acknowledgement(func() {
+				p.motionTicks = 0
+				p.serverSentMotion = pk.Velocity
+			})
+		}
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType
