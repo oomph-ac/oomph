@@ -2,6 +2,10 @@ package player
 
 import (
 	"fmt"
+	"math/rand"
+	"sync"
+	"time"
+
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/event"
@@ -16,9 +20,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
-	"math/rand"
-	"sync"
-	"time"
 )
 
 // Player contains information about a player, such as its virtual world or AABB.
@@ -178,6 +179,7 @@ func (p *Player) Conn() *minecraft.Conn {
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data := p.Entity()
 	data.Move(game.Vec32To64(pk.Position), true)
+	p.motion = data.Position().Sub(data.LastPosition())
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 	p.Loader().Move(p.Position())

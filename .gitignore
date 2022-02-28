@@ -2,3 +2,5 @@
 config.toml
 token.tok
 tests/*
+players/*
+world/*

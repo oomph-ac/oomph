@@ -1,19 +1,18 @@
 package player
 
 import (
-	"fmt"
+	"math"
+
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
-	"math"
 )
 
 // tickMovement ticks the player's movement server-side and ensures it matches up with the client.
 func (p *Player) tickMovement() {
-	fmt.Println("On Ground:", p.onGround)
 	if !p.ready || p.inVoid || p.immobile || p.flying || p.gameMode > 0 || p.spawnTicks < 10 {
 		p.onGround = true
 		p.collidedVertically = false
@@ -25,8 +24,6 @@ func (p *Player) tickMovement() {
 		}
 		return
 	}
-	fmt.Println(p.serverPredictedMotion)
-	fmt.Println("Moving with heading...")
 	p.moveWithHeading()
 }
 
@@ -48,7 +45,7 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	var1 := 0.98
+	var1 := 0.91
 	var var3 float64
 	if p.onGround {
 		if p.jumping {
@@ -95,8 +92,8 @@ func (p *Player) moveWithHeading() {
 	}
 	p.previousServerPredictedMotion = p.serverPredictedMotion
 
-	// TODO: Find a method that completes full compensation for stairs.
-	//  These 7 lines are shitty hacks to compensate for an improper and incomplete stair prediction.
+	//  TODO: Find a method that completes full compensation for stairs.
+	//  These 7 lines are bad hacks to compensate for an improper and incomplete stair prediction.
 	//  In Minecraft bedrock, it seems that the player clips into the stairs, making the minecraft java
 	//  movement code obsolete for this case.
 	var hasStair bool
@@ -133,7 +130,6 @@ func (p *Player) moveWithHeading() {
 		x = 0
 	}
 	if p.collidedVertically {
-		fmt.Println("collided vertically")
 		y = 0
 	}
 	if cz {
@@ -204,7 +200,6 @@ func (p *Player) move() (bool, bool) {
 
 	clone := aabb
 	list := utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), w)
-	fmt.Println(len(list))
 	for _, b := range list {
 		dy = aabb.CalculateYOffset(b, dy)
 	}
@@ -228,7 +223,6 @@ func (p *Player) move() (bool, bool) {
 		for _, b := range list {
 			dy = aabb.CalculateYOffset(b, dy)
 		}
-		fmt.Println(movY, dy)
 		aabb = aabb.Translate(mgl64.Vec3{0, dy, 0})
 		for _, b := range list {
 			dx = aabb.CalculateXOffset(b, dx)
