@@ -82,7 +82,7 @@ func (p *Player) moveWithHeading() {
 			yMotion = 0
 		}
 		p.serverPredictedMotion = mgl64.Vec3{
-			game.ClampFloat(p.serverPredictedMotion.Z(), -f6, f6),
+			game.ClampFloat(p.serverPredictedMotion.X(), -f6, f6),
 			yMotion,
 			game.ClampFloat(p.serverPredictedMotion.Z(), -f6, f6),
 		}

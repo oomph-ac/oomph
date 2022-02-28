@@ -27,9 +27,9 @@ func BlocksNearby(pos mgl64.Vec3, aabb physics.AABB, w *world.World) []world.Blo
 	maxX, maxY, maxZ := max[0], max[1], max[2]
 
 	var blocks []world.Block
-	for y := minY; y <= maxY; y++ {
-		for x := minX; x <= maxX; x++ {
-			for z := minZ; z <= maxZ; z++ {
+	for y := minY; y < maxY; y++ {
+		for x := minX; x < maxX; x++ {
+			for z := minZ; z < maxZ; z++ {
 				blocks = append(blocks, w.Block(cube.PosFromVec3(pos).Add(cube.Pos{int(x), int(y), int(z)})))
 			}
 		}
