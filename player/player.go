@@ -28,15 +28,15 @@ type Player struct {
 	rid uint64
 	uid int64
 
-	viewDist int32
+	wMu sync.Mutex
+	w   *world.World
+	l   *world.Loader
+	p   *provider
 
-	chunkMu sync.Mutex
-	chunks  map[world.ChunkPos]*chunk.Chunk
+	viewDist int
 
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
-
-	dimension world.Dimension
 
 	serverTicker           *time.Ticker
 	clientTick, serverTick uint64
@@ -70,13 +70,13 @@ type Player struct {
 
 	teleportOffset uint8
 
-	sneaking, sprinting     bool
-	teleporting, jumping    bool
-	inVoid, inUnloadedChunk bool
-	immobile, flying, dead  bool
-	collidedHorizontally    bool
-	collidedVertically      bool
-	onGround                bool
+	sneaking, sprinting    bool
+	teleporting, jumping   bool
+	immobile, flying, dead bool
+	collidedHorizontally   bool
+	collidedVertically     bool
+	onGround               bool
+	inVoid                 bool
 
 	climbableTicks uint32
 	cobwebTicks    uint32
@@ -95,10 +95,16 @@ type Player struct {
 	checks  []check.Check
 
 	closed bool
+
+	world.NopViewer
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
-func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, conn, serverConn *minecraft.Conn) *Player {
+func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *minecraft.Conn) *Player {
+	w := world.New(log, dimension, &world.Settings{})
+	prov := &provider{chunks: make(map[world.ChunkPos]*chunk.Chunk)}
+	w.Provider(prov)
+
 	data := conn.GameData()
 	p := &Player{
 		log: log,
@@ -109,10 +115,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, viewDist int32, co
 		rid: data.EntityRuntimeID,
 		uid: data.EntityUniqueID,
 
-		viewDist: viewDist,
-
-		chunks:    make(map[world.ChunkPos]*chunk.Chunk),
-		dimension: dimension,
+		w: w,
+		p: prov,
 
 		h: NopHandler{},
 
@@ -168,7 +172,7 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Move(game.Vec32To64(pk.Position), true)
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
-	p.cleanChunks()
+	p.l.Move(p.Position())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -176,7 +180,7 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos), true)
 	data.ResetTeleportationTicks()
-	p.cleanChunks()
+	p.l.Move(p.Position())
 }
 
 // MoveEntity moves an entity to the given position.
@@ -203,6 +207,23 @@ func (p *Player) ServerTick() uint64 {
 // client has sent. (since the packet is sent every client tick)
 func (p *Player) ClientTick() uint64 {
 	return p.clientTick
+}
+
+// Position returns the position of the player.
+func (p *Player) Position() mgl64.Vec3 {
+	return p.Entity().Position()
+}
+
+// Rotation returns the rotation of the player.
+func (p *Player) Rotation() mgl64.Vec3 {
+	return p.Entity().Rotation()
+}
+
+// World returns the world of the player.
+func (p *Player) World() *world.World {
+	p.wMu.Lock()
+	defer p.wMu.Unlock()
+	return p.w
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
@@ -362,6 +383,8 @@ func (p *Player) Disconnect(reason string) {
 
 // Close closes the player.
 func (p *Player) Close() error {
+	p.closed = true
+
 	if err := p.conn.Close(); err != nil {
 		return err
 	}
@@ -378,15 +401,19 @@ func (p *Player) Close() error {
 	p.checks = nil
 	p.checkMu.Unlock()
 
-	p.chunkMu.Lock()
-	p.chunks = nil
-	p.chunkMu.Unlock()
+	p.wMu.Lock()
+	if err := p.w.Close(); err != nil {
+		return err
+	}
+	if err := p.l.Close(); err != nil {
+		return err
+	}
+	p.p = nil
+	p.wMu.Unlock()
 
 	p.ackMu.Lock()
 	p.acknowledgements = nil
 	p.ackMu.Unlock()
-
-	p.closed = true
 	return nil
 }
 
@@ -400,6 +427,12 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
+		if p.viewDist > 0 {
+			if err := p.l.Load(p.viewDist / 2); err != nil {
+				p.log.Errorf("%s: error loading chunka: %s", p.Name(), err)
+			}
+		}
+
 		p.flushEntityLocations()
 		p.serverTick++
 	}

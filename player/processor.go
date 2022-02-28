@@ -20,6 +20,17 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	p.clicking = false
 
 	switch pk := pk.(type) {
+	case *packet.RequestChunkRadius:
+		p.wMu.Lock()
+		defer p.wMu.Unlock()
+
+		p.viewDist = int(pk.ChunkRadius)
+		if p.l == nil {
+			p.l = world.NewLoader(p.viewDist, p.w, p)
+			return false
+		}
+		p.l.ChangeRadius(p.viewDist)
+		return false
 	case *packet.NetworkStackLatency:
 		p.ackMu.Lock()
 		call, ok := p.acknowledgements[pk.Timestamp]
@@ -31,6 +42,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			return true
 		}
 		p.ackMu.Unlock()
+		return false
 	case *packet.PlayerAuthInput:
 		p.clientTick++
 		p.Move(pk)
@@ -41,7 +53,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.sneaking = !p.sneaking
 		}
 
-		pos := p.Entity().Position()
+		pos := p.Position()
 
 		p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 		p.inVoid = pos.Y() <= game.VoidLevel
@@ -61,11 +73,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 		p.speed = math.Max(0, p.speed)
 
-		p.chunkMu.Lock()
-		_, ok := p.chunks[world.ChunkPos{int32(pos.X()) >> 4, int32(pos.Z()) >> 4}]
-		p.inUnloadedChunk = !ok
-		p.chunkMu.Unlock()
-
 		p.tickMovement()
 		p.tickNearbyBlocks()
 		p.tickEntityLocations()
@@ -73,6 +80,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
 		}
+		return false
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
@@ -88,6 +96,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
+		return false
 	}
 
 	// Run all registered checks.
@@ -157,13 +166,13 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
 			p.ready = true
-			p.LoadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
+			p.loadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
 		})
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if ok {
 			p.Acknowledgement(func() {
-				p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+				p.World().SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
 			})
 		}
 	case *packet.SetActorData:

@@ -48,7 +48,7 @@ func (l listener) Accept() (session.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := player.NewPlayer(l.o.log, world.Overworld, 8, c.(*minecraft.Conn), nil)
+	p := player.NewPlayer(l.o.log, world.Overworld, c.(*minecraft.Conn), nil)
 	l.o.players <- p
 	return p, err
 }

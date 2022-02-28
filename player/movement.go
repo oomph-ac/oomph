@@ -38,7 +38,7 @@ func (p *Player) moveFlying(friction float64) {
 		var1 = friction / var1
 		forward := p.moveForward * var1
 		strafe := p.moveStrafe * var1
-		yaw := p.Entity().Rotation().Z()
+		yaw := p.Rotation().Z()
 		var2 := game.MCSin(yaw * math.Pi / 180)
 		var3 := game.MCCos(yaw * math.Pi / 180)
 		p.serverPredictedMotion[0] += strafe*var3 - forward*var2
@@ -59,7 +59,7 @@ func (p *Player) jump() {
 		p.serverPredictedMotion.Z(),
 	}
 	if p.Sprinting() {
-		f := p.Entity().Rotation().Z() * 0.017453292
+		f := p.Rotation().Z() * 0.017453292
 		p.serverPredictedMotion = mgl64.Vec3{
 			p.serverPredictedMotion.X() - game.MCSin(f)*0.2,
 			p.serverPredictedMotion.Y(),
