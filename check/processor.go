@@ -51,11 +51,11 @@ type Processor interface {
 	// CollidedHorizontally returns true if the processor has collided horizontally.
 	CollidedHorizontally() bool
 
-	// Motion returns the motion of the player.
+	// Motion returns the motion of the processor.
 	Motion() mgl64.Vec3
-	// ServerPredictedMotion returns the server-predicted motion of the player.
+	// ServerPredictedMotion returns the server-predicted motion of the processor.
 	ServerPredictedMotion() mgl64.Vec3
-	// PreviousServerPredictedMotion returns the previous server-predicted motion of the player.
+	// PreviousServerPredictedMotion returns the previous server-predicted motion of the processor.
 	PreviousServerPredictedMotion() mgl64.Vec3
 
 	// GameMode returns the current game mode of the processor.
