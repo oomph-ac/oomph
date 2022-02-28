@@ -25,6 +25,7 @@ func (p *Player) tickMovement() {
 		}
 		return
 	}
+	fmt.Println(p.serverPredictedMotion)
 	fmt.Println("Moving with heading...")
 	p.moveWithHeading()
 }
@@ -99,7 +100,7 @@ func (p *Player) moveWithHeading() {
 	//  In Minecraft bedrock, it seems that the player clips into the stairs, making the minecraft java
 	//  movement code obsolete for this case.
 	var hasStair bool
-	for _, b := range utils.BlocksNearby(p.Position(), e.AABB().Grow(0.2), w) {
+	for _, b := range utils.BlocksNearby(e.AABB().Translate(p.Position()).Grow(0.2), w) {
 		if _, ok := b.Model().(model.Stair); ok {
 			hasStair = true
 			break
@@ -132,6 +133,7 @@ func (p *Player) moveWithHeading() {
 		x = 0
 	}
 	if p.collidedVertically {
+		fmt.Println("collided vertically")
 		y = 0
 	}
 	if cz {
@@ -174,17 +176,13 @@ func (p *Player) move() (bool, bool) {
 	// TODO: Prediction with collision on cobweb
 	p.ySize *= 0.4
 
-	pos := p.Entity().LastPosition()
 	w := p.World()
-
-	fmt.Println(pos)
-
-	aabb := p.AABB()
+	aabb := p.AABB().Translate(p.Entity().LastPosition())
 	oldClone := aabb
 
 	if p.onGround && p.sneaking {
 		mov := 0.05
-		for ; dx != 0.0 && len(utils.BlocksNearby(pos, aabb.Translate(mgl64.Vec3{dx, -1, 0}), w)) == 0; movX = dx {
+		for ; dx != 0.0 && len(utils.BlocksNearby(aabb.Translate(mgl64.Vec3{dx, -1, 0}), w)) == 0; movX = dx {
 			if dx < mov && dx >= -mov {
 				dx = 0
 			} else if dx > 0 {
@@ -193,7 +191,7 @@ func (p *Player) move() (bool, bool) {
 				dx += mov
 			}
 		}
-		for ; dz != 0.0 && len(utils.BlocksNearby(pos, aabb.Translate(mgl64.Vec3{0, -1, dz}), w)) == 0; movZ = dz {
+		for ; dz != 0.0 && len(utils.BlocksNearby(aabb.Translate(mgl64.Vec3{0, -1, dz}), w)) == 0; movZ = dz {
 			if dz < mov && dz >= -mov {
 				dz = 0
 			} else if dz > 0 {
@@ -205,7 +203,7 @@ func (p *Player) move() (bool, bool) {
 	}
 
 	clone := aabb
-	list := utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), p.Position(), w)
+	list := utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), w)
 	fmt.Println(len(list))
 	for _, b := range list {
 		dy = aabb.CalculateYOffset(b, dy)
@@ -226,7 +224,7 @@ func (p *Player) move() (bool, bool) {
 		dx, dy, dz = movX, game.StepHeight, movZ
 
 		aabb = oldClone
-		list = utils.CollidingBlocks(aabb.Extend(mgl64.Vec3{dx, dy, dz}), p.Position(), w)
+		list = utils.CollidingBlocks(aabb.Extend(mgl64.Vec3{dx, dy, dz}), w)
 		for _, b := range list {
 			dy = aabb.CalculateYOffset(b, dy)
 		}
