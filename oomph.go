@@ -83,7 +83,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 
-	p := player.NewPlayer(o.log, world.Overworld, 8, conn, serverConn)
+	p := player.NewPlayer(o.log, world.Overworld, conn, serverConn)
 	o.players <- p
 
 	g.Add(2)
