@@ -73,7 +73,7 @@ func (e *Entity) Move(pos mgl64.Vec3, offset bool) {
 	e.lastPosition = e.position
 	e.position = pos
 	if offset {
-		e.position = e.position.Sub(mgl64.Vec3{0, 1.621})
+		e.position = e.position.Sub(mgl64.Vec3{0, 1.62})
 	}
 }
 
@@ -89,7 +89,7 @@ func (e *Entity) UpdateReceivedPosition(pos mgl64.Vec3) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.receivedPosition = pos.Sub(mgl64.Vec3{0, 1.621})
+	e.receivedPosition = pos.Sub(mgl64.Vec3{0, 1.62})
 }
 
 // Rotation returns the rotation of the entity.

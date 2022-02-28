@@ -8,7 +8,7 @@ import (
 
 // tickMovement ticks the player's movement server-side and ensures it matches up with the client.
 func (p *Player) tickMovement() {
-	if p.inUnloadedChunk || p.inVoid || p.immobile || p.flying || p.gameMode > 0 || p.spawnTicks < 10 {
+	if !p.ready || p.inVoid || p.immobile || p.flying || p.gameMode > 0 || p.spawnTicks < 10 {
 		p.onGround = true
 		p.collidedVertically = true
 		p.previousServerPredictedMotion = p.motion

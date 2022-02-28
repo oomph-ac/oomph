@@ -11,7 +11,6 @@ import (
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 	"time"
 )
 
@@ -20,17 +19,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	p.clicking = false
 
 	switch pk := pk.(type) {
-	case *packet.RequestChunkRadius:
-		p.wMu.Lock()
-		defer p.wMu.Unlock()
-
-		p.viewDist = int(pk.ChunkRadius)
-		if p.l == nil {
-			p.l = world.NewLoader(p.viewDist, p.w, p)
-			return false
-		}
-		p.l.ChangeRadius(p.viewDist)
-		return false
 	case *packet.NetworkStackLatency:
 		p.ackMu.Lock()
 		call, ok := p.acknowledgements[pk.Timestamp]
@@ -53,28 +41,28 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.sneaking = !p.sneaking
 		}
 
-		pos := p.Position()
-
-		p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-		p.inVoid = pos.Y() <= game.VoidLevel
-		p.teleporting = false
-
-		p.jumpVelocity = game.DefaultJumpMotion
-		p.speed = game.NormalMovementSpeed
-		p.gravity = game.NormalGravity
-
-		p.tickEffects()
-
-		p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
-		p.moveForward = float64(pk.MoveVector.Y() * 0.98)
-
-		if p.Sprinting() {
-			p.speed *= 1.3
-		}
-		p.speed = math.Max(0, p.speed)
-
-		p.tickMovement()
-		p.tickNearbyBlocks()
+		//pos := p.Position()
+		//
+		//p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+		//p.inVoid = pos.Y() <= game.VoidLevel
+		//p.teleporting = false
+		//
+		//p.jumpVelocity = game.DefaultJumpMotion
+		//p.speed = game.NormalMovementSpeed
+		//p.gravity = game.NormalGravity
+		//
+		//p.tickEffects()
+		//
+		//p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
+		//p.moveForward = float64(pk.MoveVector.Y() * 0.98)
+		//
+		//if p.Sprinting() {
+		//	p.speed *= 1.3
+		//}
+		//p.speed = math.Max(0, p.speed)
+		//
+		//p.tickMovement()
+		//p.tickNearbyBlocks()
 		p.tickEntityLocations()
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
@@ -87,10 +75,12 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 	case *packet.AdventureSettings:
 		p.flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
+		return false
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 			p.dead = false
 		}
+		return false
 	case *packet.Text:
 		if p.serverConn != nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
@@ -165,8 +155,8 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
-			p.ready = true
 			p.loadRawChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
+			p.ready = true
 		})
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
