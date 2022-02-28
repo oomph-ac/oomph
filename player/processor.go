@@ -1,6 +1,9 @@
 package player
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
@@ -8,11 +11,11 @@ import (
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
-	"math"
+
+	"time"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"time"
 )
 
 // ClientProcess processes the given packet from the client.
@@ -56,6 +59,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 		p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
 		p.moveForward = float64(pk.MoveVector.Y() * 0.98)
+		fmt.Println(p.moveForward, p.moveStrafe)
 
 		if p.Sprinting() {
 			p.speed *= 1.3
