@@ -7,8 +7,8 @@ import (
 
 // AutoClickerD checks if a user has a constant and low standard deviation in their click data.
 type AutoClickerD struct {
-	basic
 	samples []float64
+	basic
 }
 
 // NewAutoClickerD creates a new AutoClickerD check.
@@ -32,17 +32,17 @@ func (*AutoClickerD) MaxViolations() float64 {
 }
 
 // Process ...
-func (a *AutoClickerD) Process(processor Processor, _ packet.Packet) {
-	if processor.Clicking() {
-		a.samples = append(a.samples, float64(processor.ClickDelay()))
+func (a *AutoClickerD) Process(p Processor, _ packet.Packet) {
+	if p.Clicking() {
+		a.samples = append(a.samples, float64(p.ClickDelay()))
 		if len(a.samples) < 20 {
 			// Not enough samples, wait until we have more.
 			return
 		}
 
-		cps := processor.CPS()
+		cps := p.CPS()
 		kurtosis, skewness, outliers, deviation := game.Kurtosis(a.samples), game.Skewness(a.samples), game.Outliers(a.samples), game.StandardDeviation(a.samples)
-		processor.Debug(a, map[string]interface{}{
+		p.Debug(a, map[string]interface{}{
 			"Kurtosis":  game.Round(kurtosis, 2),
 			"Skewness":  game.Round(skewness, 2),
 			"Outliers":  outliers,
@@ -51,7 +51,7 @@ func (a *AutoClickerD) Process(processor Processor, _ packet.Packet) {
 		})
 		if kurtosis <= 0.05 && skewness < 0 && outliers == 0 && deviation <= 25 && cps >= 9 {
 			if a.Buff(1, 2) > 1 {
-				processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 400), map[string]interface{}{
+				p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
 					"Kurtosis": game.Round(kurtosis, 2),
 					"Skewness": game.Round(skewness, 2),
 					"CPS":      cps,

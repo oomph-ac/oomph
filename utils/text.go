@@ -51,7 +51,7 @@ func PrettyParameters(params map[string]interface{}) string {
 	sb := &strings.Builder{}
 	sb.WriteString("[\n")
 	for k, v := range params {
-		sb.WriteString("\t\"" + k + "\"")
+		sb.WriteString("    \"" + k + "\"")
 		sb.WriteString(": ")
 		sb.WriteString(fmt.Sprint(v))
 		sb.WriteString(",\n")

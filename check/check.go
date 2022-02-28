@@ -19,5 +19,5 @@ type Check interface {
 	MaxViolations() float64
 
 	// Process will process the packet provided for the check.
-	Process(processor Processor, pk packet.Packet)
+	Process(p Processor, pk packet.Packet)
 }

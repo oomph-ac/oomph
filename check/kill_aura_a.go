@@ -7,8 +7,8 @@ import (
 
 // KillAuraA checks if a player is attacking an entity without swinging their arm.
 type KillAuraA struct {
-	basic
 	lastSwingTick uint64
+	basic
 }
 
 // NewKillAuraA creates a new KillAuraA check.
@@ -32,21 +32,21 @@ func (*KillAuraA) MaxViolations() float64 {
 }
 
 // Process ...
-func (k *KillAuraA) Process(processor Processor, pk packet.Packet) {
+func (k *KillAuraA) Process(p Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.Animate:
 		if pk.ActionType == packet.AnimateActionSwingArm {
-			k.lastSwingTick = processor.ClientTick()
-			processor.Debug(k, map[string]interface{}{
+			k.lastSwingTick = p.ClientTick()
+			p.Debug(k, map[string]interface{}{
 				"Last Swing Client Tick": k.lastSwingTick,
 			})
 		}
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
-			currentTick := processor.ClientTick()
+			currentTick := p.ClientTick()
 			tickDiff := currentTick - k.lastSwingTick
 			if tickDiff > 4 {
-				processor.Flag(k, k.updateAndGetViolationAfterTicks(currentTick, 600), map[string]interface{}{
+				p.Flag(k, k.updateAndGetViolationAfterTicks(currentTick, 600), map[string]interface{}{
 					"Tick Difference": tickDiff,
 					"Current Tick":    currentTick,
 					"Last Tick":       k.lastSwingTick,
