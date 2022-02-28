@@ -33,8 +33,6 @@ type Player struct {
 	l   *world.Loader
 	p   *provider
 
-	viewDist int
-
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
 
@@ -101,7 +99,7 @@ type Player struct {
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
 func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *minecraft.Conn) *Player {
-	w := world.New(log, dimension, &world.Settings{})
+	w := world.New(nopLogger{}, dimension, &world.Settings{})
 	prov := &provider{chunks: make(map[world.ChunkPos]*chunk.Chunk)}
 	w.Provider(prov)
 
@@ -157,6 +155,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 			check.NewTimerA(),
 		},
 	}
+	p.l = world.NewLoader(conn.ChunkRadius(), w, p)
 	go p.startTicking()
 	return p
 }
@@ -172,7 +171,7 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Move(game.Vec32To64(pk.Position), true)
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
-	p.l.Move(p.Position())
+	p.Loader().Move(p.Position())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -180,7 +179,7 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos), true)
 	data.ResetTeleportationTicks()
-	p.l.Move(p.Position())
+	p.Loader().Move(p.Position())
 }
 
 // MoveEntity moves an entity to the given position.
@@ -224,6 +223,13 @@ func (p *Player) World() *world.World {
 	p.wMu.Lock()
 	defer p.wMu.Unlock()
 	return p.w
+}
+
+// Loader returns the loader of the player.
+func (p *Player) Loader() *world.Loader {
+	p.wMu.Lock()
+	defer p.wMu.Unlock()
+	return p.l
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
@@ -427,10 +433,9 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
-		if p.viewDist > 0 {
-			if err := p.l.Load(p.viewDist / 2); err != nil {
-				p.log.Errorf("%s: error loading chunka: %s", p.Name(), err)
-			}
+		if p.ready {
+			// We can expect missing chunks to happen at times, so just suppress the errors.
+			_ = p.l.Load(4)
 		}
 
 		p.flushEntityLocations()

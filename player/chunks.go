@@ -28,6 +28,14 @@ func (p *provider) LoadChunk(pos world.ChunkPos) (*chunk.Chunk, bool, error) {
 	return ch, ok, nil
 }
 
+// nopLogger is a no-op implementation of the Logger interface to suppress logging on worlds/expected missing chunks.
+type nopLogger struct{}
+
+func (n nopLogger) Debugf(string, ...interface{}) {}
+func (n nopLogger) Infof(string, ...interface{})  {}
+func (n nopLogger) Errorf(string, ...interface{}) {}
+func (n nopLogger) Fatalf(string, ...interface{}) {}
+
 // loadRawChunk loads a chunk to the player's world provider from raw sub chunk data.
 func (p *Player) loadRawChunk(pos world.ChunkPos, data []byte, subChunkCount uint32) {
 	if p.closed {
