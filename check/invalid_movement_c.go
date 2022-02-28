@@ -7,8 +7,8 @@ import (
 
 // InvalidMovementC checks if the delay between the users jumps is invalid.
 type InvalidMovementC struct {
-	basic
 	jumpTicks int32
+	basic
 }
 
 // NewInvalidMovementC creates a new InvalidMovementC check.
@@ -32,7 +32,7 @@ func (*InvalidMovementC) MaxViolations() float64 {
 }
 
 // Process ...
-func (i *InvalidMovementC) Process(processor Processor, pk packet.Packet) {
+func (i *InvalidMovementC) Process(p Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.PlayerAuthInput:
 		i.jumpTicks--
@@ -42,9 +42,9 @@ func (i *InvalidMovementC) Process(processor Processor, pk packet.Packet) {
 			i.jumpTicks = 0
 		}
 
-		if processor.Jumping() {
+		if p.Jumping() {
 			if i.jumpTicks > 0 || !isHoldingJump {
-				processor.Flag(i, 1, map[string]interface{}{
+				p.Flag(i, 1, map[string]interface{}{
 					"Jumping Ticks": i.jumpTicks,
 					"Jumping":       isHoldingJump,
 				})

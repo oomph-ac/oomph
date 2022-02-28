@@ -11,12 +11,12 @@ import (
 
 // AimAssistA checks the correlation coefficient between expected aim-bot rotation values and actual rotation values.
 type AimAssistA struct {
-	basic
 	waiting             bool
 	target              uint64
 	attackPos           mgl64.Vec3
 	realRotationSamples []float64
 	botRotationSamples  []float64
+	basic
 }
 
 // NewAimAssistA creates a new AimAssistA check.
@@ -40,7 +40,7 @@ func (*AimAssistA) MaxViolations() float64 {
 }
 
 // Process ...
-func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
+func (a *AimAssistA) Process(p Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
@@ -54,8 +54,8 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 		}
 	case *packet.PlayerAuthInput:
 		if a.waiting {
-			if e, ok := processor.SearchEntity(a.target); ok {
-				selfLoc := processor.Entity()
+			if e, ok := p.SearchEntity(a.target); ok {
+				selfLoc := p.Entity()
 				yawDiff := math.Mod(selfLoc.Rotation().Y()-selfLoc.LastRotation().Y(), 180)
 				if yawDiff >= 180 {
 					yawDiff = 180 - math.Mod(yawDiff, 180)
@@ -73,7 +73,7 @@ func (a *AimAssistA) Process(processor Processor, pk packet.Packet) {
 				if len(a.realRotationSamples) == 40 || len(a.botRotationSamples) == 40 {
 					cc := game.CorrelationCoefficient(a.realRotationSamples, a.botRotationSamples)
 					if cc > 0.99 {
-						processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 200), map[string]interface{}{
+						p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 200), map[string]interface{}{
 							"Correlation": game.Round(cc, 2)},
 						)
 					}

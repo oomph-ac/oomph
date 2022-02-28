@@ -6,8 +6,8 @@ import (
 
 // AutoClickerB checks if the user is clicking above 18 cps with no double clicks.
 type AutoClickerB struct {
-	basic
 	samples []uint64
+	basic
 }
 
 // NewAutoClickerB creates a new AutoClickerB check.
@@ -31,13 +31,13 @@ func (*AutoClickerB) MaxViolations() float64 {
 }
 
 // Process ...
-func (a *AutoClickerB) Process(processor Processor, _ packet.Packet) {
-	if processor.Clicking() {
-		a.samples = append(a.samples, processor.ClickDelay())
+func (a *AutoClickerB) Process(p Processor, _ packet.Packet) {
+	if p.Clicking() {
+		a.samples = append(a.samples, p.ClickDelay())
 		if len(a.samples) == 20 {
-			if a.verifySamples() && processor.CPS() >= 18 {
-				processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 300), map[string]interface{}{
-					"CPS": processor.CPS(),
+			if a.verifySamples() && p.CPS() >= 18 {
+				p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 300), map[string]interface{}{
+					"CPS": p.CPS(),
 				})
 			}
 			a.samples = make([]uint64, 0)

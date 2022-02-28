@@ -10,8 +10,8 @@ import (
 
 // KillAuraB checks if a player is attacking too many entities at once.
 type KillAuraB struct {
-	basic
 	entities map[uint64]*entity.Entity
+	basic
 }
 
 // NewKillAuraB creates a new KillAuraB check.
@@ -35,11 +35,11 @@ func (*KillAuraB) MaxViolations() float64 {
 }
 
 // Process ...
-func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
+func (k *KillAuraB) Process(p Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
-			if e, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok {
+			if e, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok {
 				k.entities[data.TargetEntityRuntimeID] = e
 			}
 		}
@@ -54,7 +54,7 @@ func (k *KillAuraB) Process(processor Processor, pk packet.Packet) {
 				}
 			}
 			if minDist < math.MaxFloat64 && minDist > 1.5 {
-				processor.Flag(k, k.updateAndGetViolationAfterTicks(processor.ClientTick(), 40), map[string]interface{}{
+				p.Flag(k, k.updateAndGetViolationAfterTicks(p.ClientTick(), 40), map[string]interface{}{
 					"Minimum Distance": game.Round(minDist, 2),
 					"Entities":         len(k.entities),
 				})

@@ -7,10 +7,10 @@ import (
 
 // TimerA checks for the timer cheat by using a balance system.
 type TimerA struct {
-	basic
 	balance   int64
 	lastTime  uint64
 	clientTPS float64
+	basic
 }
 
 // NewTimerA creates a new TimerA check.
@@ -34,14 +34,14 @@ func (*TimerA) MaxViolations() float64 {
 }
 
 // Process ...
-func (t *TimerA) Process(processor Processor, pk packet.Packet) {
-	if !processor.Ready() {
+func (t *TimerA) Process(p Processor, pk packet.Packet) {
+	if !p.Ready() {
 		// Wait until we're spawned in to prevent falses on join.
 		return
 	}
 
 	if _, ok := pk.(*packet.PlayerAuthInput); ok {
-		currentTime := processor.ServerTick()
+		currentTime := p.ServerTick()
 		if t.lastTime == 0 {
 			t.lastTime = currentTime
 			return
@@ -58,7 +58,7 @@ func (t *TimerA) Process(processor Processor, pk packet.Packet) {
 		// The time difference should be one, so we subtract one from the time difference and add it to the balance.
 		t.balance += int64(timeDiff) - 1
 		if t.balance == -5 {
-			processor.Flag(t, 1, map[string]interface{}{
+			p.Flag(t, 1, map[string]interface{}{
 				"Timer": game.Round(t.clientTPS/float64(20), 4)},
 			)
 			t.balance = 0

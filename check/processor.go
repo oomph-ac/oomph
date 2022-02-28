@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 )
@@ -12,9 +13,9 @@ type Processor interface {
 	// ClientTick returns the current client tick of the processor
 	ClientTick() uint64
 
-	// IdentityData returns the login.IdentityData of a player. It contains the UUID, XUID and username of the connection.
+	// IdentityData returns the login.IdentityData of a processor. It contains the UUID, XUID and username of the connection.
 	IdentityData() login.IdentityData
-	// ClientData returns the login.ClientData of a player. This includes less sensitive data of the player like its skin,
+	// ClientData returns the login.ClientData of a processor. This includes less sensitive data of the processor like its skin,
 	// language code and other non-essential information.
 	ClientData() login.ClientData
 
@@ -31,26 +32,49 @@ type Processor interface {
 	// CPS returns the clicks per second of the processor.
 	CPS() int
 
-	// Ready returns true if the player is ready/spawned in.
+	// Ready returns true if the processor is ready/spawned in.
 	Ready() bool
 
-	// GameMode returns the current game mode of the player.
+	// ClimbableTicks returns the amount of climbable ticks the processor has.
+	ClimbableTicks() uint32
+	// CobwebTicks returns the amount of cobweb ticks the processor has.
+	CobwebTicks() uint32
+	// LiquidTicks returns the amount of liquid ticks the processor has.
+	LiquidTicks() uint32
+	// MotionTicks returns the amount of motion ticks the processor has.
+	MotionTicks() uint32
+	// SpawnTicks returns the amount of spawn ticks the processor has.
+	SpawnTicks() uint32
+
+	// CollidedVertically returns true if the processor has collided vertically.
+	CollidedVertically() bool
+	// CollidedHorizontally returns true if the processor has collided horizontally.
+	CollidedHorizontally() bool
+
+	// Motion returns the motion of the player.
+	Motion() mgl64.Vec3
+	// ServerPredictedMotion returns the server-predicted motion of the player.
+	ServerPredictedMotion() mgl64.Vec3
+	// PreviousServerPredictedMotion returns the previous server-predicted motion of the player.
+	PreviousServerPredictedMotion() mgl64.Vec3
+
+	// GameMode returns the current game mode of the processor.
 	GameMode() int32
-	// Sneaking returns true if the player is currently sneaking.
+	// Sneaking returns true if the processor is currently sneaking.
 	Sneaking() bool
-	// Sprinting returns true if the player is currently sprinting.
+	// Sprinting returns true if the processor is currently sprinting.
 	Sprinting() bool
-	// Teleporting returns true if the player is currently teleporting.
+	// Teleporting returns true if the processor is currently teleporting.
 	Teleporting() bool
-	// Jumping returns true if the player is currently jumping.
+	// Jumping returns true if the processor is currently jumping.
 	Jumping() bool
-	// Immobile returns true if the player is currently immobile.
+	// Immobile returns true if the processor is currently immobile.
 	Immobile() bool
-	// Flying returns true if the player is currently flying.
+	// Flying returns true if the processor is currently flying.
 	Flying() bool
-	// Dead returns true if the player is currently dead.
+	// Dead returns true if the processor is currently dead.
 	Dead() bool
-	// Clicking returns true if the player is clicking.
+	// Clicking returns true if the processor is clicking.
 	Clicking() bool
 
 	// Debug debugs the given parameters to the processor.

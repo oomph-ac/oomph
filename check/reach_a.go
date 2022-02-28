@@ -13,11 +13,11 @@ import (
 
 // ReachA checks if a player has an abnormal amount of reach.
 type ReachA struct {
-	basic
 	awaitingTick   bool
 	inputMode      uint32
-	attackPos      mgl64.Vec3
 	attackedEntity uint64
+	attackPos      mgl64.Vec3
+	basic
 }
 
 // NewReachA creates a new ReachA check.
@@ -41,22 +41,22 @@ func (*ReachA) MaxViolations() float64 {
 }
 
 // Process ...
-func (r *ReachA) Process(processor Processor, pk packet.Packet) {
+func (r *ReachA) Process(p Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
-			if processor.GameMode() == packet.GameTypeSurvival || processor.GameMode() == packet.GameTypeAdventure {
+			if p.GameMode() == packet.GameTypeSurvival || p.GameMode() == packet.GameTypeAdventure {
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = game.Vec32To64(data.Position)
-				if processor.Sneaking() {
+				if p.Sneaking() {
 					r.attackPos[1] -= 0.08
 				}
-				if t, ok := processor.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
+				if t, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
 					if r.inputMode == packet.InputModeTouch {
 						dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
 						if dist > 3.15 {
 							if r.Buff(1, 10) >= 5 {
-								processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
+								p.Flag(r, r.updateAndGetViolationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
 									"Distance": game.Round(dist, 4),
 									"Type":     "Raw",
 								})
@@ -74,8 +74,8 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 	case *packet.PlayerAuthInput:
 		r.inputMode = pk.InputMode
 		if r.awaitingTick {
-			if t, ok := processor.SearchEntity(r.attackedEntity); ok && t.Player() {
-				e := processor.Entity()
+			if t, ok := p.SearchEntity(r.attackedEntity); ok && t.Player() {
+				e := p.Entity()
 				rot := e.Rotation()
 				dv := game.DirectionVector(rot.Z(), rot.X())
 
@@ -87,7 +87,7 @@ func (r *ReachA) Process(processor Processor, pk packet.Packet) {
 						dist := world.Distance(ray.Position(), r.attackPos)
 						if dist >= 3.1 && math.Abs(dist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
 							if r.Buff(1, 10) >= 3 {
-								processor.Flag(r, r.updateAndGetViolationAfterTicks(processor.ClientTick(), 600), map[string]interface{}{
+								p.Flag(r, r.updateAndGetViolationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
 									"Distance": game.Round(dist, 2),
 									"Type":     "Raycast",
 								})

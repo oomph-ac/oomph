@@ -32,13 +32,13 @@ func (*AutoClickerC) MaxViolations() float64 {
 }
 
 // Process ...
-func (a *AutoClickerC) Process(processor Processor, _ packet.Packet) {
-	if processor.Clicking() {
-		a.samples = append(a.samples, float64(processor.ClickDelay()))
+func (a *AutoClickerC) Process(p Processor, _ packet.Packet) {
+	if p.Clicking() {
+		a.samples = append(a.samples, float64(p.ClickDelay()))
 		if len(a.samples) == 20 {
-			cps := processor.CPS()
+			cps := p.CPS()
 			deviation, skewness := game.StandardDeviation(a.samples), game.Skewness(a.samples)
-			processor.Debug(a, map[string]interface{}{
+			p.Debug(a, map[string]interface{}{
 				"Deviation": game.Round(deviation, 3),
 				"Skewness":  game.Round(skewness, 3),
 				"CPS":       cps,
@@ -49,7 +49,7 @@ func (a *AutoClickerC) Process(processor Processor, _ packet.Packet) {
 					e = 1.0
 				}
 				if a.Buff(1) >= e {
-					processor.Flag(a, a.updateAndGetViolationAfterTicks(processor.ClientTick(), 400), map[string]interface{}{
+					p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
 						"Deviation": game.Round(deviation, 3),
 						"Skewness":  game.Round(skewness, 3),
 						"CPS":       cps,

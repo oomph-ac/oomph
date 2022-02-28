@@ -3,6 +3,7 @@ package player
 import (
 	"fmt"
 	"github.com/df-mc/dragonfly/server/entity/effect"
+	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
@@ -62,7 +63,8 @@ type Player struct {
 	speed                   float64
 	ySize                   float64
 
-	motion, serverSentMotion      mgl64.Vec3
+	motion                        mgl64.Vec3
+	serverSentMotion              mgl32.Vec3
 	serverPredictedMotion         mgl64.Vec3
 	previousServerPredictedMotion mgl64.Vec3
 
@@ -140,9 +142,13 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 
 			check.NewAutoClickerA(),
 			check.NewAutoClickerB(),
+
+			//TODO: Reintegrate these after settings/the panel.
 			//check.NewAutoClickerC(),
 			//check.NewAutoClickerD(),
 
+			check.NewInvalidMovementA(),
+			check.NewInvalidMovementB(),
 			check.NewInvalidMovementC(),
 
 			check.NewKillAuraA(),
@@ -153,6 +159,9 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 			check.NewReachA(),
 
 			check.NewTimerA(),
+
+			check.NewVelocityA(),
+			check.NewVelocityB(),
 		},
 	}
 	p.l = world.NewLoader(conn.ChunkRadius(), w, p)
@@ -216,6 +225,11 @@ func (p *Player) Position() mgl64.Vec3 {
 // Rotation returns the rotation of the player.
 func (p *Player) Rotation() mgl64.Vec3 {
 	return p.Entity().Rotation()
+}
+
+// AABB returns the axis-aligned bounding box of the player.
+func (p *Player) AABB() physics.AABB {
+	return p.Entity().AABB()
 }
 
 // World returns the world of the player.
@@ -295,6 +309,56 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 // Ready returns true if the player is ready/spawned in.
 func (p *Player) Ready() bool {
 	return p.ready
+}
+
+// ClimbableTicks returns the amount of climbable ticks the player has.
+func (p *Player) ClimbableTicks() uint32 {
+	return p.climbableTicks
+}
+
+// CobwebTicks returns the amount of cobweb ticks the player has.
+func (p *Player) CobwebTicks() uint32 {
+	return p.cobwebTicks
+}
+
+// LiquidTicks returns the amount of liquid ticks the player has.
+func (p *Player) LiquidTicks() uint32 {
+	return p.liquidTicks
+}
+
+// MotionTicks returns the amount of motion ticks the player has.
+func (p *Player) MotionTicks() uint32 {
+	return p.motionTicks
+}
+
+// CollidedVertically returns true if the player has collided vertically.
+func (p *Player) CollidedVertically() bool {
+	return p.collidedVertically
+}
+
+// CollidedHorizontally returns true if the player has collided horizontally.
+func (p *Player) CollidedHorizontally() bool {
+	return p.collidedHorizontally
+}
+
+// Motion returns the motion of the player.
+func (p *Player) Motion() mgl64.Vec3 {
+	return p.motion
+}
+
+// ServerPredictedMotion returns the server-predicted motion of the player.
+func (p *Player) ServerPredictedMotion() mgl64.Vec3 {
+	return p.serverPredictedMotion
+}
+
+// PreviousServerPredictedMotion returns the previous server-predicted motion of the player.
+func (p *Player) PreviousServerPredictedMotion() mgl64.Vec3 {
+	return p.previousServerPredictedMotion
+}
+
+// SpawnTicks returns the amount of spawn ticks the player has.
+func (p *Player) SpawnTicks() uint32 {
+	return p.spawnTicks
 }
 
 // GameMode returns the current game mode of the player.
