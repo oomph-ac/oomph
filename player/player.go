@@ -179,10 +179,10 @@ func (p *Player) Conn() *minecraft.Conn {
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data := p.Entity()
 	data.Move(game.Vec32To64(pk.Position), true)
-	p.motion = data.Position().Sub(data.LastPosition())
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 	p.Loader().Move(p.Position())
+	p.motion = data.Position().Sub(data.LastPosition())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
