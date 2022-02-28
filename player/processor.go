@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block/cube"
@@ -59,7 +58,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 		p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
 		p.moveForward = float64(pk.MoveVector.Y() * 0.98)
-		fmt.Println(p.moveForward, p.moveStrafe)
 
 		if p.Sprinting() {
 			p.speed *= 1.3
