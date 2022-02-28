@@ -9,7 +9,7 @@ import (
 // tickNearbyBlocks is called once every client tick to update block ticks.
 func (p *Player) tickNearbyBlocks() {
 	var liquids, climbables uint32
-	for _, v := range utils.BlocksNearby(p.Position(), p.Entity().AABB().Grow(0.2), p.World()) {
+	for _, v := range utils.BlocksNearby(p.Position(), p.AABB().Grow(0.2), p.World()) {
 		// TODO: Also check for vines and cobwebs when added in DF.
 		switch v.(type) {
 		case world.Liquid:
@@ -20,6 +20,7 @@ func (p *Player) tickNearbyBlocks() {
 	}
 
 	p.spawnTicks++
+	p.cobwebTicks++
 	p.liquidTicks++
 	p.motionTicks++
 	p.climbableTicks++

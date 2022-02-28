@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"math"
@@ -35,6 +36,7 @@ func (*VelocityA) MaxViolations() float64 {
 func (v *VelocityA) Process(p Processor, pk packet.Packet) {
 	switch pk.(type) {
 	case *packet.PlayerAuthInput:
+		fmt.Println(p.MotionTicks(), p.ClimbableTicks(), p.CobwebTicks(), p.LiquidTicks(), p.Teleporting(), p.CollidedHorizontally(), p.PreviousServerPredictedMotion().Y())
 		if p.MotionTicks() == 1 && p.ClimbableTicks() >= 10 && p.CobwebTicks() >= 10 && p.LiquidTicks() >= 10 &&
 			!p.Teleporting() && !p.CollidedVertically() && p.PreviousServerPredictedMotion().Y() >= 0.005 {
 
