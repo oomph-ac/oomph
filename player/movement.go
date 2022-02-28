@@ -136,8 +136,6 @@ func (p *Player) moveWithHeading() {
 		z = 0
 	}
 
-	// 0.98000001907349 * -0.08
-
 	p.serverPredictedMotion = mgl64.Vec3{
 		x * var1,
 		(y - p.gravity) * game.GravityMultiplier,
