@@ -3,6 +3,7 @@ package player
 import (
 	"context"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"net"
@@ -70,5 +71,6 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 
 // StartGameContext starts the game for the conn with a context to cancel it.
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
+	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	return p.conn.StartGameContext(ctx, data)
 }

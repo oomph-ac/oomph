@@ -2,6 +2,7 @@ package oomph
 
 import (
 	"errors"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"sync"
 
 	"github.com/df-mc/dragonfly/server/world"
@@ -67,10 +68,13 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		return
 	}
 
+	data := serverConn.GameData()
+	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
+
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
-		if err := conn.StartGame(serverConn.GameData()); err != nil {
+		if err := conn.StartGame(data); err != nil {
 			return
 		}
 		g.Done()
