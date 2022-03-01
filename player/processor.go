@@ -43,10 +43,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
 			p.sneaking = !p.sneaking
 		}
+		p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 
 		pos := p.Position()
-
-		p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 		p.inVoid = pos.Y() <= game.VoidLevel
 		p.teleporting = false
 
