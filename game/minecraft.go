@@ -7,7 +7,7 @@ var sinTable []float64
 
 // init initializes the sinTable.
 func init() {
-	for i := float64(0); i < 65536; i++ {
+	for i := 0.0; i < 65536; i++ {
 		sinTable = append(sinTable, math.Sin(i*math.Pi*2/65536))
 	}
 }
