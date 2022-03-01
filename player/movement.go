@@ -23,9 +23,9 @@ func (p *Player) tickMovement() {
 			(p.motion.Y() - p.gravity) * game.GravityMultiplier,
 			p.motion.Z() * (0.6 * 0.91),
 		}
-		return
+	} else {
+		p.moveWithHeading()
 	}
-	p.moveWithHeading()
 }
 
 // moveWithHeading moves the player with the current heading.
@@ -51,6 +51,8 @@ func (p *Player) moveWithHeading() {
 	groundFriction := 0.546
 	if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok && p.onGround {
 		groundFriction = 0.91 * b.Friction()
+	} else if !p.onGround {
+		groundFriction = 0.91
 	}
 
 	moveFriction := 0.02
@@ -118,16 +120,11 @@ func (p *Player) moveWithHeading() {
 	}
 	p.serverPredictedMotion[1] = (p.serverPredictedMotion[1] - p.gravity) * game.GravityMultiplier
 
-	if p.onGround {
-		p.serverPredictedMotion[0] *= groundFriction
-		p.serverPredictedMotion[2] *= groundFriction
-	} else {
-		p.serverPredictedMotion[0] *= 0.91
-		p.serverPredictedMotion[2] *= 0.91
-	}
+	p.serverPredictedMotion[0] *= groundFriction
 	if cX {
 		p.serverPredictedMotion[0] = 0
 	}
+	p.serverPredictedMotion[2] *= groundFriction
 	if cZ {
 		p.serverPredictedMotion[2] = 0
 	}

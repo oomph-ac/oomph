@@ -14,9 +14,14 @@ func Round(val float64, precision int) float64 {
 	return value
 }
 
-// Vec32To64 converts a 32 bit vector to a 64 bit one.
+// Vec32To64 converts a 32-bit vector to a 64-bit one.
 func Vec32To64(vec3 mgl32.Vec3) mgl64.Vec3 {
 	return mgl64.Vec3{float64(vec3[0]), float64(vec3[1]), float64(vec3[2])}
+}
+
+// Vec64To32 converts a 64-bit vector to a 32-bit one.
+func Vec64To32(vec3 mgl64.Vec3) mgl32.Vec3 {
+	return mgl32.Vec3{float32(vec3[0]), float32(vec3[1]), float32(vec3[2])}
 }
 
 // DirectionVector returns a direction vector from the given yaw and pitch values.
