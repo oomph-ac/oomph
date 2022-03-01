@@ -1,8 +1,9 @@
 package player
 
 import (
-	"github.com/df-mc/dragonfly/server/block"
 	"math"
+
+	"github.com/df-mc/dragonfly/server/block"
 
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
@@ -54,10 +55,12 @@ func (p *Player) moveWithHeading() {
 
 	moveFriction := 0.02
 	if p.onGround {
-		moveFriction = math.Pow(0.546/groundFriction, 3)
+		moveFriction = math.Pow(0.546/groundFriction, 3) * p.speed
+	} else if p.sprinting {
+		moveFriction = 0.026
 	}
 
-	p.moveFlying(p.speed * moveFriction)
+	p.moveFlying(moveFriction)
 
 	climbable := utils.BlockClimbable(w.Block(cube.PosFromVec3(e.LastPosition())))
 	if climbable {
@@ -115,11 +118,16 @@ func (p *Player) moveWithHeading() {
 	}
 	p.serverPredictedMotion[1] = (p.serverPredictedMotion[1] - p.gravity) * game.GravityMultiplier
 
-	p.serverPredictedMotion[0] *= groundFriction
+	if p.onGround {
+		p.serverPredictedMotion[0] *= groundFriction
+		p.serverPredictedMotion[2] *= groundFriction
+	} else {
+		p.serverPredictedMotion[0] *= 0.91
+		p.serverPredictedMotion[2] *= 0.91
+	}
 	if cX {
 		p.serverPredictedMotion[0] = 0
 	}
-	p.serverPredictedMotion[2] *= groundFriction
 	if cZ {
 		p.serverPredictedMotion[2] = 0
 	}
