@@ -59,23 +59,20 @@ func (p *Player) moveWithHeading() {
 
 	p.moveFlying(p.speed * moveFriction)
 
-	if utils.BlockClimbable(w.Block(cube.PosFromVec3(e.LastPosition()))) {
-		yMotion := p.serverPredictedMotion.Y()
-		if yMotion < -0.2 {
-			yMotion = -0.2
+	climbable := utils.BlockClimbable(w.Block(cube.PosFromVec3(e.LastPosition())))
+	if climbable {
+		p.serverPredictedMotion[0] = game.ClampFloat(p.serverPredictedMotion.X(), -0.2, 0.2)
+		p.serverPredictedMotion[2] = game.ClampFloat(p.serverPredictedMotion.Z(), -0.2, 0.2)
+		if p.serverPredictedMotion[1] < -0.2 {
+			p.serverPredictedMotion[1] = -0.2
 		}
-		if p.sneaking && yMotion < 0 {
-			yMotion = 0
-		}
-		p.serverPredictedMotion = mgl64.Vec3{
-			game.ClampFloat(p.serverPredictedMotion.X(), -0.2, 0.2),
-			yMotion,
-			game.ClampFloat(p.serverPredictedMotion.Z(), -0.2, 0.2),
+		if p.sneaking && p.serverPredictedMotion[1] < 0 {
+			p.serverPredictedMotion[1] = 0
 		}
 	}
 
 	cx, cz := p.move()
-	if utils.BlockClimbable(w.Block(cube.PosFromVec3(e.LastPosition()))) && p.collidedHorizontally {
+	if climbable && p.collidedHorizontally {
 		p.serverPredictedMotion[1] = 0.2
 	}
 	p.previousServerPredictedMotion = p.serverPredictedMotion
@@ -92,7 +89,7 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	if hasStair && p.serverPredictedMotion.Y() >= 0 && p.serverPredictedMotion.Y() < 0.6 && p.motion.Y() > -1e-6 && p.motion.Y() < 1 {
+	if hasStair && p.serverPredictedMotion[1] >= 0 && p.serverPredictedMotion[1] < 0.6 && p.motion[1] > -1e-6 && p.motion[1] < 1 {
 		p.onGround = true
 		p.previousServerPredictedMotion = p.motion
 		p.serverPredictedMotion = p.motion
@@ -113,7 +110,7 @@ func (p *Player) moveWithHeading() {
 		p.serverPredictedMotion[1] = yMotion
 	}
 
-	x, y, z := p.serverPredictedMotion.X(), p.serverPredictedMotion.Y(), p.serverPredictedMotion.Z()
+	x, y, z := p.serverPredictedMotion[0], p.serverPredictedMotion[1], p.serverPredictedMotion[2]
 	if cx {
 		x = 0
 	}
