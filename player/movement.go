@@ -29,9 +29,7 @@ func (p *Player) tickMovement() {
 
 // moveWithHeading moves the player with the current heading.
 func (p *Player) moveWithHeading() {
-	w := p.World()
-	e := p.Entity()
-
+	w, e := p.World(), p.Entity()
 	if p.motionTicks == 0 {
 		p.serverPredictedMotion = game.Vec32To64(p.serverSentMotion)
 		if p.jumping {
@@ -49,23 +47,19 @@ func (p *Player) moveWithHeading() {
 		p.jump()
 	}
 
-	var1, var3 := 0.546, 0.02
+	groundFriction := 0.546
 	if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok && p.onGround {
-		var1 = 0.91 * b.Friction()
-	}
-	if p.sprinting {
-		var3 = 0.026
+		groundFriction = 0.91 * b.Friction()
 	}
 
-	var2 := math.Pow(0.546/var1, 3)
+	moveFriction := 0.02
 	if p.onGround {
-		var3 = p.speed * var2
+		moveFriction = math.Pow(0.546/groundFriction, 3)
 	}
 
-	p.moveFlying(var3)
+	p.moveFlying(p.speed * moveFriction)
 
 	if utils.BlockClimbable(w.Block(cube.PosFromVec3(e.LastPosition()))) {
-		f6 := 0.2
 		yMotion := p.serverPredictedMotion.Y()
 		if yMotion < -0.2 {
 			yMotion = -0.2
@@ -74,9 +68,9 @@ func (p *Player) moveWithHeading() {
 			yMotion = 0
 		}
 		p.serverPredictedMotion = mgl64.Vec3{
-			game.ClampFloat(p.serverPredictedMotion.X(), -f6, f6),
+			game.ClampFloat(p.serverPredictedMotion.X(), -0.2, 0.2),
 			yMotion,
-			game.ClampFloat(p.serverPredictedMotion.Z(), -f6, f6),
+			game.ClampFloat(p.serverPredictedMotion.Z(), -0.2, 0.2),
 		}
 	}
 
@@ -131,9 +125,9 @@ func (p *Player) moveWithHeading() {
 	}
 
 	p.serverPredictedMotion = mgl64.Vec3{
-		x * var1,
+		x * groundFriction,
 		(y - p.gravity) * game.GravityMultiplier,
-		z * var1,
+		z * groundFriction,
 	}
 }
 
