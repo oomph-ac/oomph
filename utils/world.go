@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/block/model"
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/world"
 	"math"
@@ -19,7 +20,7 @@ func BlockClimbable(b world.Block) bool {
 }
 
 // BlocksNearby returns a slice of blocks that are nearby the search position.
-func BlocksNearby(aabb physics.AABB, w *world.World) []world.Block {
+func BlocksNearby(aabb physics.AABB, w *world.World, solid bool) []world.Block {
 	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := min[0], min[1], min[2]
@@ -29,7 +30,12 @@ func BlocksNearby(aabb physics.AABB, w *world.World) []world.Block {
 	for y := minY; y < maxY; y++ {
 		for x := minX; x < maxX; x++ {
 			for z := minZ; z < maxZ; z++ {
-				blocks = append(blocks, w.Block(cube.Pos{int(x), int(y), int(z)}))
+				b := w.Block(cube.Pos{int(x), int(y), int(z)})
+				if _, ok := b.Model().(model.Solid); !ok && solid {
+					// The block isn't solid, move along and check the next one.
+					continue
+				}
+				blocks = append(blocks, b)
 			}
 		}
 	}

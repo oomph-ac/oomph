@@ -82,7 +82,7 @@ func (p *Player) moveWithHeading() {
 	// In Minecraft bedrock, it seems that the player clips into the stairs, making the minecraft java
 	// movement code obsolete for this case.
 	var hasStair bool
-	for _, b := range utils.BlocksNearby(e.AABB().Translate(p.Position()).Grow(0.2), w) {
+	for _, b := range utils.BlocksNearby(e.AABB().Translate(p.Position()).Grow(0.2), w, false) {
 		if _, ok := b.Model().(model.Stair); ok {
 			hasStair = true
 			break
@@ -163,7 +163,7 @@ func (p *Player) move() (bool, bool) {
 
 	if p.onGround && p.sneaking {
 		mov := 0.05
-		for ; dx != 0.0 && len(utils.BlocksNearby(aabb.Translate(mgl64.Vec3{dx, -1, 0}), w)) == 0; movX = dx {
+		for ; dx != 0.0 && len(utils.BlocksNearby(aabb.Translate(mgl64.Vec3{dx, -1, 0}), w, true)) == 0; movX = dx {
 			if dx < mov && dx >= -mov {
 				dx = 0
 			} else if dx > 0 {
@@ -172,7 +172,7 @@ func (p *Player) move() (bool, bool) {
 				dx += mov
 			}
 		}
-		for ; dz != 0.0 && len(utils.BlocksNearby(aabb.Translate(mgl64.Vec3{0, -1, dz}), w)) == 0; movZ = dz {
+		for ; dz != 0.0 && len(utils.BlocksNearby(aabb.Translate(mgl64.Vec3{0, -1, dz}), w, true)) == 0; movZ = dz {
 			if dz < mov && dz >= -mov {
 				dz = 0
 			} else if dz > 0 {
