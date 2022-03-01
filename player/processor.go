@@ -75,6 +75,30 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
+		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
+			if t.HeldItem.Stack.Count < 0 {
+				// No item, so do nothing.
+				return false
+			}
+
+			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
+			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
+			if !ok {
+				// Block somehow doesn't exist, so do nothing.
+				return false
+			}
+
+			w := p.World()
+			boxes := block.Model().AABB(pos, w)
+			for _, box := range boxes {
+				if box.IntersectsWith(p.AABB()) {
+					// Intersects with our AABB, so do nothing.
+					return false
+				}
+			}
+
+			// Tada.
+			w.SetBlock(pos, block)
 		}
 	case *packet.AdventureSettings:
 		p.flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
