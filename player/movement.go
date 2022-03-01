@@ -251,6 +251,6 @@ func (p *Player) jump() {
 	if p.Sprinting() {
 		f := p.Rotation().Z() * 0.017453292
 		p.serverPredictedMotion[0] -= game.MCSin(f) * 0.2
-		p.serverPredictedMotion[2] -= game.MCCos(f) * 0.2
+		p.serverPredictedMotion[2] += game.MCCos(f) * 0.2
 	}
 }
