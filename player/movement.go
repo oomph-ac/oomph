@@ -190,6 +190,9 @@ func (p *Player) move() (bool, bool) {
 		dy = aabb.CalculateYOffset(b, dy)
 	}
 	aabb = aabb.Translate(mgl64.Vec3{0, dy, 0})
+
+	notFalling := p.onGround || (movY != dy && movY < 0)
+
 	for _, b := range list {
 		dx = aabb.CalculateXOffset(b, dx)
 	}
@@ -199,7 +202,7 @@ func (p *Player) move() (bool, bool) {
 	}
 	aabb = aabb.Translate(mgl64.Vec3{0, 0, dz})
 
-	if (p.onGround || (movY != dy && movY < 0)) && (movX != dx || movZ != dz) {
+	if notFalling && (movX != dx || movZ != dz) {
 		cx, cz := dx, dz
 		cy := dy
 		dx, dy, dz = movX, game.StepHeight, movZ
