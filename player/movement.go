@@ -1,9 +1,9 @@
 package player
 
 import (
+	"github.com/df-mc/dragonfly/server/block"
 	"math"
 
-	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
 	"github.com/go-gl/mathgl/mgl64"
@@ -45,22 +45,16 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	var1 := 0.91
-	var var3 float64
-	if p.onGround {
-		if p.jumping {
-			p.jump()
-		}
-		if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok {
-			var1 *= b.Friction()
-		} else {
-			var1 *= 0.6
-		}
-	} else {
-		var3 = 0.02
-		if p.sprinting {
-			var3 = 0.026
-		}
+	if p.onGround && p.jumping {
+		p.jump()
+	}
+
+	var1, var3 := 0.546, 0.02
+	if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok && p.onGround {
+		var1 = 0.91 * b.Friction()
+	}
+	if p.sprinting {
+		var3 = 0.026
 	}
 
 	var2 := math.Pow(0.546/var1, 3)
@@ -92,10 +86,10 @@ func (p *Player) moveWithHeading() {
 	}
 	p.previousServerPredictedMotion = p.serverPredictedMotion
 
-	//  TODO: Find a method that completes full compensation for stairs.
-	//  These 7 lines are bad hacks to compensate for an improper and incomplete stair prediction.
-	//  In Minecraft bedrock, it seems that the player clips into the stairs, making the minecraft java
-	//  movement code obsolete for this case.
+	// TODO: Find a method that completes full compensation for stairs.
+	// These 7 lines are bad hacks to compensate for an improper and incomplete stair prediction.
+	// In Minecraft bedrock, it seems that the player clips into the stairs, making the minecraft java
+	// movement code obsolete for this case.
 	var hasStair bool
 	for _, b := range utils.BlocksNearby(e.AABB().Translate(p.Position()).Grow(0.2), w) {
 		if _, ok := b.Model().(model.Stair); ok {
@@ -167,11 +161,11 @@ func (p *Player) move() (bool, bool) {
 	dx, dy, dz := p.serverPredictedMotion.X(), p.serverPredictedMotion.Y(), p.serverPredictedMotion.Z()
 	movX, movY, movZ := dx, dy, dz
 
-	// TODO: Prediction with collision on cobweb
+	// TODO: Prediction with cobweb collisions.
 
 	w := p.World()
 	aabb := p.AABB().Translate(p.Entity().LastPosition())
-	oldClone := aabb
+	clone := aabb
 
 	if p.onGround && p.sneaking {
 		mov := 0.05
@@ -195,8 +189,7 @@ func (p *Player) move() (bool, bool) {
 		}
 	}
 
-	clone := aabb
-	list := utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), w)
+	list := utils.CollidingBlocks(aabb.Extend(mgl64.Vec3{dx, dy, dz}), w)
 	for _, b := range list {
 		dy = aabb.CalculateYOffset(b, dy)
 	}
@@ -215,26 +208,25 @@ func (p *Player) move() (bool, bool) {
 		cy := dy
 		dx, dy, dz = movX, game.StepHeight, movZ
 
-		aabb = oldClone
-		list = utils.CollidingBlocks(aabb.Extend(mgl64.Vec3{dx, dy, dz}), w)
+		list = utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), w)
 		for _, b := range list {
-			dy = aabb.CalculateYOffset(b, dy)
+			dy = clone.CalculateYOffset(b, dy)
 		}
-		aabb = aabb.Translate(mgl64.Vec3{0, dy, 0})
+		clone = clone.Translate(mgl64.Vec3{0, dy, 0})
 		for _, b := range list {
-			dx = aabb.CalculateXOffset(b, dx)
+			dx = clone.CalculateXOffset(b, dx)
 		}
-		aabb = aabb.Translate(mgl64.Vec3{dx, 0, 0})
+		clone = clone.Translate(mgl64.Vec3{dx, 0, 0})
 		for _, b := range list {
-			dz = aabb.CalculateZOffset(b, dz)
+			dz = clone.CalculateZOffset(b, dz)
 		}
-		aabb = aabb.Translate(mgl64.Vec3{0, 0, dz})
+		clone = clone.Translate(mgl64.Vec3{0, 0, dz})
 
 		reverseDY := -dy
 		for _, b := range list {
-			reverseDY = aabb.CalculateYOffset(b, reverseDY)
+			reverseDY = clone.CalculateYOffset(b, reverseDY)
 		}
-		aabb = aabb.Translate(mgl64.Vec3{0, reverseDY, 0})
+		clone = clone.Translate(mgl64.Vec3{0, reverseDY, 0})
 
 		dy = 0
 		if (math.Pow(cx, 2) + math.Pow(cz, 2)) >= (math.Pow(dx, 2) + math.Pow(dz, 2)) {
