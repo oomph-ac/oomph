@@ -59,7 +59,7 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) {
 		t.balance += int64(timeDiff) - 1
 		if t.balance == -5 {
 			p.Flag(t, 1, map[string]interface{}{
-				"Timer": game.Round(t.clientTPS/float64(20), 4)},
+				"Timer": game.Round(t.clientTPS/20.0, 4)},
 			)
 			t.balance = 0
 		}
