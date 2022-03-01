@@ -104,7 +104,7 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	if p.ySize > 1e-5 || hasStair && p.serverPredictedMotion.Y() >= 0 && p.serverPredictedMotion.Y() < 0.6 && p.motion.Y() > -1e-6 && p.motion.Y() < 1 {
+	if hasStair && p.serverPredictedMotion.Y() >= 0 && p.serverPredictedMotion.Y() < 0.6 && p.motion.Y() > -1e-6 && p.motion.Y() < 1 {
 		p.onGround = true
 		p.previousServerPredictedMotion = p.motion
 		p.serverPredictedMotion = p.motion
@@ -168,7 +168,6 @@ func (p *Player) move() (bool, bool) {
 	movX, movY, movZ := dx, dy, dz
 
 	// TODO: Prediction with collision on cobweb
-	p.ySize *= 0.4
 
 	w := p.World()
 	aabb := p.AABB().Translate(p.Entity().LastPosition())

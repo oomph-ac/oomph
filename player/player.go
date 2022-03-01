@@ -62,7 +62,6 @@ type Player struct {
 	jumpVelocity            float64
 	gravity                 float64
 	speed                   float64
-	ySize                   float64
 
 	motion                        mgl64.Vec3
 	serverSentMotion              mgl32.Vec3
