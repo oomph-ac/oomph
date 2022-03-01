@@ -34,13 +34,6 @@ func (*KillAuraA) MaxViolations() float64 {
 // Process ...
 func (k *KillAuraA) Process(p Processor, pk packet.Packet) {
 	switch pk := pk.(type) {
-	case *packet.Animate:
-		if pk.ActionType == packet.AnimateActionSwingArm {
-			k.lastSwingTick = p.ClientTick()
-			p.Debug(k, map[string]interface{}{
-				"Last Swing Client Tick": k.lastSwingTick,
-			})
-		}
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			currentTick := p.ClientTick()
