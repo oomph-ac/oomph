@@ -71,7 +71,7 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	cx, cz := p.move()
+	cX, cZ := p.move()
 	if climbable && p.collidedHorizontally {
 		p.serverPredictedMotion[1] = 0.2
 	}
@@ -110,21 +110,18 @@ func (p *Player) moveWithHeading() {
 		p.serverPredictedMotion[1] = yMotion
 	}
 
-	x, y, z := p.serverPredictedMotion[0], p.serverPredictedMotion[1], p.serverPredictedMotion[2]
-	if cx {
-		x = 0
-	}
 	if p.collidedVertically {
-		y = 0
+		p.serverPredictedMotion[1] = 0
 	}
-	if cz {
-		z = 0
-	}
+	p.serverPredictedMotion[1] = (p.serverPredictedMotion[1] - p.gravity) * game.GravityMultiplier
 
-	p.serverPredictedMotion = mgl64.Vec3{
-		x * groundFriction,
-		(y - p.gravity) * game.GravityMultiplier,
-		z * groundFriction,
+	p.serverPredictedMotion[0] *= groundFriction
+	if cX {
+		p.serverPredictedMotion[0] = 0
+	}
+	p.serverPredictedMotion[2] *= groundFriction
+	if cZ {
+		p.serverPredictedMotion[2] = 0
 	}
 }
 
