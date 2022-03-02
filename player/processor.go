@@ -75,10 +75,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
-			if t.HeldItem.Stack.Count < 0 {
+			/* if t.HeldItem.Stack.Count < 0 {
 				// No item, so do nothing.
 				return false
-			}
+			} TAL ITS AN UNSIGNED INTEGER UR SKID CONFIRMED 2022 IM GOING TO GOPHER DISCORD TO REPORT */
 
 			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
 			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
@@ -90,7 +90,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			w := p.World()
 			boxes := block.Model().AABB(pos, w)
 			for _, box := range boxes {
-				if box.IntersectsWith(p.AABB()) {
+				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
 					// Intersects with our AABB, so do nothing.
 					return false
 				}

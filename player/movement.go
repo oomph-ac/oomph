@@ -44,8 +44,8 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	if p.onGround && p.jumping {
-		p.jump()
+	if p.jumping {
+		p.jump() // TODO: In another check, use a threshold to determine if the player is always jumping on air.
 	}
 
 	groundFriction := 0.546
@@ -164,7 +164,11 @@ func (p *Player) move() (bool, bool) {
 	// TODO: Prediction with cobweb collisions.
 
 	w := p.World()
-	aabb := p.AABB().Translate(p.Entity().LastPosition()).Grow(-1e-4)
+	aabb := p.AABB().Translate(p.Entity().LastPosition()).GrowVec3(mgl64.Vec3{
+		-1e-4,
+		0,
+		-1e-4,
+	})
 	clone := aabb
 
 	if p.onGround && p.sneaking {

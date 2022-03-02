@@ -1,10 +1,11 @@
 package check
 
 import (
+	"math"
+
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // InvalidMovementB checks if the user's vertical movement is close to the predicted movement.
@@ -42,8 +43,10 @@ func (i *InvalidMovementB) Process(p Processor, pk packet.Packet) {
 		if diff > 0.01 && lastDiff > 0.01 && !p.Teleporting() && p.LiquidTicks() >= 10 && p.CobwebTicks() >= 10 {
 			if i.Buff(1, 15) >= 10 {
 				p.Flag(i, i.updateAndGetViolationAfterTicks(p.ClientTick(), 5), map[string]interface{}{
-					"Previous Y": game.Round(p.PreviousServerPredictedMotion().Y(), 5),
-					"Motion Y":   game.Round(p.Motion().Y(), 5),
+					"Y Prediction": game.Round(p.PreviousServerPredictedMotion().Y(), 5),
+					"Y Movement":   game.Round(p.Motion().Y(), 5),
+					"Current Diff": game.Round(diff, 5),
+					"Last Diff":    game.Round(lastDiff, 5),
 				})
 			}
 		} else {
