@@ -51,8 +51,6 @@ func (p *Player) moveWithHeading() {
 	groundFriction := 0.546
 	if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok && p.onGround {
 		groundFriction = 0.91 * b.Friction()
-	} else if !p.onGround {
-		groundFriction = 0.91
 	}
 
 	moveFriction := 0.02
@@ -120,11 +118,17 @@ func (p *Player) moveWithHeading() {
 	}
 	p.serverPredictedMotion[1] = (p.serverPredictedMotion[1] - p.gravity) * game.GravityMultiplier
 
-	p.serverPredictedMotion[0] *= groundFriction
+	if p.onGround {
+		p.serverPredictedMotion[0] *= groundFriction
+		p.serverPredictedMotion[2] *= groundFriction
+	} else {
+		p.serverPredictedMotion[0] *= 0.91
+		p.serverPredictedMotion[2] *= 0.91
+	}
+
 	if cX {
 		p.serverPredictedMotion[0] = 0
 	}
-	p.serverPredictedMotion[2] *= groundFriction
 	if cZ {
 		p.serverPredictedMotion[2] = 0
 	}
@@ -160,7 +164,7 @@ func (p *Player) move() (bool, bool) {
 	// TODO: Prediction with cobweb collisions.
 
 	w := p.World()
-	aabb := p.AABB().Translate(p.Entity().LastPosition())
+	aabb := p.AABB().Translate(p.Entity().LastPosition()).Grow(-1e-4)
 	clone := aabb
 
 	if p.onGround && p.sneaking {
@@ -185,7 +189,8 @@ func (p *Player) move() (bool, bool) {
 		}
 	}
 
-	list := utils.CollidingBlocks(aabb.Extend(mgl64.Vec3{dx, dy, dz}), w)
+	clone2 := aabb
+	list := utils.CollidingBlocks(clone2.Extend(mgl64.Vec3{dx, dy, dz}), w)
 	for _, b := range list {
 		dy = aabb.CalculateYOffset(b, dy)
 	}
@@ -207,7 +212,8 @@ func (p *Player) move() (bool, bool) {
 		cy := dy
 		dx, dy, dz = movX, game.StepHeight, movZ
 
-		list = utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), w)
+		clone3 := clone
+		list = utils.CollidingBlocks(clone3.Extend(mgl64.Vec3{dx, dy, dz}), w)
 		for _, b := range list {
 			dy = clone.CalculateYOffset(b, dy)
 		}
@@ -225,9 +231,8 @@ func (p *Player) move() (bool, bool) {
 		for _, b := range list {
 			reverseDY = clone.CalculateYOffset(b, reverseDY)
 		}
+		dy += reverseDY
 		clone = clone.Translate(mgl64.Vec3{0, reverseDY, 0})
-
-		dy = 0
 		if (math.Pow(cx, 2) + math.Pow(cz, 2)) >= (math.Pow(dx, 2) + math.Pow(dz, 2)) {
 			dx, dy, dz = cx, cy, cz
 		}
