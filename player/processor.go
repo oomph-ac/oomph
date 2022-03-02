@@ -90,7 +90,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			w := p.World()
 			boxes := block.Model().AABB(pos, w)
 			for _, box := range boxes {
-				if box.IntersectsWith(p.AABB()) {
+				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
 					// Intersects with our AABB, so do nothing.
 					return false
 				}
