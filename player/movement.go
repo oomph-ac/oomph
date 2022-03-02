@@ -199,14 +199,14 @@ func (p *Player) move() (bool, bool) {
 		dx = aabb.CalculateXOffset(b, dx)
 	}
 	aabb = aabb.Translate(mgl64.Vec3{dx, 0, 0})
+
 	for _, b := range list {
 		dz = aabb.CalculateZOffset(b, dz)
 	}
 	aabb = aabb.Translate(mgl64.Vec3{0, 0, dz})
 
 	if notFalling && (movX != dx || movZ != dz) {
-		cx, cz := dx, dz
-		cy := dy
+		cx, cy, cz := dx, dy, dz
 		dx, dy, dz = movX, game.StepHeight, movZ
 
 		list = utils.CollidingBlocks(clone.Extend(mgl64.Vec3{dx, dy, dz}), w)
@@ -237,7 +237,7 @@ func (p *Player) move() (bool, bool) {
 
 	p.collidedVertically = movY != dy
 	p.collidedHorizontally = movX != dx || movZ != dz
-	p.onGround = movY != dy && movY < 0
+	p.onGround = p.collidedVertically && movY < 0
 
 	p.serverPredictedMotion = mgl64.Vec3{dx, dy, dz}
 	return movX != dx, movZ != dz
