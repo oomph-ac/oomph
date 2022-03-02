@@ -48,11 +48,13 @@ func (p *Player) moveWithHeading() {
 		p.jump()
 	}
 
-	groundFriction := 0.546
-	if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok && p.onGround {
-		groundFriction = 0.91 * b.Friction()
-	} else if !p.onGround {
-		groundFriction = 0.91
+	groundFriction := 0.91
+	if p.onGround {
+		friction := 0.6
+		if b, ok := w.Block(cube.PosFromVec3(e.LastPosition()).Side(cube.FaceDown)).(block.Frictional); ok {
+			friction = b.Friction()
+		}
+		groundFriction *= friction
 	}
 
 	moveFriction := 0.02
