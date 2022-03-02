@@ -47,7 +47,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 		pos := p.Position()
 		p.inVoid = pos.Y() <= game.VoidLevel
-		p.teleporting = false
 
 		p.jumpVelocity = game.DefaultJumpMotion
 		p.speed = game.NormalMovementSpeed
@@ -66,6 +65,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.tickMovement()
 		p.tickNearbyBlocks()
 		p.tickEntityLocations()
+		p.teleporting = false
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
