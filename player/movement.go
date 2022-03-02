@@ -19,9 +19,9 @@ func (p *Player) tickMovement() {
 		p.collidedVertically = false
 		p.previousServerPredictedMotion = p.motion
 		p.serverPredictedMotion = mgl64.Vec3{
-			p.motion.X() * (0.6 * 0.91),
+			p.motion.X() * 0.546,
 			(p.motion.Y() - p.gravity) * game.GravityMultiplier,
-			p.motion.Z() * (0.6 * 0.91),
+			p.motion.Z() * 0.546,
 		}
 	} else {
 		p.moveWithHeading()

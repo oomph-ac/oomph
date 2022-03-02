@@ -37,6 +37,9 @@ func (i *InvalidMovementA) MaxViolations() float64 {
 func (i *InvalidMovementA) Process(p Processor, pk packet.Packet) {
 	switch pk.(type) {
 	case *packet.PlayerAuthInput:
+		if p.Motion().LenSqr() <= 1e-10 {
+			return
+		}
 		diffVec := game.AbsVec64(p.Motion().Sub(p.PreviousServerPredictedMotion()))
 		lastDiffVec := game.AbsVec64(p.Motion().Sub(i.lastPrediction))
 
