@@ -48,6 +48,10 @@ type Processor interface {
 
 	// CollidedVertically returns true if the processor has collided vertically.
 	CollidedVertically() bool
+	// OnGround returns true if the processor is collided with the ground.
+	OnGround() bool
+	// LastOnGround returns true if the processor was collided with the ground on the previous frame.
+	LastOnGround() bool
 	// CollidedHorizontally returns true if the processor has collided horizontally.
 	CollidedHorizontally() bool
 
