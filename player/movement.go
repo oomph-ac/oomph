@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -44,8 +45,10 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	if p.jumping {
-		p.jump() // TODO: In another check, use a threshold to determine if the player is always jumping on air.
+	if p.jumping && p.onGround {
+		p.jump()
+	} else if p.jumping {
+		fmt.Println("INVALID JUMP")
 	}
 
 	groundFriction := 0.546
@@ -74,6 +77,7 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
+	p.lastOnGround = p.onGround
 	cX, cZ := p.move()
 	if climbable && p.collidedHorizontally {
 		p.serverPredictedMotion[1] = 0.2
@@ -92,7 +96,7 @@ func (p *Player) moveWithHeading() {
 		}
 	}
 
-	if hasStair && p.serverPredictedMotion[1] >= 0 && p.serverPredictedMotion[1] < 0.6 && p.motion[1] > -1e-6 && p.motion[1] < 1 {
+	if p.stepLenience > 1e-5 && hasStair && p.serverPredictedMotion[1] >= 0 && p.serverPredictedMotion[1] < 0.6 && p.motion[1] > -1e-6 && p.motion[1] < 1 {
 		p.onGround = true
 		p.previousServerPredictedMotion = p.motion
 		p.serverPredictedMotion = p.motion
@@ -134,7 +138,7 @@ func (p *Player) moveWithHeading() {
 	}
 }
 
-// moveFlying moves the player in air.
+// moveFlying applies movement for the player with the given friction
 func (p *Player) moveFlying(friction float64) {
 	var1 := math.Pow(p.moveForward, 2) + math.Pow(p.moveStrafe, 2)
 	if var1 >= 1e-4 {
@@ -162,6 +166,7 @@ func (p *Player) move() (bool, bool) {
 	movX, movY, movZ := dx, dy, dz
 
 	// TODO: Prediction with cobweb collisions.
+	p.stepLenience *= 0.4
 
 	w := p.World()
 	aabb := p.AABB().Translate(p.Entity().LastPosition()).GrowVec3(mgl64.Vec3{
@@ -239,6 +244,8 @@ func (p *Player) move() (bool, bool) {
 		clone = clone.Translate(mgl64.Vec3{0, reverseDY, 0})
 		if (math.Pow(cx, 2) + math.Pow(cz, 2)) >= (math.Pow(dx, 2) + math.Pow(dz, 2)) {
 			dx, dy, dz = cx, cy, cz
+		} else {
+			p.stepLenience += dy
 		}
 	}
 
@@ -257,5 +264,8 @@ func (p *Player) jump() {
 		f := p.Rotation().Z() * 0.017453292
 		p.serverPredictedMotion[0] -= game.MCSin(f) * 0.2
 		p.serverPredictedMotion[2] += game.MCCos(f) * 0.2
+	}
+	if p.lastOnGround {
+		p.onGround = false
 	}
 }

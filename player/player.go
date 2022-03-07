@@ -62,6 +62,7 @@ type Player struct {
 	jumpVelocity            float64
 	gravity                 float64
 	speed                   float64
+	stepLenience            float64
 
 	motion                        mgl64.Vec3
 	serverSentMotion              mgl32.Vec3
@@ -76,6 +77,7 @@ type Player struct {
 	collidedHorizontally   bool
 	collidedVertically     bool
 	onGround               bool
+	lastOnGround           bool
 	inVoid                 bool
 
 	climbableTicks uint32
@@ -335,6 +337,14 @@ func (p *Player) MotionTicks() uint32 {
 // CollidedVertically returns true if the player has collided vertically.
 func (p *Player) CollidedVertically() bool {
 	return p.collidedVertically
+}
+
+func (p *Player) OnGround() bool {
+	return p.onGround
+}
+
+func (p *Player) LastOnGround() bool {
+	return p.lastOnGround
 }
 
 // CollidedHorizontally returns true if the player has collided horizontally.
