@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/go-gl/mathgl/mgl64"
@@ -43,6 +44,10 @@ func (i *InvalidMovementA) Process(p Processor, pk packet.Packet) {
 		}
 		diffVec := game.AbsVec64(p.Motion().Sub(p.PreviousServerPredictedMotion()))
 		lastDiffVec := game.AbsVec64(p.Motion().Sub(i.lastPrediction))
+
+		if math.Abs(p.Motion().X()) > 1e-5 || math.Abs(p.Motion().Z()) > 1e-5 {
+			fmt.Println(diffVec[0], diffVec[2], lastDiffVec[0], lastDiffVec[2])
+		}
 
 		max := 0.15
 		if p.CollidedHorizontally() {
