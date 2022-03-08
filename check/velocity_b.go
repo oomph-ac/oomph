@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-// VelocityB checks if a player is taking an abnormal amount of horizontal knock-back.
+// VelocityB checks if a player is taking an abnormal amount of horizontal knockback.
 type VelocityB struct {
 	basic
 }
@@ -23,7 +23,7 @@ func (*VelocityB) Name() (string, string) {
 
 // Description ...
 func (*VelocityB) Description() string {
-	return "This checks if a player is taking an abnormal amount of horizontal knock-back."
+	return "This checks if a player is taking an abnormal amount of horizontal knockback."
 }
 
 // MaxViolations ...
