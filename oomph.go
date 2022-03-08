@@ -2,8 +2,9 @@ package oomph
 
 import (
 	"errors"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"sync"
+
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/player"
@@ -29,7 +30,7 @@ func New(log *logrus.Logger, addr string) *Oomph {
 }
 
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
-// Addresses should be formatted in the following format: "ip:port", ex: "127.0.0.1:19132".
+// Addresses should be formatted in the following format: "ip:port" (ex: "127.0.0.1:19132").
 // If you're using dragonfly, use Listen instead of Start.
 func (o *Oomph) Start(remoteAddr string) error {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
