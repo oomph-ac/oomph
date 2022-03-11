@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -47,8 +46,6 @@ func (p *Player) moveWithHeading() {
 
 	if p.jumping && p.onGround {
 		p.jump()
-	} else if p.jumping {
-		fmt.Println("INVALID JUMP")
 	}
 
 	groundFriction := 0.546
