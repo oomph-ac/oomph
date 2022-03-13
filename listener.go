@@ -6,6 +6,7 @@ import (
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 )
 
@@ -19,6 +20,7 @@ type listener struct {
 func (o *Oomph) Listen(s *server.Server, name string) error {
 	l, err := minecraft.ListenConfig{
 		StatusProvider: minecraft.NewStatusProvider(name),
+		ResourcePacks:  utils.GetResourcePacks(),
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
