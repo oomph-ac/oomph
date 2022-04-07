@@ -35,36 +35,38 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		return false
 	case *packet.PlayerAuthInput:
 		p.clientTick++
-		p.Move(pk)
+		if p.ready {
+			p.Move(pk)
 
-		if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-			p.sprinting = !p.sprinting
-		} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-			p.sneaking = !p.sneaking
+			if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+				p.sprinting = !p.sprinting
+			} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+				p.sneaking = !p.sneaking
+			}
+			p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+
+			pos := p.Position()
+			p.inVoid = pos.Y() <= game.VoidLevel
+
+			p.jumpVelocity = game.DefaultJumpMotion
+			p.speed = game.NormalMovementSpeed
+			p.gravity = game.NormalGravity
+
+			p.tickEffects()
+
+			p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
+			p.moveForward = float64(pk.MoveVector.Y() * 0.98)
+
+			if p.Sprinting() {
+				p.speed *= 1.3
+			}
+			p.speed = math.Max(0, p.speed)
+
+			p.tickMovement()
+			p.tickNearbyBlocks()
+			p.tickEntityLocations()
+			p.teleporting = false
 		}
-		p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-
-		pos := p.Position()
-		p.inVoid = pos.Y() <= game.VoidLevel
-
-		p.jumpVelocity = game.DefaultJumpMotion
-		p.speed = game.NormalMovementSpeed
-		p.gravity = game.NormalGravity
-
-		p.tickEffects()
-
-		p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
-		p.moveForward = float64(pk.MoveVector.Y() * 0.98)
-
-		if p.Sprinting() {
-			p.speed *= 1.3
-		}
-		p.speed = math.Max(0, p.speed)
-
-		p.tickMovement()
-		p.tickNearbyBlocks()
-		p.tickEntityLocations()
-		p.teleporting = false
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
