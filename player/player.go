@@ -10,7 +10,6 @@ import (
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/check"
@@ -33,7 +32,6 @@ type Player struct {
 	wMu sync.Mutex
 	w   *world.World
 	l   *world.Loader
-	p   *provider
 
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
@@ -101,10 +99,6 @@ type Player struct {
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
 func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *minecraft.Conn) *Player {
-	w := world.New(nopLogger{}, dimension, &world.Settings{})
-	prov := &provider{chunks: make(map[world.ChunkPos]*chunk.Chunk)}
-	w.Provider(prov)
-
 	data := conn.GameData()
 	p := &Player{
 		log: log,
@@ -115,9 +109,7 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 		rid: data.EntityRuntimeID,
 		uid: data.EntityUniqueID,
 
-		w: w,
-		p: prov,
-
+		w: world.New(nil, dimension, &world.Settings{}),
 		h: NopHandler{},
 
 		acknowledgements: make(map[int64]func()),
@@ -164,7 +156,9 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 			check.NewVelocityB(),
 		},
 	}
-	p.l = world.NewLoader(conn.ChunkRadius(), w, p)
+	p.w.Generator(nil)
+	p.w.Provider(nil)
+	p.l = world.NewLoader(conn.ChunkRadius(), p.w, p)
 	go p.startTicking()
 	return p
 }
@@ -483,7 +477,6 @@ func (p *Player) Close() error {
 	if err := p.l.Close(); err != nil {
 		return err
 	}
-	p.p = nil
 	p.wMu.Unlock()
 
 	p.ackMu.Lock()
@@ -502,11 +495,6 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
-		if p.ready {
-			// We can expect missing chunks to happen at times, so just suppress the errors.
-			_ = p.l.Load(4)
-		}
-
 		p.flushEntityLocations()
 		p.serverTick++
 	}
