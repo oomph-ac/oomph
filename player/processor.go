@@ -178,15 +178,17 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
-			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-			c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.w.Range())
-			if err != nil {
-				p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
-				return
-			}
+			go func() {
+				a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+				c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.World().Range())
+				if err != nil {
+					p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
+					return
+				}
 
-			world_setChunk(p.w, world.ChunkPos(pk.Position), c, nil)
-			p.ready = true
+				world_setChunk(p.World(), world.ChunkPos(pk.Position), c, nil)
+				p.ready = true
+			}()
 		})
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
