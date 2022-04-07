@@ -1,10 +1,11 @@
 package check
 
 import (
+	"math"
+
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // InvalidMovementA checks if the user's XZ movement is close to the predicted movement.
@@ -50,7 +51,6 @@ func (i *InvalidMovementA) Process(p Processor, pk packet.Packet) {
 
 		if (diffVec.X() > max || diffVec.Z() > max) && (lastDiffVec.X() > max || lastDiffVec.Z() > max) &&
 			!p.Teleporting() && p.LiquidTicks() >= 10 && p.CobwebTicks() >= 10 {
-
 			if i.Buff(1, 15) >= 10 {
 				p.Flag(i, i.updateAndGetViolationAfterTicks(p.ClientTick(), 5), map[string]interface{}{
 					"Difference (X)": game.Round(diffVec.X(), 5),

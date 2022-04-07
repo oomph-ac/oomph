@@ -7,7 +7,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// VelocityA checks if a player is taking an abnormal amount of vertical knock-back.
+// VelocityA checks if a player is taking an abnormal amount of vertical knockback.
 type VelocityA struct {
 	basic
 }
@@ -24,7 +24,7 @@ func (*VelocityA) Name() (string, string) {
 
 // Description ...
 func (*VelocityA) Description() string {
-	return "This checks if a player is taking an abnormal amount of vertical knock-back."
+	return "This checks if a player is taking an abnormal amount of vertical knockback."
 }
 
 // MaxViolations ...
