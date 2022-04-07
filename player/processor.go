@@ -1,20 +1,19 @@
 package player
 
 import (
-	"math"
-
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
-
-	"time"
-
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"math"
+	"time"
+	_ "unsafe"
 )
 
 // ClientProcess processes the given packet from the client.
@@ -75,11 +74,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
-			/* if t.HeldItem.Stack.Count < 0 {
-				// No item, so do nothing.
-				return false
-			} TAL ITS AN UNSIGNED INTEGER UR SKID CONFIRMED 2022 IM GOING TO GOPHER DISCORD TO REPORT */
-
 			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
 			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
 			if !ok {
@@ -97,8 +91,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}
 
 			// Tada.
-			w.SetBlock(pos, block)
+			w.SetBlock(pos, block, nil)
 		}
+	case *packet.ChunkRadiusUpdated:
+		p.Loader().ChangeRadius(int(pk.ChunkRadius))
+		return false
 	case *packet.AdventureSettings:
 		p.flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
 		return false
@@ -181,14 +178,21 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
-			p.loadChunk(world.ChunkPos{pk.Position.X(), pk.Position.Z()}, pk.RawPayload, pk.SubChunkCount)
+			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+			c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.w.Range())
+			if err != nil {
+				p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
+				return
+			}
+
+			world_setChunk(p.w, world.ChunkPos(pk.Position), c, nil)
 			p.ready = true
 		})
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if ok {
 			p.Acknowledgement(func() {
-				p.World().SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+				p.World().SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b, nil)
 			})
 		}
 	case *packet.SetActorData:
@@ -249,3 +253,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	}
 	return false
 }
+
+//go:linkname world_setChunk github.com/df-mc/dragonfly/server/world.(*World).setChunk
+//noinspection ALL
+func world_setChunk(w *world.World, pos world.ChunkPos, c *chunk.Chunk, e map[cube.Pos]world.Block)
