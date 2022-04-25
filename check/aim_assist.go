@@ -73,7 +73,7 @@ func (a *AimAssistA) Process(p Processor, pk packet.Packet) {
 				if len(a.realRotationSamples) == 40 || len(a.botRotationSamples) == 40 {
 					cc := game.CorrelationCoefficient(a.realRotationSamples, a.botRotationSamples)
 					if cc > 0.99 {
-						p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 200), map[string]interface{}{
+						p.Flag(a, a.violationAfterTicks(p.ClientTick(), 200), map[string]interface{}{
 							"Correlation": game.Round(cc, 2)},
 						)
 					}

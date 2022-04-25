@@ -42,7 +42,7 @@ func (i *InvalidMovementB) Process(p Processor, pk packet.Packet) {
 		lastDiff := math.Abs(p.Motion().Y() - i.lastPrediction.Y())
 		if diff > 0.01 && lastDiff > 0.01 && !p.Teleporting() && p.LiquidTicks() >= 10 && p.CobwebTicks() >= 10 {
 			if i.Buff(1, 15) >= 10 {
-				p.Flag(i, i.updateAndGetViolationAfterTicks(p.ClientTick(), 5), map[string]interface{}{
+				p.Flag(i, i.violationAfterTicks(p.ClientTick(), 5), map[string]interface{}{
 					"Y Prediction": game.Round(p.PreviousServerPredictedMotion().Y(), 5),
 					"Y Movement":   game.Round(p.Motion().Y(), 5),
 					"Current Diff": game.Round(diff, 5),

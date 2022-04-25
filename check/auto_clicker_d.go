@@ -51,7 +51,7 @@ func (a *AutoClickerD) Process(p Processor, _ packet.Packet) {
 		})
 		if kurtosis <= 0.05 && skewness < 0 && outliers == 0 && deviation <= 25 && cps >= 9 {
 			if a.Buff(1, 2) > 1 {
-				p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
+				p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
 					"Kurtosis": game.Round(kurtosis, 2),
 					"Skewness": game.Round(skewness, 2),
 					"CPS":      cps,

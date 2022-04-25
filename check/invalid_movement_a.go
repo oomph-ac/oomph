@@ -52,7 +52,7 @@ func (i *InvalidMovementA) Process(p Processor, pk packet.Packet) {
 		if (diffVec.X() > max || diffVec.Z() > max) && (lastDiffVec.X() > max || lastDiffVec.Z() > max) &&
 			!p.Teleporting() && p.LiquidTicks() >= 10 && p.CobwebTicks() >= 10 {
 			if i.Buff(1, 15) >= 10 {
-				p.Flag(i, i.updateAndGetViolationAfterTicks(p.ClientTick(), 5), map[string]interface{}{
+				p.Flag(i, i.violationAfterTicks(p.ClientTick(), 5), map[string]interface{}{
 					"Difference (X)": game.Round(diffVec.X(), 5),
 					"Difference (Z)": game.Round(diffVec.Z(), 5),
 				})

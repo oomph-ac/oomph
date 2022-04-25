@@ -32,7 +32,7 @@ func (*AutoClickerA) MaxViolations() float64 {
 // Process ...
 func (a *AutoClickerA) Process(p Processor, _ packet.Packet) {
 	if p.Clicking() && p.CPS() > 22 {
-		p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 40), map[string]interface{}{
+		p.Flag(a, a.violationAfterTicks(p.ClientTick(), 40), map[string]interface{}{
 			"CPS": p.CPS(),
 		})
 	}

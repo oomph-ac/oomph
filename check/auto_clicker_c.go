@@ -49,7 +49,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) {
 					e = 1.0
 				}
 				if a.Buff(1) >= e {
-					p.Flag(a, a.updateAndGetViolationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
+					p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
 						"Deviation": game.Round(deviation, 3),
 						"Skewness":  game.Round(skewness, 3),
 						"CPS":       cps,
