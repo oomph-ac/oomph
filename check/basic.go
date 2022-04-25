@@ -33,9 +33,7 @@ func (b *basic) Violations() float64 {
 
 // violationAfterTicks ...
 func (b *basic) violationAfterTicks(tick uint64, maxTicks uint64) float64 {
-	defer func() {
-		b.lastFlagTick = tick
-	}()
 	diff := float64(tick - b.lastFlagTick)
+	b.lastFlagTick = tick
 	return math.Max(((float64(maxTicks)+math.Min(diff, 1))-diff)/float64(maxTicks), 0)
 }
