@@ -32,10 +32,10 @@ func (t *basic) Violations() float64 {
 }
 
 // updateAndGetViolationAfterTicks ...
-// TODO: what the fuck is this?
-func (t *basic) updateAndGetViolationAfterTicks(tick uint64, maxTime float64) float64 {
+func (t *basic) updateAndGetViolationAfterTicks(tick uint64, maxTicks uint64) float64 {
 	defer func() {
 		t.lastFlagTick = tick
 	}()
-	return math.Max((maxTime+math.Min(float64(tick-t.lastFlagTick), 1))/maxTime, 0)
+	diff := float64(tick - t.lastFlagTick)
+	return math.Max(((float64(maxTicks)+math.Min(diff, 1))-diff)/float64(maxTicks), 0)
 }
