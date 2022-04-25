@@ -54,7 +54,7 @@ func (k *KillAuraB) Process(p Processor, pk packet.Packet) {
 				}
 			}
 			if minDist < math.MaxFloat64 && minDist > 1.5 {
-				p.Flag(k, k.updateAndGetViolationAfterTicks(p.ClientTick(), 40), map[string]interface{}{
+				p.Flag(k, k.violationAfterTicks(p.ClientTick(), 40), map[string]interface{}{
 					"Minimum Distance": game.Round(minDist, 2),
 					"Entities":         len(k.entities),
 				})

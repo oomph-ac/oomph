@@ -42,7 +42,7 @@ func (v *VelocityA) Process(p Processor, pk packet.Packet) {
 			vel := p.Motion().Y() / p.PreviousServerPredictedMotion().Y()
 			if vel <= 0.9999 || vel >= 1.1 {
 				if v.Buff(1) >= 12 {
-					p.Flag(v, v.updateAndGetViolationAfterTicks(p.ClientTick(), 100), map[string]interface{}{
+					p.Flag(v, v.violationAfterTicks(p.ClientTick(), 100), map[string]interface{}{
 						"Velocity": game.Round(vel, 6),
 					})
 				} else {

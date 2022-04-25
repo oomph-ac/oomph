@@ -31,8 +31,8 @@ func (t *basic) Violations() float64 {
 	return t.violations
 }
 
-// updateAndGetViolationAfterTicks ...
-func (t *basic) updateAndGetViolationAfterTicks(tick uint64, maxTicks uint64) float64 {
+// violationAfterTicks ...
+func (t *basic) violationAfterTicks(tick uint64, maxTicks uint64) float64 {
 	defer func() {
 		t.lastFlagTick = tick
 	}()
