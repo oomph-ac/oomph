@@ -25,7 +25,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			return true
 		}
 		p.ackMu.Unlock()
-		return false
 	case *packet.PlayerAuthInput:
 		p.clientTick++
 		if p.ready {
@@ -45,25 +44,21 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
 		}
-		return false
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
 		}
 	case *packet.AdventureSettings:
 		p.flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
-		return false
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 			p.dead = false
 		}
-		return false
 	case *packet.Text:
 		if p.serverConn != nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
-		return false
 	}
 
 	// Run all registered checks.
