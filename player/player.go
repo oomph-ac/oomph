@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
@@ -29,10 +28,6 @@ type Player struct {
 	rid uint64
 	uid int64
 
-	wMu sync.Mutex
-	w   *world.World
-	l   *world.Loader
-
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
 
@@ -50,39 +45,12 @@ type Player struct {
 	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]mgl64.Vec3
 
-	effectsMu sync.Mutex
-	effects   map[int32]effect.Effect
-
 	ready    bool
 	gameMode int32
-
-	moveForward, moveStrafe float64
-	jumpVelocity            float64
-	gravity                 float64
-	speed                   float64
-	stepLenience            float64
-
-	motion                        mgl64.Vec3
-	serverSentMotion              mgl32.Vec3
-	serverPredictedMotion         mgl64.Vec3
-	previousServerPredictedMotion mgl64.Vec3
-
-	teleportOffset uint8
 
 	sneaking, sprinting    bool
 	teleporting, jumping   bool
 	immobile, flying, dead bool
-	collidedHorizontally   bool
-	collidedVertically     bool
-	onGround               bool
-	lastOnGround           bool
-	inVoid                 bool
-
-	climbableTicks uint32
-	cobwebTicks    uint32
-	liquidTicks    uint32
-	motionTicks    uint32
-	spawnTicks     uint32
 
 	clickMu       sync.Mutex
 	clicking      bool
@@ -100,7 +68,7 @@ type Player struct {
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
-func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *minecraft.Conn) *Player {
+func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	data := conn.GameData()
 	p := &Player{
 		log: log,
@@ -111,7 +79,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 		rid: data.EntityRuntimeID,
 		uid: data.EntityUniqueID,
 
-		w: world.New(nil, dimension, &world.Settings{}),
 		h: NopHandler{},
 
 		acknowledgements: make(map[int64]func()),
@@ -126,8 +93,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
-		effects: make(map[int32]effect.Effect),
-
 		gameMode: data.PlayerGameMode,
 
 		serverTicker: time.NewTicker(time.Second / 20),
@@ -141,8 +106,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 			//check.NewAutoClickerC(),
 			//check.NewAutoClickerD(),
 
-			check.NewInvalidMovementA(),
-			check.NewInvalidMovementB(),
 			check.NewInvalidMovementC(),
 
 			check.NewKillAuraA(),
@@ -153,14 +116,8 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 			check.NewReachA(),
 
 			check.NewTimerA(),
-
-			check.NewVelocityA(),
-			check.NewVelocityB(),
 		},
 	}
-	p.w.Generator(nil)
-	p.w.Provider(nil)
-	p.l = world.NewLoader(conn.ChunkRadius(), p.w, p)
 	go p.startTicking()
 	return p
 }
@@ -176,8 +133,6 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Move(game.Vec32To64(pk.Position), true)
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
-	p.Loader().Move(p.Position())
-	p.motion = data.Position().Sub(data.LastPosition())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -185,7 +140,6 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos), true)
 	data.ResetTeleportationTicks()
-	p.Loader().Move(p.Position())
 }
 
 // MoveEntity moves an entity to the given position.
@@ -227,20 +181,6 @@ func (p *Player) Rotation() mgl64.Vec3 {
 // AABB returns the axis-aligned bounding box of the player.
 func (p *Player) AABB() physics.AABB {
 	return p.Entity().AABB()
-}
-
-// World returns the world of the player.
-func (p *Player) World() *world.World {
-	p.wMu.Lock()
-	defer p.wMu.Unlock()
-	return p.w
-}
-
-// Loader returns the loader of the player.
-func (p *Player) Loader() *world.Loader {
-	p.wMu.Lock()
-	defer p.wMu.Unlock()
-	return p.l
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
@@ -306,64 +246,6 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 // Ready returns true if the player is ready/spawned in.
 func (p *Player) Ready() bool {
 	return p.ready
-}
-
-// ClimbableTicks returns the amount of climbable ticks the player has.
-func (p *Player) ClimbableTicks() uint32 {
-	return p.climbableTicks
-}
-
-// CobwebTicks returns the amount of cobweb ticks the player has.
-func (p *Player) CobwebTicks() uint32 {
-	return p.cobwebTicks
-}
-
-// LiquidTicks returns the amount of liquid ticks the player has.
-func (p *Player) LiquidTicks() uint32 {
-	return p.liquidTicks
-}
-
-// MotionTicks returns the amount of motion ticks the player has.
-func (p *Player) MotionTicks() uint32 {
-	return p.motionTicks
-}
-
-// CollidedVertically returns true if the player has collided vertically.
-func (p *Player) CollidedVertically() bool {
-	return p.collidedVertically
-}
-
-func (p *Player) OnGround() bool {
-	return p.onGround
-}
-
-func (p *Player) LastOnGround() bool {
-	return p.lastOnGround
-}
-
-// CollidedHorizontally returns true if the player has collided horizontally.
-func (p *Player) CollidedHorizontally() bool {
-	return p.collidedHorizontally
-}
-
-// Motion returns the motion of the player.
-func (p *Player) Motion() mgl64.Vec3 {
-	return p.motion
-}
-
-// ServerPredictedMotion returns the server-predicted motion of the player.
-func (p *Player) ServerPredictedMotion() mgl64.Vec3 {
-	return p.serverPredictedMotion
-}
-
-// PreviousServerPredictedMotion returns the previous server-predicted motion of the player.
-func (p *Player) PreviousServerPredictedMotion() mgl64.Vec3 {
-	return p.previousServerPredictedMotion
-}
-
-// SpawnTicks returns the amount of spawn ticks the player has.
-func (p *Player) SpawnTicks() uint32 {
-	return p.spawnTicks
 }
 
 // GameMode returns the current game mode of the player.
@@ -479,15 +361,6 @@ func (p *Player) Close() error {
 	p.checkMu.Lock()
 	p.checks = nil
 	p.checkMu.Unlock()
-
-	p.wMu.Lock()
-	if err := p.w.Close(); err != nil {
-		return err
-	}
-	if err := p.l.Close(); err != nil {
-		return err
-	}
-	p.wMu.Unlock()
 
 	p.ackMu.Lock()
 	p.acknowledgements = nil

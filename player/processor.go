@@ -1,19 +1,12 @@
 package player
 
 import (
-	"github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/df-mc/dragonfly/server/entity/effect"
-	"github.com/df-mc/dragonfly/server/world"
-	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
-	"time"
-	_ "unsafe"
 )
 
 // ClientProcess processes the given packet from the client.
@@ -45,25 +38,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}
 			p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 
-			pos := p.Position()
-			p.inVoid = pos.Y() <= game.VoidLevel
-
-			p.jumpVelocity = game.DefaultJumpMotion
-			p.speed = game.NormalMovementSpeed
-			p.gravity = game.NormalGravity
-
-			p.tickEffects()
-
-			p.moveStrafe = float64(pk.MoveVector.X() * 0.98)
-			p.moveForward = float64(pk.MoveVector.Y() * 0.98)
-
-			if p.Sprinting() {
-				p.speed *= 1.3
-			}
-			p.speed = math.Max(0, p.speed)
-
-			p.tickMovement()
-			p.tickNearbyBlocks()
 			p.tickEntityLocations()
 			p.teleporting = false
 		}
@@ -75,29 +49,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
-		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
-			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
-			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
-			if !ok {
-				// Block somehow doesn't exist, so do nothing.
-				return false
-			}
-
-			w := p.World()
-			boxes := block.Model().AABB(pos, w)
-			for _, box := range boxes {
-				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
-					// Intersects with our AABB, so do nothing.
-					return false
-				}
-			}
-
-			// Tada.
-			w.SetBlock(pos, block, nil)
 		}
-	case *packet.ChunkRadiusUpdated:
-		p.Loader().ChangeRadius(int(pk.ChunkRadius))
-		return false
 	case *packet.AdventureSettings:
 		p.flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
 		return false
@@ -178,27 +130,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
-	case *packet.LevelChunk:
-		p.Acknowledgement(func() {
-			go func() {
-				a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-				c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.World().Range())
-				if err != nil {
-					p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
-					return
-				}
-
-				world_setChunk(p.World(), world.ChunkPos(pk.Position), c, nil)
-				p.ready = true
-			}()
-		})
-	case *packet.UpdateBlock:
-		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
-		if ok {
-			p.Acknowledgement(func() {
-				p.World().SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b, nil)
-			})
-		}
 	case *packet.SetActorData:
 		p.Acknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
@@ -211,13 +142,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				p.immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
 			}
 		})
-	case *packet.SetActorMotion:
-		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				p.motionTicks = 0
-				p.serverSentMotion = pk.Velocity
-			})
-		}
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType
@@ -238,26 +162,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				}
 			})
 		}
-	case *packet.MobEffect:
-		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				switch pk.Operation {
-				case packet.MobEffectAdd, packet.MobEffectModify:
-					if t, ok := effect.ByID(int(pk.EffectType)); ok {
-						if t, ok := t.(effect.LastingType); ok {
-							eff := effect.New(t, int(pk.Amplifier+1), time.Duration(pk.Duration*50)*time.Millisecond)
-							p.SetEffect(pk.EffectType, eff)
-						}
-					}
-				case packet.MobEffectRemove:
-					p.RemoveEffect(pk.EffectType)
-				}
-			})
-		}
 	}
 	return false
 }
-
-//go:linkname world_setChunk github.com/df-mc/dragonfly/server/world.(*World).setChunk
-//noinspection ALL
-func world_setChunk(w *world.World, pos world.ChunkPos, c *chunk.Chunk, e map[cube.Pos]world.Block)
