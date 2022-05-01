@@ -139,6 +139,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				p.immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
 			}
 		})
+	case *packet.SubChunk, *packet.LevelChunk:
+		p.Acknowledgement(func() {
+			p.ready = true
+		})
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType
