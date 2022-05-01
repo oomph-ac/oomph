@@ -140,10 +140,14 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
-func (p *Player) Teleport(pos mgl32.Vec3) {
+func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos), true)
-	data.ResetTeleportationTicks()
+	if reset {
+		data.ResetTeleportationTicks()
+	} else {
+		data.IncrementTeleportationTicks()
+	}
 }
 
 // MoveEntity moves an entity to the given position.
