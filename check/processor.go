@@ -1,7 +1,6 @@
 package check
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 )
@@ -34,33 +33,6 @@ type Processor interface {
 
 	// Ready returns true if the processor is ready/spawned in.
 	Ready() bool
-
-	// ClimbableTicks returns the amount of climbable ticks the processor has.
-	ClimbableTicks() uint32
-	// CobwebTicks returns the amount of cobweb ticks the processor has.
-	CobwebTicks() uint32
-	// LiquidTicks returns the amount of liquid ticks the processor has.
-	LiquidTicks() uint32
-	// MotionTicks returns the amount of motion ticks the processor has.
-	MotionTicks() uint32
-	// SpawnTicks returns the amount of spawn ticks the processor has.
-	SpawnTicks() uint32
-
-	// CollidedVertically returns true if the processor has collided vertically.
-	CollidedVertically() bool
-	// OnGround returns true if the processor is collided with the ground.
-	OnGround() bool
-	// LastOnGround returns true if the processor was collided with the ground on the previous frame.
-	LastOnGround() bool
-	// CollidedHorizontally returns true if the processor has collided horizontally.
-	CollidedHorizontally() bool
-
-	// Motion returns the motion of the processor.
-	Motion() mgl64.Vec3
-	// ServerPredictedMotion returns the server-predicted motion of the processor.
-	ServerPredictedMotion() mgl64.Vec3
-	// PreviousServerPredictedMotion returns the previous server-predicted motion of the processor.
-	PreviousServerPredictedMotion() mgl64.Vec3
 
 	// GameMode returns the current game mode of the processor.
 	GameMode() int32
