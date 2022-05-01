@@ -104,8 +104,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
-				p.Teleport(pk.Position)
-				if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
+				teleport := utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport)
+				p.Teleport(pk.Position, teleport)
+				if teleport {
 					p.teleporting = true
 				}
 			})
@@ -116,8 +117,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
-				p.Teleport(pk.Position)
-				if pk.Mode == packet.MoveModeTeleport {
+				teleport := pk.Mode == packet.MoveModeTeleport
+				p.Teleport(pk.Position, teleport)
+				if teleport {
 					p.teleporting = true
 				}
 			})
