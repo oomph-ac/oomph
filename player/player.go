@@ -2,7 +2,9 @@ package player
 
 import (
 	"fmt"
+	"golang.org/x/text/language"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +29,8 @@ type Player struct {
 
 	rid uint64
 	uid int64
+
+	locale language.Tag
 
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
@@ -117,6 +121,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewTimerA(),
 		},
 	}
+	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
 	go p.startTicking()
 	return p
 }
@@ -149,6 +154,11 @@ func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3) {
 		p.queuedEntityLocations[rid] = pos
 		p.queueMu.Unlock()
 	}
+}
+
+// Locale returns the locale of the player.
+func (p *Player) Locale() language.Tag {
+	return p.locale
 }
 
 // Entity returns the entity data of the player.
