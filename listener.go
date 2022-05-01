@@ -6,7 +6,6 @@ import (
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
 
 // listener is a Dragonfly listener implementation for direct Oomph.
@@ -16,10 +15,10 @@ type listener struct {
 }
 
 // Listen listens for oomph connections, this should be used instead of Start for dragonfly servers.
-func (o *Oomph) Listen(srv *server.Server, packs []*resource.Pack, name string) error {
+func (o *Oomph) Listen(srv *server.Server, name string) error {
 	l, err := minecraft.ListenConfig{
 		StatusProvider: minecraft.NewStatusProvider(name),
-		ResourcePacks:  packs,
+		ResourcePacks:  srv.Resources(),
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err

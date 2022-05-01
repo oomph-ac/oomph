@@ -3,7 +3,7 @@ module github.com/oomph-ac/oomph
 go 1.18
 
 require (
-	github.com/df-mc/dragonfly v0.6.3-0.20220430211142-88604c4bbe46
+	github.com/df-mc/dragonfly v0.6.3-0.20220501035922-b9db9a35d147
 	github.com/go-gl/mathgl v1.0.0
 	github.com/pelletier/go-toml v1.9.4
 	github.com/sandertv/gophertunnel v1.19.9
