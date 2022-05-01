@@ -15,10 +15,11 @@ type listener struct {
 }
 
 // Listen listens for oomph connections, this should be used instead of Start for dragonfly servers.
-func (o *Oomph) Listen(srv *server.Server, name string) error {
+func (o *Oomph) Listen(srv *server.Server, name string, requirePacks bool) error {
 	l, err := minecraft.ListenConfig{
-		StatusProvider: minecraft.NewStatusProvider(name),
-		ResourcePacks:  srv.Resources(),
+		StatusProvider:       minecraft.NewStatusProvider(name),
+		ResourcePacks:        srv.Resources(),
+		TexturePacksRequired: requirePacks,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
