@@ -102,9 +102,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewAutoClickerA(),
 			check.NewAutoClickerB(),
 
-			//TODO: Reintegrate these after settings/the panel.
-			//check.NewAutoClickerC(),
-			//check.NewAutoClickerD(),
+			check.NewAutoClickerC(),
+			check.NewAutoClickerD(),
 
 			check.NewInvalidMovementC(),
 
