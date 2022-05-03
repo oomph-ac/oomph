@@ -1,6 +1,10 @@
 package player
 
 import (
+	"math"
+	"time"
+	_ "unsafe"
+
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
@@ -11,9 +15,6 @@ import (
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
-	"time"
-	_ "unsafe"
 )
 
 // ClientProcess processes the given packet from the client.
@@ -66,6 +67,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.tickNearbyBlocks()
 			p.tickEntityLocations()
 			p.teleporting = false
+			p.needsNewLocQueue = true
 		}
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
