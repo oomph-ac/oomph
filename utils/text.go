@@ -42,20 +42,36 @@ func Device(os protocol.DeviceOS) string {
 }
 
 // PrettyParameters converts the given parameters to a readable string.
-func PrettyParameters(params map[string]interface{}) string {
+func PrettyParameters(params map[string]interface{}, condensed bool) string {
 	if len(params) == 0 {
 		// Don't waste time if there are no parameters.
 		return "[]"
 	}
 
 	sb := &strings.Builder{}
-	sb.WriteString("[\n")
+	sb.WriteString("[")
+	if !condensed {
+		sb.WriteString("\n")
+	}
+
+	var ind int
 	for k, v := range params {
-		sb.WriteString("    \"" + k + "\"")
+		if !condensed {
+			sb.WriteString(strings.Repeat(" ", 4))
+		}
+		sb.WriteString("\"" + k + "\"")
 		sb.WriteString(": ")
 		sb.WriteString(fmt.Sprint(v))
-		sb.WriteString(",\n")
+		if condensed {
+			if ind < len(params)-1 {
+				sb.WriteString(", ")
+			}
+		} else {
+			sb.WriteString(",\n")
+		}
+		ind++
 	}
+
 	sb.WriteString("]")
 	return sb.String()
 }
