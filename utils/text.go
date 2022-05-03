@@ -59,7 +59,7 @@ func PrettyParameters(params map[string]interface{}, condensed bool) string {
 		if !condensed {
 			sb.WriteString(strings.Repeat(" ", 4))
 		}
-		sb.WriteString("\"" + k + "\"")
+		sb.WriteString(fmt.Sprint(k))
 		sb.WriteString(": ")
 		sb.WriteString(fmt.Sprint(v))
 		if condensed {
