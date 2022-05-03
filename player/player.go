@@ -223,7 +223,7 @@ func (p *Player) Debug(check check.Check, params map[string]interface{}) {
 	ctx := event.C()
 	p.handler().HandleDebug(ctx, check, params)
 	if !ctx.Cancelled() {
-		p.log.Debugf("%s (%s%s): %s", p.Name(), name, variant, utils.PrettyParameters(params))
+		p.log.Debugf("%s (%s%s): %s", p.Name(), name, variant, utils.PrettyParameters(params, true))
 	}
 }
 
@@ -242,7 +242,7 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 	if ctx.Cancelled() {
 		return
 	}
-	p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params))
+	p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params, true))
 	if now, max := check.Violations(), check.MaxViolations(); now >= max {
 		go func() {
 			message := fmt.Sprintf("§7[§6oomph§7] §bcaught lackin!\n§6cheat detected: §b%s%s", name, variant)
