@@ -222,9 +222,9 @@ func (p *Player) Debug(check check.Check, params map[string]interface{}) {
 	name, variant := check.Name()
 	ctx := event.C()
 	p.handler().HandleDebug(ctx, check, params)
-	ctx.Continue(func() {
+	if !ctx.Cancelled() {
 		p.log.Debugf("%s (%s%s): %s", p.Name(), name, variant, utils.PrettyParameters(params))
-	})
+	}
 }
 
 // Flag flags the given check data to the console and other relevant sources.
@@ -239,21 +239,22 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]i
 
 	ctx := event.C()
 	p.handler().HandleFlag(ctx, check, params)
-	ctx.Continue(func() {
-		p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params))
-		if now, max := check.Violations(), check.MaxViolations(); now >= max {
-			go func() {
-				message := fmt.Sprintf("§7[§6oomph§7] §bcaught lackin!\n§6cheat detected: §b%s%s", name, variant)
+	if ctx.Cancelled() {
+		return
+	}
+	p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params))
+	if now, max := check.Violations(), check.MaxViolations(); now >= max {
+		go func() {
+			message := fmt.Sprintf("§7[§6oomph§7] §bcaught lackin!\n§6cheat detected: §b%s%s", name, variant)
 
-				ctx = event.C()
-				p.handler().HandlePunishment(ctx, check, &message)
-				ctx.Continue(func() {
-					p.log.Infof("%s was detected and punished for using %s%s.", p.Name(), name, variant)
-					p.Disconnect(message)
-				})
-			}()
-		}
-	})
+			ctx = event.C()
+			p.handler().HandlePunishment(ctx, check, &message)
+			if !ctx.Cancelled() {
+				p.log.Infof("%s was detected and punished for using %s%s.", p.Name(), name, variant)
+				p.Disconnect(message)
+			}
+		}()
+	}
 }
 
 // Ready returns true if the player is ready/spawned in.
