@@ -1,9 +1,10 @@
 package check
 
 import (
+	"math"
+
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
-	"math"
 
 	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
