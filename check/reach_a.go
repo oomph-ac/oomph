@@ -97,7 +97,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 							uDv = uDv.Add(dvDiff.Mul(float64(1 / i)))
 							uPos = uPos.Add(posDiff.Mul(float64(1 / i)))
 						}
-						if ray, ok := trace.AABBIntercept(targetAABB, r.attackPos, r.attackPos.Add(uDv.Mul(14))); ok {
+						if ray, ok := trace.AABBIntercept(targetAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
 							minDist = math.Min(minDist, ray.Position().Sub(uPos).Len())
 							valid = true
 						}
