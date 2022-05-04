@@ -1,9 +1,10 @@
 package entity
 
 import (
+	"sync"
+
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/go-gl/mathgl/mgl64"
-	"sync"
 )
 
 // Entity represents an entity in a world with a *player.Player.
@@ -73,7 +74,7 @@ func (e *Entity) Move(pos mgl64.Vec3, offset bool) {
 	e.lastPosition = e.position
 	e.position = pos
 	if offset {
-		e.position = e.position.Sub(mgl64.Vec3{0, 1.62})
+		e.position[1] -= 1.62
 	}
 }
 
@@ -85,11 +86,14 @@ func (e *Entity) ReceivedPosition() mgl64.Vec3 {
 }
 
 // UpdateReceivedPosition updates the position of the entity that the client sees.
-func (e *Entity) UpdateReceivedPosition(pos mgl64.Vec3) {
+func (e *Entity) UpdateReceivedPosition(pos mgl64.Vec3, offset bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.receivedPosition = pos.Sub(mgl64.Vec3{0, 1.62})
+	e.receivedPosition = pos
+	if offset {
+		e.receivedPosition[1] -= 1.62
+	}
 }
 
 // Rotation returns the rotation of the entity.
