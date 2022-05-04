@@ -20,10 +20,10 @@ type Oomph struct {
 
 // New returns a new Oomph instance.
 // If your server is using Dragonfly, be sure to use the Listener function instead.
-func New(log *logrus.Logger, addr string) *Oomph {
+func New(log *logrus.Logger, localAddr string) *Oomph {
 	return &Oomph{
 		players: make(chan *player.Player),
-		addr:    addr,
+		addr:    localAddr,
 		log:     log,
 	}
 }
