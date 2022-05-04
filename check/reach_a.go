@@ -87,16 +87,11 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 				targetAABB := t.AABB().Grow(0.1).Translate(t.LastPosition())
 
 				if !aabb.IntersectsWith(targetAABB) {
-					dvDiff := cDv.Sub(lDv)
-					posDiff := cPos.Sub(lPos)
-					minDist, valid := 69000.0, false
-					for i := 30; i != 0; i-- {
-						uDv := lDv
-						uPos := lPos
-						if i != 0 {
-							uDv = uDv.Add(dvDiff.Mul(float64(1 / i)))
-							uPos = uPos.Add(posDiff.Mul(float64(1 / i)))
-						}
+					dvDiff, posDiff := cDv.Sub(lDv), cPos.Sub(lPos)
+					minDist, valid := math.MaxFloat64, false
+					for i := 30.0; i > 0; i-- {
+						uDv := lDv.Add(dvDiff.Mul(1.0 / i))
+						uPos := lPos.Add(posDiff.Mul(1.0 / i))
 						if ray, ok := trace.AABBIntercept(targetAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
 							minDist = math.Min(minDist, ray.Position().Sub(uPos).Len())
 							valid = true
