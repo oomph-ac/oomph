@@ -6,7 +6,6 @@ import (
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
-	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
@@ -88,7 +87,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 
-	p := player.NewPlayer(o.log, world.Overworld, conn, serverConn)
+	p := player.NewPlayer(o.log, conn, serverConn)
 	o.players <- p
 
 	g.Add(2)

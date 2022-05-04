@@ -34,7 +34,7 @@ func TestOomphDirect(t *testing.T) {
 
 	go func() {
 		oomph := New(log, ":19132")
-		if err := oomph.Listen(srv, config.Server.Name); err != nil {
+		if err := oomph.Listen(srv, config.Server.Name, false); err != nil {
 			log.Fatalln(err)
 		}
 
