@@ -1,6 +1,8 @@
 package player
 
 import (
+	_ "unsafe"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"

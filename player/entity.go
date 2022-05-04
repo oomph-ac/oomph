@@ -37,7 +37,8 @@ func (p *Player) tickEntityLocations() {
 	for _, e := range p.entities {
 		if increments := e.NewLocationIncrements(); increments > 0 {
 			delta := e.ReceivedPosition().Sub(e.LastPosition()).Mul(1 / float64(e.NewLocationIncrements()))
-			e.Move(e.Position().Add(delta), false)
+			pos := e.Position().Add(delta)
+			e.Move(pos, false)
 			e.DecrementNewLocationIncrements()
 		}
 		e.IncrementTeleportationTicks()
@@ -50,16 +51,13 @@ func (p *Player) flushEntityLocations() {
 	p.queueMu.Lock()
 	defer p.queueMu.Unlock()
 
-	queue := make(map[uint64]mgl64.Vec3)
-	for rid, pos := range p.queuedEntityLocations {
-		queue[rid] = pos
-	}
+	queue := p.queuedEntityLocations
 	p.queuedEntityLocations = make(map[uint64]mgl64.Vec3)
 
 	p.Acknowledgement(func() {
 		for rid, pos := range queue {
 			if e, valid := p.SearchEntity(rid); valid {
-				e.UpdateReceivedPosition(pos)
+				e.UpdateReceivedPosition(pos, e.Player())
 				e.ResetNewLocationIncrements()
 			}
 		}
