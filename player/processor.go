@@ -67,7 +67,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.tickNearbyBlocks()
 			p.tickEntityLocations()
 			p.teleporting = false
-			p.needsNewLocQueue = true
 		}
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {

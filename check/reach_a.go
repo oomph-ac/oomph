@@ -74,21 +74,39 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 	case *packet.PlayerAuthInput:
 		r.inputMode = pk.InputMode
 		if r.awaitingTick {
-			if t, ok := p.SearchEntity(r.attackedEntity); ok && t.Player() {
+			if t, ok := p.SearchEntity(r.attackedEntity); ok /*&& t.Player()*/ {
 				e := p.Entity()
-				rot := e.Rotation()
-				dv := game.DirectionVector(rot.Z(), rot.X())
+				cRot, lRot := e.Rotation(), e.LastRotation()
+				cDv, lDv := game.DirectionVector(cRot.Z(), cRot.X()), game.DirectionVector(lRot.Z(), lRot.X())
+				cPos, lPos := p.Entity().Position().Add(mgl64.Vec3{0, 1.62, 0}), r.attackPos
+				if p.Sneaking() {
+					cPos[1] -= 0.08
+				}
 
 				aabb := e.AABB().Translate(e.LastPosition())
 				targetAABB := t.AABB().Grow(0.1).Translate(t.LastPosition())
 
 				if !aabb.IntersectsWith(targetAABB) {
-					if ray, ok := trace.AABBIntercept(targetAABB, r.attackPos, r.attackPos.Add(dv.Mul(14.0))); ok {
-						dist := ray.Position().Sub(r.attackPos).Len()
-						if dist >= 3.1 && math.Abs(dist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
-							if r.Buff(1, 10) >= 3 {
+					dvDiff := cDv.Sub(lDv)
+					posDiff := cPos.Sub(lPos)
+					minDist, valid := 69000.0, false
+					for i := 30; i != 0; i-- {
+						uDv := lDv
+						uPos := lPos
+						if i != 0 {
+							uDv = uDv.Add(dvDiff.Mul(float64(1 / i)))
+							uPos = uPos.Add(posDiff.Mul(float64(1 / i)))
+						}
+						if ray, ok := trace.AABBIntercept(targetAABB, r.attackPos, r.attackPos.Add(uDv.Mul(14))); ok {
+							minDist = math.Min(minDist, ray.Position().Sub(uPos).Len())
+							valid = true
+						}
+					}
+					if valid {
+						if minDist >= 3.1 && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
+							if r.Buff(1, 6) >= 3 {
 								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
-									"Distance": game.Round(dist, 2),
+									"Distance": game.Round(minDist, 2),
 									"Type":     "Raycast",
 								})
 							}

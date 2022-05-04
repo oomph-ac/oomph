@@ -49,7 +49,6 @@ type Player struct {
 
 	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]mgl64.Vec3
-	needsNewLocQueue      bool
 
 	effectsMu sync.Mutex
 	effects   map[int32]effect.Effect
@@ -126,7 +125,6 @@ func NewPlayer(log *logrus.Logger, dimension world.Dimension, conn, serverConn *
 
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
-		needsNewLocQueue:      true,
 
 		effects: make(map[int32]effect.Effect),
 
@@ -194,20 +192,6 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3) {
 	// If the entity exists, we can queue the location for an update.
 	if _, ok := p.SearchEntity(rid); ok {
-		if p.needsNewLocQueue {
-			p.Acknowledgement(func() {
-				p.queueMu.Lock()
-				for rid, pos := range p.queuedEntityLocations {
-					if e, valid := p.SearchEntity(rid); valid {
-						e.UpdateReceivedPosition(pos)
-						e.ResetNewLocationIncrements()
-					}
-				}
-				p.queuedEntityLocations = make(map[uint64]mgl64.Vec3)
-				p.queueMu.Unlock()
-			})
-			p.needsNewLocQueue = false
-		}
 		p.queueMu.Lock()
 		p.queuedEntityLocations[rid] = pos
 		p.queueMu.Unlock()
@@ -521,7 +505,7 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	for range p.serverTicker.C {
-		//p.flushEntityLocations()
+		p.flushEntityLocations()
 		p.serverTick++
 	}
 }
