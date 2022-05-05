@@ -2,13 +2,13 @@ package player
 
 import (
 	"fmt"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"golang.org/x/text/language"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
@@ -192,7 +192,7 @@ func (p *Player) Rotation() mgl64.Vec3 {
 }
 
 // AABB returns the axis-aligned bounding box of the player.
-func (p *Player) AABB() physics.AABB {
+func (p *Player) AABB() cube.BBox {
 	return p.Entity().AABB()
 }
 

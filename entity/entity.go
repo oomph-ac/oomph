@@ -1,10 +1,9 @@
 package entity
 
 import (
-	"sync"
-
-	"github.com/df-mc/dragonfly/server/entity/physics"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
+	"sync"
 )
 
 // Entity represents an entity in a world with a *player.Player.
@@ -25,7 +24,7 @@ type Entity struct {
 	// teleportTicks is the amount of client ticks that have passed since the entity has teleported.
 	teleportTicks uint32
 	// aabb represents the bounding box of the entity.
-	aabb physics.AABB
+	aabb cube.BBox
 	// player is true if the entity is a player.
 	player bool
 	// newLocationIncrements is the amount of ticks the entity's position should be smoothed out by.
@@ -35,7 +34,7 @@ type Entity struct {
 }
 
 // defaultAABB is the default AABB for newly created entities.
-var defaultAABB = physics.NewAABB(
+var defaultAABB = cube.Box(
 	mgl64.Vec3{-0.3, 0, -0.3},
 	mgl64.Vec3{0.3, 1.8, 0.3},
 )
@@ -170,14 +169,14 @@ func (e *Entity) Player() bool {
 }
 
 // AABB returns the AABB of the entity.
-func (e *Entity) AABB() physics.AABB {
+func (e *Entity) AABB() cube.BBox {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.aabb
 }
 
 // SetAABB updates the AABB of the entity.
-func (e *Entity) SetAABB(aabb physics.AABB) {
+func (e *Entity) SetAABB(aabb cube.BBox) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.aabb = aabb
