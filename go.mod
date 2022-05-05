@@ -3,10 +3,10 @@ module github.com/oomph-ac/oomph
 go 1.18
 
 require (
-	github.com/df-mc/dragonfly v0.6.3-0.20220501203106-de06f6094f60
+	github.com/df-mc/dragonfly v0.6.3-0.20220505230200-ae2625fe36b2
 	github.com/go-gl/mathgl v1.0.0
 	github.com/pelletier/go-toml v1.9.4
-	github.com/sandertv/gophertunnel v1.19.9
+	github.com/sandertv/gophertunnel v1.19.10
 	github.com/sirupsen/logrus v1.8.1
 )
 

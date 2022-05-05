@@ -1,14 +1,12 @@
 package check
 
 import (
-	"math"
-
+	"github.com/df-mc/dragonfly/server/block/cube/trace"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
-
-	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"math"
 )
 
 // ReachA checks if a player has an abnormal amount of reach.
@@ -92,7 +90,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 					for i := 30.0; i > 0; i-- {
 						uDv := lDv.Add(dvDiff.Mul(1.0 / i))
 						uPos := lPos.Add(posDiff.Mul(1.0 / i))
-						if ray, ok := trace.AABBIntercept(targetAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
+						if ray, ok := trace.BBoxIntercept(targetAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
 							minDist = math.Min(minDist, ray.Position().Sub(uPos).Len())
 							valid = true
 						}
