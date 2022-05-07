@@ -10,8 +10,8 @@ import (
 func AABBFromDimensions(width, height float64) cube.BBox {
 	h := width / 2
 	return cube.Box(
-		mgl64.Vec3{-h, 0, -h},
-		mgl64.Vec3{h, height, h},
+		-h, 0, -h,
+		h, height, h,
 	)
 }
 
