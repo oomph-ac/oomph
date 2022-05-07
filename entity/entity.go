@@ -35,8 +35,8 @@ type Entity struct {
 
 // defaultAABB is the default AABB for newly created entities.
 var defaultAABB = cube.Box(
-	mgl64.Vec3{-0.3, 0, -0.3},
-	mgl64.Vec3{0.3, 1.8, 0.3},
+	-0.3, 0, -0.3,
+	0.3, 1.8, 0.3,
 )
 
 // NewEntity creates a new entity with the provided parameters.
