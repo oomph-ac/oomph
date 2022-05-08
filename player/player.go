@@ -68,6 +68,8 @@ type Player struct {
 
 	closed bool
 
+	c chan struct{}
+
 	world.NopViewer
 }
 
@@ -98,6 +100,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
 
 		gameMode: data.PlayerGameMode,
+
+		c: make(chan struct{}),
 
 		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
@@ -371,6 +375,7 @@ func (p *Player) Close() error {
 	}
 
 	p.serverTicker.Stop()
+	close(p.c)
 
 	p.checkMu.Lock()
 	p.checks = nil
@@ -379,6 +384,10 @@ func (p *Player) Close() error {
 	p.ackMu.Lock()
 	p.acknowledgements = nil
 	p.ackMu.Unlock()
+
+	p.entityMu.Lock()
+	p.entities = nil
+	p.entityMu.Unlock()
 	return nil
 }
 
@@ -391,7 +400,10 @@ func (p *Player) Handle(h Handler) {
 
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
-	for range p.serverTicker.C {
+	select {
+	case <-p.c:
+		return
+	case <-p.serverTicker.C:
 		p.flushEntityLocations()
 		p.serverTick++
 	}
