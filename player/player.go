@@ -400,12 +400,14 @@ func (p *Player) Handle(h Handler) {
 
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
-	select {
-	case <-p.c:
-		return
-	case <-p.serverTicker.C:
-		p.flushEntityLocations()
-		p.serverTick++
+	for {
+		select {
+		case <-p.c:
+			return
+		case <-p.serverTicker.C:
+			p.flushEntityLocations()
+			p.serverTick++
+		}
 	}
 }
 
