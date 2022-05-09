@@ -350,11 +350,11 @@ func (p *Player) Name() string {
 // Disconnect disconnects the player for the reason provided.
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
-	p.Close()
+	_ = p.Close()
 }
 
 // Close closes the player.
-func (p *Player) Close() {
+func (p *Player) Close() error {
 	p.once.Do(func() {
 		p.checkMu.Lock()
 		p.checks = nil
@@ -375,6 +375,7 @@ func (p *Player) Close() {
 			_ = p.serverConn.Close()
 		}
 	})
+	return nil
 }
 
 // Handle sets the handler of the player.
