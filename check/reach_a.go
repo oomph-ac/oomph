@@ -46,9 +46,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 			if p.GameMode() == packet.GameTypeSurvival || p.GameMode() == packet.GameTypeAdventure {
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = game.Vec32To64(data.Position)
-				if p.Sneaking() {
-					r.attackPos[1] -= 0.08
-				}
+				// TODO: When added to Bedrock, account for sneaking AABB.
 				if t, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
 					if r.inputMode == packet.InputModeTouch {
 						dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
