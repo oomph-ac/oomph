@@ -35,7 +35,6 @@ type Player struct {
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
 
-	serverTicker           *time.Ticker
 	clientTick, serverTick uint64
 
 	hMutex sync.RWMutex
@@ -66,9 +65,8 @@ type Player struct {
 	checkMu sync.Mutex
 	checks  []check.Check
 
-	closed bool
-
-	c chan struct{}
+	c    chan struct{}
+	once sync.Once
 
 	world.NopViewer
 }
@@ -103,7 +101,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		c: make(chan struct{}),
 
-		serverTicker: time.NewTicker(time.Second / 20),
 		checks: []check.Check{
 			check.NewAimAssistA(),
 
@@ -203,8 +200,8 @@ func (p *Player) AABB() cube.BBox {
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
 func (p *Player) Acknowledgement(f func()) {
-	if p.closed {
-		// Don't request an acknowledgement if the player is already closed.
+	if p.acknowledgements == nil {
+		// Don't request an acknowledgement if acknowledgements are closed.
 		return
 	}
 
@@ -353,42 +350,31 @@ func (p *Player) Name() string {
 // Disconnect disconnects the player for the reason provided.
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
-	_ = p.Close()
+	p.Close()
 }
 
 // Close closes the player.
-func (p *Player) Close() error {
-	if p.closed {
-		// Already closed, do nothing.
-		return nil
-	}
-	p.closed = true
+func (p *Player) Close() {
+	p.once.Do(func() {
+		p.checkMu.Lock()
+		p.checks = nil
+		p.checkMu.Unlock()
 
-	if err := p.conn.Close(); err != nil {
-		return err
-	}
+		p.ackMu.Lock()
+		p.acknowledgements = nil
+		p.ackMu.Unlock()
 
-	if p.serverConn != nil {
-		if err := p.serverConn.Close(); err != nil {
-			return err
+		p.entityMu.Lock()
+		p.entities = nil
+		p.entityMu.Unlock()
+
+		close(p.c)
+
+		_ = p.conn.Close()
+		if p.serverConn != nil {
+			_ = p.serverConn.Close()
 		}
-	}
-
-	p.serverTicker.Stop()
-	close(p.c)
-
-	p.checkMu.Lock()
-	p.checks = nil
-	p.checkMu.Unlock()
-
-	p.ackMu.Lock()
-	p.acknowledgements = nil
-	p.ackMu.Unlock()
-
-	p.entityMu.Lock()
-	p.entities = nil
-	p.entityMu.Unlock()
-	return nil
+	})
 }
 
 // Handle sets the handler of the player.
@@ -400,11 +386,13 @@ func (p *Player) Handle(h Handler) {
 
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
+	t := time.NewTicker(time.Second / 20)
+	defer t.Stop()
 	for {
 		select {
 		case <-p.c:
 			return
-		case <-p.serverTicker.C:
+		case <-t.C:
 			p.flushEntityLocations()
 			p.serverTick++
 		}
