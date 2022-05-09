@@ -2,13 +2,8 @@ package player
 
 import (
 	"fmt"
+	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/block/cube"
-	"golang.org/x/text/language"
-	"math/rand"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
@@ -20,6 +15,11 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/text/language"
+	"math/rand"
+	"strings"
+	"sync"
+	"time"
 )
 
 // Player contains information about a player, such as its virtual world or AABB.
@@ -35,7 +35,7 @@ type Player struct {
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
 
-	clientTick, serverTick uint64
+	clientTick, serverTick atomic.Uint64
 
 	hMutex sync.RWMutex
 	h      Handler
@@ -173,13 +173,13 @@ func (p *Player) Entity() *entity.Entity {
 
 // ServerTick returns the current server tick.
 func (p *Player) ServerTick() uint64 {
-	return p.serverTick
+	return p.serverTick.Load()
 }
 
 // ClientTick returns the current client tick. This is measured by the amount of PlayerAuthInput packets the
 // client has sent. (since the packet is sent every client tick)
 func (p *Player) ClientTick() uint64 {
-	return p.clientTick
+	return p.clientTick.Load()
 }
 
 // Position returns the position of the player.
@@ -395,7 +395,7 @@ func (p *Player) startTicking() {
 			return
 		case <-t.C:
 			p.flushEntityLocations()
-			p.serverTick++
+			p.serverTick.Inc()
 		}
 	}
 }

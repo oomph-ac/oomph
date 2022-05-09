@@ -28,7 +28,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
-		p.clientTick++
+		p.clientTick.Inc()
 		if p.ready {
 			p.Move(pk)
 
