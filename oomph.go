@@ -157,8 +157,10 @@ func (o *Oomph) LookupCheck(name string, check check.Check) (check.Check, bool) 
 	if !ok {
 		return nil, false
 	}
+	tSub, tName := check.Name()
 	for _, c := range checks {
-		if c.Name() == check.Name() {
+		sub, name := c.Name()
+		if tSub == sub && tName == name {
 			return c, true
 		}
 	}
