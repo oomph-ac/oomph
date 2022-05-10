@@ -35,10 +35,11 @@ func (o *Oomph) Listen(srv *server.Server, name string, requirePacks bool) error
 // Accept accepts an incoming player into the server. It blocks until a player connects to the server.
 // Accept returns an error if the Server is no longer available.
 func (o *Oomph) Accept() (*player.Player, error) {
-	p, ok := <-o.players
+	p, ok := <-o.playerChan
 	if !ok {
 		return nil, errors.New("could not accept player: oomph stopped")
 	}
+	o.players[p.Name()] = p
 	return p, nil
 }
 
@@ -50,7 +51,7 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 	p := player.NewPlayer(l.o.log, c.(*minecraft.Conn), nil)
-	l.o.players <- p
+	l.o.playerChan <- p
 	return p, err
 }
 
@@ -62,6 +63,6 @@ func (l listener) Disconnect(conn session.Conn, reason string) error {
 // Close closes the Listener.
 func (l listener) Close() error {
 	_ = l.Listener.Close()
-	close(l.o.players)
+	close(l.o.playerChan)
 	return nil
 }

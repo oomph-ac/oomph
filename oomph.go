@@ -2,6 +2,7 @@ package oomph
 
 import (
 	"errors"
+	"github.com/oomph-ac/oomph/check"
 	"sync"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -13,18 +14,20 @@ import (
 
 // Oomph represents an instance of the Oomph proxy.
 type Oomph struct {
-	players chan *player.Player
-	log     *logrus.Logger
-	addr    string
+	players    map[string]*player.Player
+	playerChan chan *player.Player
+	log        *logrus.Logger
+	addr       string
 }
 
 // New returns a new Oomph instance.
 // If your server is using Dragonfly, be sure to use the Listener function instead.
 func New(log *logrus.Logger, localAddr string) *Oomph {
 	return &Oomph{
-		players: make(chan *player.Player),
-		addr:    localAddr,
-		log:     log,
+		players:    make(map[string]*player.Player),
+		playerChan: make(chan *player.Player),
+		addr:       localAddr,
+		log:        log,
 	}
 }
 
@@ -88,7 +91,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	g.Wait()
 
 	p := player.NewPlayer(o.log, conn, serverConn)
-	o.players <- p
+	o.playerChan <- p
 
 	g.Add(2)
 	go func() {
@@ -137,4 +140,27 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 	p.Close()
+}
+
+// LookupChecks will lookup the checks of a player.
+func (o *Oomph) LookupChecks(name string) ([]check.Check, bool) {
+	p, ok := o.players[name]
+	if !ok {
+		return nil, false
+	}
+	return p.Checks(), true
+}
+
+// LookupCheck will lookup a specific check for a player.
+func (o *Oomph) LookupCheck(name string, check check.Check) (check.Check, bool) {
+	checks, ok := o.LookupChecks(name)
+	if !ok {
+		return nil, false
+	}
+	for _, c := range checks {
+		if c.Name() == check.Name() {
+			return c, true
+		}
+	}
+	return nil, false
 }

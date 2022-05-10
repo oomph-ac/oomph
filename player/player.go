@@ -197,6 +197,13 @@ func (p *Player) AABB() cube.BBox {
 	return p.Entity().AABB()
 }
 
+// Checks returns the checks of the player.
+func (p *Player) Checks() []check.Check {
+	p.checkMu.Lock()
+	defer p.checkMu.Unlock()
+	return p.checks
+}
+
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Stop abusing NSL!
 func (p *Player) Acknowledgement(f func()) {
