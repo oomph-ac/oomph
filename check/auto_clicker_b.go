@@ -2,6 +2,7 @@ package check
 
 import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"golang.org/x/exp/slices"
 )
 
 // AutoClickerB checks if the user is clicking above 18 cps with no double clicks.
@@ -35,7 +36,7 @@ func (a *AutoClickerB) Process(p Processor, _ packet.Packet) {
 	if p.Clicking() {
 		a.samples = append(a.samples, p.ClickDelay())
 		if len(a.samples) == 20 {
-			if a.verifySamples() && p.CPS() >= 18 {
+			if !slices.Contains(a.samples, 0) && p.CPS() >= 18 {
 				p.Flag(a, a.violationAfterTicks(p.ClientTick(), 300), map[string]any{
 					"CPS": p.CPS(),
 				})
@@ -43,14 +44,4 @@ func (a *AutoClickerB) Process(p Processor, _ packet.Packet) {
 			a.samples = make([]uint64, 0)
 		}
 	}
-}
-
-// verifySamples verifies the existing samples for any violations.
-func (a *AutoClickerB) verifySamples() bool {
-	for _, v := range a.samples {
-		if v == 0 {
-			return false
-		}
-	}
-	return true
 }
