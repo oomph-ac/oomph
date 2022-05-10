@@ -38,7 +38,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) {
 		if len(a.samples) == 20 {
 			cps := p.CPS()
 			deviation, skewness := game.StandardDeviation(a.samples), game.Skewness(a.samples)
-			p.Debug(a, map[string]interface{}{
+			p.Debug(a, map[string]any{
 				"Deviation": game.Round(deviation, 3),
 				"Skewness":  game.Round(skewness, 3),
 				"CPS":       cps,
@@ -49,7 +49,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) {
 					e = 1.0
 				}
 				if a.Buff(1) >= e {
-					p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
+					p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]any{
 						"Deviation": game.Round(deviation, 3),
 						"Skewness":  game.Round(skewness, 3),
 						"CPS":       cps,
