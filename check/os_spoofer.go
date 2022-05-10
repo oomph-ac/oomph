@@ -40,7 +40,7 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) {
 			// Console players have to use a proxy to join servers, which would change their device os.
 			return
 		}
-		
+
 		titleID := p.IdentityData().TitleID
 		if expected, ok := map[string]protocol.DeviceOS{
 			"1739947436": protocol.DeviceAndroid,
@@ -53,13 +53,13 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) {
 			"1916611344": protocol.DeviceWP,
 			// TODO: Add more title IDs.
 		}[titleID]; ok && expected != deviceOS {
-			p.Flag(o, 1, map[string]interface{}{
+			p.Flag(o, 1, map[string]any{
 				"Title ID":    titleID,
 				"Given OS":    utils.Device(deviceOS),
 				"Expected OS": utils.Device(expected),
 			})
 		} else if !ok {
-			p.Debug(o, map[string]interface{}{
+			p.Debug(o, map[string]any{
 				"Unknown Title ID": titleID,
 				"Given OS":         utils.Device(deviceOS),
 			})

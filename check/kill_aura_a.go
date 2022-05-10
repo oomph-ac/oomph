@@ -43,7 +43,7 @@ func (k *KillAuraA) Process(p Processor, pk packet.Packet) {
 			currentTick := p.ClientTick()
 			tickDiff := currentTick - k.lastSwingTick
 			if tickDiff > 4 {
-				p.Flag(k, k.violationAfterTicks(currentTick, 600), map[string]interface{}{
+				p.Flag(k, k.violationAfterTicks(currentTick, 600), map[string]any{
 					"Tick Difference": tickDiff,
 					"Current Tick":    currentTick,
 					"Last Tick":       k.lastSwingTick,

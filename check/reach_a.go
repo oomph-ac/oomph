@@ -52,7 +52,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 						dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
 						if dist > 3.15 {
 							if r.Buff(1, 10) >= 5 {
-								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
+								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]any{
 									"Distance": game.Round(dist, 4),
 									"Type":     "Raw",
 								})
@@ -96,7 +96,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 					if valid {
 						if minDist >= 3.1 && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
 							if r.Buff(1, 6) >= 3 {
-								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
+								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]any{
 									"Distance": game.Round(minDist, 2),
 									"Type":     "Raycast",
 								})

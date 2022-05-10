@@ -219,7 +219,7 @@ func (p *Player) Acknowledgement(f func()) {
 }
 
 // Debug debugs the given check data to the console and other relevant sources.
-func (p *Player) Debug(check check.Check, params map[string]interface{}) {
+func (p *Player) Debug(check check.Check, params map[string]any) {
 	name, variant := check.Name()
 	ctx := event.C()
 	p.handler().HandleDebug(ctx, check, params)
@@ -229,7 +229,7 @@ func (p *Player) Debug(check check.Check, params map[string]interface{}) {
 }
 
 // Flag flags the given check data to the console and other relevant sources.
-func (p *Player) Flag(check check.Check, violations float64, params map[string]interface{}) {
+func (p *Player) Flag(check check.Check, violations float64, params map[string]any) {
 	if violations <= 0 {
 		// No violations, don't flag anything.
 		return

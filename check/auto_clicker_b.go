@@ -36,7 +36,7 @@ func (a *AutoClickerB) Process(p Processor, _ packet.Packet) {
 		a.samples = append(a.samples, p.ClickDelay())
 		if len(a.samples) == 20 {
 			if a.verifySamples() && p.CPS() >= 18 {
-				p.Flag(a, a.violationAfterTicks(p.ClientTick(), 300), map[string]interface{}{
+				p.Flag(a, a.violationAfterTicks(p.ClientTick(), 300), map[string]any{
 					"CPS": p.CPS(),
 				})
 			}
