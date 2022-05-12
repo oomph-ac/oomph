@@ -75,9 +75,6 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 				cRot, lRot := e.Rotation(), e.LastRotation()
 				cDv, lDv := game.DirectionVector(cRot.Z(), cRot.X()), game.DirectionVector(lRot.Z(), lRot.X())
 				cPos, lPos := p.Entity().Position().Add(mgl64.Vec3{0, 1.62, 0}), r.attackPos
-				if p.Sneaking() {
-					cPos[1] -= 0.08
-				}
 
 				aabb := e.AABB().Translate(e.LastPosition())
 				targetAABB := t.AABB().Grow(0.1).Translate(t.LastPosition())
