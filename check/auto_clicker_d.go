@@ -5,7 +5,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoClickerD checks if a user has a constant and low standard deviation in their click data.
+// AutoClickerD checks for an irregular clicking pattern using statistics.
 type AutoClickerD struct {
 	samples []float64
 	basic
@@ -23,7 +23,7 @@ func (*AutoClickerD) Name() (string, string) {
 
 // Description ...
 func (*AutoClickerD) Description() string {
-	return "This checks if a user has a constant and low standard deviation in their click data."
+	return "This checks for an irregular clicking pattern."
 }
 
 // MaxViolations ...
