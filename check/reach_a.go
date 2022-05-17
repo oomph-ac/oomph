@@ -52,21 +52,20 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 					r.attackPos[1] -= 0.08
 				}
 				if t, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
-					if r.inputMode == packet.InputModeTouch {
-						dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
-						if dist > 3.15 {
-							if r.Buff(1, 10) >= 5 {
-								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
-									"Distance": game.Round(dist, 4),
-									"Type":     "Raw",
-								})
-							}
-						} else {
-							r.Buff(-0.05)
-							r.violations = math.Max(r.violations-0.01, 0)
+					if r.inputMode != packet.InputModeTouch {
+						r.awaitingTick = true
+					}
+					dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
+					if dist > 3.15 {
+						if r.Buff(1, 10) >= 5 {
+							p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
+								"Distance": game.Round(dist, 4),
+								"Type":     "Raw",
+							})
 						}
 					} else {
-						r.awaitingTick = true
+						r.Buff(-0.05)
+						r.violations = math.Max(r.violations-0.01, 0)
 					}
 				}
 			}
@@ -74,36 +73,41 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 	case *packet.PlayerAuthInput:
 		r.inputMode = pk.InputMode
 		if r.awaitingTick {
-			if t, ok := p.SearchEntity(r.attackedEntity); ok /*&& t.Player()*/ {
+			if t, ok := p.SearchEntity(r.attackedEntity); ok && t.Player() {
 				e := p.Entity()
 				cRot, lRot := e.Rotation(), e.LastRotation()
 				cDv, lDv := game.DirectionVector(cRot.Z(), cRot.X()), game.DirectionVector(lRot.Z(), lRot.X())
 				cPos, lPos := p.Entity().Position().Add(mgl64.Vec3{0, 1.62, 0}), r.attackPos
+				cEntPos, lEntPos := t.Position(), t.LastPosition()
 				if p.Sneaking() {
 					cPos[1] -= 0.08
 				}
 
-				aabb := e.AABB().Translate(e.LastPosition())
 				targetAABB := t.AABB().Grow(0.1).Translate(t.LastPosition())
 
-				if !aabb.IntersectsWith(targetAABB) {
+				if !e.AABB().Translate(e.LastPosition()).IntersectsWith(targetAABB) {
 					dvDiff := cDv.Sub(lDv)
 					posDiff := cPos.Sub(lPos)
+					entPosDiff := cEntPos.Sub(lEntPos)
 					minDist, valid := 69000.0, false
-					for i := 30; i != 0; i-- {
+					maxDist := 3.1
+					for i := 0; i <= 30; i++ {
 						uDv := lDv
 						uPos := lPos
+						uEntPos := lEntPos
 						if i != 0 {
 							uDv = uDv.Add(dvDiff.Mul(float64(1 / i)))
 							uPos = uPos.Add(posDiff.Mul(float64(1 / i)))
+							uEntPos = uEntPos.Add(entPosDiff.Mul(float64(1 / i)))
 						}
-						if ray, ok := trace.AABBIntercept(targetAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
+						uAABB := t.AABB().Translate(uEntPos)
+						if ray, ok := trace.AABBIntercept(uAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
 							minDist = math.Min(minDist, ray.Position().Sub(uPos).Len())
 							valid = true
 						}
 					}
 					if valid {
-						if minDist >= 3.1 && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
+						if minDist >= maxDist && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
 							if r.Buff(1, 6) >= 3 {
 								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
 									"Distance": game.Round(minDist, 2),

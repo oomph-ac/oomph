@@ -17,6 +17,8 @@ type Entity struct {
 	lastPosition mgl64.Vec3
 	// receivedPosition is the position of the entity that the client sees on their side.
 	receivedPosition mgl64.Vec3
+	// interpolationMotion is the client-sided motion of the entity
+	interpolatedMotion mgl64.Vec3
 	// rotation represents the rotation of an entity. The first value is the pitch, and the second and third represent
 	// the yaw and head yaw, the latter of which only being applicable for certain entities, such as players.
 	rotation mgl64.Vec3
@@ -28,6 +30,8 @@ type Entity struct {
 	aabb physics.AABB
 	// player is true if the entity is a player.
 	player bool
+	// onGround determines wether the entity is on or off the ground
+	onGround bool
 	// newLocationIncrements is the amount of ticks the entity's position should be smoothed out by.
 	// Every client tick, this value will be de-incremented, and whenever the client receives a position for an
 	// entity, this value will be reset to 3.
@@ -50,6 +54,7 @@ func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
 		lastRotation:     rotation,
 		aabb:             defaultAABB,
 		player:           player,
+		onGround:         true,
 	}
 }
 
@@ -78,6 +83,18 @@ func (e *Entity) Move(pos mgl64.Vec3, offset bool) {
 	}
 }
 
+func (e *Entity) ClientInterpolation(motion mgl64.Vec3) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.interpolatedMotion = motion
+}
+
+func (e *Entity) InterpolatedMotion() mgl64.Vec3 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.interpolatedMotion
+}
+
 // ReceivedPosition returns the position of the entity that the client sees.
 func (e *Entity) ReceivedPosition() mgl64.Vec3 {
 	e.mu.Lock()
@@ -86,11 +103,12 @@ func (e *Entity) ReceivedPosition() mgl64.Vec3 {
 }
 
 // UpdateReceivedPosition updates the position of the entity that the client sees.
-func (e *Entity) UpdateReceivedPosition(pos mgl64.Vec3, offset bool) {
+func (e *Entity) UpdateReceivedPosition(pos mgl64.Vec3, ground bool, offset bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	e.receivedPosition = pos
+	e.onGround = ground
 	if offset {
 		e.receivedPosition[1] -= 1.62
 	}
@@ -167,6 +185,12 @@ func (e *Entity) Player() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.player
+}
+
+func (e *Entity) OnGround() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.onGround
 }
 
 // AABB returns the AABB of the entity.

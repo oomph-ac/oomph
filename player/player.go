@@ -2,11 +2,12 @@ package player
 
 import (
 	"fmt"
-	"golang.org/x/text/language"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/text/language"
 
 	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/event"
@@ -46,8 +47,9 @@ type Player struct {
 	entityMu sync.Mutex
 	entities map[uint64]*entity.Entity
 
-	queueMu               sync.Mutex
-	queuedEntityLocations map[uint64]mgl64.Vec3
+	queueMu                          sync.Mutex
+	queuedEntityLocations            map[uint64]utils.LocationData
+	queuedEntityMotionInterpolations map[uint64]mgl64.Vec3
 
 	ready    bool
 	gameMode int32
@@ -95,7 +97,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		),
 
 		entities:              make(map[uint64]*entity.Entity),
-		queuedEntityLocations: make(map[uint64]mgl64.Vec3),
+		queuedEntityLocations: make(map[uint64]utils.LocationData),
 
 		gameMode: data.PlayerGameMode,
 
@@ -151,11 +153,14 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 }
 
 // MoveEntity moves an entity to the given position.
-func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3) {
+func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, ground bool) {
 	// If the entity exists, we can queue the location for an update.
 	if _, ok := p.SearchEntity(rid); ok {
 		p.queueMu.Lock()
-		p.queuedEntityLocations[rid] = pos
+		p.queuedEntityLocations[rid] = utils.LocationData{
+			Position: pos,
+			OnGround: ground,
+		}
 		p.queueMu.Unlock()
 	}
 }
@@ -197,8 +202,8 @@ func (p *Player) AABB() physics.AABB {
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
-// TODO: Stop abusing NSL!
-func (p *Player) Acknowledgement(f func()) {
+// TODO: Find something with similar usage to NSL - it will possibly be removed in future versions of Minecraft
+func (p *Player) Acknowledgement(f func(), flush bool) {
 	if p.closed {
 		// Don't request an acknowledgement if the player is already closed.
 		return
@@ -214,7 +219,9 @@ func (p *Player) Acknowledgement(f func()) {
 	p.ackMu.Unlock()
 
 	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
-	_ = p.conn.Flush() // Make sure we get an acknowledgement as soon as possible!
+	if flush {
+		_ = p.conn.Flush()
+	}
 }
 
 // Debug debugs the given check data to the console and other relevant sources.
