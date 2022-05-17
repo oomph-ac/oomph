@@ -42,7 +42,7 @@ func Device(os protocol.DeviceOS) string {
 }
 
 // PrettyParameters converts the given parameters to a readable string.
-func PrettyParameters(params map[string]interface{}, condensed bool) string {
+func PrettyParameters(params map[string]any, condensed bool) string {
 	if len(params) == 0 {
 		// Don't waste time if there are no parameters.
 		return "[]"

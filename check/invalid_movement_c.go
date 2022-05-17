@@ -44,7 +44,7 @@ func (i *InvalidMovementC) Process(p Processor, pk packet.Packet) {
 
 		if p.Jumping() {
 			if i.jumpTicks > 0 || !isHoldingJump {
-				p.Flag(i, 1, map[string]interface{}{
+				p.Flag(i, 1, map[string]any{
 					"Jumping Ticks": i.jumpTicks,
 					"Jumping":       isHoldingJump,
 				})
