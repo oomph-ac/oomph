@@ -35,8 +35,8 @@ func (*OSSpoofer) MaxViolations() float64 {
 func (o *OSSpoofer) Process(p Processor, pk packet.Packet) {
 	switch pk.(type) {
 	case *packet.TickSync: // Sent by the client right as it spawns in.
-		titleID := p.IdentityData().TitleID
 		deviceOS := p.ClientData().DeviceOS
+		titleID := p.IdentityData().TitleID
 
 		if expected, ok := map[string]protocol.DeviceOS{
 			"1739947436": protocol.DeviceAndroid,
@@ -49,13 +49,17 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) {
 			"1916611344": protocol.DeviceWP,
 			// TODO: Add more title IDs.
 		}[titleID]; ok && expected != deviceOS {
-			p.Flag(o, 1, map[string]interface{}{
+			if titleID == "2044456598" || titleID == "1828326430" {
+				// rawr XD! prowxy wockys made some fwucky wuckys in their code! now we have to ignore console players
+				return
+			}
+			p.Flag(o, 1, map[string]any{
 				"Title ID":    titleID,
 				"Given OS":    utils.Device(deviceOS),
 				"Expected OS": utils.Device(expected),
 			})
 		} else if !ok {
-			p.Debug(o, map[string]interface{}{
+			p.Debug(o, map[string]any{
 				"Unknown Title ID": titleID,
 				"Given OS":         utils.Device(deviceOS),
 			})
