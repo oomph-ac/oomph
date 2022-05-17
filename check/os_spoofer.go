@@ -36,12 +36,8 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) {
 	switch pk.(type) {
 	case *packet.TickSync: // Sent by the client right as it spawns in.
 		deviceOS := p.ClientData().DeviceOS
-		if deviceOS == protocol.DeviceXBOX || deviceOS == protocol.DeviceOrbis {
-			// Console players have to use a proxy to join servers, which would change their device os.
-			return
-		}
-
 		titleID := p.IdentityData().TitleID
+
 		if expected, ok := map[string]protocol.DeviceOS{
 			"1739947436": protocol.DeviceAndroid,
 			"1810924247": protocol.DeviceIOS,
@@ -53,6 +49,10 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) {
 			"1916611344": protocol.DeviceWP,
 			// TODO: Add more title IDs.
 		}[titleID]; ok && expected != deviceOS {
+			if titleID == "2044456598" || titleID == "1828326430" {
+				// rawr XD! prowxy wockys made some fwucky wuckys in their code! now we have to ignore console players
+				return
+			}
 			p.Flag(o, 1, map[string]any{
 				"Title ID":    titleID,
 				"Given OS":    utils.Device(deviceOS),
