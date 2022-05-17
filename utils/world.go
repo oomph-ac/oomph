@@ -4,7 +4,6 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
-	"github.com/df-mc/dragonfly/server/entity/physics"
 	"github.com/df-mc/dragonfly/server/world"
 	"math"
 )
@@ -20,7 +19,7 @@ func BlockClimbable(b world.Block) bool {
 }
 
 // BlocksNearby returns a slice of blocks that are nearby the search position.
-func BlocksNearby(aabb physics.AABB, w *world.World, solid bool) []world.Block {
+func BlocksNearby(aabb cube.BBox, w *world.World, solid bool) []world.Block {
 	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := min[0], min[1], min[2]
@@ -43,18 +42,18 @@ func BlocksNearby(aabb physics.AABB, w *world.World, solid bool) []world.Block {
 }
 
 // CollidingBlocks returns all block AABBs that collide with the entity.
-func CollidingBlocks(aabb physics.AABB, w *world.World) []physics.AABB {
+func CollidingBlocks(aabb cube.BBox, w *world.World) []cube.BBox {
 	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
 	maxX, maxY, maxZ := int(math.Floor(max[0])), int(math.Floor(max[1])), int(math.Floor(max[2]))
 
-	var blockAABBs []physics.AABB
+	var blockAABBs []cube.BBox
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				blockPos := cube.Pos{x, y, z}
-				for _, box := range w.Block(blockPos).Model().AABB(blockPos, w) {
+				for _, box := range w.Block(blockPos).Model().BBox(blockPos, w) {
 					if box.Translate(blockPos.Vec3()).IntersectsWith(aabb) {
 						blockAABBs = append(blockAABBs, box.Translate(blockPos.Vec3()))
 					}

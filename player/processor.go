@@ -11,7 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// ClientProcess processes the given packet from the client.
+// ClientProcess processes a given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) bool {
 	p.clicking = false
 
@@ -28,7 +28,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
-		p.clientTick++
+		p.clientTick.Inc()
 		if p.ready {
 			p.Move(pk)
 
@@ -72,7 +72,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	return false
 }
 
-// ServerProcess processes the given packet from the server.
+// ServerProcess processes a given packet from the server.
 func (p *Player) ServerProcess(pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.AddPlayer:
@@ -88,7 +88,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
 				true,
 			))
-		})
+		}, false)
 	case *packet.AddActor:
 		if pk.EntityRuntimeID == p.rid {
 			// We are the player.
@@ -102,7 +102,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
 				false,
 			))
-		})
+		}, false)
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
@@ -111,11 +111,11 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				if teleport {
 					p.teleporting = true
 				}
-			})
+			}, false)
 			return false
 		}
 
-		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
+		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
@@ -124,11 +124,11 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				if teleport {
 					p.teleporting = true
 				}
-			})
+			}, false)
 			return false
 		}
 
-		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position))
+		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 	case *packet.SetActorData:
 		p.Acknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
@@ -140,20 +140,20 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
 				p.immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
 			}
-		})
+		}, false)
 	case *packet.SubChunk, *packet.LevelChunk:
 		p.Acknowledgement(func() {
 			p.ready = true
-		})
+		}, false)
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType
-		})
+		}, false)
 	case *packet.RemoveActor:
 		if pk.EntityUniqueID != p.uid {
 			p.Acknowledgement(func() {
 				p.RemoveEntity(uint64(pk.EntityUniqueID))
-			})
+			}, false)
 		}
 	case *packet.UpdateAttributes:
 		if pk.EntityRuntimeID == p.rid {
@@ -163,7 +163,14 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 						p.dead = true
 					}
 				}
-			})
+			}, false)
+		}
+	case *packet.SetActorMotion:
+		if pk.EntityRuntimeID == p.rid {
+			return false
+		}
+		if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
+			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	}
 	return false

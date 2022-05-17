@@ -5,7 +5,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoClickerC checks for an irregular clicking pattern using statistics.
+// AutoClickerC checks if a user has a constant and low standard deviation in their click data.
 type AutoClickerC struct {
 	basic
 	samples []float64
@@ -23,7 +23,7 @@ func (*AutoClickerC) Name() (string, string) {
 
 // Description ...
 func (*AutoClickerC) Description() string {
-	return "This checks for an irregular clicking pattern."
+	return "This checks if a user has a constant and low standard deviation in their click data."
 }
 
 // MaxViolations ...
@@ -38,7 +38,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) {
 		if len(a.samples) == 20 {
 			cps := p.CPS()
 			deviation, skewness := game.StandardDeviation(a.samples), game.Skewness(a.samples)
-			p.Debug(a, map[string]interface{}{
+			p.Debug(a, map[string]any{
 				"Deviation": game.Round(deviation, 3),
 				"Skewness":  game.Round(skewness, 3),
 				"CPS":       cps,
@@ -49,7 +49,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) {
 					e = 1.0
 				}
 				if a.Buff(1) >= e {
-					p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]interface{}{
+					p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]any{
 						"Deviation": game.Round(deviation, 3),
 						"Skewness":  game.Round(skewness, 3),
 						"CPS":       cps,
