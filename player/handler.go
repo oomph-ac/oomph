@@ -12,9 +12,9 @@ type Handler interface {
 	// this should be used if you want to punish players.
 	HandlePunishment(ctx *event.Context, check check.Check, message *string)
 	// HandleFlag handles when a player gets flagged for a check.
-	HandleFlag(ctx *event.Context, check check.Check, params map[string]interface{})
+	HandleFlag(ctx *event.Context, check check.Check, params map[string]any)
 	// HandleDebug handles check debug messages. These are logged by default and ctx.Cancel should be used to cancel them.
-	HandleDebug(ctx *event.Context, check check.Check, params map[string]interface{})
+	HandleDebug(ctx *event.Context, check check.Check, params map[string]any)
 }
 
 // NopHandler implements the Handler interface but does not execute any code when an event is called. The
@@ -29,7 +29,7 @@ var _ Handler = (*NopHandler)(nil)
 func (NopHandler) HandlePunishment(*event.Context, check.Check, *string) {}
 
 // HandleFlag ...
-func (NopHandler) HandleFlag(*event.Context, check.Check, map[string]interface{}) {}
+func (NopHandler) HandleFlag(*event.Context, check.Check, map[string]any) {}
 
 // HandleDebug ...
-func (NopHandler) HandleDebug(*event.Context, check.Check, map[string]interface{}) {}
+func (NopHandler) HandleDebug(*event.Context, check.Check, map[string]any) {}
