@@ -1,22 +1,22 @@
 package game
 
 import (
-	"github.com/df-mc/dragonfly/server/entity/physics"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
 	"math"
 )
 
 // AABBFromDimensions returns a bounding box from the given dimensions.
-func AABBFromDimensions(width, height float64) physics.AABB {
+func AABBFromDimensions(width, height float64) cube.BBox {
 	h := width / 2
-	return physics.NewAABB(
-		mgl64.Vec3{-h, 0, -h},
-		mgl64.Vec3{h, height, h},
+	return cube.Box(
+		-h, 0, -h,
+		h, height, h,
 	)
 }
 
 // AABBVectorDistance calculates the distance between an AABB and a vector.
-func AABBVectorDistance(a physics.AABB, v mgl64.Vec3) float64 {
+func AABBVectorDistance(a cube.BBox, v mgl64.Vec3) float64 {
 	x := math.Max(a.Min().X()-v.X(), math.Max(0, v.X()-a.Max().X()))
 	y := math.Max(a.Min().Y()-v.Y(), math.Max(0, v.Y()-a.Max().Y()))
 	z := math.Max(a.Min().Z()-v.Z(), math.Max(0, v.Z()-a.Max().Z()))

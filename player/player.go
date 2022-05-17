@@ -2,14 +2,14 @@ package player
 
 import (
 	"fmt"
+
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
-	"golang.org/x/text/language"
-
-	"github.com/df-mc/dragonfly/server/entity/physics"
+	"github.com/df-mc/atomic"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
@@ -21,6 +21,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/text/language"
 )
 
 // Player contains information about a player, such as its virtual world or AABB.
@@ -36,8 +37,7 @@ type Player struct {
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
 
-	serverTicker           *time.Ticker
-	clientTick, serverTick uint64
+	clientTick, serverTick atomic.Uint64
 
 	hMutex sync.RWMutex
 	h      Handler
@@ -68,7 +68,8 @@ type Player struct {
 	checkMu sync.Mutex
 	checks  []check.Check
 
-	closed bool
+	c    chan struct{}
+	once sync.Once
 
 	world.NopViewer
 }
@@ -101,7 +102,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		gameMode: data.PlayerGameMode,
 
-		serverTicker: time.NewTicker(time.Second / 20),
+		c: make(chan struct{}),
+
 		checks: []check.Check{
 			check.NewAimAssistA(),
 
@@ -177,13 +179,13 @@ func (p *Player) Entity() *entity.Entity {
 
 // ServerTick returns the current server tick.
 func (p *Player) ServerTick() uint64 {
-	return p.serverTick
+	return p.serverTick.Load()
 }
 
 // ClientTick returns the current client tick. This is measured by the amount of PlayerAuthInput packets the
 // client has sent. (since the packet is sent every client tick)
 func (p *Player) ClientTick() uint64 {
-	return p.clientTick
+	return p.clientTick.Load()
 }
 
 // Position returns the position of the player.
@@ -197,15 +199,15 @@ func (p *Player) Rotation() mgl64.Vec3 {
 }
 
 // AABB returns the axis-aligned bounding box of the player.
-func (p *Player) AABB() physics.AABB {
+func (p *Player) AABB() cube.BBox {
 	return p.Entity().AABB()
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Find something with similar usage to NSL - it will possibly be removed in future versions of Minecraft
 func (p *Player) Acknowledgement(f func(), flush bool) {
-	if p.closed {
-		// Don't request an acknowledgement if the player is already closed.
+	if p.acknowledgements == nil {
+		// Don't request an acknowledgement if acknowledgements are closed.
 		return
 	}
 
@@ -225,7 +227,7 @@ func (p *Player) Acknowledgement(f func(), flush bool) {
 }
 
 // Debug debugs the given check data to the console and other relevant sources.
-func (p *Player) Debug(check check.Check, params map[string]interface{}) {
+func (p *Player) Debug(check check.Check, params map[string]any) {
 	name, variant := check.Name()
 	ctx := event.C()
 	p.handler().HandleDebug(ctx, check, params)
@@ -235,7 +237,7 @@ func (p *Player) Debug(check check.Check, params map[string]interface{}) {
 }
 
 // Flag flags the given check data to the console and other relevant sources.
-func (p *Player) Flag(check check.Check, violations float64, params map[string]interface{}) {
+func (p *Player) Flag(check check.Check, violations float64, params map[string]any) {
 	if violations <= 0 {
 		// No violations, don't flag anything.
 		return
@@ -356,36 +358,31 @@ func (p *Player) Name() string {
 // Disconnect disconnects the player for the reason provided.
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
-	_ = p.Close()
+	p.Close()
 }
 
 // Close closes the player.
 func (p *Player) Close() error {
-	if p.closed {
-		// Already closed, do nothing.
-		return nil
-	}
-	p.closed = true
+	p.once.Do(func() {
+		p.checkMu.Lock()
+		p.checks = nil
+		p.checkMu.Unlock()
 
-	if err := p.conn.Close(); err != nil {
-		return err
-	}
+		p.ackMu.Lock()
+		p.acknowledgements = nil
+		p.ackMu.Unlock()
 
-	if p.serverConn != nil {
-		if err := p.serverConn.Close(); err != nil {
-			return err
+		p.entityMu.Lock()
+		p.entities = nil
+		p.entityMu.Unlock()
+
+		close(p.c)
+
+		_ = p.conn.Close()
+		if p.serverConn != nil {
+			_ = p.serverConn.Close()
 		}
-	}
-
-	p.serverTicker.Stop()
-
-	p.checkMu.Lock()
-	p.checks = nil
-	p.checkMu.Unlock()
-
-	p.ackMu.Lock()
-	p.acknowledgements = nil
-	p.ackMu.Unlock()
+	})
 	return nil
 }
 
@@ -398,9 +395,16 @@ func (p *Player) Handle(h Handler) {
 
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
-	for range p.serverTicker.C {
-		p.flushEntityLocations()
-		p.serverTick++
+	t := time.NewTicker(time.Second / 20)
+	defer t.Stop()
+	for {
+		select {
+		case <-p.c:
+			return
+		case <-t.C:
+			p.flushEntityLocations()
+			p.serverTick.Inc()
+		}
 	}
 }
 

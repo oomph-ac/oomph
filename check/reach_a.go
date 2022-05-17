@@ -3,10 +3,9 @@ package check
 import (
 	"math"
 
+	"github.com/df-mc/dragonfly/server/block/cube/trace"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
-
-	"github.com/df-mc/dragonfly/server/entity/physics/trace"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -48,9 +47,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 			if p.GameMode() == packet.GameTypeSurvival || p.GameMode() == packet.GameTypeAdventure {
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = game.Vec32To64(data.Position)
-				if p.Sneaking() {
-					r.attackPos[1] -= 0.08
-				}
+				// TODO: When added to Bedrock, account for sneaking AABB.
 				if t, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
 					if r.inputMode != packet.InputModeTouch {
 						r.awaitingTick = true
@@ -79,9 +76,9 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 				cDv, lDv := game.DirectionVector(cRot.Z(), cRot.X()), game.DirectionVector(lRot.Z(), lRot.X())
 				cPos, lPos := p.Entity().Position().Add(mgl64.Vec3{0, 1.62, 0}), r.attackPos
 				cEntPos, lEntPos := t.Position(), t.LastPosition()
-				if p.Sneaking() {
+				/* if p.Sneaking() {
 					cPos[1] -= 0.08
-				}
+				} */
 
 				targetAABB := t.AABB().Grow(0.1).Translate(t.LastPosition())
 
@@ -101,7 +98,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 							uEntPos = uEntPos.Add(entPosDiff.Mul(float64(1 / i)))
 						}
 						uAABB := t.AABB().Translate(uEntPos)
-						if ray, ok := trace.AABBIntercept(uAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
+						if ray, ok := trace.BBoxIntercept(uAABB, uPos, uPos.Add(uDv.Mul(14))); ok {
 							minDist = math.Min(minDist, ray.Position().Sub(uPos).Len())
 							valid = true
 						}
@@ -109,7 +106,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 					if valid {
 						if minDist >= maxDist && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
 							if r.Buff(1, 6) >= 3 {
-								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
+								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]any{
 									"Distance": game.Round(minDist, 2),
 									"Type":     "Raycast",
 								})
