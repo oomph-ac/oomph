@@ -1,6 +1,8 @@
 package game
 
-import "math"
+import (
+	"math"
+)
 
 // sinTable ...
 var sinTable []float64

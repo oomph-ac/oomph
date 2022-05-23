@@ -47,6 +47,8 @@ type Player struct {
 	entityMu sync.Mutex
 	entities map[uint64]*entity.Entity
 
+	mInfo *MovementInfo
+
 	queueMu                          sync.Mutex
 	queuedEntityLocations            map[uint64]utils.LocationData
 	queuedEntityMotionInterpolations map[uint64]mgl64.Vec3
@@ -54,9 +56,7 @@ type Player struct {
 	ready    bool
 	gameMode int32
 
-	sneaking, sprinting    bool
-	teleporting, jumping   bool
-	immobile, flying, dead bool
+	dead bool
 
 	clickMu       sync.Mutex
 	clicking      bool
@@ -64,6 +64,10 @@ type Player struct {
 	lastClickTick uint64
 	clickDelay    uint64
 	cps           int
+
+	world *world.World
+	wl    *world.Loader
+	wMu   sync.Mutex
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -124,8 +128,15 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 			check.NewTimerA(),
 		},
+
+		mInfo: &MovementInfo{},
+
+		world: world.New(nil, world.Overworld, &world.Settings{}),
 	}
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
+	p.world.Generator(nil)
+	p.world.Provider(nil)
+	p.wl = world.NewLoader(conn.ChunkRadius(), p.world, p)
 	go p.startTicking()
 	return p
 }
@@ -141,6 +152,9 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Move(game.Vec32To64(pk.Position), true)
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
+
+	p.mInfo.ClientMovement = data.Position().Sub(data.LastPosition())
+	p.WorldLoader().Move(data.Position())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -152,6 +166,8 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	} else {
 		data.IncrementTeleportationTicks()
 	}
+	p.mInfo.Teleporting = true
+	p.WorldLoader().Move(p.Position())
 }
 
 // MoveEntity moves an entity to the given position.
@@ -165,6 +181,14 @@ func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, ground bool) {
 		}
 		p.queueMu.Unlock()
 	}
+}
+
+func (p *Player) World() *world.World {
+	return p.world
+}
+
+func (p *Player) WorldLoader() *world.Loader {
+	return p.wl
 }
 
 // Locale returns the locale of the player.
@@ -201,6 +225,10 @@ func (p *Player) Rotation() mgl64.Vec3 {
 // AABB returns the axis-aligned bounding box of the player.
 func (p *Player) AABB() cube.BBox {
 	return p.Entity().AABB()
+}
+
+func (p *Player) MovementInfo() *MovementInfo {
+	return p.mInfo
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
@@ -278,32 +306,32 @@ func (p *Player) GameMode() int32 {
 
 // Sneaking returns true if the player is currently sneaking.
 func (p *Player) Sneaking() bool {
-	return p.sneaking
+	return p.mInfo.Sneaking
 }
 
 // Sprinting returns true if the player is currently sprinting.
 func (p *Player) Sprinting() bool {
-	return p.sprinting
+	return p.mInfo.Sprinting
 }
 
 // Teleporting returns true if the player is currently teleporting.
 func (p *Player) Teleporting() bool {
-	return p.teleporting
+	return p.mInfo.Teleporting
 }
 
 // Jumping returns true if the player is currently jumping.
 func (p *Player) Jumping() bool {
-	return p.jumping
+	return p.mInfo.Jumping
 }
 
 // Immobile returns true if the player is currently immobile.
 func (p *Player) Immobile() bool {
-	return p.immobile
+	return p.mInfo.Immobile
 }
 
 // Flying returns true if the player is currently flying.
 func (p *Player) Flying() bool {
-	return p.flying
+	return p.mInfo.Flying
 }
 
 // Dead returns true if the player is currently dead.
