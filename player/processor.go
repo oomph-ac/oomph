@@ -3,7 +3,11 @@ package player
 import (
 	_ "unsafe"
 
+	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
@@ -32,15 +36,29 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if p.ready {
 			p.Move(pk)
 
-			if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-				p.sprinting = !p.sprinting
-			} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-				p.sneaking = !p.sneaking
-			}
-			p.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+			p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
+			p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
 
+			if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+				p.mInfo.Sprinting = !p.mInfo.Sprinting
+			} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+				p.mInfo.Sneaking = !p.mInfo.Sneaking
+			}
+			p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+			p.mInfo.InVoid = p.Position().Y() < -35
+
+			p.mInfo.JumpVelocity = game.DefaultJumpMotion
+			p.mInfo.Speed = game.NormalMovementSpeed
+			p.mInfo.Gravity = game.NormalGravity
+
+			if p.mInfo.Sprinting {
+				p.mInfo.Speed *= 1.3
+			}
+
+			p.updateMovementState()
 			p.tickEntityLocations()
-			p.teleporting = false
+
+			p.mInfo.Teleporting = false
 		}
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
@@ -49,9 +67,30 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
+		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
+			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
+			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
+			if !ok {
+				// Block somehow doesn't exist, so do nothing.
+				return false
+			}
+
+			p.wMu.Lock()
+			w := p.World()
+			boxes := block.Model().BBox(pos, w)
+			for _, box := range boxes {
+				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
+					// Intersects with our AABB, so do nothing.
+					return false
+				}
+			}
+
+			// Set the block in the world
+			w.SetBlock(pos, block, nil)
+			p.wMu.Unlock()
 		}
 	case *packet.AdventureSettings:
-		p.flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
+		p.mInfo.Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 			p.dead = false
@@ -61,6 +100,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
+	case *packet.ChunkRadiusUpdated:
+		p.WorldLoader().ChangeRadius(int(pk.ChunkRadius))
 	}
 
 	// Run all registered checks.
@@ -109,7 +150,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				teleport := utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport)
 				p.Teleport(pk.Position, teleport)
 				if teleport {
-					p.teleporting = true
+					p.mInfo.Teleporting = true
 				}
 			}, false)
 			return false
@@ -122,7 +163,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				teleport := pk.Mode == packet.MoveModeTeleport
 				p.Teleport(pk.Position, teleport)
 				if teleport {
-					p.teleporting = true
+					p.mInfo.Teleporting = true
 				}
 			}, false)
 			return false
@@ -138,10 +179,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}
 
 			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
-				p.immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
+				p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
 			}
 		}, false)
-	case *packet.SubChunk, *packet.LevelChunk:
+	case *packet.SubChunk:
 		p.Acknowledgement(func() {
 			p.ready = true
 		}, false)
@@ -167,11 +208,44 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID == p.rid {
-			return false
-		}
-		if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
+			p.Acknowledgement(func() {
+				p.mInfo.UpdateServerSentVelocity(mgl64.Vec3{
+					float64(pk.Velocity[0]),
+					float64(pk.Velocity[1]),
+					float64(pk.Velocity[2]),
+				})
+
+			}, false)
+		} else if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
+		}
+	case *packet.LevelChunk:
+		p.Acknowledgement(func() {
+			go func() {
+				a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+				c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
+				if err != nil {
+					p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
+					return
+				}
+
+				p.wMu.Lock()
+				world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
+				p.wMu.Unlock()
+				p.ready = true
+			}()
+		}, false)
+	case *packet.UpdateBlock:
+		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
+		if ok {
+			p.Acknowledgement(func() {
+				p.world.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b, nil)
+			}, false)
 		}
 	}
 	return false
 }
+
+//go:linkname world_setChunk github.com/df-mc/dragonfly/server/world.(*World).setChunk
+//noinspection ALL
+func world_setChunk(w *world.World, pos world.ChunkPos, c *chunk.Chunk, e map[cube.Pos]world.Block)
