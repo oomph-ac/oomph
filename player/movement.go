@@ -103,7 +103,7 @@ func (p *Player) calculateExpectedMovement() {
 	p.mInfo.ServerPredictedMovement = p.mInfo.ServerMovement
 
 	p.simulateVerticalFriction()
-	p.simulateHorizontalFriction()
+	p.simulateHorizontalFriction(v1)
 
 }
 
@@ -152,6 +152,7 @@ func (p *Player) simulateCollisions() {
 		p.mInfo.XCollision = false
 	}
 
+	p.mInfo.OnGround = false
 	if !mgl64.FloatEqual(vel[1], deltaY) {
 		p.mInfo.VerticallyCollided = true
 		if vel[1] < 0 {
@@ -160,7 +161,6 @@ func (p *Player) simulateCollisions() {
 		vel[1] = deltaY
 	} else {
 		p.mInfo.VerticallyCollided = false
-		p.mInfo.OnGround = false
 	}
 
 	if !mgl64.FloatEqual(vel[2], deltaZ) {
@@ -179,15 +179,7 @@ func (p *Player) simulateVerticalFriction() {
 	p.mInfo.ServerMovement[1] *= 0.98
 }
 
-func (p *Player) simulateHorizontalFriction() {
-	friction := 0.91
-	if p.mInfo.OnGround {
-		if b, ok := p.World().Block(cube.PosFromVec3(p.Position()).Side(cube.FaceDown)).(block.Frictional); ok {
-			friction *= b.Friction()
-		} else {
-			friction *= 0.6
-		}
-	}
+func (p *Player) simulateHorizontalFriction(friction float64) {
 	p.mInfo.ServerMovement[0] *= friction
 	p.mInfo.ServerMovement[2] *= friction
 }
