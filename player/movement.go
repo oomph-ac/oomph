@@ -74,10 +74,30 @@ func (p *Player) calculateExpectedMovement() {
 		}
 	}
 
-	p.simulateCollisions(0.001)
+	p.simulateCollisions()
 
 	if climb && p.mInfo.HorizontallyCollided {
 		p.mInfo.ServerMovement[1] = 0.2
+	}
+
+	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 0.0001 {
+		p.mInfo.ServerMovement[0] = 0
+	}
+	if mgl64.Abs(p.mInfo.ServerMovement[1]) < 0.0001 {
+		p.mInfo.ServerMovement[1] = 0
+	}
+	if mgl64.Abs(p.mInfo.ServerMovement[2]) < 0.0001 {
+		p.mInfo.ServerMovement[2] = 0
+	}
+
+	if mgl64.Abs(p.mInfo.ClientMovement[0]) < 0.0001 {
+		p.mInfo.ClientMovement[0] = 0
+	}
+	if mgl64.Abs(p.mInfo.ClientMovement[1]) < 0.0001 {
+		p.mInfo.ClientMovement[1] = 0
+	}
+	if mgl64.Abs(p.mInfo.ClientMovement[2]) < 0.0001 {
+		p.mInfo.ClientMovement[2] = 0
 	}
 
 	p.mInfo.ServerPredictedMovement = p.mInfo.ServerMovement
@@ -102,107 +122,50 @@ func (p *Player) simulateAddedMovementForce(f float64) {
 	}
 }
 
-func (p *Player) simulateCollisions(epsilon float64) {
+func (p *Player) simulateCollisions() {
 	vel := p.mInfo.ServerMovement
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
-	movX, movY, movZ := deltaX, deltaY, deltaZ
-	//fmt.Println("client wants to move", movX, movZ, "at tick", p.clientTick.Load())
 
 	entityBBox := p.AABB().Translate(p.entity.LastPosition())
 	blocks := utils.NearbyBBoxes(entityBBox.Extend(vel), p.World())
 
-	if !mgl64.FloatEqualThreshold(deltaY, 0, epsilon) {
-		// First we move the entity BBox on the Y axis.
-		for _, blockBBox := range blocks {
-			deltaY = entityBBox.YOffset(blockBBox, deltaY)
-		}
-		entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
+	// Check collisions on the Y axis first
+	for _, blockBBox := range blocks {
+		deltaY = entityBBox.YOffset(blockBBox, deltaY)
 	}
+	entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
 
-	flag := p.mInfo.OnGround || (deltaY != movY && movY < 0)
-
-	if !mgl64.FloatEqualThreshold(deltaX, 0, epsilon) {
-		// Then on the X axis.
-		for _, blockBBox := range blocks {
-			deltaX = entityBBox.XOffset(blockBBox, deltaX)
-		}
-		entityBBox = entityBBox.Translate(mgl64.Vec3{deltaX})
+	// Afterward, check for collisions on the X and Z axis
+	for _, blockBBox := range blocks {
+		deltaX = entityBBox.XOffset(blockBBox, deltaX)
 	}
-
-	if !mgl64.FloatEqualThreshold(deltaZ, 0, epsilon) {
-		// And finally on the Z axis.
-		for _, blockBBox := range blocks {
-			deltaZ = entityBBox.ZOffset(blockBBox, deltaZ)
-		}
+	entityBBox = entityBBox.Translate(mgl64.Vec3{deltaX})
+	for _, blockBBox := range blocks {
+		deltaZ = entityBBox.ZOffset(blockBBox, deltaZ)
 	}
+	//entityBBox = entityBBox.Translate(mgl64.Vec3{0, 0, deltaZ})
 
-	if flag && (movX != deltaX || movZ != deltaZ) {
-		cx, cy, cz := deltaX, deltaY, deltaZ
-		deltaX, deltaY, deltaZ = movX, game.StepHeight, movZ
-		entityBBox = p.AABB().Translate(p.entity.LastPosition())
-		blocks := utils.NearbyBBoxes(entityBBox.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}), p.World())
-
-		for _, blockBBox := range blocks {
-			deltaY = entityBBox.YOffset(blockBBox, deltaY)
-		}
-		entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
-
-		if !mgl64.FloatEqualThreshold(deltaX, 0, epsilon) {
-			for _, blockBBox := range blocks {
-				deltaX = entityBBox.XOffset(blockBBox, deltaX)
-			}
-			entityBBox = entityBBox.Translate(mgl64.Vec3{deltaX})
-		}
-
-		if !mgl64.FloatEqualThreshold(deltaZ, 0, epsilon) {
-			for _, blockBBox := range blocks {
-				deltaZ = entityBBox.ZOffset(blockBBox, deltaZ)
-			}
-			entityBBox = entityBBox.Translate(mgl64.Vec3{0, 0, deltaZ})
-		}
-
-		reverseDeltaY := -deltaY
-		for _, blockBBox := range blocks {
-			reverseDeltaY = entityBBox.YOffset(blockBBox, reverseDeltaY)
-		}
-		deltaY += reverseDeltaY
-
-		if (math.Pow(deltaX, 2) + math.Pow(deltaZ, 2)) <= (math.Pow(cx, 2) + math.Pow(cz, 2)) {
-			deltaX, deltaY, deltaZ = cx, cy, cz
-		} else {
-			p.mInfo.StepLenience += deltaY
-		}
-
-	}
-
-	if !mgl64.FloatEqual(vel[1], 0) {
-		// The Y velocity of the player is currently not 0, meaning it is moving either up or down. We can
-		// then assume the player is not currently on the ground.
-		p.mInfo.OnGround = false
-	}
-
-	if !mgl64.FloatEqual(deltaX, movX) {
+	if !mgl64.FloatEqual(vel[0], deltaX) {
 		p.mInfo.XCollision = true
-		vel[0] = 0
+		vel[0] = deltaX
 	} else {
 		p.mInfo.XCollision = false
 	}
 
-	if !mgl64.FloatEqual(deltaY, movY) {
-		// The player either hit the ground or hit the ceiling.
+	if !mgl64.FloatEqual(vel[1], deltaY) {
 		p.mInfo.VerticallyCollided = true
-		if movY < 0 {
-			// The player was going down, so we can assume it is now on the ground.
+		if vel[1] < 0 {
 			p.mInfo.OnGround = true
 		}
-		vel[1] = 0
+		vel[1] = deltaY
 	} else {
 		p.mInfo.VerticallyCollided = false
+		p.mInfo.OnGround = false
 	}
 
-	if !mgl64.FloatEqual(deltaZ, movZ) {
+	if !mgl64.FloatEqual(vel[2], deltaZ) {
 		p.mInfo.ZCollision = true
-		vel[2] = 0
+		vel[2] = deltaZ
 	} else {
 		p.mInfo.ZCollision = false
 	}
