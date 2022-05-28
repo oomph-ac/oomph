@@ -123,6 +123,11 @@ func (p *Player) simulateAddedMovementForce(f float64) {
 }
 
 func (p *Player) simulateCollisions() {
+	if p.mInfo.StepLenience < 1e-10 {
+		p.mInfo.StepLenience = 0
+	}
+	p.mInfo.StepLenience *= 0.4
+
 	vel := p.mInfo.ServerMovement
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
@@ -134,6 +139,7 @@ func (p *Player) simulateCollisions() {
 		deltaY = entityBBox.YOffset(blockBBox, deltaY)
 	}
 	entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
+	//flag := p.mInfo.OnGround || (vel[1] != deltaY && vel[1] < 0)
 
 	// Afterward, check for collisions on the X and Z axis
 	for _, blockBBox := range blocks {
@@ -144,6 +150,40 @@ func (p *Player) simulateCollisions() {
 		deltaZ = entityBBox.ZOffset(blockBBox, deltaZ)
 	}
 	//entityBBox = entityBBox.Translate(mgl64.Vec3{0, 0, deltaZ})
+
+	/* if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
+		cx, cy, cz := deltaX, deltaY, deltaZ
+		deltaX, deltaY, deltaZ = vel[0], game.StepHeight, vel[2]
+
+		entityBBox = p.AABB().Translate(p.entity.LastPosition())
+		blocks = utils.NearbyBBoxes(entityBBox.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}), p.World())
+
+		for _, blockBBox := range blocks {
+			deltaY = entityBBox.YOffset(blockBBox, deltaY)
+		}
+		entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
+
+		for _, blockBBox := range blocks {
+			deltaX = entityBBox.XOffset(blockBBox, deltaX)
+		}
+		entityBBox = entityBBox.Translate(mgl64.Vec3{deltaX})
+		for _, blockBBox := range blocks {
+			deltaZ = entityBBox.ZOffset(blockBBox, deltaZ)
+		}
+		entityBBox = entityBBox.Translate(mgl64.Vec3{0, 0, deltaZ})
+
+		reverseDeltaY := -deltaY
+		for _, blockBBox := range blocks {
+			reverseDeltaY = entityBBox.YOffset(blockBBox, reverseDeltaY)
+		}
+		deltaY += reverseDeltaY
+
+		if (math.Pow(cx, 2) + math.Pow(cz, 2)) >= (math.Pow(deltaX, 2) + math.Pow(deltaZ, 2)) {
+			deltaX, deltaY, deltaZ = cx, cy, cz
+		} else {
+			p.mInfo.StepLenience += deltaY
+		}
+	} */
 
 	if !mgl64.FloatEqual(vel[0], deltaX) {
 		p.mInfo.XCollision = true
