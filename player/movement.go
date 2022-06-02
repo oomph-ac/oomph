@@ -8,11 +8,14 @@ import (
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 func (p *Player) updateMovementState() {
-	// TODO: Movement predictions
-	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 {
+	if p.mInfo.CorrectionCooldown > 0 {
+		p.mInfo.CorrectionCooldown--
+	}
+	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 || p.mInfo.Teleporting {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = false
 		p.mInfo.ServerPredictedMovement = p.mInfo.ClientMovement
@@ -21,6 +24,8 @@ func (p *Player) updateMovementState() {
 			(p.mInfo.ClientMovement.Y() - p.mInfo.Gravity) * game.GravityMultiplier,
 			p.mInfo.ClientMovement.Z() * 0.546,
 		}
+		p.mInfo.CanExempt = true
+	} else if p.mInfo.StepLenience > 1e-4 {
 		p.mInfo.CanExempt = true
 	} else {
 		p.calculateExpectedMovement()
@@ -90,20 +95,22 @@ func (p *Player) calculateExpectedMovement() {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
-	if mgl64.Abs(p.mInfo.ClientMovement[0]) < 0.0001 {
-		p.mInfo.ClientMovement[0] = 0
-	}
-	if mgl64.Abs(p.mInfo.ClientMovement[1]) < 0.0001 {
-		p.mInfo.ClientMovement[1] = 0
-	}
-	if mgl64.Abs(p.mInfo.ClientMovement[2]) < 0.0001 {
-		p.mInfo.ClientMovement[2] = 0
-	}
-
 	p.mInfo.ServerPredictedMovement = p.mInfo.ServerMovement
+	mError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement)
+	/* if mgl64.Abs(mError[0]) > 0.005 || mgl64.Abs(mError[1]) > 0.005 || mgl64.Abs(mError[2]) > 0.005 {
+		fmt.Println("Unexpected movement error at tick", p.clientTick.Load(), mError, p.mInfo.MoveForward, p.mInfo.MoveStrafe)
+	} */
 
-	p.simulateVerticalFriction()
+	if mError.LenSqr() > 0.04 {
+		//fmt.Println("Correction needed (position-threshold)!", mError.LenSqr())
+		p.mInfo.CorrectMovement(p)
+	}
+
+	p.simulateGravity()
 	p.simulateHorizontalFriction(v1)
+	if p.mInfo.StepLenience > 1e-4 {
+		p.mInfo.ServerPredictedMovement[1] += p.mInfo.StepLenience
+	}
 
 }
 
@@ -123,10 +130,10 @@ func (p *Player) simulateAddedMovementForce(f float64) {
 }
 
 func (p *Player) simulateCollisions() {
-	if p.mInfo.StepLenience < 1e-10 {
+	p.mInfo.StepLenience *= 0.4
+	if p.mInfo.StepLenience < 1e-4 {
 		p.mInfo.StepLenience = 0
 	}
-	p.mInfo.StepLenience *= 0.4
 
 	vel := p.mInfo.ServerMovement
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
@@ -134,12 +141,34 @@ func (p *Player) simulateCollisions() {
 	entityBBox := p.AABB().Translate(p.entity.LastPosition())
 	blocks := utils.NearbyBBoxes(entityBBox.Extend(vel), p.World())
 
+	if p.mInfo.OnGround && p.mInfo.Sneaking {
+		mov := 0.05
+		for ; deltaX != 0.0 && len(utils.NearbyBBoxes(entityBBox.Translate(mgl64.Vec3{deltaX, -1, 0}), p.World())) == 0; vel[0] = deltaX {
+			if deltaX < mov && deltaX >= -mov {
+				deltaX = 0
+			} else if deltaX > 0 {
+				deltaX -= mov
+			} else {
+				deltaX += mov
+			}
+		}
+		for ; deltaZ != 0.0 && len(utils.NearbyBBoxes(entityBBox.Translate(mgl64.Vec3{0, -1, deltaZ}), p.World())) == 0; vel[2] = deltaZ {
+			if deltaZ < mov && deltaZ >= -mov {
+				deltaZ = 0
+			} else if deltaZ > 0 {
+				deltaZ -= mov
+			} else {
+				deltaZ += mov
+			}
+		}
+	}
+
 	// Check collisions on the Y axis first
 	for _, blockBBox := range blocks {
 		deltaY = entityBBox.YOffset(blockBBox, deltaY)
 	}
 	entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
-	//flag := p.mInfo.OnGround || (vel[1] != deltaY && vel[1] < 0)
+	flag := p.mInfo.OnGround || (vel[1] != deltaY && vel[1] < 0)
 
 	// Afterward, check for collisions on the X and Z axis
 	for _, blockBBox := range blocks {
@@ -151,7 +180,7 @@ func (p *Player) simulateCollisions() {
 	}
 	//entityBBox = entityBBox.Translate(mgl64.Vec3{0, 0, deltaZ})
 
-	/* if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
+	if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
 		cx, cy, cz := deltaX, deltaY, deltaZ
 		deltaX, deltaY, deltaZ = vel[0], game.StepHeight, vel[2]
 
@@ -182,8 +211,9 @@ func (p *Player) simulateCollisions() {
 			deltaX, deltaY, deltaZ = cx, cy, cz
 		} else {
 			p.mInfo.StepLenience += deltaY
+			//fmt.Println("updated step lenience:", p.mInfo.StepLenience)
 		}
-	} */
+	}
 
 	if !mgl64.FloatEqual(vel[0], deltaX) {
 		p.mInfo.XCollision = true
@@ -192,14 +222,18 @@ func (p *Player) simulateCollisions() {
 		p.mInfo.XCollision = false
 	}
 
-	p.mInfo.OnGround = false
 	if !mgl64.FloatEqual(vel[1], deltaY) {
 		p.mInfo.VerticallyCollided = true
 		if vel[1] < 0 {
 			p.mInfo.OnGround = true
+		} else {
+			p.mInfo.OnGround = false
 		}
-		vel[1] = deltaY
+		if p.mInfo.StepLenience < 1e-4 {
+			vel[1] = deltaY
+		}
 	} else {
+		p.mInfo.OnGround = false
 		p.mInfo.VerticallyCollided = false
 	}
 
@@ -214,7 +248,7 @@ func (p *Player) simulateCollisions() {
 	p.mInfo.ServerMovement = vel
 }
 
-func (p *Player) simulateVerticalFriction() {
+func (p *Player) simulateGravity() {
 	p.mInfo.ServerMovement[1] -= p.mInfo.Gravity
 	p.mInfo.ServerMovement[1] *= 0.98
 }
@@ -235,6 +269,8 @@ func (p *Player) simulateJump() {
 
 type MovementInfo struct {
 	CanExempt bool
+
+	CorrectionCooldown uint64
 
 	MoveForward, MoveStrafe float64
 	JumpVelocity            float64
@@ -259,6 +295,23 @@ type MovementInfo struct {
 	ServerSentMovement      mgl64.Vec3
 	ServerMovement          mgl64.Vec3
 	ServerPredictedMovement mgl64.Vec3
+}
+
+func (m *MovementInfo) CorrectMovement(p *Player) {
+	if m.CorrectionCooldown > 0 || p.mInfo.CanExempt {
+		return
+	}
+	m.CorrectionCooldown = 10
+	pk := &packet.CorrectPlayerMovePrediction{
+		Position: game.Vec64To32(p.Entity().LastPosition().Add(mgl64.Vec3{0, 1.62}).Add(p.mInfo.ServerPredictedMovement)),
+		Delta:    game.Vec64To32(p.mInfo.ServerMovement),
+		OnGround: p.mInfo.OnGround,
+		Tick:     p.ClientFrame(),
+	}
+	p.conn.WritePacket(pk)
+	p.Acknowledgement(func() {
+		p.mInfo.CanExempt = true
+	}, false)
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {

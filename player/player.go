@@ -37,7 +37,7 @@ type Player struct {
 	ackMu            sync.Mutex
 	acknowledgements map[int64]func()
 
-	clientTick, serverTick atomic.Uint64
+	clientTick, clientFrame, serverTick atomic.Uint64
 
 	hMutex sync.RWMutex
 	h      Handler
@@ -167,6 +167,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 		data.IncrementTeleportationTicks()
 	}
 	p.mInfo.Teleporting = true
+	p.mInfo.CanExempt = true
 	p.WorldLoader().Move(p.Position())
 }
 
@@ -210,6 +211,12 @@ func (p *Player) ServerTick() uint64 {
 // client has sent. (since the packet is sent every client tick)
 func (p *Player) ClientTick() uint64 {
 	return p.clientTick.Load()
+}
+
+// ClientFrame returns the last tick value sent by the client in PlayerAuthInput - this is used for movement correction
+// and various server authorization stuff.
+func (p *Player) ClientFrame() uint64 {
+	return p.clientFrame.Load()
 }
 
 // Position returns the position of the player.

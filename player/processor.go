@@ -33,6 +33,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
+		p.clientFrame.Store(pk.Tick)
 		if p.ready {
 			p.Move(pk)
 
@@ -40,9 +41,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
 
 			if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-				p.mInfo.Sprinting = !p.mInfo.Sprinting
+				p.mInfo.Sprinting = utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting)
 			} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-				p.mInfo.Sneaking = !p.mInfo.Sneaking
+				p.mInfo.Sneaking = utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking)
 			}
 			p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 			p.mInfo.InVoid = p.Position().Y() < -35
@@ -148,9 +149,8 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
 				teleport := utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport)
-				p.Teleport(pk.Position, teleport)
 				if teleport {
-					p.mInfo.Teleporting = true
+					p.Teleport(pk.Position, teleport)
 				}
 			}, false)
 			return false
@@ -171,6 +171,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 	case *packet.SetActorData:
+		pk.Tick = p.ClientFrame()
 		p.Acknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
@@ -198,6 +199,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	case *packet.UpdateAttributes:
 		if pk.EntityRuntimeID == p.rid {
+			pk.Tick = p.ClientFrame()
 			p.Acknowledgement(func() {
 				for _, a := range pk.Attributes {
 					if a.Name == "minecraft:health" && a.Value <= 0 {
