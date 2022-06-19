@@ -1,6 +1,7 @@
 package player
 
 import (
+	"math"
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block/cube"
@@ -34,33 +35,45 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
-		if p.ready {
-			p.Move(pk)
 
-			p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
-			p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
+		p.wMu.Lock()
+		p.inLoadedChunk = world_chunkExists(p.world, p.Position()) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
+		p.wMu.Unlock()
 
-			if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) || utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-				p.mInfo.Sprinting = utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting)
-			} else if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) || utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-				p.mInfo.Sneaking = utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking)
-			}
-			p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-			p.mInfo.InVoid = p.Position().Y() < -35
+		p.Move(pk)
 
-			p.mInfo.JumpVelocity = game.DefaultJumpMotion
-			p.mInfo.Speed = game.NormalMovementSpeed
-			p.mInfo.Gravity = game.NormalGravity
+		p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
+		p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
 
-			if p.mInfo.Sprinting {
-				p.mInfo.Speed *= 1.3
-			}
-
-			p.updateMovementState()
-			p.tickEntityLocations()
-
-			p.mInfo.Teleporting = false
+		if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+			p.mInfo.Sprinting = true
 		}
+		if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+			p.mInfo.Sprinting = false
+		}
+		if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+			p.mInfo.Sneaking = true
+		}
+		if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+			p.mInfo.Sneaking = false
+		}
+		p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+		p.mInfo.InVoid = p.Position().Y() < -35
+
+		p.mInfo.JumpVelocity = game.DefaultJumpMotion
+		p.mInfo.Speed = game.NormalMovementSpeed
+		p.mInfo.Gravity = game.NormalGravity
+
+		if p.mInfo.Sprinting {
+			p.mInfo.Speed *= 1.3
+		}
+
+		p.updateMovementState()
+		p.tickEntityLocations()
+		p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+
+		pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
+		p.mInfo.Teleporting = false
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
@@ -76,7 +89,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				return false
 			}
 
-			p.wMu.Lock()
 			w := p.World()
 			boxes := block.Model().BBox(pos, w)
 			for _, box := range boxes {
@@ -88,7 +100,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			// Set the block in the world
 			w.SetBlock(pos, block, nil)
-			p.wMu.Unlock()
 		}
 	case *packet.AdventureSettings:
 		p.mInfo.Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
@@ -103,6 +114,21 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 	case *packet.ChunkRadiusUpdated:
 		p.WorldLoader().ChangeRadius(int(pk.ChunkRadius))
+	case *packet.Login:
+		if os, ok := map[string]protocol.DeviceOS{
+			"1739947436": protocol.DeviceAndroid,
+			"1810924247": protocol.DeviceIOS,
+			"1944307183": protocol.DeviceFireOS,
+			"896928775":  protocol.DeviceWin10,
+			"2044456598": protocol.DeviceOrbis,
+			"2047319603": protocol.DeviceNX,
+			"1828326430": protocol.DeviceXBOX,
+			"1916611344": protocol.DeviceWP,
+		}[p.IdentityData().TitleID]; ok {
+			p.gamePlatform = os
+		} else {
+			p.gamePlatform = protocol.DeviceLinux
+		}
 	}
 
 	// Run all registered checks.
@@ -161,9 +187,8 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		if pk.EntityRuntimeID == p.rid {
 			p.Acknowledgement(func() {
 				teleport := pk.Mode == packet.MoveModeTeleport
-				p.Teleport(pk.Position, teleport)
 				if teleport {
-					p.mInfo.Teleporting = true
+					p.Teleport(pk.Position, teleport)
 				}
 			}, false)
 			return false
@@ -171,12 +196,18 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 	case *packet.SetActorData:
-		pk.Tick = p.ClientFrame()
 		p.Acknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
-			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && widthExists && heightExists {
-				e.SetAABB(game.AABBFromDimensions(float64(width.(float32)), float64(height.(float32))))
+			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
+				if widthExists {
+					width := game.Round(float64(width.(float32)), 5)
+					e.SetAABB(game.AABBFromDimensions(width, e.AABB().Height()))
+				}
+				if heightExists {
+					height := game.Round(float64(height.(float32)), 5)
+					e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height))
+				}
 			}
 
 			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
@@ -199,7 +230,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	case *packet.UpdateAttributes:
 		if pk.EntityRuntimeID == p.rid {
-			pk.Tick = p.ClientFrame()
 			p.Acknowledgement(func() {
 				for _, a := range pk.Attributes {
 					if a.Name == "minecraft:health" && a.Value <= 0 {
@@ -224,6 +254,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
 			go func() {
+				p.wMu.Lock()
 				a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
 				c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
 				if err != nil {
@@ -231,7 +262,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 					return
 				}
 
-				p.wMu.Lock()
 				world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
 				p.wMu.Unlock()
 				p.ready = true
@@ -241,13 +271,37 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if ok {
 			p.Acknowledgement(func() {
-				p.world.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b, nil)
+				p.World().SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b, nil)
 			}, false)
 		}
 	}
 	return false
 }
 
+// This function checks if a chunk exists in the world's cache
+func world_chunkExists(w *world.World, pos mgl64.Vec3) bool {
+	c, ok := world_chunkFromCache(w, world.ChunkPos{
+		int32(math.Floor(pos[0])) >> 4,
+		int32(math.Floor(pos[2])) >> 4,
+	})
+	if ok {
+		c.Unlock()
+	}
+	return ok
+}
+
 //go:linkname world_setChunk github.com/df-mc/dragonfly/server/world.(*World).setChunk
 //noinspection ALL
 func world_setChunk(w *world.World, pos world.ChunkPos, c *chunk.Chunk, e map[cube.Pos]world.Block)
+
+//go:linkname world_chunkFromCache github.com/df-mc/dragonfly/server/world.(*World).chunkFromCache
+//noinspection ALL
+func world_chunkFromCache(w *world.World, pos world.ChunkPos) (*chunkData, bool)
+
+type chunkData struct {
+	*chunk.Chunk
+	e        map[cube.Pos]world.Block
+	v        []world.Viewer
+	l        []*world.Loader
+	entities []world.Entity
+}

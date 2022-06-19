@@ -19,6 +19,7 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/language"
@@ -53,10 +54,13 @@ type Player struct {
 	queuedEntityLocations            map[uint64]utils.LocationData
 	queuedEntityMotionInterpolations map[uint64]mgl64.Vec3
 
-	ready    bool
 	gameMode int32
 
-	dead bool
+	gamePlatform protocol.DeviceOS
+
+	ready         bool
+	dead          bool
+	inLoadedChunk bool
 
 	clickMu       sync.Mutex
 	clicking      bool
@@ -106,6 +110,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		gameMode: data.PlayerGameMode,
 
+		inLoadedChunk: false,
+
 		c: make(chan struct{}),
 
 		checks: []check.Check{
@@ -131,11 +137,16 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		mInfo: &MovementInfo{},
 
-		world: world.New(nil, world.Overworld, &world.Settings{}),
+		world: world.Config{
+			Provider:        nil,
+			Generator:       nil,
+			Dim:             nil,
+			RandomTickSpeed: -1,
+			RandSource:      nil,
+			ReadOnly:        true,
+		}.New(),
 	}
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
-	p.world.Generator(nil)
-	p.world.Provider(nil)
 	p.wl = world.NewLoader(conn.ChunkRadius(), p.world, p)
 	go p.startTicking()
 	return p
@@ -154,7 +165,6 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.IncrementTeleportationTicks()
 
 	p.mInfo.ClientMovement = data.Position().Sub(data.LastPosition())
-	p.WorldLoader().Move(data.Position())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -168,7 +178,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	}
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
-	p.WorldLoader().Move(p.Position())
+	p.WorldLoader().Move(data.Position())
 }
 
 // MoveEntity moves an entity to the given position.
@@ -185,10 +195,14 @@ func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, ground bool) {
 }
 
 func (p *Player) World() *world.World {
+	p.wMu.Lock()
+	defer p.wMu.Unlock()
 	return p.world
 }
 
 func (p *Player) WorldLoader() *world.Loader {
+	p.wMu.Lock()
+	defer p.wMu.Unlock()
 	return p.wl
 }
 
@@ -242,8 +256,7 @@ func (p *Player) MovementInfo() *MovementInfo {
 // TODO: Find something with similar usage to NSL - it will possibly be removed in future versions of Minecraft
 func (p *Player) Acknowledgement(f func(), flush bool) {
 	if p.acknowledgements == nil {
-		// Don't request an acknowledgement if acknowledgements are closed.
-		return
+		return // Don't request an acknowledgement if acknowledgements are closed.
 	}
 
 	t := int64(rand.Int31()) * 1000 // Ensure that we don't get screwed over because the number is too fat.
@@ -251,11 +264,16 @@ func (p *Player) Acknowledgement(f func(), flush bool) {
 		t *= -1
 	}
 
+	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
+
+	if p.gamePlatform == protocol.DeviceNX {
+		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
+	}
+
 	p.ackMu.Lock()
 	p.acknowledgements[t] = f
 	p.ackMu.Unlock()
 
-	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
 	if flush {
 		_ = p.conn.Flush()
 	}
@@ -301,6 +319,10 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	}
 }
 
+func (p *Player) GamePlatform() protocol.DeviceOS {
+	return p.gamePlatform
+}
+
 // Ready returns true if the player is ready/spawned in.
 func (p *Player) Ready() bool {
 	return p.ready
@@ -344,6 +366,11 @@ func (p *Player) Flying() bool {
 // Dead returns true if the player is currently dead.
 func (p *Player) Dead() bool {
 	return p.dead
+}
+
+// InLoadedChunk returns true if the player is in a chunk loaded by it's world
+func (p *Player) InLoadedChunk() bool {
+	return p.inLoadedChunk
 }
 
 // Clicking returns true if the player is clicking.
@@ -439,6 +466,18 @@ func (p *Player) startTicking() {
 		case <-t.C:
 			p.flushEntityLocations()
 			p.serverTick.Inc()
+			if p.serverTick.Load()%20 == 0 {
+				curr := time.Now()
+				p.Acknowledgement(func() {
+					ms := time.Since(curr).Milliseconds()
+					msg := fmt.Sprint("NSL Latency: ", ms, "ms")
+					msgpk := &packet.Text{
+						TextType: packet.TextTypeChat,
+						Message:  msg,
+					}
+					p.conn.WritePacket(msgpk)
+				}, true)
+			}
 		}
 	}
 }

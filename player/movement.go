@@ -12,27 +12,23 @@ import (
 )
 
 func (p *Player) updateMovementState() {
-	if p.mInfo.CorrectionCooldown > 0 {
-		p.mInfo.CorrectionCooldown--
-	}
-	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 || p.mInfo.Teleporting {
+	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 || p.mInfo.Teleporting || !p.inLoadedChunk {
 		p.mInfo.OnGround = true
-		p.mInfo.VerticallyCollided = false
+		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPredictedMovement = p.mInfo.ClientMovement
+		p.mInfo.ServerPredictedPosition = p.Position()
 		p.mInfo.ServerMovement = mgl64.Vec3{
 			p.mInfo.ClientMovement.X() * 0.546,
 			(p.mInfo.ClientMovement.Y() - p.mInfo.Gravity) * game.GravityMultiplier,
 			p.mInfo.ClientMovement.Z() * 0.546,
 		}
 		p.mInfo.CanExempt = true
-	} else if p.mInfo.StepLenience > 1e-4 {
-		p.mInfo.CanExempt = true
 	} else {
 		p.calculateExpectedMovement()
-		p.mInfo.CanExempt = false
+		p.mInfo.CanExempt = p.mInfo.StepLenience > 1e-4
 	}
 
-	p.mInfo.Tick()
+	p.mInfo.UpdateTickStatus()
 }
 
 func (p *Player) calculateExpectedMovement() {
@@ -49,7 +45,7 @@ func (p *Player) calculateExpectedMovement() {
 
 	v1 := 0.91
 	if p.mInfo.OnGround {
-		if b, ok := p.World().Block(cube.PosFromVec3(p.Position()).Side(cube.FaceDown)).(block.Frictional); ok {
+		if b, ok := p.World().Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition).Side(cube.FaceDown)).(block.Frictional); ok {
 			v1 *= b.Friction()
 		} else {
 			v1 *= 0.6
@@ -67,7 +63,7 @@ func (p *Player) calculateExpectedMovement() {
 
 	p.simulateAddedMovementForce(v3)
 
-	climb := utils.BlockClimbable(p.World().Block(cube.PosFromVec3(p.Entity().LastPosition())))
+	climb := utils.BlockClimbable(p.World().Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition)))
 	if climb {
 		p.mInfo.ServerMovement[0] = game.ClampFloat(p.mInfo.ServerMovement.X(), -0.2, 0.2)
 		p.mInfo.ServerMovement[2] = game.ClampFloat(p.mInfo.ServerMovement.Z(), -0.2, 0.2)
@@ -82,7 +78,7 @@ func (p *Player) calculateExpectedMovement() {
 	p.simulateCollisions()
 
 	if climb && p.mInfo.HorizontallyCollided {
-		p.mInfo.ServerMovement[1] = 0.2
+		p.mInfo.ServerMovement[1] = 0.3
 	}
 
 	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 0.0001 {
@@ -96,20 +92,22 @@ func (p *Player) calculateExpectedMovement() {
 	}
 
 	p.mInfo.ServerPredictedMovement = p.mInfo.ServerMovement
-	mError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement)
-	/* if mgl64.Abs(mError[0]) > 0.005 || mgl64.Abs(mError[1]) > 0.005 || mgl64.Abs(mError[2]) > 0.005 {
-		fmt.Println("Unexpected movement error at tick", p.clientTick.Load(), mError, p.mInfo.MoveForward, p.mInfo.MoveStrafe)
-	} */
-
-	if mError.LenSqr() > 0.04 {
-		//fmt.Println("Correction needed (position-threshold)!", mError.LenSqr())
-		p.mInfo.CorrectMovement(p)
-	}
 
 	p.simulateGravity()
 	p.simulateHorizontalFriction(v1)
 	if p.mInfo.StepLenience > 1e-4 {
 		p.mInfo.ServerPredictedMovement[1] += p.mInfo.StepLenience
+	}
+
+	mError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement)
+	if mgl64.Abs(mError[0]) > 0.01 || mgl64.Abs(mError[1]) > 0.01 || mgl64.Abs(mError[2]) > 0.01 {
+		// The client's movement is too far from the server's prediction, and therefore the
+		// server needs to correct the client's movement to keep both in sync.
+		p.mInfo.CorrectMovement(p)
+	} else {
+		// Since the client's movement is around the same as the server's, we can assume their movement is legitimate
+		// and set the servers predicted position to the client's.
+		p.mInfo.ServerPredictedPosition = p.Position()
 	}
 
 }
@@ -131,19 +129,20 @@ func (p *Player) simulateAddedMovementForce(f float64) {
 
 func (p *Player) simulateCollisions() {
 	p.mInfo.StepLenience *= 0.4
-	if p.mInfo.StepLenience < 1e-4 {
+	if p.mInfo.StepLenience <= 1e-4 {
 		p.mInfo.StepLenience = 0
 	}
 
 	vel := p.mInfo.ServerMovement
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
-	entityBBox := p.AABB().Translate(p.entity.LastPosition())
-	blocks := utils.NearbyBBoxes(entityBBox.Extend(vel), p.World())
+	moveBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
+	cloneBB := moveBB
+	blocks := utils.NearbyBBoxes(cloneBB.Extend(vel), p.World())
 
 	if p.mInfo.OnGround && p.mInfo.Sneaking {
 		mov := 0.05
-		for ; deltaX != 0.0 && len(utils.NearbyBBoxes(entityBBox.Translate(mgl64.Vec3{deltaX, -1, 0}), p.World())) == 0; vel[0] = deltaX {
+		for ; deltaX != 0.0 && len(utils.NearbyBBoxes(moveBB.Translate(mgl64.Vec3{deltaX, -1, 0}), p.World())) == 0; vel[0] = deltaX {
 			if deltaX < mov && deltaX >= -mov {
 				deltaX = 0
 			} else if deltaX > 0 {
@@ -152,7 +151,7 @@ func (p *Player) simulateCollisions() {
 				deltaX += mov
 			}
 		}
-		for ; deltaZ != 0.0 && len(utils.NearbyBBoxes(entityBBox.Translate(mgl64.Vec3{0, -1, deltaZ}), p.World())) == 0; vel[2] = deltaZ {
+		for ; deltaZ != 0.0 && len(utils.NearbyBBoxes(moveBB.Translate(mgl64.Vec3{0, -1, deltaZ}), p.World())) == 0; vel[2] = deltaZ {
 			if deltaZ < mov && deltaZ >= -mov {
 				deltaZ = 0
 			} else if deltaZ > 0 {
@@ -165,45 +164,46 @@ func (p *Player) simulateCollisions() {
 
 	// Check collisions on the Y axis first
 	for _, blockBBox := range blocks {
-		deltaY = entityBBox.YOffset(blockBBox, deltaY)
+		deltaY = moveBB.YOffset(blockBBox, deltaY)
 	}
-	entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
+	moveBB = moveBB.Translate(mgl64.Vec3{0, deltaY})
+
 	flag := p.mInfo.OnGround || (vel[1] != deltaY && vel[1] < 0)
 
 	// Afterward, check for collisions on the X and Z axis
 	for _, blockBBox := range blocks {
-		deltaX = entityBBox.XOffset(blockBBox, deltaX)
+		deltaX = moveBB.XOffset(blockBBox, deltaX)
 	}
-	entityBBox = entityBBox.Translate(mgl64.Vec3{deltaX})
+	moveBB = moveBB.Translate(mgl64.Vec3{deltaX})
 	for _, blockBBox := range blocks {
-		deltaZ = entityBBox.ZOffset(blockBBox, deltaZ)
+		deltaZ = moveBB.ZOffset(blockBBox, deltaZ)
 	}
-	//entityBBox = entityBBox.Translate(mgl64.Vec3{0, 0, deltaZ})
 
 	if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
 		cx, cy, cz := deltaX, deltaY, deltaZ
 		deltaX, deltaY, deltaZ = vel[0], game.StepHeight, vel[2]
 
-		entityBBox = p.AABB().Translate(p.entity.LastPosition())
-		blocks = utils.NearbyBBoxes(entityBBox.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}), p.World())
+		stepBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
+		cloneBB = stepBB
+		blocks = utils.NearbyBBoxes(cloneBB.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}), p.World())
 
 		for _, blockBBox := range blocks {
-			deltaY = entityBBox.YOffset(blockBBox, deltaY)
+			deltaY = stepBB.YOffset(blockBBox, deltaY)
 		}
-		entityBBox = entityBBox.Translate(mgl64.Vec3{0, deltaY})
+		stepBB = stepBB.Translate(mgl64.Vec3{0, deltaY})
 
 		for _, blockBBox := range blocks {
-			deltaX = entityBBox.XOffset(blockBBox, deltaX)
+			deltaX = stepBB.XOffset(blockBBox, deltaX)
 		}
-		entityBBox = entityBBox.Translate(mgl64.Vec3{deltaX})
+		stepBB = stepBB.Translate(mgl64.Vec3{deltaX})
 		for _, blockBBox := range blocks {
-			deltaZ = entityBBox.ZOffset(blockBBox, deltaZ)
+			deltaZ = stepBB.ZOffset(blockBBox, deltaZ)
 		}
-		entityBBox = entityBBox.Translate(mgl64.Vec3{0, 0, deltaZ})
+		stepBB = stepBB.Translate(mgl64.Vec3{0, 0, deltaZ})
 
 		reverseDeltaY := -deltaY
 		for _, blockBBox := range blocks {
-			reverseDeltaY = entityBBox.YOffset(blockBBox, reverseDeltaY)
+			reverseDeltaY = stepBB.YOffset(blockBBox, reverseDeltaY)
 		}
 		deltaY += reverseDeltaY
 
@@ -211,15 +211,8 @@ func (p *Player) simulateCollisions() {
 			deltaX, deltaY, deltaZ = cx, cy, cz
 		} else {
 			p.mInfo.StepLenience += deltaY
-			//fmt.Println("updated step lenience:", p.mInfo.StepLenience)
+			deltaY = cy
 		}
-	}
-
-	if !mgl64.FloatEqual(vel[0], deltaX) {
-		p.mInfo.XCollision = true
-		vel[0] = deltaX
-	} else {
-		p.mInfo.XCollision = false
 	}
 
 	if !mgl64.FloatEqual(vel[1], deltaY) {
@@ -229,12 +222,17 @@ func (p *Player) simulateCollisions() {
 		} else {
 			p.mInfo.OnGround = false
 		}
-		if p.mInfo.StepLenience < 1e-4 {
-			vel[1] = deltaY
-		}
+		vel[1] = deltaY
 	} else {
 		p.mInfo.OnGround = false
 		p.mInfo.VerticallyCollided = false
+	}
+
+	if !mgl64.FloatEqual(vel[0], deltaX) {
+		p.mInfo.XCollision = true
+		vel[0] = deltaX
+	} else {
+		p.mInfo.XCollision = false
 	}
 
 	if !mgl64.FloatEqual(vel[2], deltaZ) {
@@ -246,6 +244,8 @@ func (p *Player) simulateCollisions() {
 
 	p.mInfo.HorizontallyCollided = p.mInfo.XCollision || p.mInfo.ZCollision
 	p.mInfo.ServerMovement = vel
+
+	p.mInfo.ServerPredictedPosition = p.mInfo.ServerPredictedPosition.Add(vel)
 }
 
 func (p *Player) simulateGravity() {
@@ -270,7 +270,7 @@ func (p *Player) simulateJump() {
 type MovementInfo struct {
 	CanExempt bool
 
-	CorrectionCooldown uint64
+	ExpectingFutureCorrrection bool
 
 	MoveForward, MoveStrafe float64
 	JumpVelocity            float64
@@ -278,7 +278,7 @@ type MovementInfo struct {
 	Speed                   float64
 	StepLenience            float64
 
-	MotionTicks int64
+	MotionTicks uint64
 
 	Sneaking, Sprinting bool
 	Jumping             bool
@@ -295,22 +295,24 @@ type MovementInfo struct {
 	ServerSentMovement      mgl64.Vec3
 	ServerMovement          mgl64.Vec3
 	ServerPredictedMovement mgl64.Vec3
+	ServerPredictedPosition mgl64.Vec3
 }
 
 func (m *MovementInfo) CorrectMovement(p *Player) {
-	if m.CorrectionCooldown > 0 || p.mInfo.CanExempt {
+	if p.mInfo.ExpectingFutureCorrrection || p.mInfo.CanExempt {
 		return
 	}
-	m.CorrectionCooldown = 10
+	m.ExpectingFutureCorrrection = true
+	pos, delta := p.mInfo.ServerPredictedPosition, p.mInfo.ServerMovement
 	pk := &packet.CorrectPlayerMovePrediction{
-		Position: game.Vec64To32(p.Entity().LastPosition().Add(mgl64.Vec3{0, 1.62}).Add(p.mInfo.ServerPredictedMovement)),
-		Delta:    game.Vec64To32(p.mInfo.ServerMovement),
+		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
+		Delta:    game.Vec64To32(delta),
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
 	}
 	p.conn.WritePacket(pk)
 	p.Acknowledgement(func() {
-		p.mInfo.CanExempt = true
+		m.ExpectingFutureCorrrection = false
 	}, false)
 }
 
@@ -319,6 +321,6 @@ func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
 	m.MotionTicks = 0
 }
 
-func (m *MovementInfo) Tick() {
+func (m *MovementInfo) UpdateTickStatus() {
 	m.MotionTicks++
 }
