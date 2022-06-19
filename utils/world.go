@@ -7,7 +7,6 @@ import (
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // BlockClimbable returns whether the given block is climbable.
@@ -67,20 +66,22 @@ func CollidingBlocks(aabb cube.BBox, w *world.World) []cube.BBox {
 }
 
 func NearbyBBoxes(aabb cube.BBox, w *world.World) []cube.BBox {
-	grown := aabb.Grow(0.25)
+	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
 	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
 
 	// A prediction of one BBox per block, plus an additional 2, in case
-	blockBBoxs := make([]cube.BBox, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ)+2)
+	var blockBBoxs []cube.BBox
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
 				boxes := w.Block(pos).Model().BBox(pos, w)
 				for _, box := range boxes {
-					blockBBoxs = append(blockBBoxs, box.Translate(mgl64.Vec3{float64(x), float64(y), float64(z)}))
+					if box.Translate(pos.Vec3()).IntersectsWith(aabb) {
+						blockBBoxs = append(blockBBoxs, box.Translate(pos.Vec3()))
+					}
 				}
 			}
 		}

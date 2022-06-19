@@ -9,9 +9,8 @@ import (
 
 // Round will round a number to a given precision.
 func Round(val float64, precision int) float64 {
-	p := math.Pow10(precision)
-	value := float64(int(val*p)) / p
-	return value
+	pwr := math.Pow(10, float64(precision))
+	return math.Round(val*pwr) / pwr
 }
 
 // Vec32To64 converts a 32-bit vector to a 64-bit one.
@@ -22,6 +21,10 @@ func Vec32To64(vec3 mgl32.Vec3) mgl64.Vec3 {
 // Vec64To32 converts a 64-bit vector to a 32-bit one.
 func Vec64To32(vec3 mgl64.Vec3) mgl32.Vec3 {
 	return mgl32.Vec3{float32(vec3[0]), float32(vec3[1]), float32(vec3[2])}
+}
+
+func RoundVec64(v mgl64.Vec3, p int) mgl64.Vec3 {
+	return mgl64.Vec3{Round(v.X(), p), Round(v.Y(), p), Round(v.Z(), p)}
 }
 
 // DirectionVector returns a direction vector from the given yaw and pitch values.
