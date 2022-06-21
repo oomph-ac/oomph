@@ -104,7 +104,7 @@ func (p *Player) calculateExpectedMovement() {
 		// The client's movement is too far from the server's prediction, and therefore the
 		// server needs to correct the client's movement to keep both in sync.
 		p.mInfo.CorrectMovement(p)
-	} else {
+	} else if !p.mInfo.ExpectingFutureCorrection {
 		// Since the client's movement is around the same as the server's, we can assume their movement is legitimate
 		// and set the servers predicted position to the client's.
 		p.mInfo.ServerPredictedPosition = p.Position()
@@ -270,7 +270,7 @@ func (p *Player) simulateJump() {
 type MovementInfo struct {
 	CanExempt bool
 
-	ExpectingFutureCorrrection bool
+	ExpectingFutureCorrection bool
 
 	MoveForward, MoveStrafe float64
 	JumpVelocity            float64
@@ -299,11 +299,11 @@ type MovementInfo struct {
 }
 
 func (m *MovementInfo) CorrectMovement(p *Player) {
-	if p.mInfo.ExpectingFutureCorrrection || p.mInfo.CanExempt {
+	if m.ExpectingFutureCorrection || m.CanExempt {
 		return
 	}
-	m.ExpectingFutureCorrrection = true
-	pos, delta := p.mInfo.ServerPredictedPosition, p.mInfo.ServerMovement
+	m.ExpectingFutureCorrection = true
+	pos, delta := m.ServerPredictedPosition, m.ServerMovement
 	pk := &packet.CorrectPlayerMovePrediction{
 		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
 		Delta:    game.Vec64To32(delta),
@@ -312,7 +312,7 @@ func (m *MovementInfo) CorrectMovement(p *Player) {
 	}
 	p.conn.WritePacket(pk)
 	p.Acknowledgement(func() {
-		m.ExpectingFutureCorrrection = false
+		m.ExpectingFutureCorrection = false
 	}, false)
 }
 
