@@ -179,7 +179,7 @@ func (p *Player) simulateCollisions() {
 		deltaZ = moveBB.ZOffset(blockBBox, deltaZ)
 	}
 
-	if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
+	if flag && (vel[0] != deltaX || vel[2] != deltaZ) {
 		cx, cy, cz := deltaX, deltaY, deltaZ
 		deltaX, deltaY, deltaZ = vel[0], game.StepHeight, vel[2]
 
