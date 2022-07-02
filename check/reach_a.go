@@ -40,7 +40,7 @@ func (*ReachA) MaxViolations() float64 {
 }
 
 // Process ...
-func (r *ReachA) Process(p Processor, pk packet.Packet) {
+func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
@@ -59,6 +59,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 								"Distance": game.Round(dist, 4),
 								"Type":     "Raw",
 							})
+							return true
 						}
 					} else {
 						r.Buff(-0.05)
@@ -110,6 +111,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 									"Distance": game.Round(minDist, 2),
 									"Type":     "Raycast",
 								})
+								return true
 							}
 						} else {
 							r.Buff(-0.01)
@@ -121,4 +123,6 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) {
 			r.awaitingTick = false
 		}
 	}
+
+	return false
 }

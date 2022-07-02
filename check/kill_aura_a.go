@@ -32,7 +32,7 @@ func (*KillAuraA) MaxViolations() float64 {
 }
 
 // Process ...
-func (k *KillAuraA) Process(p Processor, pk packet.Packet) {
+func (k *KillAuraA) Process(p Processor, pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.Animate:
 		if pk.ActionType == packet.AnimateActionSwingArm {
@@ -48,7 +48,10 @@ func (k *KillAuraA) Process(p Processor, pk packet.Packet) {
 					"Current Tick":    currentTick,
 					"Last Tick":       k.lastSwingTick,
 				})
+				return true
 			}
 		}
 	}
+
+	return false
 }

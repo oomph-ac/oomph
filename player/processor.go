@@ -18,6 +18,7 @@ import (
 
 // ClientProcess processes a given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) bool {
+	cancel := false
 	p.clicking = false
 
 	switch pk := pk.(type) {
@@ -26,54 +27,16 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		call, ok := p.acknowledgements[pk.Timestamp]
 		if ok {
 			delete(p.acknowledgements, pk.Timestamp)
-			p.ackMu.Unlock()
-
 			call()
-			return true
+			cancel = true
 		}
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
-		p.clientFrame.Store(pk.Tick)
-
-		p.wMu.Lock()
-		p.inLoadedChunk = world_chunkExists(p.world, p.Position()) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
-		p.wMu.Unlock()
-
+		p.MovementInfo().AddQueuedInput(pk)
 		p.Move(pk)
-
-		p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
-		p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
-
-		if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
-			p.mInfo.Sprinting = true
-		}
-		if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-			p.mInfo.Sprinting = false
-		}
-		if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
-			p.mInfo.Sneaking = true
-		}
-		if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-			p.mInfo.Sneaking = false
-		}
-		p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-		p.mInfo.InVoid = p.Position().Y() < -35
-
-		p.mInfo.JumpVelocity = game.DefaultJumpMotion
-		p.mInfo.Speed = game.NormalMovementSpeed
-		p.mInfo.Gravity = game.NormalGravity
-
-		if p.mInfo.Sprinting {
-			p.mInfo.Speed *= 1.3
-		}
-
-		p.updateMovementState()
 		p.tickEntityLocations()
-		p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
-
-		pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
-		p.mInfo.Teleporting = false
+		cancel = true
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
@@ -102,7 +65,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			w.SetBlock(pos, block, nil)
 		}
 	case *packet.AdventureSettings:
-		p.mInfo.Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
+		p.MovementInfo().Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 			p.dead = false
@@ -135,9 +98,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	p.checkMu.Lock()
 	defer p.checkMu.Unlock()
 	for _, c := range p.checks {
-		c.Process(p, pk)
+		cancel = c.Process(p, pk) || cancel
 	}
-	return false
+	return cancel
 }
 
 // ServerProcess processes a given packet from the server.
@@ -173,12 +136,16 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}, false)
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
+			/* p.Acknowledgement(func() {
 				teleport := utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport)
 				if teleport {
 					p.Teleport(pk.Position, teleport)
 				}
-			}, false)
+			}, false) */
+			teleport := utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport)
+			if teleport {
+				p.Teleport(pk.Position, teleport)
+			}
 			return false
 		}
 
@@ -211,7 +178,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}
 
 			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
-				p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
+				p.MovementInfo().Immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
 			}
 		}, false)
 	case *packet.SubChunk:
@@ -240,21 +207,30 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				p.mInfo.UpdateServerSentVelocity(mgl64.Vec3{
+			// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
+			// does take knockback when it recieves it.
+			/* p.Acknowledgement(func() {
+				p.MovementInfo().UpdateServerSentVelocity(mgl64.Vec3{
 					float64(pk.Velocity[0]),
 					float64(pk.Velocity[1]),
 					float64(pk.Velocity[2]),
 				})
+			}, false) */
 
-			}, false)
+			// The server movement is updated to the knockback sent by this packet. Regardless of wether
+			// the client has recieved knockback - the server's movement should be the knockback sent by the server.
+
+			p.MovementInfo().UpdateServerSentVelocity(mgl64.Vec3{
+				float64(pk.Velocity[0]),
+				float64(pk.Velocity[1]),
+				float64(pk.Velocity[2]),
+			})
 		} else if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
 		p.Acknowledgement(func() {
 			go func() {
-				p.wMu.Lock()
 				a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
 				c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
 				if err != nil {
@@ -263,7 +239,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				}
 
 				world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
-				p.wMu.Unlock()
+
 				p.ready = true
 			}()
 		}, false)

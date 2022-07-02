@@ -32,7 +32,7 @@ func (*AutoClickerB) MaxViolations() float64 {
 }
 
 // Process ...
-func (a *AutoClickerB) Process(p Processor, _ packet.Packet) {
+func (a *AutoClickerB) Process(p Processor, _ packet.Packet) bool {
 	if p.Clicking() {
 		a.samples = append(a.samples, p.ClickDelay())
 		if len(a.samples) == 20 {
@@ -44,4 +44,6 @@ func (a *AutoClickerB) Process(p Processor, _ packet.Packet) {
 			a.samples = make([]uint64, 0)
 		}
 	}
+
+	return false
 }

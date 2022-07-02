@@ -24,11 +24,60 @@ func (p *Player) updateMovementState() {
 		}
 		p.mInfo.CanExempt = true
 	} else {
+		p.mInfo.InUnsupportedRewindScenario = false
 		p.calculateExpectedMovement()
 		p.mInfo.CanExempt = p.mInfo.StepLenience > 1e-4
 	}
 
 	p.mInfo.UpdateTickStatus()
+}
+
+func (p *Player) validateMovement() {
+	mError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement)
+	posError := p.Position().Sub(p.mInfo.ServerPredictedPosition)
+	if mgl64.Abs(mError[0]) > 1e-3 || mgl64.Abs(mError[1]) > 1e-4 || mgl64.Abs(mError[2]) > 1e-3 {
+		p.mInfo.TrustedPositionCredits *= 0.85 // Reduce the amount of trusted position credits - the client has shown it cannot be trusted as of now
+		if mError.LenSqr() > 0.04 {
+			p.correctMovement()
+		}
+	} else if !p.mInfo.ExpectingFutureCorrection {
+		p.mInfo.TrustedPositionCredits++
+		if p.mInfo.TrustedPositionCredits >= 40 {
+			// Since the client's movement is around the same as the server's (and they have built up to a credible score), we can assume their movement is legitimate
+			// and set the servers predicted position to the client's.
+			p.mInfo.ServerPredictedPosition = p.Position()
+		}
+	}
+
+	// This scenario would happen when the movement is within a threshold to not be corrected, but is high enough
+	// the threshold to make small positional differences every tick, leading up to a big difference in the end. Although this
+	// could be fixed by correcting player movement when a much lower threshold is met, but in the off chance that the prediction is slightly
+	// off, this would make the player's movement flucuate and feel "laggy".
+	if posError.Len() > 3 {
+		p.correctMovement()
+	}
+}
+
+func (p *Player) correctMovement() {
+	if p.mInfo.ExpectingFutureCorrection || p.mInfo.CanExempt {
+		return
+	}
+	if p.mInfo.InUnsupportedRewindScenario {
+		p.SendOomphDebug("unable to rewind due to unsupported rewind scenario")
+		return
+	}
+	p.mInfo.ExpectingFutureCorrection = true
+	pos, delta := p.mInfo.ServerPredictedPosition, p.mInfo.ServerMovement
+	pk := &packet.CorrectPlayerMovePrediction{
+		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
+		Delta:    game.Vec64To32(delta),
+		OnGround: p.mInfo.OnGround,
+		Tick:     p.ClientFrame(),
+	}
+	p.conn.WritePacket(pk)
+	p.Acknowledgement(func() {
+		p.mInfo.ExpectingFutureCorrection = false
+	}, false)
 }
 
 func (p *Player) calculateExpectedMovement() {
@@ -47,6 +96,7 @@ func (p *Player) calculateExpectedMovement() {
 	if p.mInfo.OnGround {
 		if b, ok := p.World().Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition).Side(cube.FaceDown)).(block.Frictional); ok {
 			v1 *= b.Friction()
+			p.mInfo.InUnsupportedRewindScenario = true
 		} else {
 			v1 *= 0.6
 		}
@@ -92,24 +142,11 @@ func (p *Player) calculateExpectedMovement() {
 	}
 
 	p.mInfo.ServerPredictedMovement = p.mInfo.ServerMovement
-
 	p.simulateGravity()
 	p.simulateHorizontalFriction(v1)
 	if p.mInfo.StepLenience > 1e-4 {
 		p.mInfo.ServerPredictedMovement[1] += p.mInfo.StepLenience
 	}
-
-	mError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement)
-	if mgl64.Abs(mError[0]) > 0.01 || mgl64.Abs(mError[1]) > 0.01 || mgl64.Abs(mError[2]) > 0.01 {
-		// The client's movement is too far from the server's prediction, and therefore the
-		// server needs to correct the client's movement to keep both in sync.
-		p.mInfo.CorrectMovement(p)
-	} else if !p.mInfo.ExpectingFutureCorrection {
-		// Since the client's movement is around the same as the server's, we can assume their movement is legitimate
-		// and set the servers predicted position to the client's.
-		p.mInfo.ServerPredictedPosition = p.Position()
-	}
-
 }
 
 func (p *Player) simulateAddedMovementForce(f float64) {
@@ -246,6 +283,12 @@ func (p *Player) simulateCollisions() {
 	p.mInfo.ServerMovement = vel
 
 	p.mInfo.ServerPredictedPosition = p.mInfo.ServerPredictedPosition.Add(vel)
+
+	bb := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
+	blocks = utils.NearbyBBoxes(bb, p.World())
+	if cube.AnyIntersections(blocks, bb) {
+		p.mInfo.InUnsupportedRewindScenario = true
+	}
 }
 
 func (p *Player) simulateGravity() {
@@ -270,7 +313,9 @@ func (p *Player) simulateJump() {
 type MovementInfo struct {
 	CanExempt bool
 
-	ExpectingFutureCorrection bool
+	InUnsupportedRewindScenario bool
+	ExpectingFutureCorrection   bool
+	TrustedPositionCredits      float64
 
 	MoveForward, MoveStrafe float64
 	JumpVelocity            float64
@@ -279,6 +324,7 @@ type MovementInfo struct {
 	StepLenience            float64
 
 	MotionTicks uint64
+	LiquidTicks uint64
 
 	Sneaking, Sprinting bool
 	Jumping             bool
@@ -296,24 +342,57 @@ type MovementInfo struct {
 	ServerMovement          mgl64.Vec3
 	ServerPredictedMovement mgl64.Vec3
 	ServerPredictedPosition mgl64.Vec3
+
+	InputQueue            []*packet.PlayerAuthInput
+	LastRecievedInput     *packet.PlayerAuthInput
+	FixedInputSize        int
+	ProcessedInputsOnTick int
+	HasMissingInput       bool
+	FilledQueueTicks      int
 }
 
-func (m *MovementInfo) CorrectMovement(p *Player) {
-	if m.ExpectingFutureCorrection || m.CanExempt {
-		return
+func (m *MovementInfo) AddQueuedInput(input *packet.PlayerAuthInput) {
+	m.InputQueue = append(m.InputQueue, input)
+	if len(m.InputQueue) > m.FixedInputSize {
+		m.InputQueue = m.InputQueue[1:]
 	}
-	m.ExpectingFutureCorrection = true
-	pos, delta := m.ServerPredictedPosition, m.ServerMovement
-	pk := &packet.CorrectPlayerMovePrediction{
-		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
-		Delta:    game.Vec64To32(delta),
-		OnGround: p.mInfo.OnGround,
-		Tick:     p.ClientFrame(),
+}
+
+func (m *MovementInfo) UpdateInputStatus() {
+	m.HasMissingInput = len(m.InputQueue) == 0
+	if m.HasMissingInput {
+		m.ProcessedInputsOnTick++
 	}
-	p.conn.WritePacket(pk)
-	p.Acknowledgement(func() {
-		m.ExpectingFutureCorrection = false
-	}, false)
+}
+
+func (m *MovementInfo) GetQueuedInputs() (inputs []*packet.PlayerAuthInput) {
+	processed := m.ProcessedInputsOnTick
+	for processed > 0 {
+		if len(m.InputQueue) > 0 {
+			m.LastRecievedInput = m.InputQueue[0]
+			inputs = append(inputs, m.LastRecievedInput)
+			m.InputQueue = m.InputQueue[1:]
+			m.ProcessedInputsOnTick--
+		} else {
+			inputs = append(inputs, m.LastRecievedInput)
+			break
+		}
+		processed--
+	}
+	if m.ProcessedInputsOnTick < 1 {
+		m.ProcessedInputsOnTick = 1
+	}
+	remaining := len(m.InputQueue)
+	if remaining != 0 {
+		m.FilledQueueTicks++
+		if m.FilledQueueTicks == 20 {
+			m.ProcessedInputsOnTick++
+			m.FilledQueueTicks = 0
+		}
+	} else {
+		m.FilledQueueTicks = 0
+	}
+	return inputs
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
@@ -323,4 +402,5 @@ func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
 
 func (m *MovementInfo) UpdateTickStatus() {
 	m.MotionTicks++
+	m.LiquidTicks++
 }

@@ -18,6 +18,7 @@ type Check interface {
 	// MaxViolations will return the maximum violations the check can track.
 	MaxViolations() float64
 
-	// Process will process the packet provided for the check.
-	Process(p Processor, pk packet.Packet)
+	// Process will process the packet provided for the check. The boolean returned indicates whether or not
+	// the packet should not be sent to the server.
+	Process(p Processor, pk packet.Packet) bool
 }
