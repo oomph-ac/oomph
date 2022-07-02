@@ -147,6 +147,7 @@ func (p *Player) calculateExpectedMovement() {
 	if p.mInfo.StepLenience > 1e-4 {
 		p.mInfo.ServerPredictedMovement[1] += p.mInfo.StepLenience
 	}
+	p.mInfo.ServerPredictedPosition = p.mInfo.ServerPredictedPosition.Add(p.mInfo.ServerPredictedMovement)
 }
 
 func (p *Player) simulateAddedMovementForce(f float64) {
@@ -216,7 +217,7 @@ func (p *Player) simulateCollisions() {
 		deltaZ = moveBB.ZOffset(blockBBox, deltaZ)
 	}
 
-	if flag && (vel[0] != deltaX || vel[2] != deltaZ) {
+	if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
 		cx, cy, cz := deltaX, deltaY, deltaZ
 		deltaX, deltaY, deltaZ = vel[0], game.StepHeight, vel[2]
 
@@ -282,8 +283,6 @@ func (p *Player) simulateCollisions() {
 	p.mInfo.HorizontallyCollided = p.mInfo.XCollision || p.mInfo.ZCollision
 	p.mInfo.ServerMovement = vel
 
-	p.mInfo.ServerPredictedPosition = p.mInfo.ServerPredictedPosition.Add(vel)
-
 	bb := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
 	blocks = utils.NearbyBBoxes(bb, p.World())
 	if cube.AnyIntersections(blocks, bb) {
@@ -342,57 +341,6 @@ type MovementInfo struct {
 	ServerMovement          mgl64.Vec3
 	ServerPredictedMovement mgl64.Vec3
 	ServerPredictedPosition mgl64.Vec3
-
-	InputQueue            []*packet.PlayerAuthInput
-	LastRecievedInput     *packet.PlayerAuthInput
-	FixedInputSize        int
-	ProcessedInputsOnTick int
-	HasMissingInput       bool
-	FilledQueueTicks      int
-}
-
-func (m *MovementInfo) AddQueuedInput(input *packet.PlayerAuthInput) {
-	m.InputQueue = append(m.InputQueue, input)
-	if len(m.InputQueue) > m.FixedInputSize {
-		m.InputQueue = m.InputQueue[1:]
-	}
-}
-
-func (m *MovementInfo) UpdateInputStatus() {
-	m.HasMissingInput = len(m.InputQueue) == 0
-	if m.HasMissingInput {
-		m.ProcessedInputsOnTick++
-	}
-}
-
-func (m *MovementInfo) GetQueuedInputs() (inputs []*packet.PlayerAuthInput) {
-	processed := m.ProcessedInputsOnTick
-	for processed > 0 {
-		if len(m.InputQueue) > 0 {
-			m.LastRecievedInput = m.InputQueue[0]
-			inputs = append(inputs, m.LastRecievedInput)
-			m.InputQueue = m.InputQueue[1:]
-			m.ProcessedInputsOnTick--
-		} else {
-			inputs = append(inputs, m.LastRecievedInput)
-			break
-		}
-		processed--
-	}
-	if m.ProcessedInputsOnTick < 1 {
-		m.ProcessedInputsOnTick = 1
-	}
-	remaining := len(m.InputQueue)
-	if remaining != 0 {
-		m.FilledQueueTicks++
-		if m.FilledQueueTicks == 20 {
-			m.ProcessedInputsOnTick++
-			m.FilledQueueTicks = 0
-		}
-	} else {
-		m.FilledQueueTicks = 0
-	}
-	return inputs
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {

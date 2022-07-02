@@ -33,10 +33,49 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
-		p.MovementInfo().AddQueuedInput(pk)
+		p.clientFrame.Store(pk.Tick)
+
+		p.wMu.Lock()
+		p.inLoadedChunk = world_chunkExists(p.world, p.Position()) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
+		p.wMu.Unlock()
+
 		p.Move(pk)
+
+		p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
+		p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
+
+		if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+			p.mInfo.Sprinting = true
+		}
+		if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+			p.mInfo.Sprinting = false
+		}
+		if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+			p.mInfo.Sneaking = true
+		}
+		if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+			p.mInfo.Sneaking = false
+		}
+		p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+		p.mInfo.InVoid = p.Position().Y() < -35
+
+		p.mInfo.JumpVelocity = game.DefaultJumpMotion
+		p.mInfo.Speed = game.NormalMovementSpeed
+		p.mInfo.Gravity = game.NormalGravity
+
+		if p.mInfo.Sprinting {
+			p.mInfo.Speed *= 1.3
+		}
+
+		p.updateMovementState()
+		p.validateMovement()
+
 		p.tickEntityLocations()
-		cancel = true
+		p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+
+		pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
+		p.mInfo.Teleporting = false
+		p.tickEntityLocations()
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
