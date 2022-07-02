@@ -1,12 +1,13 @@
 package check
 
 import (
+	"math"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // AimAssistA checks the correlation coefficient between expected aim-bot rotation values and actual rotation values.
@@ -40,13 +41,13 @@ func (*AimAssistA) MaxViolations() float64 {
 }
 
 // Process ...
-func (a *AimAssistA) Process(p Processor, pk packet.Packet) {
+func (a *AimAssistA) Process(p Processor, pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 			if a.target == data.TargetEntityRuntimeID {
 				a.waiting = true
-				return
+				return false
 			}
 			a.target = data.TargetEntityRuntimeID
 			a.attackPos = game.Vec32To64(data.Position.Sub(mgl32.Vec3{0, 1.62}))
@@ -83,4 +84,6 @@ func (a *AimAssistA) Process(p Processor, pk packet.Packet) {
 			a.waiting = false
 		}
 	}
+
+	return false
 }

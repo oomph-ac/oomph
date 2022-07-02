@@ -1,11 +1,12 @@
 package check
 
 import (
+	"math"
+
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 // KillAuraB checks if a player is attacking too many entities at once.
@@ -35,7 +36,7 @@ func (*KillAuraB) MaxViolations() float64 {
 }
 
 // Process ...
-func (k *KillAuraB) Process(p Processor, pk packet.Packet) {
+func (k *KillAuraB) Process(p Processor, pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
@@ -58,8 +59,11 @@ func (k *KillAuraB) Process(p Processor, pk packet.Packet) {
 					"Minimum Distance": game.Round(minDist, 2),
 					"Entities":         len(k.entities),
 				})
+				return true
 			}
 		}
 		k.entities = make(map[uint64]*entity.Entity)
 	}
+
+	return false
 }

@@ -32,12 +32,12 @@ func (*AutoClickerD) MaxViolations() float64 {
 }
 
 // Process ...
-func (a *AutoClickerD) Process(p Processor, _ packet.Packet) {
+func (a *AutoClickerD) Process(p Processor, _ packet.Packet) bool {
 	if p.Clicking() {
 		a.samples = append(a.samples, float64(p.ClickDelay()))
 		if len(a.samples) < 20 {
 			// Not enough samples, wait until we have more.
-			return
+			return false
 		}
 
 		cps := p.CPS()
@@ -62,4 +62,6 @@ func (a *AutoClickerD) Process(p Processor, _ packet.Packet) {
 		}
 		a.samples = []float64{}
 	}
+
+	return false
 }

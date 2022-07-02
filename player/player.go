@@ -49,6 +49,7 @@ type Player struct {
 	entities map[uint64]*entity.Entity
 
 	mInfo *MovementInfo
+	miMu  sync.Mutex
 
 	queueMu                          sync.Mutex
 	queuedEntityLocations            map[uint64]utils.LocationData
@@ -123,8 +124,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewAutoClickerC(),
 			check.NewAutoClickerD(),
 
-			check.NewInvalidMovementC(),
-
 			check.NewKillAuraA(),
 			check.NewKillAuraB(),
 
@@ -135,7 +134,10 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewTimerA(),
 		},
 
-		mInfo: &MovementInfo{},
+		mInfo: &MovementInfo{
+			FixedInputSize:        100,
+			ProcessedInputsOnTick: 1,
+		},
 
 		world: world.Config{
 			Provider:        nil,
@@ -164,11 +166,12 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 
-	p.mInfo.ClientMovement = data.Position().Sub(data.LastPosition())
+	p.MovementInfo().ClientMovement = data.Position().Sub(data.LastPosition())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
 func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
+	p.miMu.Lock()
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos), true)
 	if reset {
@@ -179,6 +182,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
 	p.WorldLoader().Move(data.Position())
+	p.miMu.Unlock()
 }
 
 // MoveEntity moves an entity to the given position.
@@ -249,6 +253,8 @@ func (p *Player) AABB() cube.BBox {
 }
 
 func (p *Player) MovementInfo() *MovementInfo {
+	p.miMu.Lock()
+	defer p.miMu.Unlock()
 	return p.mInfo
 }
 
@@ -335,32 +341,32 @@ func (p *Player) GameMode() int32 {
 
 // Sneaking returns true if the player is currently sneaking.
 func (p *Player) Sneaking() bool {
-	return p.mInfo.Sneaking
+	return p.MovementInfo().Sneaking
 }
 
 // Sprinting returns true if the player is currently sprinting.
 func (p *Player) Sprinting() bool {
-	return p.mInfo.Sprinting
+	return p.MovementInfo().Sprinting
 }
 
 // Teleporting returns true if the player is currently teleporting.
 func (p *Player) Teleporting() bool {
-	return p.mInfo.Teleporting
+	return p.MovementInfo().Teleporting
 }
 
 // Jumping returns true if the player is currently jumping.
 func (p *Player) Jumping() bool {
-	return p.mInfo.Jumping
+	return p.MovementInfo().Jumping
 }
 
 // Immobile returns true if the player is currently immobile.
 func (p *Player) Immobile() bool {
-	return p.mInfo.Immobile
+	return p.MovementInfo().Immobile
 }
 
 // Flying returns true if the player is currently flying.
 func (p *Player) Flying() bool {
-	return p.mInfo.Flying
+	return p.MovementInfo().Flying
 }
 
 // Dead returns true if the player is currently dead.
@@ -417,6 +423,14 @@ func (p *Player) Name() string {
 	return p.IdentityData().DisplayName
 }
 
+func (p *Player) SendOomphDebug(message string) {
+	_ = p.conn.WritePacket(&packet.Text{
+		TextType: packet.TextTypeChat,
+		Message:  "§l§7[§gO§7]§r " + message,
+		XUID:     "",
+	})
+}
+
 // Disconnect disconnects the player for the reason provided.
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
@@ -464,6 +478,59 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
+			p.miMu.Lock()
+			if p.ServerTick() < 20 {
+				p.mInfo.ProcessedInputsOnTick = 100
+			}
+			p.mInfo.UpdateInputStatus()
+			inputs := p.mInfo.GetQueuedInputs()
+			for _, pk := range inputs {
+				p.clientFrame.Store(pk.Tick)
+
+				p.wMu.Lock()
+				p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
+				p.wMu.Unlock()
+
+				p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
+				p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
+
+				if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+					p.mInfo.Sprinting = true
+				}
+				if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+					p.mInfo.Sprinting = false
+				}
+				if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+					p.mInfo.Sneaking = true
+				}
+				if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+					p.mInfo.Sneaking = false
+				}
+				p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+				p.mInfo.InVoid = p.Position().Y() < -35
+
+				p.mInfo.JumpVelocity = game.DefaultJumpMotion
+				p.mInfo.Speed = game.NormalMovementSpeed
+				p.mInfo.Gravity = game.NormalGravity
+
+				if p.mInfo.Sprinting {
+					p.mInfo.Speed *= 1.3
+				}
+
+				p.updateMovementState()
+				if !p.mInfo.HasMissingInput {
+					p.validateMovement()
+				} else {
+					fmt.Println("missing input detected!")
+				}
+				p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+
+				pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
+				p.serverConn.WritePacket(pk)
+				p.mInfo.Teleporting = false
+			}
+			p.miMu.Unlock()
+
 			p.flushEntityLocations()
 			p.serverTick.Inc()
 			if p.serverTick.Load()%20 == 0 {

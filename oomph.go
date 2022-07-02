@@ -70,7 +70,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	data := serverConn.GameData()
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-	data.PlayerMovementSettings.RewindHistorySize = 30
+	data.PlayerMovementSettings.RewindHistorySize = 60
 
 	var g sync.WaitGroup
 	g.Add(2)
