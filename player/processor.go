@@ -33,49 +33,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
-		p.clientFrame.Store(pk.Tick)
-
-		p.wMu.Lock()
-		p.inLoadedChunk = world_chunkExists(p.world, p.Position()) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
-		p.wMu.Unlock()
-
-		p.Move(pk)
-
-		p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
-		p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
-
-		if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
-			p.mInfo.Sprinting = true
-		}
-		if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-			p.mInfo.Sprinting = false
-		}
-		if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
-			p.mInfo.Sneaking = true
-		}
-		if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-			p.mInfo.Sneaking = false
-		}
-		p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-		p.mInfo.InVoid = p.Position().Y() < -35
-
-		p.mInfo.JumpVelocity = game.DefaultJumpMotion
-		p.mInfo.Speed = game.NormalMovementSpeed
-		p.mInfo.Gravity = game.NormalGravity
-
-		if p.mInfo.Sprinting {
-			p.mInfo.Speed *= 1.3
-		}
-
-		p.updateMovementState()
-		p.validateMovement()
-
 		p.tickEntityLocations()
-		p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
-
-		pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
-		p.mInfo.Teleporting = false
-		p.tickEntityLocations()
+		if p.Ready() {
+			p.MovementInfo().QueueInput(pk)
+		}
+		cancel = true
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
@@ -190,36 +152,39 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 	case *packet.MovePlayer:
+		pk.Tick = p.ClientFrame()
 		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				teleport := pk.Mode == packet.MoveModeTeleport
-				if teleport {
-					p.Teleport(pk.Position, teleport)
-				}
-			}, false)
+			teleport := pk.Mode == packet.MoveModeTeleport
+			if teleport {
+				p.Teleport(pk.Position, teleport)
+			}
 			return false
 		}
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 	case *packet.SetActorData:
-		p.Acknowledgement(func() {
-			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
-			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
-			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
-				if widthExists {
-					width := game.Round(float64(width.(float32)), 5)
-					e.SetAABB(game.AABBFromDimensions(width, e.AABB().Height()))
-				}
-				if heightExists {
-					height := game.Round(float64(height.(float32)), 5)
-					e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height))
-				}
-			}
+		mInfo := p.MovementInfo()
+		pk.Tick = mInfo.SimulationFrame
 
-			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
-				p.MovementInfo().Immobile = utils.HasDataFlag(entity.DataFlagImmobile, f.(int64))
+		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
+		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
+		if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
+			if widthExists {
+				width := game.Round(float64(width.(float32)), 5)
+				e.SetAABB(game.AABBFromDimensions(width, e.AABB().Height()))
 			}
-		}, false)
+			if heightExists {
+				height := game.Round(float64(height.(float32)), 5)
+				e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height))
+			}
+		}
+
+		if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
+			flags := f.(int64)
+			mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
+			mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
+			mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
+		}
 	case *packet.SubChunk:
 		p.Acknowledgement(func() {
 			p.ready = true
