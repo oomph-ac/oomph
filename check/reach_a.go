@@ -48,19 +48,20 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 				r.attackedEntity = data.TargetEntityRuntimeID
 				r.attackPos = game.Vec32To64(data.Position)
 				// TODO: When added to Bedrock, account for sneaking AABB.
-				if t, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok && t.TeleportationTicks() >= 40 {
+				if t, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok && !p.Teleporting() {
 					if r.inputMode != packet.InputModeTouch {
 						r.awaitingTick = true
 					}
 					dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
 					if dist > 3.15 {
-						if r.Buff(1, 10) >= 5 {
+						/*if r.Buff(1, 10) >= 5 {
 							p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]interface{}{
 								"Distance": game.Round(dist, 4),
 								"Type":     "Raw",
 							})
 							return true
-						}
+						}*/
+						return true
 					} else {
 						r.Buff(-0.05)
 						r.violations = math.Max(r.violations-0.01, 0)
@@ -88,7 +89,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 					posDiff := cPos.Sub(lPos)
 					entPosDiff := cEntPos.Sub(lEntPos)
 					minDist, valid := 69000.0, false
-					maxDist := 3.1
+					//maxDist := 3.1
 					for i := 0; i <= 30; i++ {
 						uDv := lDv
 						uPos := lPos
@@ -105,14 +106,14 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 						}
 					}
 					if valid {
-						if minDist >= maxDist && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
-							if r.Buff(1, 6) >= 3 {
+						if minDist >= 3 && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
+							/* if minDist >= maxDist && r.Buff(1, 6) >= 3 {
 								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]any{
 									"Distance": game.Round(minDist, 2),
 									"Type":     "Raycast",
 								})
-								return true
-							}
+							} */
+							return true
 						} else {
 							r.Buff(-0.01)
 							r.violations = math.Max(r.violations-0.0075, 0)

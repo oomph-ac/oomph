@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+	"math"
 
 	"math/rand"
 	"strings"
@@ -163,12 +164,13 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 
-	p.MovementInfo().ClientMovement = data.Position().Sub(data.LastPosition())
+	p.mInfo.ClientMovement = data.Position().Sub(data.LastPosition())
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
 func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	p.miMu.Lock()
+	pos = pos.Sub(mgl32.Vec3{0, 1.62})
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos), true)
 	if reset {
@@ -178,7 +180,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	}
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
-	p.WorldLoader().Move(data.Position())
+	p.mInfo.ServerPredictedPosition = game.Vec32To64(pos)
 	p.miMu.Unlock()
 }
 
@@ -469,6 +471,7 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	t := time.NewTicker(time.Second / 20)
+	netErr := 0.0
 	defer t.Stop()
 	for {
 		select {
@@ -489,6 +492,86 @@ func (p *Player) startTicking() {
 					p.conn.WritePacket(msgpk)
 				}, true)
 			}
+
+			p.miMu.Lock()
+			inputs, filled := p.mInfo.GetInputs()
+			for _, pk := range inputs {
+				if pk != nil {
+					p.clientFrame.Store(p.mInfo.SimulationFrame)
+
+					p.wMu.Lock()
+					p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
+					p.wMu.Unlock()
+
+					if !filled {
+						p.Move(pk)
+					}
+
+					p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
+					p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
+
+					if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+						p.mInfo.Sprinting = true
+					} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+						p.mInfo.Sprinting = false
+					}
+
+					if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+						p.mInfo.Sneaking = true
+					} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+						p.mInfo.Sneaking = false
+					}
+					p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+					p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
+					p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
+					p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+					p.mInfo.InVoid = p.Position().Y() < -35
+
+					p.mInfo.JumpVelocity = game.DefaultJumpMotion
+					p.mInfo.Speed = game.NormalMovementSpeed
+					p.mInfo.Gravity = game.NormalGravity
+
+					if p.mInfo.Sprinting {
+						p.mInfo.Speed *= 1.3
+					}
+
+					if p.updateMovementState() && !filled {
+						p.validateMovement()
+					}
+					p.mInfo.AdvanceSimulationFrame()
+
+					if filled {
+						netErr = math.Min(netErr+1, 12)
+					} else {
+						netErr = math.Max(0, netErr-0.075)
+					}
+					if netErr >= 1 {
+						var color string
+						if netErr >= 9 {
+							color = "§l§4"
+						} else if netErr >= 6 {
+							color = "§c"
+						} else {
+							color = "§e"
+						}
+						p.conn.WritePacket(&packet.Text{
+							TextType:   packet.TextTypeTip,
+							XUID:       "",
+							SourceName: "",
+							Message:    color + "Network Issue",
+						})
+					}
+
+					p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+
+					pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
+					pk.Tick = p.mInfo.SimulationFrame
+					p.mInfo.Teleporting = false
+
+					p.serverConn.WritePacket(pk)
+				}
+			}
+			p.miMu.Unlock()
 		}
 	}
 }
