@@ -11,8 +11,9 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func (p *Player) updateMovementState() {
-	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 || p.mInfo.Teleporting || !p.inLoadedChunk {
+func (p *Player) updateMovementState() bool {
+	var exempt bool
+	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 || !p.inLoadedChunk {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPredictedMovement = p.mInfo.ClientMovement
@@ -23,47 +24,36 @@ func (p *Player) updateMovementState() {
 			p.mInfo.ClientMovement.Z() * 0.546,
 		}
 		p.mInfo.CanExempt = true
+		exempt = true
 	} else {
 		p.mInfo.InUnsupportedRewindScenario = false
+		exempt = p.mInfo.CanExempt
 		p.calculateExpectedMovement()
-		p.mInfo.CanExempt = p.mInfo.StepLenience > 1e-4
+		p.mInfo.CanExempt = false
 	}
 
 	p.mInfo.UpdateTickStatus()
+	return !exempt
 }
 
 func (p *Player) validateMovement() {
 	mError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement)
-	posError := p.Position().Sub(p.mInfo.ServerPredictedPosition)
-	if mgl64.Abs(mError[0]) > 1e-3 || mgl64.Abs(mError[1]) > 1e-4 || mgl64.Abs(mError[2]) > 1e-3 {
-		p.mInfo.TrustedPositionCredits *= 0.85 // Reduce the amount of trusted position credits - the client has shown it cannot be trusted as of now
-		if mError.LenSqr() > 0.04 {
-			p.correctMovement()
-		}
-	} else if !p.mInfo.ExpectingFutureCorrection {
-		p.mInfo.TrustedPositionCredits++
-		if p.mInfo.TrustedPositionCredits >= 40 {
-			// Since the client's movement is around the same as the server's (and they have built up to a credible score), we can assume their movement is legitimate
-			// and set the servers predicted position to the client's.
-			p.mInfo.ServerPredictedPosition = p.Position()
-		}
+	if mError.LenSqr() > 0.04 {
+		p.correctMovement()
 	}
 
 	// This scenario would happen when the movement is within a threshold to not be corrected, but is high enough
 	// the threshold to make small positional differences every tick, leading up to a big difference in the end. Although this
 	// could be fixed by correcting player movement when a much lower threshold is met, but in the off chance that the prediction is slightly
 	// off, this would make the player's movement flucuate and feel "laggy".
-	if posError.Len() > 3 {
+	posError := p.Position().Sub(p.mInfo.ServerPredictedPosition)
+	if posError.LenSqr() > 9 {
 		p.correctMovement()
 	}
 }
 
 func (p *Player) correctMovement() {
-	if p.mInfo.ExpectingFutureCorrection || p.mInfo.CanExempt {
-		return
-	}
-	if p.mInfo.InUnsupportedRewindScenario {
-		p.SendOomphDebug("unable to rewind due to unsupported rewind scenario")
+	if p.mInfo.ExpectingFutureCorrection || p.mInfo.CanExempt || p.mInfo.InUnsupportedRewindScenario {
 		return
 	}
 	p.mInfo.ExpectingFutureCorrection = true
@@ -127,7 +117,7 @@ func (p *Player) calculateExpectedMovement() {
 
 	p.simulateCollisions()
 
-	if climb && p.mInfo.HorizontallyCollided {
+	if climb && (p.mInfo.HorizontallyCollided || p.mInfo.JumpDown) {
 		p.mInfo.ServerMovement[1] = 0.3
 	}
 
@@ -144,10 +134,6 @@ func (p *Player) calculateExpectedMovement() {
 	p.mInfo.ServerPredictedMovement = p.mInfo.ServerMovement
 	p.simulateGravity()
 	p.simulateHorizontalFriction(v1)
-	if p.mInfo.StepLenience > 1e-4 {
-		p.mInfo.ServerPredictedMovement[1] += p.mInfo.StepLenience
-	}
-	p.mInfo.ServerPredictedPosition = p.mInfo.ServerPredictedPosition.Add(p.mInfo.ServerPredictedMovement)
 }
 
 func (p *Player) simulateAddedMovementForce(f float64) {
@@ -216,6 +202,7 @@ func (p *Player) simulateCollisions() {
 	for _, blockBBox := range blocks {
 		deltaZ = moveBB.ZOffset(blockBBox, deltaZ)
 	}
+	moveBB = moveBB.Translate(mgl64.Vec3{0, 0, deltaZ})
 
 	if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
 		cx, cy, cz := deltaX, deltaY, deltaZ
@@ -249,7 +236,8 @@ func (p *Player) simulateCollisions() {
 			deltaX, deltaY, deltaZ = cx, cy, cz
 		} else {
 			p.mInfo.StepLenience += deltaY
-			deltaY = cy
+			moveBB = stepBB
+			//p.SendOomphDebug(fmt.Sprint(deltaY))
 		}
 	}
 
@@ -283,9 +271,19 @@ func (p *Player) simulateCollisions() {
 	p.mInfo.HorizontallyCollided = p.mInfo.XCollision || p.mInfo.ZCollision
 	p.mInfo.ServerMovement = vel
 
+	min, max := moveBB.Min(), moveBB.Max()
+	p.mInfo.ServerPredictedPosition = mgl64.Vec3{
+		(min[0] + max[0]) / 2,
+		min[1] - p.mInfo.StepLenience,
+		(min[2] + max[2]) / 2,
+	}
+	if p.mInfo.StepLenience > 1e-4 {
+		p.mInfo.ServerPredictedPosition = p.Position() // TODO! __Proper__ step predictions
+	}
+
 	bb := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
 	blocks = utils.NearbyBBoxes(bb, p.World())
-	if cube.AnyIntersections(blocks, bb) {
+	if cube.AnyIntersections(blocks, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
 		p.mInfo.InUnsupportedRewindScenario = true
 	}
 }
@@ -314,7 +312,6 @@ type MovementInfo struct {
 
 	InUnsupportedRewindScenario bool
 	ExpectingFutureCorrection   bool
-	TrustedPositionCredits      float64
 
 	MoveForward, MoveStrafe float64
 	JumpVelocity            float64
@@ -325,11 +322,12 @@ type MovementInfo struct {
 	MotionTicks uint64
 	LiquidTicks uint64
 
-	Sneaking, Sprinting bool
-	Jumping             bool
-	Teleporting         bool
-	Immobile            bool
-	Flying              bool
+	Sneaking, SneakDown   bool
+	Jumping, JumpDown     bool
+	Sprinting, SprintDown bool
+	Teleporting           bool
+	Immobile              bool
+	Flying                bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool
@@ -341,6 +339,54 @@ type MovementInfo struct {
 	ServerMovement          mgl64.Vec3
 	ServerPredictedMovement mgl64.Vec3
 	ServerPredictedPosition mgl64.Vec3
+
+	LastProcessedInput *packet.PlayerAuthInput
+	InputBuffer        []*packet.PlayerAuthInput
+	SimulationFrame    uint64
+	MissingInput       bool
+	ExcessInputTicks   int64
+}
+
+func (m *MovementInfo) QueueInput(input *packet.PlayerAuthInput) {
+	if m.SimulationFrame == 0 {
+		m.SimulationFrame = input.Tick
+	}
+	if input.Tick < m.SimulationFrame {
+		return
+	}
+	m.InputBuffer = append(m.InputBuffer, input)
+	m.MissingInput = false
+}
+
+func (m *MovementInfo) GetInputs() (inputs []*packet.PlayerAuthInput, filled bool) {
+	if len(m.InputBuffer) > 1 || (len(m.InputBuffer) > 0 && m.MissingInput) {
+		input := m.InputBuffer[0]
+		m.InputBuffer = m.InputBuffer[1:]
+		m.LastProcessedInput = input
+		inputs = append(inputs, input)
+		if len(m.InputBuffer) > 1 {
+			m.ExcessInputTicks++
+			if m.ExcessInputTicks >= 3 {
+				input = m.InputBuffer[0]
+				m.InputBuffer = m.InputBuffer[1:]
+				m.LastProcessedInput = input
+				inputs = append(inputs, input)
+				m.ExcessInputTicks = 0
+			}
+		} else {
+			m.ExcessInputTicks = 0
+		}
+		filled = false
+	} else if len(m.InputBuffer) == 0 {
+		inputs = append(inputs, m.LastProcessedInput)
+		filled = true
+	}
+	return
+}
+
+func (m *MovementInfo) AdvanceSimulationFrame() {
+	m.SimulationFrame++
+	m.MissingInput = true
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {

@@ -58,7 +58,7 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) bool {
 		// The time difference should be one, so we subtract one from the time difference and add it to the balance.
 		t.balance += int64(timeDiff) - 1
 		if t.balance == -5 {
-			p.Flag(t, 1, map[string]any{
+			p.Flag(t, 0.001, map[string]any{
 				"Timer": game.Round(t.clientTPS/20.0, 4)},
 			)
 			t.balance = 0

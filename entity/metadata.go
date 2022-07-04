@@ -9,5 +9,7 @@ const (
 )
 
 const (
-	DataFlagImmobile = 16
+	DataFlagSneaking  = 1
+	DataFlagSprinting = 3
+	DataFlagImmobile  = 16
 )
