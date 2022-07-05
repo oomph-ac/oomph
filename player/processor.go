@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"math"
 	_ "unsafe"
 
@@ -15,6 +16,9 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+var ticks uint64
+var started bool
 
 // ClientProcess processes a given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) bool {
@@ -33,6 +37,14 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
+		p.clientFrame.Store(pk.Tick)
+		if p.inLoadedChunk {
+			ticks++
+			fmt.Println("chunk loaded for", ticks, "ticks")
+			started = true
+		} else if started {
+			fmt.Println("took", ticks, "ticks for chunk to disappear into thin air")
+		}
 		p.tickEntityLocations()
 		if p.Ready() {
 			p.MovementInfo().QueueInput(pk)
@@ -152,7 +164,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 	case *packet.MovePlayer:
-		pk.Tick = p.ClientFrame()
+		pk.Tick = p.MovementInfo().SimulationFrame
 		if pk.EntityRuntimeID == p.rid {
 			teleport := pk.Mode == packet.MoveModeTeleport
 			if teleport {
@@ -213,22 +225,24 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		if pk.EntityRuntimeID == p.rid {
 			// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 			// does take knockback when it recieves it.
-			/* p.Acknowledgement(func() {
-				p.MovementInfo().UpdateServerSentVelocity(mgl64.Vec3{
-					float64(pk.Velocity[0]),
-					float64(pk.Velocity[1]),
-					float64(pk.Velocity[2]),
-				})
-			}, false) */
-
-			// The server movement is updated to the knockback sent by this packet. Regardless of wether
-			// the client has recieved knockback - the server's movement should be the knockback sent by the server.
-
-			p.MovementInfo().UpdateServerSentVelocity(mgl64.Vec3{
+			velocity := mgl64.Vec3{
 				float64(pk.Velocity[0]),
 				float64(pk.Velocity[1]),
 				float64(pk.Velocity[2]),
-			})
+			}
+			p.Acknowledgement(func() {
+				p.MovementInfo().QueueUpdate(p.ClientFrame()+1, func() {
+					p.mInfo.UpdateServerSentVelocity(velocity)
+				})
+			}, false)
+
+			// The server movement is updated to the knockback sent by this packet. Regardless of wether
+			// the client has recieved knockback - the server's movement should be the knockback sent by the server.
+			/* p.MovementInfo().UpdateServerSentVelocity(mgl64.Vec3{
+				float64(pk.Velocity[0]),
+				float64(pk.Velocity[1]),
+				float64(pk.Velocity[2]),
+			}) */
 		} else if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}

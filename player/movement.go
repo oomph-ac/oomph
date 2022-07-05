@@ -36,18 +36,9 @@ func (p *Player) updateMovementState() bool {
 	return !exempt
 }
 
-func (p *Player) validateMovement() {
-	mError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement)
-	if mError.LenSqr() > 0.04 {
-		p.correctMovement()
-	}
-
-	// This scenario would happen when the movement is within a threshold to not be corrected, but is high enough
-	// the threshold to make small positional differences every tick, leading up to a big difference in the end. Although this
-	// could be fixed by correcting player movement when a much lower threshold is met, but in the off chance that the prediction is slightly
-	// off, this would make the player's movement flucuate and feel "laggy".
-	posError := p.Position().Sub(p.mInfo.ServerPredictedPosition)
-	if posError.LenSqr() > 9 {
+func (p *Player) validateMovement(threshold float64) {
+	mError, posError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement), p.Position().Sub(p.mInfo.ServerPredictedPosition)
+	if mError.LenSqr() > threshold || posError.LenSqr() > threshold {
 		p.correctMovement()
 	}
 }
@@ -62,7 +53,7 @@ func (p *Player) correctMovement() {
 		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
 		Delta:    game.Vec64To32(delta),
 		OnGround: p.mInfo.OnGround,
-		Tick:     p.ClientFrame(),
+		Tick:     p.mInfo.SimulationFrame,
 	}
 	p.conn.WritePacket(pk)
 	p.Acknowledgement(func() {
@@ -342,6 +333,7 @@ type MovementInfo struct {
 
 	LastProcessedInput *packet.PlayerAuthInput
 	InputBuffer        []*packet.PlayerAuthInput
+	UpdateBuffer       map[uint64][]func()
 	SimulationFrame    uint64
 	MissingInput       bool
 	ExcessInputTicks   int64
@@ -356,6 +348,15 @@ func (m *MovementInfo) QueueInput(input *packet.PlayerAuthInput) {
 	}
 	m.InputBuffer = append(m.InputBuffer, input)
 	m.MissingInput = false
+}
+
+func (m *MovementInfo) QueueUpdate(tick uint64, f func()) {
+	m.UpdateBuffer[tick] = append(m.UpdateBuffer[tick], f)
+}
+
+func (m *MovementInfo) GetUpdates(tick uint64) []func() {
+	defer delete(m.UpdateBuffer, tick)
+	return m.UpdateBuffer[tick]
 }
 
 func (m *MovementInfo) GetInputs() (inputs []*packet.PlayerAuthInput, filled bool) {
