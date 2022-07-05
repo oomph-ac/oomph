@@ -135,7 +135,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewTimerA(),
 		},
 
-		mInfo: &MovementInfo{},
+		mInfo: &MovementInfo{
+			UpdateBuffer: make(map[uint64][]func()),
+		},
 
 		world: world.Config{
 			Provider:        nil,
@@ -230,8 +232,7 @@ func (p *Player) ClientTick() uint64 {
 	return p.clientTick.Load()
 }
 
-// ClientFrame returns the last tick value sent by the client in PlayerAuthInput - this is used for movement correction
-// and various server authorization stuff.
+// ClientFrame returns the client's simulation frame given in the latest input packet
 func (p *Player) ClientFrame() uint64 {
 	return p.clientFrame.Load()
 }
@@ -497,7 +498,9 @@ func (p *Player) startTicking() {
 			inputs, filled := p.mInfo.GetInputs()
 			for _, pk := range inputs {
 				if pk != nil {
-					p.clientFrame.Store(p.mInfo.SimulationFrame)
+					for _, update := range p.mInfo.GetUpdates(p.mInfo.SimulationFrame) {
+						update()
+					}
 
 					p.wMu.Lock()
 					p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
@@ -536,7 +539,7 @@ func (p *Player) startTicking() {
 					}
 
 					if p.updateMovementState() && !filled {
-						p.validateMovement()
+						p.validateMovement(0.04)
 					}
 					p.mInfo.AdvanceSimulationFrame()
 
