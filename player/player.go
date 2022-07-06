@@ -11,6 +11,7 @@ import (
 
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
@@ -48,6 +49,9 @@ type Player struct {
 
 	entityMu sync.Mutex
 	entities map[uint64]*entity.Entity
+
+	effects  map[int32]effect.Effect
+	effectMu sync.Mutex
 
 	mInfo *MovementInfo
 	miMu  sync.Mutex
@@ -110,6 +114,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]utils.LocationData),
 
+		effects: make(map[int32]effect.Effect),
+
 		gameMode: data.PlayerGameMode,
 
 		inLoadedChunk: false,
@@ -166,7 +172,8 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 
-	p.mInfo.ClientMovement = data.Position().Sub(data.LastPosition())
+	//p.mInfo.ClientMovement = data.Position().Sub(data.LastPosition())
+	p.mInfo.ClientMovement = game.Vec32To64(pk.Delta)
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -534,12 +541,14 @@ func (p *Player) startTicking() {
 					p.mInfo.Speed = game.NormalMovementSpeed
 					p.mInfo.Gravity = game.NormalGravity
 
+					p.tickEffects()
+
 					if p.mInfo.Sprinting {
 						p.mInfo.Speed *= 1.3
 					}
 
 					if p.updateMovementState() && !filled {
-						p.validateMovement(0.04)
+						p.validateMovement()
 					}
 					p.mInfo.AdvanceSimulationFrame()
 
@@ -548,12 +557,14 @@ func (p *Player) startTicking() {
 					} else {
 						netErr = math.Max(0, netErr-0.075)
 					}
-					if netErr >= 1 {
+					if netErr > 0 {
 						var color string
 						if netErr >= 9 {
 							color = "§l§4"
 						} else if netErr >= 6 {
 							color = "§c"
+						} else if netErr < 1 {
+							color = "§a"
 						} else {
 							color = "§e"
 						}
@@ -561,12 +572,13 @@ func (p *Player) startTicking() {
 							TextType:   packet.TextTypeTip,
 							XUID:       "",
 							SourceName: "",
-							Message:    color + "Network Issue",
+							Message:    fmt.Sprint(color+"Network Issue§r§7 ("+color, math.Round(netErr), "§r§7)"),
 						})
 					}
 
+					r := p.conn.ChunkRadius()
 					p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
-					p.WorldLoader().Load(p.conn.ChunkRadius())
+					p.WorldLoader().Load(int(math.Floor(float64(r*r) * math.Pi)))
 
 					pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
 					pk.Tick = p.mInfo.SimulationFrame
