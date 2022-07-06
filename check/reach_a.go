@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block/cube/trace"
@@ -16,6 +17,8 @@ type ReachA struct {
 	inputMode      uint32
 	attackedEntity uint64
 	attackPos      mgl64.Vec3
+	oldEntPos      mgl64.Vec3
+	newEntPos      mgl64.Vec3
 	basic
 }
 
@@ -51,6 +54,8 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 				if t, ok := p.SearchEntity(data.TargetEntityRuntimeID); ok && !p.Teleporting() {
 					if r.inputMode != packet.InputModeTouch {
 						r.awaitingTick = true
+						r.oldEntPos = t.LastPosition()
+						r.newEntPos = t.Position()
 					}
 					dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), r.attackPos)
 					if dist > 3.15 {
@@ -77,7 +82,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 				cRot, lRot := e.Rotation(), e.LastRotation()
 				cDv, lDv := game.DirectionVector(cRot.Z(), cRot.X()), game.DirectionVector(lRot.Z(), lRot.X())
 				cPos, lPos := p.Entity().Position().Add(mgl64.Vec3{0, 1.62, 0}), r.attackPos
-				cEntPos, lEntPos := t.Position(), t.LastPosition()
+				cEntPos, lEntPos := r.newEntPos, r.oldEntPos
 				/* if p.Sneaking() {
 					cPos[1] -= 0.08
 				} */
@@ -106,6 +111,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 						}
 					}
 					if valid {
+						p.SendOomphDebug(fmt.Sprint("dist:", game.Round(minDist, 6)))
 						if minDist >= 3 && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
 							/* if minDist >= maxDist && r.Buff(1, 6) >= 3 {
 								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]any{

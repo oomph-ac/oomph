@@ -486,8 +486,12 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
+			r := p.conn.ChunkRadius()
+			p.WorldLoader().Load(int(math.Floor(float64(r*r) * math.Pi)))
+
 			p.flushEntityLocations()
 			p.serverTick.Inc()
+
 			if p.serverTick.Load()%20 == 0 {
 				curr := time.Now()
 				p.Acknowledgement(func() {
@@ -575,10 +579,7 @@ func (p *Player) startTicking() {
 							Message:    fmt.Sprint(color+"Network Issue§r§7 ("+color, math.Round(netErr), "§r§7)"),
 						})
 					}
-
-					r := p.conn.ChunkRadius()
 					p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
-					p.WorldLoader().Load(int(math.Floor(float64(r*r) * math.Pi)))
 
 					pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
 					pk.Tick = p.mInfo.SimulationFrame

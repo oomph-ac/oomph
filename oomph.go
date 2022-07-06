@@ -6,6 +6,7 @@ import (
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
@@ -89,6 +90,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	g.Wait()
 
 	p := player.NewPlayer(o.log, conn, serverConn)
+	p.MovementInfo().ServerPredictedPosition = game.Vec32To64(data.PlayerPosition)
 	o.players <- p
 
 	g.Add(2)
