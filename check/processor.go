@@ -57,4 +57,6 @@ type Processor interface {
 	Debug(check Check, params map[string]any)
 	// Flag flags the given check with the given parameters.
 	Flag(check Check, violations float64, params map[string]any)
+
+	SendOomphDebug(message string)
 }
