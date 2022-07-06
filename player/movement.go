@@ -16,13 +16,8 @@ func (p *Player) updateMovementState() bool {
 	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 || !p.inLoadedChunk {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
-		p.mInfo.ServerPredictedMovement = p.mInfo.ClientMovement
 		p.mInfo.ServerPredictedPosition = p.Position()
-		p.mInfo.ServerMovement = mgl64.Vec3{
-			p.mInfo.ClientMovement.X() * 0.546,
-			(p.mInfo.ClientMovement.Y() - p.mInfo.Gravity) * game.GravityMultiplier,
-			p.mInfo.ClientMovement.Z() * 0.546,
-		}
+		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 		p.mInfo.CanExempt = true
 		exempt = true
 	} else {
@@ -36,10 +31,15 @@ func (p *Player) updateMovementState() bool {
 	return !exempt
 }
 
-func (p *Player) validateMovement(threshold float64) {
-	mError, posError := p.mInfo.ClientMovement.Sub(p.mInfo.ServerPredictedMovement), p.Position().Sub(p.mInfo.ServerPredictedPosition)
-	if mError.LenSqr() > threshold || posError.LenSqr() > threshold {
+func (p *Player) validateMovement() {
+	posError, velError := p.mInfo.ServerPredictedPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
+	if posError > 0.04 || velError > 0.25 { // These values are taken from BDS' anti-cheat configuration
 		p.correctMovement()
+	}
+
+	if posError <= 0.000001 {
+		p.mInfo.ServerPredictedPosition = p.Position()
+		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 	}
 }
 
@@ -122,7 +122,6 @@ func (p *Player) calculateExpectedMovement() {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
-	p.mInfo.ServerPredictedMovement = p.mInfo.ServerMovement
 	p.simulateGravity()
 	p.simulateHorizontalFriction(v1)
 }
@@ -328,7 +327,6 @@ type MovementInfo struct {
 	ClientMovement          mgl64.Vec3
 	ServerSentMovement      mgl64.Vec3
 	ServerMovement          mgl64.Vec3
-	ServerPredictedMovement mgl64.Vec3
 	ServerPredictedPosition mgl64.Vec3
 
 	LastProcessedInput *packet.PlayerAuthInput
@@ -347,6 +345,10 @@ func (m *MovementInfo) QueueInput(input *packet.PlayerAuthInput) {
 		return
 	}
 	m.InputBuffer = append(m.InputBuffer, input)
+	if len(m.InputBuffer) > 10 {
+		m.SimulationFrame = m.InputBuffer[0].Tick
+		m.InputBuffer = m.InputBuffer[1:]
+	}
 	m.MissingInput = false
 }
 

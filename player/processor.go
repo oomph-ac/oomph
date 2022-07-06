@@ -1,11 +1,12 @@
 package player
 
 import (
-	"fmt"
 	"math"
+	"time"
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
@@ -16,9 +17,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
-
-var ticks uint64
-var started bool
 
 // ClientProcess processes a given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) bool {
@@ -38,13 +36,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
-		if p.inLoadedChunk {
-			ticks++
-			fmt.Println("chunk loaded for", ticks, "ticks")
-			started = true
-		} else if started {
-			fmt.Println("took", ticks, "ticks for chunk to disappear into thin air")
-		}
 		p.tickEntityLocations()
 		if p.Ready() {
 			p.MovementInfo().QueueInput(pk)
@@ -212,14 +203,15 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}, false)
 		}
 	case *packet.UpdateAttributes:
+		pk.Tick = p.mInfo.SimulationFrame
 		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				for _, a := range pk.Attributes {
-					if a.Name == "minecraft:health" && a.Value <= 0 {
-						p.dead = true
-					}
+			for _, a := range pk.Attributes {
+				if a.Name == "minecraft:health" && a.Value <= 0 {
+					p.dead = true
+				} else if a.Name == "minecraft:movement" {
+					p.mInfo.Speed = float64(a.Value)
 				}
-			}, false)
+			}
 		}
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID == p.rid {
@@ -247,24 +239,36 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
-		p.Acknowledgement(func() {
-			go func() {
-				a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-				c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
-				if err != nil {
-					p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
-					return
-				}
+		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+		c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
+		if err != nil {
+			p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
+			return false
+		}
 
-				world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
-				p.ready = true
-			}()
-		}, false)
+		world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
+		p.ready = true
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if ok {
 			p.Acknowledgement(func() {
 				p.World().SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b, nil)
+			}, false)
+		}
+	case *packet.MobEffect:
+		if pk.EntityRuntimeID == p.rid {
+			p.Acknowledgement(func() {
+				switch pk.Operation {
+				case packet.MobEffectAdd, packet.MobEffectModify:
+					if t, ok := effect.ByID(int(pk.EffectType)); ok {
+						if t, ok := t.(effect.LastingType); ok {
+							eff := effect.New(t, int(pk.Amplifier+1), time.Duration(pk.Duration*50)*time.Millisecond)
+							p.SetEffect(pk.EffectType, eff)
+						}
+					}
+				case packet.MobEffectRemove:
+					p.RemoveEffect(pk.EffectType)
+				}
 			}, false)
 		}
 	}
