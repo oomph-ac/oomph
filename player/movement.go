@@ -329,12 +329,12 @@ type MovementInfo struct {
 	ServerMovement          mgl64.Vec3
 	ServerPredictedPosition mgl64.Vec3
 
-	LastProcessedInput *packet.PlayerAuthInput
-	InputBuffer        []*packet.PlayerAuthInput
-	UpdateBuffer       map[uint64][]func()
-	SimulationFrame    uint64
-	MissingInput       bool
-	ExcessInputTicks   int64
+	LastProcessedInput                  *packet.PlayerAuthInput
+	InputBuffer                         []*packet.PlayerAuthInput
+	UpdateBuffer                        map[uint64][]func()
+	SimulationFrame                     uint64
+	MissingInput                        bool
+	ExcessInputTicks, MissingInputTicks int64
 }
 
 func (m *MovementInfo) QueueInput(input *packet.PlayerAuthInput) {
@@ -363,6 +363,7 @@ func (m *MovementInfo) GetUpdates(tick uint64) []func() {
 
 func (m *MovementInfo) GetInputs() (inputs []*packet.PlayerAuthInput, filled bool) {
 	if len(m.InputBuffer) > 1 || (len(m.InputBuffer) > 0 && m.MissingInput) {
+		m.MissingInputTicks = 0
 		input := m.InputBuffer[0]
 		m.InputBuffer = m.InputBuffer[1:]
 		m.LastProcessedInput = input
@@ -381,8 +382,14 @@ func (m *MovementInfo) GetInputs() (inputs []*packet.PlayerAuthInput, filled boo
 		}
 		filled = false
 	} else if len(m.InputBuffer) == 0 {
-		inputs = append(inputs, m.LastProcessedInput)
-		filled = true
+		m.MissingInputTicks++
+		// Fill the client's inputs for 40 simulations (~2 seconds) at max. If the client is still missing inputs after
+		// 20 seconds, there is no way to dialate time for the client (as how it's done in other games), and
+		// we will have to wait for more inputs.
+		if m.MissingInputTicks <= 40 {
+			inputs = append(inputs, m.LastProcessedInput)
+			filled = true
+		}
 	}
 	return
 }
