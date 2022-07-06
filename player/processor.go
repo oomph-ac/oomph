@@ -257,7 +257,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				}
 
 				world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
-
 				p.ready = true
 			}()
 		}, false)
