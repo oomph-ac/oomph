@@ -566,6 +566,7 @@ func (p *Player) startTicking() {
 					}
 
 					p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+					p.WorldLoader().Load(p.conn.ChunkRadius())
 
 					pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
 					pk.Tick = p.mInfo.SimulationFrame
