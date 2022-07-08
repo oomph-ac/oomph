@@ -48,26 +48,33 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.Click()
-		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
-			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
-			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
-			if !ok {
-				// Block somehow doesn't exist, so do nothing.
-				return false
-			}
-
-			w := p.World()
-			boxes := block.Model().BBox(pos, w)
-			for _, box := range boxes {
-				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
-					// Intersects with our AABB, so do nothing.
-					return false
-				}
-			}
-
-			// Set the block in the world
-			w.SetBlock(pos, block, nil)
 		}
+
+		p.mInfo.QueueUpdate(p.ClientFrame()+1, func() {
+			p.serverConn.WritePacket(pk)
+
+			if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
+				pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
+				block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
+				if !ok {
+					// Block somehow doesn't exist, so do nothing.
+					return
+				}
+
+				w := p.World()
+				boxes := block.Model().BBox(pos, w)
+				for _, box := range boxes {
+					if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
+						// Intersects with our AABB, so do nothing.
+						return
+					}
+				}
+
+				// Set the block in the world
+				w.SetBlock(pos, block, nil)
+			}
+		})
+		cancel = true
 	case *packet.AdventureSettings:
 		p.MovementInfo().Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
 	case *packet.Respawn:
@@ -148,18 +155,22 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}, false) */
 			teleport := utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport)
 			if teleport {
-				p.Teleport(pk.Position, teleport)
+				p.Acknowledgement(func() {
+					p.Teleport(pk.Position, teleport)
+				}, false)
 			}
 			return false
 		}
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 	case *packet.MovePlayer:
-		pk.Tick = p.MovementInfo().SimulationFrame
+		pk.Tick = p.ClientFrame()
 		if pk.EntityRuntimeID == p.rid {
 			teleport := pk.Mode == packet.MoveModeTeleport
 			if teleport {
-				p.Teleport(pk.Position, teleport)
+				p.MovementInfo().QueueUpdate(p.ClientFrame(), func() {
+					p.Teleport(pk.Position, teleport)
+				})
 			}
 			return false
 		}
@@ -167,7 +178,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 	case *packet.SetActorData:
 		mInfo := p.MovementInfo()
-		pk.Tick = mInfo.SimulationFrame
+		pk.Tick = p.mInfo.SimulationFrame
 
 		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
@@ -203,15 +214,17 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}, false)
 		}
 	case *packet.UpdateAttributes:
-		pk.Tick = p.mInfo.SimulationFrame
+		pk.Tick = p.ClientFrame()
 		if pk.EntityRuntimeID == p.rid {
-			for _, a := range pk.Attributes {
-				if a.Name == "minecraft:health" && a.Value <= 0 {
-					p.dead = true
-				} else if a.Name == "minecraft:movement" {
-					p.mInfo.Speed = float64(a.Value)
+			p.MovementInfo().QueueUpdate(p.ClientFrame(), func() {
+				for _, a := range pk.Attributes {
+					if a.Name == "minecraft:health" && a.Value <= 0 {
+						p.dead = true
+					} else if a.Name == "minecraft:movement" {
+						p.mInfo.Speed = float64(a.Value)
+					}
 				}
-			}
+			})
 		}
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID == p.rid {
@@ -239,14 +252,16 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
-		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-		c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
-		if err != nil {
-			p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
-			return false
-		}
+		p.MovementInfo().QueueUpdate(p.ClientFrame()+1, func() {
+			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+			c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
+			if err != nil {
+				p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
+				return
+			}
 
-		world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
+			world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
+		})
 		p.ready = true
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)

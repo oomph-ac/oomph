@@ -178,7 +178,6 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
 func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
-	p.miMu.Lock()
 	pos = pos.Sub(mgl32.Vec3{0, 1.62})
 	data := p.Entity()
 	data.Move(game.Vec32To64(pos), true)
@@ -190,7 +189,6 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
 	p.mInfo.ServerPredictedPosition = game.Vec32To64(pos)
-	p.miMu.Unlock()
 }
 
 // MoveEntity moves an entity to the given position.
@@ -479,16 +477,13 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	t := time.NewTicker(time.Second / 20)
-	netErr := 0.0
+	netErr, healthVl := 0.0, 0
 	defer t.Stop()
 	for {
 		select {
 		case <-p.c:
 			return
 		case <-t.C:
-			r := p.conn.ChunkRadius()
-			p.WorldLoader().Load(int(math.Floor(float64(r*r) * math.Pi)))
-
 			p.flushEntityLocations()
 			p.serverTick.Inc()
 
@@ -503,8 +498,24 @@ func (p *Player) startTicking() {
 					}
 					p.conn.WritePacket(msgpk)
 				}, true)
+
+				// If the client's simulations are slower than the servers, the server will be stuck indefinently using the last
+				// input it processed from the client. This means the game will become unplayable and therefore the solution is to
+				// remove the player from the server. In other games, this issue would be tackled by making the client dialate time and
+				// do simulations at a faster rate - however, this is not possible in Minecraft.
+				if !p.MovementInfo().IsClientHealthy() {
+					healthVl++
+					if healthVl == 4 {
+						p.Disconnect("Your client is unable to simulate inputs at 20 ticks/second")
+						return
+					}
+				} else {
+					healthVl = 0
+				}
 			}
 
+			// This part of the server auhoritative movement system is created for the idea that the server should never need to wait on client inputs.
+			// The server should always be able to send a movement packet to the client for the smoothest movement possible.
 			p.miMu.Lock()
 			inputs, filled := p.mInfo.GetInputs()
 			for _, pk := range inputs {
@@ -580,6 +591,10 @@ func (p *Player) startTicking() {
 						})
 					}
 					p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+					if p.inLoadedChunk && !p.mInfo.Teleporting {
+						r := p.conn.ChunkRadius()
+						p.wl.Load(int(math.Floor(float64(r*r) * math.Pi)))
+					}
 
 					pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
 					pk.Tick = p.mInfo.SimulationFrame

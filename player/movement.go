@@ -329,12 +329,12 @@ type MovementInfo struct {
 	ServerMovement          mgl64.Vec3
 	ServerPredictedPosition mgl64.Vec3
 
-	LastProcessedInput                  *packet.PlayerAuthInput
-	InputBuffer                         []*packet.PlayerAuthInput
-	UpdateBuffer                        map[uint64][]func()
-	SimulationFrame                     uint64
-	MissingInput                        bool
-	ExcessInputTicks, MissingInputTicks int64
+	LastProcessedInput                     *packet.PlayerAuthInput
+	InputBuffer                            []*packet.PlayerAuthInput
+	UpdateBuffer                           map[uint64][]func()
+	SimulationFrame                        uint64
+	HadInputLastSimulation                 bool
+	ExcessInputTicks, OldSimulationCounter int64
 }
 
 func (m *MovementInfo) QueueInput(input *packet.PlayerAuthInput) {
@@ -342,14 +342,17 @@ func (m *MovementInfo) QueueInput(input *packet.PlayerAuthInput) {
 		m.SimulationFrame = input.Tick
 	}
 	if input.Tick < m.SimulationFrame {
+		m.OldSimulationCounter++
 		return
+	} else {
+		m.OldSimulationCounter = 0
 	}
 	m.InputBuffer = append(m.InputBuffer, input)
 	if len(m.InputBuffer) > 10 {
 		m.SimulationFrame = m.InputBuffer[0].Tick
 		m.InputBuffer = m.InputBuffer[1:]
 	}
-	m.MissingInput = false
+	m.HadInputLastSimulation = true
 }
 
 func (m *MovementInfo) QueueUpdate(tick uint64, f func()) {
@@ -361,16 +364,24 @@ func (m *MovementInfo) GetUpdates(tick uint64) []func() {
 	return m.UpdateBuffer[tick]
 }
 
+func (m *MovementInfo) IsClientHealthy() bool {
+	healthy := true
+	if m.OldSimulationCounter >= 10 {
+		m.OldSimulationCounter = 0
+		healthy = false
+	}
+	return healthy
+}
+
 func (m *MovementInfo) GetInputs() (inputs []*packet.PlayerAuthInput, filled bool) {
-	if len(m.InputBuffer) > 1 || (len(m.InputBuffer) > 0 && m.MissingInput) {
-		m.MissingInputTicks = 0
+	if len(m.InputBuffer) > 1 || (len(m.InputBuffer) > 0 && m.HadInputLastSimulation) {
 		input := m.InputBuffer[0]
 		m.InputBuffer = m.InputBuffer[1:]
 		m.LastProcessedInput = input
 		inputs = append(inputs, input)
 		if len(m.InputBuffer) > 1 {
 			m.ExcessInputTicks++
-			if m.ExcessInputTicks >= 3 {
+			if m.ExcessInputTicks == 10 {
 				input = m.InputBuffer[0]
 				m.InputBuffer = m.InputBuffer[1:]
 				m.LastProcessedInput = input
@@ -382,21 +393,15 @@ func (m *MovementInfo) GetInputs() (inputs []*packet.PlayerAuthInput, filled boo
 		}
 		filled = false
 	} else if len(m.InputBuffer) == 0 {
-		m.MissingInputTicks++
-		// Fill the client's inputs for 40 simulations (~2 seconds) at max. If the client is still missing inputs after
-		// 20 seconds, there is no way to dialate time for the client (as how it's done in other games), and
-		// we will have to wait for more inputs.
-		if m.MissingInputTicks <= 40 {
-			inputs = append(inputs, m.LastProcessedInput)
-			filled = true
-		}
+		inputs = append(inputs, m.LastProcessedInput)
+		filled = true
 	}
 	return
 }
 
 func (m *MovementInfo) AdvanceSimulationFrame() {
 	m.SimulationFrame++
-	m.MissingInput = true
+	m.HadInputLastSimulation = false
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
