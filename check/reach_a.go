@@ -113,13 +113,12 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 					if valid {
 						p.SendOomphDebug(fmt.Sprint("dist:", game.Round(minDist, 6)))
 						if minDist >= 3 && math.Abs(minDist-game.AABBVectorDistance(targetAABB, r.attackPos)) < 0.4 {
-							/* if minDist >= maxDist && r.Buff(1, 6) >= 3 {
+							if minDist >= 3.05 && r.Buff(1, 6) >= 3 {
 								p.Flag(r, r.violationAfterTicks(p.ClientTick(), 600), map[string]any{
 									"Distance": game.Round(minDist, 2),
 									"Type":     "Raycast",
 								})
-							} */
-							return true
+							}
 						} else {
 							r.Buff(-0.01)
 							r.violations = math.Max(r.violations-0.0075, 0)
