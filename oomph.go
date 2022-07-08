@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
 	"github.com/oomph-ac/oomph/game"
@@ -90,7 +91,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	g.Wait()
 
 	p := player.NewPlayer(o.log, conn, serverConn)
-	p.MovementInfo().ServerPredictedPosition = game.Vec32To64(data.PlayerPosition)
+	p.MovementInfo().ServerPredictedPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
+	p.WorldLoader().Move(p.MovementInfo().ServerPredictedPosition)
 	o.players <- p
 
 	g.Add(2)
