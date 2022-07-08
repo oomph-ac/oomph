@@ -228,26 +228,25 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID == p.rid {
-			// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
-			// does take knockback when it recieves it.
 			velocity := mgl64.Vec3{
 				float64(pk.Velocity[0]),
 				float64(pk.Velocity[1]),
 				float64(pk.Velocity[2]),
 			}
-			p.Acknowledgement(func() {
+
+			// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
+			// does take knockback when it recieves it.
+			/* p.Acknowledgement(func() {
 				p.MovementInfo().QueueUpdate(p.ClientFrame()+1, func() {
 					p.mInfo.UpdateServerSentVelocity(velocity)
 				})
-			}, false)
+			}, false) */
 
 			// The server movement is updated to the knockback sent by this packet. Regardless of wether
 			// the client has recieved knockback - the server's movement should be the knockback sent by the server.
-			/* p.MovementInfo().UpdateServerSentVelocity(mgl64.Vec3{
-				float64(pk.Velocity[0]),
-				float64(pk.Velocity[1]),
-				float64(pk.Velocity[2]),
-			}) */
+			p.MovementInfo().QueueUpdate(p.ClientFrame()+1, func() {
+				p.mInfo.UpdateServerSentVelocity(velocity)
+			})
 		} else if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
