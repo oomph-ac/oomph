@@ -33,7 +33,7 @@ func (p *Player) updateMovementState() bool {
 
 func (p *Player) validateMovement() {
 	posError, velError := p.mInfo.ServerPredictedPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
-	if posError > 0.04 || velError > 0.25 { // These values are taken from BDS' anti-cheat configuration
+	if posError > 0.04 || velError > 0.25 {
 		p.correctMovement()
 	}
 
@@ -59,6 +59,83 @@ func (p *Player) correctMovement() {
 	p.Acknowledgement(func() {
 		p.mInfo.ExpectingFutureCorrection = false
 	}, false)
+}
+
+func (p *Player) processQueuedInputs() {
+	p.miMu.Lock()
+	inputs, filled := p.mInfo.GetInputs()
+	for _, pk := range inputs {
+		if pk != nil {
+			for _, update := range p.mInfo.GetUpdates(p.mInfo.SimulationFrame) {
+				update()
+			}
+
+			p.wMu.Lock()
+			p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
+			p.wMu.Unlock()
+
+			if !filled {
+				p.Move(pk)
+			}
+
+			p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
+			p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
+
+			if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+				p.mInfo.Sprinting = true
+			} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+				p.mInfo.Sprinting = false
+			}
+
+			if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+				p.mInfo.Sneaking = true
+			} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+				p.mInfo.Sneaking = false
+			}
+			p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+			p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
+			p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
+			p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+			p.mInfo.InVoid = p.Position().Y() < -35
+
+			p.mInfo.JumpVelocity = game.DefaultJumpMotion
+			p.mInfo.Speed = game.NormalMovementSpeed
+			p.mInfo.Gravity = game.NormalGravity
+
+			p.tickEffects()
+
+			if p.mInfo.Sprinting {
+				p.mInfo.Speed *= 1.3
+			}
+
+			if p.updateMovementState() && !filled {
+				p.validateMovement()
+			}
+			p.mInfo.AdvanceSimulationFrame()
+
+			if filled {
+				p.conn.WritePacket(&packet.Text{
+					TextType:   packet.TextTypeTip,
+					XUID:       "",
+					SourceName: "",
+					Message:    "§cNetwork Issue",
+				})
+			}
+
+			p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+			if p.inLoadedChunk && !p.mInfo.Teleporting {
+				r := p.conn.ChunkRadius()
+				p.wl.Load(int(math.Floor(float64(r*r) * math.Pi)))
+			}
+
+			pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
+			pk.Tick = p.mInfo.SimulationFrame
+			p.mInfo.Teleporting = false
+
+			p.serverConn.WritePacket(pk)
+		}
+	}
+	p.miMu.Unlock()
 }
 
 func (p *Player) calculateExpectedMovement() {
