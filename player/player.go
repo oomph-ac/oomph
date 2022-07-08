@@ -2,7 +2,6 @@ package player
 
 import (
 	"fmt"
-	"math"
 
 	"math/rand"
 	"strings"
@@ -429,7 +428,7 @@ func (p *Player) Name() string {
 }
 
 func (p *Player) SendOomphDebug(message string) {
-	_ = p.conn.WritePacket(&packet.Text{
+	p.conn.WritePacket(&packet.Text{
 		TextType: packet.TextTypeChat,
 		Message:  "§l§7[§gO§7]§r " + message,
 		XUID:     "",
@@ -477,7 +476,7 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	t := time.NewTicker(time.Second / 20)
-	netErr, healthVl := 0.0, 0
+	healthVl := 0
 	defer t.Stop()
 	for {
 		select {
@@ -491,9 +490,9 @@ func (p *Player) startTicking() {
 				curr := time.Now()
 				p.Acknowledgement(func() {
 					ms := time.Since(curr).Milliseconds()
-					msg := fmt.Sprint("NSL Latency: ", ms, "ms")
+					msg := fmt.Sprint("RTT: ", ms, "ms")
 					msgpk := &packet.Text{
-						TextType: packet.TextTypeChat,
+						TextType: packet.TextTypeTip,
 						Message:  msg,
 					}
 					p.conn.WritePacket(msgpk)
@@ -516,94 +515,7 @@ func (p *Player) startTicking() {
 
 			// This part of the server auhoritative movement system is created for the idea that the server should never need to wait on client inputs.
 			// The server should always be able to send a movement packet to the client for the smoothest movement possible.
-			p.miMu.Lock()
-			inputs, filled := p.mInfo.GetInputs()
-			for _, pk := range inputs {
-				if pk != nil {
-					for _, update := range p.mInfo.GetUpdates(p.mInfo.SimulationFrame) {
-						update()
-					}
-
-					p.wMu.Lock()
-					p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
-					p.wMu.Unlock()
-
-					if !filled {
-						p.Move(pk)
-					}
-
-					p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
-					p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
-
-					if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
-						p.mInfo.Sprinting = true
-					} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-						p.mInfo.Sprinting = false
-					}
-
-					if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
-						p.mInfo.Sneaking = true
-					} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-						p.mInfo.Sneaking = false
-					}
-					p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-					p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
-					p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
-					p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
-					p.mInfo.InVoid = p.Position().Y() < -35
-
-					p.mInfo.JumpVelocity = game.DefaultJumpMotion
-					p.mInfo.Speed = game.NormalMovementSpeed
-					p.mInfo.Gravity = game.NormalGravity
-
-					p.tickEffects()
-
-					if p.mInfo.Sprinting {
-						p.mInfo.Speed *= 1.3
-					}
-
-					if p.updateMovementState() && !filled {
-						p.validateMovement()
-					}
-					p.mInfo.AdvanceSimulationFrame()
-
-					if filled {
-						netErr = math.Min(netErr+1, 12)
-					} else {
-						netErr = math.Max(0, netErr-0.075)
-					}
-					if netErr > 0 {
-						var color string
-						if netErr >= 9 {
-							color = "§l§4"
-						} else if netErr >= 6 {
-							color = "§c"
-						} else if netErr < 1 {
-							color = "§a"
-						} else {
-							color = "§e"
-						}
-						p.conn.WritePacket(&packet.Text{
-							TextType:   packet.TextTypeTip,
-							XUID:       "",
-							SourceName: "",
-							Message:    fmt.Sprint(color+"Network Issue§r§7 ("+color, math.Round(netErr), "§r§7)"),
-						})
-					}
-					p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
-					if p.inLoadedChunk && !p.mInfo.Teleporting {
-						r := p.conn.ChunkRadius()
-						p.wl.Load(int(math.Floor(float64(r*r) * math.Pi)))
-					}
-
-					pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
-					pk.Tick = p.mInfo.SimulationFrame
-					p.mInfo.Teleporting = false
-
-					p.serverConn.WritePacket(pk)
-				}
-			}
-			p.miMu.Unlock()
+			p.processQueuedInputs()
 		}
 	}
 }
