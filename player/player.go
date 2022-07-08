@@ -59,7 +59,8 @@ type Player struct {
 	queuedEntityLocations            map[uint64]utils.LocationData
 	queuedEntityMotionInterpolations map[uint64]mgl64.Vec3
 
-	gameMode int32
+	gameMode  int32
+	inputMode uint32
 
 	gamePlatform protocol.DeviceOS
 
@@ -135,14 +136,12 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 			check.NewOSSpoofer(),
 
-			check.NewReachA(),
+			//check.NewReachA(),
 
 			check.NewTimerA(),
 		},
 
-		mInfo: &MovementInfo{
-			UpdateBuffer: make(map[uint64][]func()),
-		},
+		mInfo: &MovementInfo{},
 
 		world: world.Config{
 			Provider:        nil,
@@ -343,6 +342,11 @@ func (p *Player) GameMode() int32 {
 	return p.gameMode
 }
 
+// InputMode returns the input mode of the player
+func (p *Player) InputMode() uint32 {
+	return p.inputMode
+}
+
 // Sneaking returns true if the player is currently sneaking.
 func (p *Player) Sneaking() bool {
 	return p.MovementInfo().Sneaking
@@ -476,7 +480,6 @@ func (p *Player) Handle(h Handler) {
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
 	t := time.NewTicker(time.Second / 20)
-	healthVl := 0
 	defer t.Stop()
 	for {
 		select {
@@ -497,25 +500,7 @@ func (p *Player) startTicking() {
 					}
 					p.conn.WritePacket(msgpk)
 				}, true)
-
-				// If the client's simulations are slower than the servers, the server will be stuck indefinently using the last
-				// input it processed from the client. This means the game will become unplayable and therefore the solution is to
-				// remove the player from the server. In other games, this issue would be tackled by making the client dialate time and
-				// do simulations at a faster rate - however, this is not possible in Minecraft.
-				if !p.MovementInfo().IsClientHealthy() {
-					healthVl++
-					if healthVl == 4 {
-						p.Disconnect("Your client is unable to simulate inputs at 20 ticks/second")
-						return
-					}
-				} else {
-					healthVl = 0
-				}
 			}
-
-			// This part of the server auhoritative movement system is created for the idea that the server should never need to wait on client inputs.
-			// The server should always be able to send a movement packet to the client for the smoothest movement possible.
-			p.processQueuedInputs()
 		}
 	}
 }

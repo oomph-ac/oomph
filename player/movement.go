@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -53,7 +54,7 @@ func (p *Player) correctMovement() {
 		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
 		Delta:    game.Vec64To32(delta),
 		OnGround: p.mInfo.OnGround,
-		Tick:     p.mInfo.SimulationFrame,
+		Tick:     p.ClientFrame(),
 	}
 	p.conn.WritePacket(pk)
 	p.Acknowledgement(func() {
@@ -61,81 +62,58 @@ func (p *Player) correctMovement() {
 	}, false)
 }
 
-func (p *Player) processQueuedInputs() {
-	p.miMu.Lock()
-	inputs, filled := p.mInfo.GetInputs()
-	for _, pk := range inputs {
-		if pk != nil {
-			for _, update := range p.mInfo.GetUpdates(p.mInfo.SimulationFrame) {
-				update()
-			}
+func (p *Player) processInput(pk *packet.PlayerAuthInput) {
+	p.inputMode = pk.InputMode
 
-			p.wMu.Lock()
-			p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
-			p.wMu.Unlock()
+	p.wMu.Lock()
+	p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
+	p.wMu.Unlock()
 
-			if !filled {
-				p.Move(pk)
-			}
+	p.Move(pk)
 
-			p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
-			p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
+	p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
+	p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
 
-			if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
-				p.mInfo.Sprinting = true
-			} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-				p.mInfo.Sprinting = false
-			}
-
-			if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
-				p.mInfo.Sneaking = true
-			} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-				p.mInfo.Sneaking = false
-			}
-			p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-			p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
-			p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
-			p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
-			p.mInfo.InVoid = p.Position().Y() < -35
-
-			p.mInfo.JumpVelocity = game.DefaultJumpMotion
-			p.mInfo.Speed = game.NormalMovementSpeed
-			p.mInfo.Gravity = game.NormalGravity
-
-			p.tickEffects()
-
-			if p.mInfo.Sprinting {
-				p.mInfo.Speed *= 1.3
-			}
-
-			if p.updateMovementState() && !filled {
-				p.validateMovement()
-			}
-			p.mInfo.AdvanceSimulationFrame()
-
-			if filled {
-				p.conn.WritePacket(&packet.Text{
-					TextType:   packet.TextTypeTip,
-					XUID:       "",
-					SourceName: "",
-					Message:    "§cNetwork Issue",
-				})
-			}
-
-			p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
-			if p.inLoadedChunk && !p.mInfo.Teleporting {
-				r := p.conn.ChunkRadius()
-				p.wl.Load(int(math.Floor(float64(r*r) * math.Pi)))
-			}
-
-			pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
-			pk.Tick = p.mInfo.SimulationFrame
-			p.mInfo.Teleporting = false
-
-			p.serverConn.WritePacket(pk)
-		}
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+		p.mInfo.Sprinting = true
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+		p.mInfo.Sprinting = false
 	}
-	p.miMu.Unlock()
+
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+		p.mInfo.Sneaking = true
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+		p.mInfo.Sneaking = false
+	}
+	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
+	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
+	p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+	p.mInfo.InVoid = p.Position().Y() < -35
+
+	p.mInfo.JumpVelocity = game.DefaultJumpMotion
+	p.mInfo.Speed = game.NormalMovementSpeed
+	p.mInfo.Gravity = game.NormalGravity
+
+	p.tickEffects()
+
+	if p.mInfo.Sprinting {
+		p.mInfo.Speed *= 1.3
+	}
+
+	if p.updateMovementState() {
+		p.validateMovement()
+	}
+
+	p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
+	r := p.conn.ChunkRadius()
+	if p.inLoadedChunk {
+		fmt.Println("loading!!!")
+		p.WorldLoader().Load(int(math.Floor(float64(r*r) * math.Pi)))
+	}
+
+	pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
+	p.mInfo.Teleporting = false
 }
 
 func (p *Player) calculateExpectedMovement() {
@@ -405,80 +383,6 @@ type MovementInfo struct {
 	ServerSentMovement      mgl64.Vec3
 	ServerMovement          mgl64.Vec3
 	ServerPredictedPosition mgl64.Vec3
-
-	LastProcessedInput                     *packet.PlayerAuthInput
-	InputBuffer                            []*packet.PlayerAuthInput
-	UpdateBuffer                           map[uint64][]func()
-	SimulationFrame                        uint64
-	HadInputLastSimulation                 bool
-	ExcessInputTicks, OldSimulationCounter int64
-}
-
-func (m *MovementInfo) QueueInput(input *packet.PlayerAuthInput) {
-	if m.SimulationFrame == 0 {
-		m.SimulationFrame = input.Tick
-	}
-	if input.Tick < m.SimulationFrame {
-		m.OldSimulationCounter++
-		return
-	} else {
-		m.OldSimulationCounter = 0
-	}
-	m.InputBuffer = append(m.InputBuffer, input)
-	if len(m.InputBuffer) > 10 {
-		m.SimulationFrame = m.InputBuffer[0].Tick
-		m.InputBuffer = m.InputBuffer[1:]
-	}
-	m.HadInputLastSimulation = true
-}
-
-func (m *MovementInfo) QueueUpdate(tick uint64, f func()) {
-	m.UpdateBuffer[tick] = append(m.UpdateBuffer[tick], f)
-}
-
-func (m *MovementInfo) GetUpdates(tick uint64) []func() {
-	defer delete(m.UpdateBuffer, tick)
-	return m.UpdateBuffer[tick]
-}
-
-func (m *MovementInfo) IsClientHealthy() bool {
-	healthy := true
-	if m.OldSimulationCounter >= 10 {
-		m.OldSimulationCounter = 0
-		healthy = false
-	}
-	return healthy
-}
-
-func (m *MovementInfo) GetInputs() (inputs []*packet.PlayerAuthInput, filled bool) {
-	if len(m.InputBuffer) > 1 || (len(m.InputBuffer) > 0 && m.HadInputLastSimulation) {
-		input := m.InputBuffer[0]
-		m.InputBuffer = m.InputBuffer[1:]
-		m.LastProcessedInput = input
-		inputs = append(inputs, input)
-		if len(m.InputBuffer) > 1 {
-			m.ExcessInputTicks++
-			if m.ExcessInputTicks == 10 {
-				input = m.InputBuffer[0]
-				m.InputBuffer = m.InputBuffer[1:]
-				m.LastProcessedInput = input
-				inputs = append(inputs, input)
-				m.ExcessInputTicks = 0
-			}
-		} else {
-			m.ExcessInputTicks = 0
-		}
-		filled = false
-	} else if len(m.InputBuffer) == 0 {
-		inputs = append(inputs, m.LastProcessedInput)
-		filled = true
-	}
-	return
-}
-
-func (m *MovementInfo) AdvanceSimulationFrame() {
-	m.SimulationFrame++
-	m.HadInputLastSimulation = false
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
