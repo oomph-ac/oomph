@@ -9,8 +9,12 @@ import (
 )
 
 func (p *Player) validateCombat(pk *packet.InventoryTransaction) bool {
+	if p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure {
+		return true
+	}
+
 	hit, _ := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData)
-	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok && !p.Teleporting() {
+	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
 		attackPos := p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62})
 		dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), attackPos)
 		if dist > 3.15 {
