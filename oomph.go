@@ -92,7 +92,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	p := player.NewPlayer(o.log, conn, serverConn)
 	p.MovementInfo().ServerPredictedPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
-	p.WorldLoader().Move(p.MovementInfo().ServerPredictedPosition)
+	p.MovementInfo().ServerMovement = mgl64.Vec3{0, -0.078, 0}
 	o.players <- p
 
 	g.Add(2)

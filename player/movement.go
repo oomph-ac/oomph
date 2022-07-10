@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -9,6 +8,7 @@ import (
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -45,7 +45,7 @@ func (p *Player) validateMovement() {
 }
 
 func (p *Player) correctMovement() {
-	if p.mInfo.ExpectingFutureCorrection || p.mInfo.CanExempt || p.mInfo.InUnsupportedRewindScenario {
+	if p.mInfo.ExpectingFutureCorrection || p.mInfo.CanExempt || p.mInfo.Teleporting || p.mInfo.InUnsupportedRewindScenario {
 		return
 	}
 	p.mInfo.ExpectingFutureCorrection = true
@@ -63,11 +63,13 @@ func (p *Player) correctMovement() {
 }
 
 func (p *Player) processInput(pk *packet.PlayerAuthInput) {
+	p.miMu.Lock()
 	p.inputMode = pk.InputMode
 
-	p.wMu.Lock()
-	p.inLoadedChunk = world_chunkExists(p.world, p.mInfo.ServerPredictedPosition) // Not being in a loaded chunk can cause issues with movement predictions - especially when collision checks are done
-	p.wMu.Unlock()
+	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
+		int32(math.Floor(p.mInfo.ServerPredictedPosition[0])) >> 4,
+		int32(math.Floor(p.mInfo.ServerPredictedPosition[2])) >> 4,
+	})
 
 	p.Move(pk)
 
@@ -105,15 +107,9 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 		p.validateMovement()
 	}
 
-	p.WorldLoader().Move(p.mInfo.ServerPredictedPosition)
-	r := p.conn.ChunkRadius()
-	if p.inLoadedChunk {
-		fmt.Println("loading!!!")
-		p.WorldLoader().Load(int(math.Floor(float64(r*r) * math.Pi)))
-	}
-
 	pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
 	p.mInfo.Teleporting = false
+	p.miMu.Unlock()
 }
 
 func (p *Player) calculateExpectedMovement() {
@@ -130,7 +126,7 @@ func (p *Player) calculateExpectedMovement() {
 
 	v1 := 0.91
 	if p.mInfo.OnGround {
-		if b, ok := p.World().Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition).Side(cube.FaceDown)).(block.Frictional); ok {
+		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition).Side(cube.FaceDown)).(block.Frictional); ok {
 			v1 *= b.Friction()
 			p.mInfo.InUnsupportedRewindScenario = true
 		} else {
@@ -149,7 +145,7 @@ func (p *Player) calculateExpectedMovement() {
 
 	p.simulateAddedMovementForce(v3)
 
-	climb := utils.BlockClimbable(p.World().Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition)))
+	climb := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition)))
 	if climb {
 		p.mInfo.ServerMovement[0] = game.ClampFloat(p.mInfo.ServerMovement.X(), -0.2, 0.2)
 		p.mInfo.ServerMovement[2] = game.ClampFloat(p.mInfo.ServerMovement.Z(), -0.2, 0.2)
@@ -207,11 +203,11 @@ func (p *Player) simulateCollisions() {
 
 	moveBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
 	cloneBB := moveBB
-	blocks := utils.NearbyBBoxes(cloneBB.Extend(vel), p.World())
+	blocks := p.GetNearbyBBoxes(cloneBB.Extend(vel))
 
 	if p.mInfo.OnGround && p.mInfo.Sneaking {
 		mov := 0.05
-		for ; deltaX != 0.0 && len(utils.NearbyBBoxes(moveBB.Translate(mgl64.Vec3{deltaX, -1, 0}), p.World())) == 0; vel[0] = deltaX {
+		for ; deltaX != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{deltaX, -1, 0}))) == 0; vel[0] = deltaX {
 			if deltaX < mov && deltaX >= -mov {
 				deltaX = 0
 			} else if deltaX > 0 {
@@ -220,7 +216,7 @@ func (p *Player) simulateCollisions() {
 				deltaX += mov
 			}
 		}
-		for ; deltaZ != 0.0 && len(utils.NearbyBBoxes(moveBB.Translate(mgl64.Vec3{0, -1, deltaZ}), p.World())) == 0; vel[2] = deltaZ {
+		for ; deltaZ != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{0, -1, deltaZ}))) == 0; vel[2] = deltaZ {
 			if deltaZ < mov && deltaZ >= -mov {
 				deltaZ = 0
 			} else if deltaZ > 0 {
@@ -255,7 +251,7 @@ func (p *Player) simulateCollisions() {
 
 		stepBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
 		cloneBB = stepBB
-		blocks = utils.NearbyBBoxes(cloneBB.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}), p.World())
+		blocks = p.GetNearbyBBoxes(cloneBB.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}))
 
 		for _, blockBBox := range blocks {
 			deltaY = stepBB.YOffset(blockBBox, deltaY)
@@ -327,7 +323,7 @@ func (p *Player) simulateCollisions() {
 	}
 
 	bb := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
-	blocks = utils.NearbyBBoxes(bb, p.World())
+	blocks = p.GetNearbyBBoxes(bb)
 	if cube.AnyIntersections(blocks, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
 		p.mInfo.InUnsupportedRewindScenario = true
 	}

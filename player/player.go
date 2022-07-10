@@ -13,6 +13,7 @@ import (
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/check"
@@ -75,9 +76,9 @@ type Player struct {
 	clickDelay    uint64
 	cps           int
 
-	world *world.World
-	wl    *world.Loader
-	wMu   sync.Mutex
+	chunks      map[protocol.ChunkPos]*chunk.Chunk
+	chunkRadius int
+	chkMu       sync.Mutex
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -143,17 +144,10 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		mInfo: &MovementInfo{},
 
-		world: world.Config{
-			Provider:        nil,
-			Generator:       nil,
-			Dim:             nil,
-			RandomTickSpeed: -1,
-			RandSource:      nil,
-			ReadOnly:        true,
-		}.New(),
+		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
 	}
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
-	p.wl = world.NewLoader(conn.ChunkRadius(), p.world, p)
+	p.chunkRadius = p.conn.ChunkRadius() + 4
 	go p.startTicking()
 	return p
 }
@@ -200,18 +194,6 @@ func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, ground bool) {
 		}
 		p.queueMu.Unlock()
 	}
-}
-
-func (p *Player) World() *world.World {
-	p.wMu.Lock()
-	defer p.wMu.Unlock()
-	return p.world
-}
-
-func (p *Player) WorldLoader() *world.Loader {
-	p.wMu.Lock()
-	defer p.wMu.Unlock()
-	return p.wl
 }
 
 // Locale returns the locale of the player.
@@ -455,6 +437,10 @@ func (p *Player) Close() error {
 		p.ackMu.Lock()
 		p.acknowledgements = nil
 		p.ackMu.Unlock()
+
+		p.chkMu.Lock()
+		p.chunks = nil
+		p.chkMu.Unlock()
 
 		p.entityMu.Lock()
 		p.entities = nil
