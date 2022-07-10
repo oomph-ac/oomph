@@ -1,7 +1,6 @@
 package player
 
 import (
-	"math"
 	"time"
 	_ "unsafe"
 
@@ -36,8 +35,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
-		p.processInput(pk)
 
+		p.processInput(pk)
+		p.cleanChunks()
 		p.tickEntityLocations()
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
@@ -57,8 +57,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				return false
 			}
 
-			w := p.World()
-			boxes := block.Model().BBox(pos, w)
+			boxes := block.Model().BBox(pos, nil)
 			for _, box := range boxes {
 				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
 					// Intersects with our AABB, so do nothing.
@@ -67,7 +66,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}
 
 			// Set the block in the world
-			w.SetBlock(pos, block, nil)
+			p.SetBlock(pos, block)
 		}
 	case *packet.AdventureSettings:
 		p.MovementInfo().Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
@@ -80,8 +79,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
-	case *packet.ChunkRadiusUpdated:
-		p.WorldLoader().ChangeRadius(int(pk.ChunkRadius))
 	case *packet.Login:
 		if os, ok := map[string]protocol.DeviceOS{
 			"1739947436": protocol.DeviceAndroid,
@@ -152,11 +149,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 	case *packet.MovePlayer:
-		pk.Tick = p.ClientFrame()
 		if pk.EntityRuntimeID == p.rid {
 			teleport := pk.Mode == packet.MoveModeTeleport
 			if teleport {
-				p.Teleport(pk.Position, teleport)
+				p.Acknowledgement(func() {
+					p.Teleport(pk.Position, teleport)
+				}, false)
 			}
 			return false
 		}
@@ -227,24 +225,24 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
-		p.wMu.Lock()
+		go func() {
+			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+			c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
+			if err != nil {
+				panic(err)
+			}
 
-		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-		c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), p.world.Range())
-		if err != nil {
-			p.log.Errorf("failed to parse chunk at %v: %v", pk.Position, err)
-			return false
-		}
-
-		world_setChunk(p.world, world.ChunkPos(pk.Position), c, nil)
-		p.ready = true
-
-		p.wMu.Unlock()
+			c.Compact()
+			p.LoadChunk(pk.Position, c)
+			p.ready = true
+		}()
+	case *packet.ChunkRadiusUpdated:
+		p.chunkRadius = int(pk.ChunkRadius) + 4
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if ok {
 			p.Acknowledgement(func() {
-				p.World().SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b, nil)
+				p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
 			}, false)
 		}
 	case *packet.MobEffect:
@@ -265,32 +263,4 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	}
 	return false
-}
-
-// This function checks if a chunk exists in the world's cache
-func world_chunkExists(w *world.World, pos mgl64.Vec3) bool {
-	c, ok := world_chunkFromCache(w, world.ChunkPos{
-		int32(math.Floor(pos[0])) >> 4,
-		int32(math.Floor(pos[2])) >> 4,
-	})
-	if ok {
-		c.Unlock()
-	}
-	return ok
-}
-
-//go:linkname world_setChunk github.com/df-mc/dragonfly/server/world.(*World).setChunk
-//noinspection ALL
-func world_setChunk(w *world.World, pos world.ChunkPos, c *chunk.Chunk, e map[cube.Pos]world.Block)
-
-//go:linkname world_chunkFromCache github.com/df-mc/dragonfly/server/world.(*World).chunkFromCache
-//noinspection ALL
-func world_chunkFromCache(w *world.World, pos world.ChunkPos) (*chunkData, bool)
-
-type chunkData struct {
-	*chunk.Chunk
-	e        map[cube.Pos]world.Block
-	v        []world.Viewer
-	l        []*world.Loader
-	entities []world.Entity
 }
