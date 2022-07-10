@@ -39,6 +39,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.processInput(pk)
 		p.cleanChunks()
 		p.tickEntityLocations()
+
+		p.hasValidatedCombat = false
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
