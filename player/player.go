@@ -137,8 +137,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 			check.NewOSSpoofer(),
 
-			//check.NewReachA(),
-
 			check.NewTimerA(),
 		},
 
