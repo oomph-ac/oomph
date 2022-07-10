@@ -65,9 +65,10 @@ type Player struct {
 
 	gamePlatform protocol.DeviceOS
 
-	ready         bool
-	dead          bool
-	inLoadedChunk bool
+	ready              bool
+	dead               bool
+	inLoadedChunk      bool
+	hasValidatedCombat bool
 
 	clickMu       sync.Mutex
 	clicking      bool

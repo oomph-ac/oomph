@@ -47,7 +47,6 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	}
 	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if !ok {
-		p.log.Errorf("failed to query chunk at %v", pos)
 		return block.Air{}
 	}
 	rid := c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
@@ -65,7 +64,6 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	rid := world.BlockRuntimeID(b)
 	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if !ok {
-		p.log.Errorf("failed to query chunk at %v", pos)
 		return
 	}
 

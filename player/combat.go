@@ -13,25 +13,27 @@ func (p *Player) validateCombat(pk *packet.InventoryTransaction) bool {
 		return true
 	}
 
+	// Only validate one combat input per client tick - since we insinuate that combat should be
+	// validated per tick (and not frame like the MC:BE client - the MC:JE client does combat on tick), there can only be one hit result.
+	// This will also save server resources as it won't have to validate multiple hit results sent in one tick.
+	if p.hasValidatedCombat {
+		return false
+	}
+	p.hasValidatedCombat = true
+
 	hit, _ := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData)
 	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
 		attackPos := p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62})
 		dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), attackPos)
-		if dist > 3.15 {
+		if dist > 3.1 {
 			return false
 		}
 
 		if p.inputMode != packet.InputModeTouch {
 			targetAABB := t.AABB().Grow(0.1).Translate(t.Position())
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
-			dist, valid := 0.0, false
-			if ray, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14))); ok {
-				dist = ray.Position().Sub(attackPos).Len()
-				valid = true
-			}
-			if !valid || dist > 3.01 {
-				return false
-			}
+			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3.01)))
+			return ok
 		}
 	}
 
