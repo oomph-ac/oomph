@@ -95,6 +95,25 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 	return blockBBoxs
 }
 
+func (p *Player) GetNearbyBlocks(aabb cube.BBox) []world.Block {
+	grown := aabb.Grow(0.25)
+	min, max := grown.Min(), grown.Max()
+	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
+	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
+
+	// A prediction of one BBox per block, plus an additional 2, in case
+	var blocks []world.Block
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			for z := minZ; z <= maxZ; z++ {
+				pos := cube.Pos{x, y, z}
+				blocks = append(blocks, p.Block(pos))
+			}
+		}
+	}
+	return blocks
+}
+
 func (p *Player) cleanChunks() {
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()
