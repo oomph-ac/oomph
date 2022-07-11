@@ -34,17 +34,17 @@ func (*TimerA) MaxViolations() float64 {
 }
 
 // Process ...
-func (t *TimerA) Process(p Processor, pk packet.Packet) {
+func (t *TimerA) Process(p Processor, pk packet.Packet) bool {
 	if !p.Ready() {
 		// Wait until we're spawned in to prevent falses on join.
-		return
+		return false
 	}
 
 	if _, ok := pk.(*packet.PlayerAuthInput); ok {
 		currentTime := p.ServerTick()
 		if t.lastTime == 0 {
 			t.lastTime = currentTime
-			return
+			return false
 		}
 		if currentTime%20 == 0 {
 			t.clientTPS = 0
@@ -55,7 +55,7 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) {
 		// Get how many ticks have passed since the last input packet.
 		timeDiff := currentTime - t.lastTime
 
-		// The time difference should be one, so we subtract one from the time difference and add it to the balance.
+		// The time difference should be one (tick), so we subtract one from the time difference and add it to the balance.
 		t.balance += int64(timeDiff) - 1
 		if t.balance == -5 {
 			p.Flag(t, 1, map[string]any{
@@ -65,4 +65,6 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) {
 		}
 		t.lastTime = currentTime
 	}
+
+	return false
 }

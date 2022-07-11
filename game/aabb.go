@@ -1,9 +1,10 @@
 package game
 
 import (
+	"math"
+
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
-	"math"
 )
 
 // AABBFromDimensions returns a bounding box from the given dimensions.
