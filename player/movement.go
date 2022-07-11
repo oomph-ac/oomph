@@ -5,6 +5,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
@@ -14,7 +15,7 @@ import (
 
 func (p *Player) updateMovementState() bool {
 	var exempt bool
-	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.gameMode > 0 || !p.inLoadedChunk {
+	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || !p.inLoadedChunk {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPredictedPosition = p.Position()
@@ -203,7 +204,7 @@ func (p *Player) simulateCollisions() {
 
 	moveBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
 	cloneBB := moveBB
-	blocks := p.GetNearbyBBoxes(cloneBB.Extend(vel))
+	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))
 
 	if p.mInfo.OnGround && p.mInfo.Sneaking {
 		mov := 0.05
@@ -228,7 +229,7 @@ func (p *Player) simulateCollisions() {
 	}
 
 	// Check collisions on the Y axis first
-	for _, blockBBox := range blocks {
+	for _, blockBBox := range boxes {
 		deltaY = moveBB.YOffset(blockBBox, deltaY)
 	}
 	moveBB = moveBB.Translate(mgl64.Vec3{0, deltaY})
@@ -236,11 +237,11 @@ func (p *Player) simulateCollisions() {
 	flag := p.mInfo.OnGround || (vel[1] != deltaY && vel[1] < 0)
 
 	// Afterward, check for collisions on the X and Z axis
-	for _, blockBBox := range blocks {
+	for _, blockBBox := range boxes {
 		deltaX = moveBB.XOffset(blockBBox, deltaX)
 	}
 	moveBB = moveBB.Translate(mgl64.Vec3{deltaX})
-	for _, blockBBox := range blocks {
+	for _, blockBBox := range boxes {
 		deltaZ = moveBB.ZOffset(blockBBox, deltaZ)
 	}
 	moveBB = moveBB.Translate(mgl64.Vec3{0, 0, deltaZ})
@@ -251,24 +252,24 @@ func (p *Player) simulateCollisions() {
 
 		stepBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
 		cloneBB = stepBB
-		blocks = p.GetNearbyBBoxes(cloneBB.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}))
+		boxes = p.GetNearbyBBoxes(cloneBB.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}))
 
-		for _, blockBBox := range blocks {
+		for _, blockBBox := range boxes {
 			deltaY = stepBB.YOffset(blockBBox, deltaY)
 		}
 		stepBB = stepBB.Translate(mgl64.Vec3{0, deltaY})
 
-		for _, blockBBox := range blocks {
+		for _, blockBBox := range boxes {
 			deltaX = stepBB.XOffset(blockBBox, deltaX)
 		}
 		stepBB = stepBB.Translate(mgl64.Vec3{deltaX})
-		for _, blockBBox := range blocks {
+		for _, blockBBox := range boxes {
 			deltaZ = stepBB.ZOffset(blockBBox, deltaZ)
 		}
 		stepBB = stepBB.Translate(mgl64.Vec3{0, 0, deltaZ})
 
 		reverseDeltaY := -deltaY
-		for _, blockBBox := range blocks {
+		for _, blockBBox := range boxes {
 			reverseDeltaY = stepBB.YOffset(blockBBox, reverseDeltaY)
 		}
 		deltaY += reverseDeltaY
@@ -323,9 +324,34 @@ func (p *Player) simulateCollisions() {
 	}
 
 	bb := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
-	blocks = p.GetNearbyBBoxes(bb)
-	if cube.AnyIntersections(blocks, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
+	boxes = p.GetNearbyBBoxes(bb)
+	blocks := p.GetNearbyBlocks(bb)
+
+	/* The following checks below determine wether or not the player is in an unspported rewind scenario.
+	What this means is that the movement corrections on the client won't work properly and the player will
+	essentially be jerked around indefinently, and therefore, corrections should not be done if these conditions
+	are met. */
+
+	// This check determines if the player is inside any blocks
+	if cube.AnyIntersections(boxes, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
 		p.mInfo.InUnsupportedRewindScenario = true
+	}
+
+	// This check determines if the player is near liquids
+	for _, bl := range blocks {
+		switch bl.(type) {
+		case world.Liquid:
+			p.mInfo.InUnsupportedRewindScenario = true
+		}
+
+		if p.mInfo.InUnsupportedRewindScenario {
+			break
+		}
+	}
+
+	if p.mInfo.InUnsupportedRewindScenario {
+		p.mInfo.ServerPredictedPosition = p.Position()
+		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 	}
 }
 
@@ -361,7 +387,6 @@ type MovementInfo struct {
 	StepLenience            float64
 
 	MotionTicks uint64
-	LiquidTicks uint64
 
 	Sneaking, SneakDown   bool
 	Jumping, JumpDown     bool
@@ -388,5 +413,4 @@ func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
 
 func (m *MovementInfo) UpdateTickStatus() {
 	m.MotionTicks++
-	m.LiquidTicks++
 }
