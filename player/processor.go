@@ -163,9 +163,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 	case *packet.SetActorData:
-		mInfo := p.MovementInfo()
-		pk.Tick = p.ClientFrame()
-
 		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
 		if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
@@ -179,12 +176,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}
 		}
 
-		if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
+		/* if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
 			flags := f.(int64)
 			mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
 			mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
 			mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
-		}
+		} */
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType

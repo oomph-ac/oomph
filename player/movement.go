@@ -51,6 +51,8 @@ func (p *Player) correctMovement() {
 	}
 	p.mInfo.ExpectingFutureCorrection = true
 	pos, delta := p.mInfo.ServerPredictedPosition, p.mInfo.ServerMovement
+
+	// This packet will correct the player to the server's predicted position.
 	pk := &packet.CorrectPlayerMovePrediction{
 		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
 		Delta:    game.Vec64To32(delta),
@@ -58,6 +60,7 @@ func (p *Player) correctMovement() {
 		Tick:     p.ClientFrame(),
 	}
 	p.conn.WritePacket(pk)
+
 	p.Acknowledgement(func() {
 		p.mInfo.ExpectingFutureCorrection = false
 	}, false)
@@ -174,6 +177,12 @@ func (p *Player) calculateExpectedMovement() {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
+	// After colliding with a block horizontally, the client stops sprinting. However, there seems to be a desync,
+	// where the client will collide with a block horizontally and not send it's status for itself to stop sprinting.
+	if p.mInfo.HorizontallyCollided && p.mInfo.ServerMovement.LenSqr() < 0.001 && !p.mInfo.SprintDown {
+		p.mInfo.Sprinting = false
+	}
+
 	p.simulateGravity()
 	p.simulateHorizontalFriction(v1)
 }
@@ -203,9 +212,9 @@ func (p *Player) simulateCollisions() {
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
 	moveBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition).GrowVec3(mgl64.Vec3{
-		-1e-4,
+		-0.00002,
 		0,
-		-1e-4,
+		0,
 	})
 	cloneBB := moveBB
 	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))
@@ -278,12 +287,11 @@ func (p *Player) simulateCollisions() {
 		}
 		deltaY += reverseDeltaY
 
-		if (math.Pow(cx, 2) + math.Pow(cz, 2)) >= (math.Pow(deltaX, 2) + math.Pow(deltaZ, 2)) {
+		if (math.Pow(cx, 2)+math.Pow(cz, 2)) >= (math.Pow(deltaX, 2)+math.Pow(deltaZ, 2)) || mgl64.FloatEqual(deltaY, 0) {
 			deltaX, deltaY, deltaZ = cx, cy, cz
 		} else {
 			p.mInfo.StepLenience += deltaY
 			moveBB = stepBB
-			//p.SendOomphDebug(fmt.Sprint(deltaY))
 		}
 	}
 
