@@ -46,10 +46,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.Click()
 		}
 	case *packet.InventoryTransaction:
-		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-			if !p.validateCombat(pk) {
-				cancel = true
-			}
+		if hit, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+			cancel = !p.validateCombat(hit)
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
 			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
