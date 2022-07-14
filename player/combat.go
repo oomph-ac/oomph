@@ -8,7 +8,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func (p *Player) validateCombat(pk *packet.InventoryTransaction) bool {
+func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bool {
 	if p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure {
 		return true
 	}
@@ -21,7 +21,6 @@ func (p *Player) validateCombat(pk *packet.InventoryTransaction) bool {
 	}
 	p.hasValidatedCombat = true
 
-	hit, _ := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData)
 	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
 		attackPos := p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62})
 		dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), attackPos)
