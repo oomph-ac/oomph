@@ -211,13 +211,13 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 			// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 			// does take knockback when it recieves it.
-			/* p.Acknowledgement(func() {
+			p.Acknowledgement(func() {
 				p.mInfo.UpdateServerSentVelocity(velocity)
-			}, false) */
+			}, false)
 
 			// The server movement is updated to the knockback sent by this packet. Regardless of wether
 			// the client has recieved knockback - the server's movement should be the knockback sent by the server.
-			p.mInfo.UpdateServerSentVelocity(velocity)
+			//p.mInfo.UpdateServerSentVelocity(velocity)
 		} else if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
