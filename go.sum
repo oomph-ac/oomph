@@ -68,6 +68,8 @@ github.com/df-mc/dragonfly v0.7.2 h1:hgMmeE7nEXHp804RE8m9t/wUxUKXwLh0WabOvckePp0
 github.com/df-mc/dragonfly v0.7.2/go.mod h1:U6wnq3QSebbGQNfqyvtl3Z8purjmjPLQhD6ESJIZ8lg=
 github.com/df-mc/dragonfly v0.7.3-0.20220704162343-b2290bc11b51 h1:XOQ18OpRNIfGaH34BC0tG2AP862E1NYo2W6YQPCUiv4=
 github.com/df-mc/dragonfly v0.7.3-0.20220704162343-b2290bc11b51/go.mod h1:U6wnq3QSebbGQNfqyvtl3Z8purjmjPLQhD6ESJIZ8lg=
+github.com/df-mc/dragonfly v0.7.4 h1:Mp8p8OYKcDP2d3/5ROoJECvr149XoXIAvJ2VNX8QmcI=
+github.com/df-mc/dragonfly v0.7.4/go.mod h1:1qb3mwW8Ba3VD0MvedDfMp+i6Lb93BWgv96IdZc2E00=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
@@ -153,6 +155,8 @@ github.com/klauspost/compress v1.15.6 h1:6D9PcO8QWu0JyaQ2zUMmu16T1T+zjjEpP91guRs
 github.com/klauspost/compress v1.15.6/go.mod h1:PhcZ0MbTNciWF3rruxRgKxI5NkcHHrHUDtV4Yw2GlzU=
 github.com/klauspost/compress v1.15.7 h1:7cgTQxJCU/vy+oP/E3B9RGbQTgbiVzIJWIKOLoAsPok=
 github.com/klauspost/compress v1.15.7/go.mod h1:PhcZ0MbTNciWF3rruxRgKxI5NkcHHrHUDtV4Yw2GlzU=
+github.com/klauspost/compress v1.15.8 h1:JahtItbkWjf2jzm/T+qgMxkP9EMHsqEUA6vCMGmXvhA=
+github.com/klauspost/compress v1.15.8/go.mod h1:PhcZ0MbTNciWF3rruxRgKxI5NkcHHrHUDtV4Yw2GlzU=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
@@ -183,6 +187,8 @@ github.com/sandertv/go-raknet v1.10.6 h1:SGGP+D9iEt8OOM2SoGM5SvYKYJMlIb6U/uw/7lp
 github.com/sandertv/go-raknet v1.10.6/go.mod h1:Gx+WgZBMQ0V2UoouGoJ8Wj6CDrMBQ4SB2F/ggpl5/+Y=
 github.com/sandertv/go-raknet v1.10.9 h1:1a8ntIenpDBue3IsUdhJhxTznGt8Qeaan7HtQKi0hBs=
 github.com/sandertv/go-raknet v1.10.9/go.mod h1:Gx+WgZBMQ0V2UoouGoJ8Wj6CDrMBQ4SB2F/ggpl5/+Y=
+github.com/sandertv/go-raknet v1.11.0 h1:zVxKJKL2B2GxDtJoB4BvW+lVhfn9/E1xw/RbNzy0Q8o=
+github.com/sandertv/go-raknet v1.11.0/go.mod h1:Gx+WgZBMQ0V2UoouGoJ8Wj6CDrMBQ4SB2F/ggpl5/+Y=
 github.com/sandertv/gophertunnel v1.19.4 h1:2UYu9qjpJadr2iJdOcnyVWE2XIV5rL8eeG243QE3ufw=
 github.com/sandertv/gophertunnel v1.19.4/go.mod h1:Os4c7g8H/VyvaU7bpg7/yOwSJU9XSRFrgmFid3Szs/c=
 github.com/sandertv/gophertunnel v1.19.9 h1:RHLB4OxULdzB+DeShuRvt1rjFSeQ5jhC3iLbLhCBqFs=
@@ -195,6 +201,8 @@ github.com/sandertv/gophertunnel v1.21.0 h1:qKWWhm/arv4W36rooAfETqY9WyTmrKJKqUrf
 github.com/sandertv/gophertunnel v1.21.0/go.mod h1:MM2eeBapijrPCK45QL0EaTEheEBHWJshdZpr6ZBsaXc=
 github.com/sandertv/gophertunnel v1.21.1 h1:fTEWNrJU2NIjn92ihs01X1UELQGVt0W7Y9fqxfJ3yr8=
 github.com/sandertv/gophertunnel v1.21.1/go.mod h1:MM2eeBapijrPCK45QL0EaTEheEBHWJshdZpr6ZBsaXc=
+github.com/sandertv/gophertunnel v1.22.1 h1:78hTCxDXPY5PANb9YWKvgRVeG29T3kpBQ4kko4a3Jho=
+github.com/sandertv/gophertunnel v1.22.1/go.mod h1:pghfqVLRdd6m8oR4ZKj918lyCuSIhC1uHEyGgj2fUzE=
 github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
@@ -245,6 +253,8 @@ golang.org/x/exp v0.0.0-20220609121020-a51bd0440498 h1:TF0FvLUGEq/8wOt/9AV1nj6D4
 golang.org/x/exp v0.0.0-20220609121020-a51bd0440498/go.mod h1:yh0Ynu2b5ZUe3MQfp2nM0ecK7wsgouWTDN0FNeJuIys=
 golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d h1:vtUKgx8dahOomfFzLREU8nSv25YHnTgLBn4rDnWZdU0=
 golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d/go.mod h1:Kr81I6Kryrl9sr8s2FK3vxD90NdsKWRuOIl2O4CvYbA=
+golang.org/x/exp v0.0.0-20220713135740-79cabaa25d75 h1:x03zeu7B2B11ySp+daztnwM5oBJ/8wGUSqrwcw9L0RA=
+golang.org/x/exp v0.0.0-20220713135740-79cabaa25d75/go.mod h1:Kr81I6Kryrl9sr8s2FK3vxD90NdsKWRuOIl2O4CvYbA=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
@@ -308,6 +318,8 @@ golang.org/x/net v0.0.0-20220607020251-c690dde0001d h1:4SFsTMi4UahlKoloni7L4eYzh
 golang.org/x/net v0.0.0-20220607020251-c690dde0001d/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
 golang.org/x/net v0.0.0-20220630215102-69896b714898 h1:K7wO6V1IrczY9QOQ2WkVpw4JQSwCd52UsxVEirZUfiw=
 golang.org/x/net v0.0.0-20220630215102-69896b714898/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
+golang.org/x/net v0.0.0-20220708220712-1185a9018129 h1:vucSRfWwTsoXro7P+3Cjlr6flUMtzCwzlvkxEQtHHB0=
+golang.org/x/net v0.0.0-20220708220712-1185a9018129/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
 golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
@@ -365,6 +377,8 @@ golang.org/x/sys v0.0.0-20220608164250-635b8c9b7f68 h1:z8Hj/bl9cOV2grsOpEaQFUaly
 golang.org/x/sys v0.0.0-20220608164250-635b8c9b7f68/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220704084225-05e143d24a9e h1:CsOuNlbOuf0mzxJIefr6Q4uAUetRUwZE4qt7VfzP+xo=
 golang.org/x/sys v0.0.0-20220704084225-05e143d24a9e/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e h1:NHvCuwuS43lGnYhten69ZWqi2QOj/CiDNcKbVqwVoew=
+golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
 golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
