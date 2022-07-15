@@ -70,6 +70,8 @@ github.com/df-mc/dragonfly v0.7.3-0.20220704162343-b2290bc11b51 h1:XOQ18OpRNIfGa
 github.com/df-mc/dragonfly v0.7.3-0.20220704162343-b2290bc11b51/go.mod h1:U6wnq3QSebbGQNfqyvtl3Z8purjmjPLQhD6ESJIZ8lg=
 github.com/df-mc/dragonfly v0.7.4 h1:Mp8p8OYKcDP2d3/5ROoJECvr149XoXIAvJ2VNX8QmcI=
 github.com/df-mc/dragonfly v0.7.4/go.mod h1:1qb3mwW8Ba3VD0MvedDfMp+i6Lb93BWgv96IdZc2E00=
+github.com/df-mc/dragonfly v0.7.5-0.20220715034012-36f2da9c63fb h1:e4CNrgP2VewVoQIAoRn1KCGj4oy8oCvFw9J6lZTEzQc=
+github.com/df-mc/dragonfly v0.7.5-0.20220715034012-36f2da9c63fb/go.mod h1:ayljw05P4skzYWaIKqNhEypVmS+X/L6kKfqZTClkuLY=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
@@ -253,6 +255,8 @@ golang.org/x/exp v0.0.0-20220609121020-a51bd0440498 h1:TF0FvLUGEq/8wOt/9AV1nj6D4
 golang.org/x/exp v0.0.0-20220609121020-a51bd0440498/go.mod h1:yh0Ynu2b5ZUe3MQfp2nM0ecK7wsgouWTDN0FNeJuIys=
 golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d h1:vtUKgx8dahOomfFzLREU8nSv25YHnTgLBn4rDnWZdU0=
 golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d/go.mod h1:Kr81I6Kryrl9sr8s2FK3vxD90NdsKWRuOIl2O4CvYbA=
+golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983 h1:sUweFwmLOje8KNfXAVqGGAsmgJ/F8jJ6wBLJDt4BTKY=
+golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983/go.mod h1:Kr81I6Kryrl9sr8s2FK3vxD90NdsKWRuOIl2O4CvYbA=
 golang.org/x/exp v0.0.0-20220713135740-79cabaa25d75 h1:x03zeu7B2B11ySp+daztnwM5oBJ/8wGUSqrwcw9L0RA=
 golang.org/x/exp v0.0.0-20220713135740-79cabaa25d75/go.mod h1:Kr81I6Kryrl9sr8s2FK3vxD90NdsKWRuOIl2O4CvYbA=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
