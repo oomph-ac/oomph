@@ -4,12 +4,12 @@ go 1.18
 
 require (
 	github.com/df-mc/atomic v1.10.0
-	github.com/df-mc/dragonfly v0.7.4
+	github.com/df-mc/dragonfly v0.7.5-0.20220715034012-36f2da9c63fb
 	github.com/go-gl/mathgl v1.0.0
 	github.com/pelletier/go-toml v1.9.5
 	github.com/sandertv/gophertunnel v1.22.1
 	github.com/sirupsen/logrus v1.8.1
-	golang.org/x/exp v0.0.0-20220713135740-79cabaa25d75
+	golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983
 	golang.org/x/text v0.3.7
 )
 
