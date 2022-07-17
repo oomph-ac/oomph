@@ -2,10 +2,12 @@ package oomph
 
 import (
 	"fmt"
-	"github.com/df-mc/dragonfly/server/entity/healing"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/df-mc/dragonfly/server/entity/healing"
+	"github.com/df-mc/dragonfly/server/player"
 
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/player/chat"
@@ -45,13 +47,12 @@ func TestOomphDirect(t *testing.T) {
 		}
 	}()
 
-	for {
-		if p, err := srv.Accept(); err == nil {
-			p.ShowCoordinates()
-			p.SetGameMode(world.GameModeSurvival)
-			p.Heal(20, healing.SourceCustom{})
-			p.AddFood(20)
-		}
+	for srv.Accept(func(p *player.Player) {
+		p.ShowCoordinates()
+		p.SetGameMode(world.GameModeSurvival)
+		p.Heal(20, healing.SourceFood{})
+		p.AddFood(20)
+	}) {
 	}
 }
 
