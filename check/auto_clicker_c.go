@@ -43,7 +43,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) bool {
 				"Skewness":  game.Round(skewness, 3),
 				"CPS":       cps,
 			})
-			if deviation <= 20 && (skewness > 1 || skewness == 0.0) && cps >= 9 {
+			if deviation <= 20 && (skewness > 1 || skewness == 0.0) && cps >= 12 {
 				e := 5.0
 				if skewness == 0.0 {
 					e = 1.0
