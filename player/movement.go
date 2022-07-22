@@ -212,9 +212,9 @@ func (p *Player) simulateCollisions() {
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
 	moveBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition).GrowVec3(mgl64.Vec3{
-		-0.00002,
+		-0.01,
 		0,
-		0,
+		-0.01,
 	})
 	cloneBB := moveBB
 	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))

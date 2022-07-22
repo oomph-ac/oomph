@@ -25,18 +25,14 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.NetworkStackLatency:
 		p.ackMu.Lock()
-		call, ok := p.acknowledgements[pk.Timestamp]
-		if ok {
-			delete(p.acknowledgements, pk.Timestamp)
-			call()
-			cancel = true
-		}
+		cancel = p.acks.Handle(pk.Timestamp)
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
 
 		p.processInput(pk)
+		p.acks.HasTicked = true
 		p.cleanChunks()
 		p.tickEntityLocations()
 
