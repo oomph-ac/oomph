@@ -13,6 +13,8 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+// updateMovementState updates the movement state of the player - this function will check if any exemptions need to be made.
+// If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
 func (p *Player) updateMovementState() bool {
 	var exempt bool
 	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || !p.inLoadedChunk {
@@ -33,6 +35,8 @@ func (p *Player) updateMovementState() bool {
 	return !exempt
 }
 
+// validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
+// If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
 	posError, velError := p.mInfo.ServerPredictedPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
 	if posError > 0.04 || velError > 0.25 {
@@ -45,6 +49,9 @@ func (p *Player) validateMovement() {
 	}
 }
 
+// correctMovement sends a movement correction to the player. Exemptions can be made to prevent sending corrections, such as if
+// the player has not recieved a correction yet, if the player is teleporting, or if the player is in an unsupported rewind scenario
+// (determined by the people that made the rewind system) - in which case movement corrections will not work properly.
 func (p *Player) correctMovement() {
 	if p.mInfo.ExpectingFutureCorrection || p.mInfo.CanExempt || p.mInfo.Teleporting || p.mInfo.InUnsupportedRewindScenario {
 		return
@@ -66,6 +73,8 @@ func (p *Player) correctMovement() {
 	}, false)
 }
 
+// processInput processes the input packet sent by the client to the server. This also updates some of the movement states such as
+// if the player is sprinting, jumping, or in a loaded chunk.
 func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.miMu.Lock()
 	p.inputMode = pk.InputMode
@@ -116,6 +125,7 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.miMu.Unlock()
 }
 
+// calculateExpectedMovement calculates the expected movement of the player for it's simulation frame.
 func (p *Player) calculateExpectedMovement() {
 	if p.mInfo.MotionTicks == 0 {
 		p.mInfo.ServerMovement = p.mInfo.ServerSentMovement
@@ -187,6 +197,7 @@ func (p *Player) calculateExpectedMovement() {
 	p.simulateHorizontalFriction(v1)
 }
 
+// simulateAddedMovementForce simulates the additional movement force created by the player's mf/ms and rotation values
 func (p *Player) simulateAddedMovementForce(f float64) {
 	v := math.Pow(p.mInfo.MoveForward, 2) + math.Pow(p.mInfo.MoveStrafe, 2)
 	if v >= 1e-4 {
@@ -202,6 +213,7 @@ func (p *Player) simulateAddedMovementForce(f float64) {
 	}
 }
 
+// simulateCollisions simulates the player's collisions with blocks
 func (p *Player) simulateCollisions() {
 	p.mInfo.StepLenience *= 0.4
 	if p.mInfo.StepLenience <= 1e-4 {
@@ -367,16 +379,19 @@ func (p *Player) simulateCollisions() {
 	}
 }
 
+// simulateGravity simulates the gravity of the player
 func (p *Player) simulateGravity() {
 	p.mInfo.ServerMovement[1] -= p.mInfo.Gravity
 	p.mInfo.ServerMovement[1] *= 0.98
 }
 
+// simulateHorizontalFriction simulates the horizontal friction of the player
 func (p *Player) simulateHorizontalFriction(friction float64) {
 	p.mInfo.ServerMovement[0] *= friction
 	p.mInfo.ServerMovement[2] *= friction
 }
 
+// simulateJump simulates the jump movement of the player
 func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
 	if p.mInfo.Sprinting {
