@@ -37,8 +37,8 @@ type Player struct {
 
 	locale language.Tag
 
-	ackMu            sync.Mutex
-	acknowledgements map[int64]func()
+	ackMu sync.Mutex
+	acks  *Acknowledgements
 
 	clientTick, clientFrame, serverTick atomic.Uint64
 
@@ -104,7 +104,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		h: NopHandler{},
 
-		acknowledgements: make(map[int64]func()),
+		acks: &Acknowledgements{
+			AcknowledgeMap: make(map[int64]func()),
+		},
 
 		entity: entity.NewEntity(
 			game.Vec32To64(data.PlayerPosition),
@@ -243,8 +245,9 @@ func (p *Player) MovementInfo() *MovementInfo {
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Find something with similar usage to NSL - it will possibly be removed in future versions of Minecraft
 func (p *Player) Acknowledgement(f func(), flush bool) {
-	if p.acknowledgements == nil {
-		return // Don't request an acknowledgement if acknowledgements are closed.
+	// Do not attempt to send an acknowledgement if the player is closed
+	if p.acks == nil {
+		return
 	}
 
 	t := int64(rand.Int31()) * 1000 // Ensure that we don't get screwed over because the number is too fat.
@@ -259,7 +262,7 @@ func (p *Player) Acknowledgement(f func(), flush bool) {
 	}
 
 	p.ackMu.Lock()
-	p.acknowledgements[t] = f
+	p.acks.Add(t, f)
 	p.ackMu.Unlock()
 
 	if flush {
@@ -432,7 +435,7 @@ func (p *Player) Close() error {
 		p.checkMu.Unlock()
 
 		p.ackMu.Lock()
-		p.acknowledgements = nil
+		p.acks = nil
 		p.ackMu.Unlock()
 
 		p.chkMu.Lock()
@@ -471,6 +474,10 @@ func (p *Player) startTicking() {
 		case <-t.C:
 			p.flushEntityLocations()
 			p.serverTick.Inc()
+			if !p.acks.Validate() {
+				p.Disconnect("Your client was unable to respond to acknowledgements sent by the server.")
+				break
+			}
 
 			if p.serverTick.Load()%20 == 0 {
 				curr := time.Now()
