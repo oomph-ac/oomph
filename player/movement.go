@@ -84,6 +84,16 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 		int32(math.Floor(p.mInfo.ServerPredictedPosition[2])) >> 4,
 	})
 
+	/* if p.inLoadedChunk {
+		b, _ := p.Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition.Sub(mgl64.Vec3{0, 1}))).EncodeBlock()
+		fmt.Println("block below is", b)
+	} else {
+		fmt.Println(protocol.ChunkPos{
+			int32(math.Floor(p.mInfo.ServerPredictedPosition[0])) >> 4,
+			int32(math.Floor(p.mInfo.ServerPredictedPosition[2])) >> 4,
+		}, "is not a loaded chunk")
+	} */
+
 	p.Move(pk)
 
 	p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
@@ -104,7 +114,7 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
 	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
 	p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
-	p.mInfo.InVoid = p.Position().Y() < -35
+	p.mInfo.InVoid = p.Position().Y() < -128
 
 	p.mInfo.JumpVelocity = game.DefaultJumpMotion
 	p.mInfo.Speed = game.NormalMovementSpeed
