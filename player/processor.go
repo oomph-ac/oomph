@@ -1,6 +1,7 @@
 package player
 
 import (
+	"bytes"
 	"time"
 	_ "unsafe"
 
@@ -218,17 +219,42 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
-		go func() {
-			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-			c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
-			if err != nil {
-				panic(err)
-			}
+		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+		c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
+		if err != nil {
+			panic(err)
+		}
 
-			c.Compact()
-			p.LoadChunk(pk.Position, c)
-			p.ready = true
-		}()
+		c.Compact()
+		p.LoadChunk(pk.Position, c)
+		p.ready = true
+	case *packet.SubChunk:
+		indexMap := make(map[protocol.ChunkPos]int)
+		for _, entry := range pk.SubChunkEntries {
+			if entry.Result != protocol.SubChunkResultSuccess {
+				continue
+			}
+			chunkPos := protocol.ChunkPos{
+				pk.Position[0] + int32(entry.Offset[0]),
+				pk.Position[2] + int32(entry.Offset[2]),
+			}
+			i, ok := indexMap[chunkPos]
+			if !ok {
+				indexMap[chunkPos] = 0
+				i = 0
+			}
+			if c, ok := p.Chunk(chunkPos); ok {
+				var index byte
+				sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+				if err != nil {
+					panic(err)
+				}
+				c.Sub()[i] = sub
+				indexMap[chunkPos]++
+				c.Unlock()
+			}
+		}
+		indexMap = nil
 	case *packet.ChunkRadiusUpdated:
 		p.chunkRadius = int(pk.ChunkRadius) + 4
 	case *packet.UpdateBlock:
@@ -257,3 +283,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	}
 	return false
 }
+
+//go:linkname chunk_subChunkDecode github.com/df-mc/dragonfly/server/world/chunk.decodeSubChunk
+//noinspection ALL
+func chunk_subChunkDecode(buf *bytes.Buffer, c *chunk.Chunk, index *byte, e chunk.Encoding) (*chunk.SubChunk, error)

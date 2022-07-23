@@ -114,7 +114,7 @@ func (p *Player) GetNearbyBlocks(aabb cube.BBox) []world.Block {
 	return blocks
 }
 
-func (p *Player) cleanChunks() {
+func (p *Player) cleanChunks() (cleaned int) {
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()
 
@@ -125,6 +125,9 @@ func (p *Player) cleanChunks() {
 		dist := math.Sqrt(float64(diffX*diffX) + float64(diffZ*diffZ))
 		if int(dist) > p.chunkRadius {
 			delete(p.chunks, pos)
+			cleaned++
 		}
 	}
+
+	return
 }
