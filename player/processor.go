@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 	_ "unsafe"
 
@@ -229,7 +230,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.LoadChunk(pk.Position, c)
 		p.ready = true
 	case *packet.SubChunk:
-		indexMap := make(map[protocol.ChunkPos]int)
+		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
 		for _, entry := range pk.SubChunkEntries {
 			if entry.Result != protocol.SubChunkResultSuccess {
 				continue
@@ -238,23 +239,23 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				pk.Position[0] + int32(entry.Offset[0]),
 				pk.Position[2] + int32(entry.Offset[2]),
 			}
-			i, ok := indexMap[chunkPos]
+			c, ok := p.Chunk(chunkPos)
 			if !ok {
-				indexMap[chunkPos] = 0
-				i = 0
-			}
-			if c, ok := p.Chunk(chunkPos); ok {
-				var index byte
-				sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
-				if err != nil {
-					panic(err)
-				}
-				c.Sub()[i] = sub
-				indexMap[chunkPos]++
+				p.chkMu.Lock()
+				c = chunk.New(a, world.Overworld.Range())
+				p.chunks[chunkPos] = c
+				p.chkMu.Unlock()
+			} else {
 				c.Unlock()
 			}
+			var index byte
+			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("index is", index, "decoded sub chunk for", chunkPos)
+			c.Sub()[index] = sub
 		}
-		indexMap = nil
 	case *packet.ChunkRadiusUpdated:
 		p.chunkRadius = int(pk.ChunkRadius) + 4
 	case *packet.UpdateBlock:
