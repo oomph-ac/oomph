@@ -181,6 +181,7 @@ func (p *Player) calculateExpectedMovement() {
 		}
 	}
 
+	hc := p.mInfo.HorizontallyCollided
 	p.simulateCollisions()
 
 	if climb && (p.mInfo.HorizontallyCollided || p.mInfo.JumpDown) {
@@ -199,7 +200,8 @@ func (p *Player) calculateExpectedMovement() {
 
 	// After colliding with a block horizontally, the client stops sprinting. However, there seems to be a desync,
 	// where the client will collide with a block horizontally and not send it's status for itself to stop sprinting.
-	if p.mInfo.HorizontallyCollided && p.mInfo.ServerMovement.LenSqr() < 0.001 && !p.mInfo.SprintDown {
+	// This behavior is also noticable in a BDS server with movement corrections enabled.
+	if hc && !p.mInfo.SprintDown && p.mInfo.MoveForward <= 0 {
 		p.mInfo.Sprinting = false
 	}
 
