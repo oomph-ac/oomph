@@ -2,7 +2,6 @@ package player
 
 import (
 	"bytes"
-	"fmt"
 	"time"
 	_ "unsafe"
 
@@ -220,42 +219,45 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
-		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-		c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
-		if err != nil {
-			panic(err)
-		}
-
-		c.Compact()
-		p.LoadChunk(pk.Position, c)
-		p.ready = true
-	case *packet.SubChunk:
-		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-		for _, entry := range pk.SubChunkEntries {
-			if entry.Result != protocol.SubChunkResultSuccess {
-				continue
-			}
-			chunkPos := protocol.ChunkPos{
-				pk.Position[0] + int32(entry.Offset[0]),
-				pk.Position[2] + int32(entry.Offset[2]),
-			}
-			c, ok := p.Chunk(chunkPos)
-			if !ok {
-				p.chkMu.Lock()
-				c = chunk.New(a, world.Overworld.Range())
-				p.chunks[chunkPos] = c
-				p.chkMu.Unlock()
-			} else {
-				c.Unlock()
-			}
-			var index byte
-			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+		go func() {
+			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+			c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println("index is", index, "decoded sub chunk for", chunkPos)
-			c.Sub()[index] = sub
-		}
+
+			c.Compact()
+			p.LoadChunk(pk.Position, c)
+			p.ready = true
+		}()
+	case *packet.SubChunk:
+		go func() {
+			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
+			for _, entry := range pk.SubChunkEntries {
+				if entry.Result != protocol.SubChunkResultSuccess {
+					continue
+				}
+				chunkPos := protocol.ChunkPos{
+					pk.Position[0] + int32(entry.Offset[0]),
+					pk.Position[2] + int32(entry.Offset[2]),
+				}
+				c, ok := p.Chunk(chunkPos)
+				if !ok {
+					p.chkMu.Lock()
+					c = chunk.New(a, world.Overworld.Range())
+					p.chunks[chunkPos] = c
+					p.chkMu.Unlock()
+				} else {
+					c.Unlock()
+				}
+				var index byte
+				sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+				if err != nil {
+					panic(err)
+				}
+				c.Sub()[index] = sub
+			}
+		}()
 	case *packet.ChunkRadiusUpdated:
 		p.chunkRadius = int(pk.ChunkRadius) + 4
 	case *packet.UpdateBlock:
