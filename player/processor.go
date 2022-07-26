@@ -223,7 +223,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
 			c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
 			if err != nil {
-				panic(err)
+				c = chunk.New(a, world.Overworld.Range())
 			}
 
 			c.Compact()
