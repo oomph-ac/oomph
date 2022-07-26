@@ -10,4 +10,4 @@ specific one.
 
 ## credits
 oomph is heavily influenced by [esoteric](https://github.com/ethaniccc/Esoteric) and [lumine](https://github.com/ethaniccc/Lumine).
-thank you, ethaniccc for providing us with these!
+thank you, ethaniccc for providing us with these!!!
