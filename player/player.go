@@ -476,10 +476,9 @@ func (p *Player) startTicking() {
 			p.serverTick.Inc()
 			if !p.acks.Validate() {
 				p.Disconnect("Your client was unable to respond to acknowledgements sent by the server.")
-				break
 			}
 
-			if p.serverTick.Load()%20 == 0 {
+			/* if p.serverTick.Load()%20 == 0 {
 				curr := time.Now()
 				p.Acknowledgement(func() {
 					ms := time.Since(curr).Milliseconds()
@@ -490,7 +489,7 @@ func (p *Player) startTicking() {
 					}
 					p.conn.WritePacket(msgpk)
 				}, true)
-			}
+			} */
 		}
 	}
 }
