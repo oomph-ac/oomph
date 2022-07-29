@@ -8,6 +8,9 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+// validateCombat checks if the player's attack was valid for the tick. If combat is found to be legitimate, this function
+// will return true. Note that if multiple attacks are recieved in a tick, this function will only validate the first
+// processed in the tick, and any other hits will be ignored until next tick.
 func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bool {
 	if p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure {
 		return true
@@ -28,6 +31,9 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 			return false
 		}
 
+		// If a player's input mode is touch, then a raycast will not be performed to validate combat.
+		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
+		// which would allow the player to attack another entity without actually looking at them.
 		if p.inputMode != packet.InputModeTouch {
 			targetAABB := t.AABB().Grow(0.1).Translate(t.Position())
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())

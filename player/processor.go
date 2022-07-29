@@ -50,14 +50,14 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
 			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
 			if !ok {
-				// Block somehow doesn't exist, so do nothing.
+				// The block somehow doesn't exist, so nothing can be done.
 				return false
 			}
 
 			boxes := block.Model().BBox(pos, nil)
 			for _, box := range boxes {
 				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
-					// Intersects with our AABB, so do nothing.
+					// The block would intersect with our AABB, so a block would not be placed.
 					return false
 				}
 			}
@@ -67,6 +67,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 	case *packet.AdventureSettings:
 		p.MovementInfo().Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
+		p.MovementInfo().CanNoClip = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagNoClip)
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 			p.dead = false

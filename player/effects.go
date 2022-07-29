@@ -5,12 +5,14 @@ import (
 	"github.com/oomph-ac/oomph/game"
 )
 
+// SetEffect sets an effect into the effect map
 func (p *Player) SetEffect(id int32, eff effect.Effect) {
 	p.effectMu.Lock()
 	p.effects[id] = eff
 	p.effectMu.Unlock()
 }
 
+// Effect gets the effect from the effect map
 func (p *Player) Effect(id int32) (effect.Effect, bool) {
 	p.effectMu.Lock()
 	eff, ok := p.effects[id]
@@ -18,12 +20,14 @@ func (p *Player) Effect(id int32) (effect.Effect, bool) {
 	return eff, ok
 }
 
+// RemoveEffect removes an effect from the effect map
 func (p *Player) RemoveEffect(id int32) {
 	p.effectMu.Lock()
 	delete(p.effects, id)
 	p.effectMu.Unlock()
 }
 
+// tickEffects ticks the effects in the effect map. This will also remove any effects that have expired.
 func (p *Player) tickEffects() {
 	p.effectMu.Lock()
 	defer p.effectMu.Unlock()
