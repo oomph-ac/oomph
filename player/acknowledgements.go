@@ -25,6 +25,7 @@ func (a *Acknowledgements) Handle(i int64) bool {
 	return ok
 }
 
+// Remove removes an acknowledgement from the map of acknowledgements.
 func (a *Acknowledgements) Remove(i int64) {
 	delete(a.AcknowledgeMap, i)
 }
