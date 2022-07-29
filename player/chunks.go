@@ -10,18 +10,21 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
+// LoadChunk adds a chunk to the map of chunks
 func (p *Player) LoadChunk(pos protocol.ChunkPos, c *chunk.Chunk) {
 	p.chkMu.Lock()
 	p.chunks[pos] = c
 	p.chkMu.Unlock()
 }
 
+// UnloadChunk removes a chunk from the map of chunks
 func (p *Player) UnloadChunk(pos protocol.ChunkPos) {
 	p.chkMu.Lock()
 	delete(p.chunks, pos)
 	p.chkMu.Unlock()
 }
 
+// ChunkExists returns true if the given chunk position was found in the map of chunks
 func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
 	p.chkMu.Lock()
 	_, ok := p.chunks[pos]
@@ -29,6 +32,8 @@ func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
 	return ok
 }
 
+// Chunk returns a chunk from the given chunk position. If the chunk was found in the map, it will
+// return the chunk and true
 func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
 	p.chkMu.Lock()
 	c, ok := p.chunks[pos]
@@ -41,6 +46,7 @@ func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
 	return nil, ok
 }
 
+// Block returns the block found at the given position
 func (p *Player) Block(pos cube.Pos) world.Block {
 	if pos.OutOfBounds(world.Overworld.Range()) {
 		return block.Air{}
@@ -56,6 +62,7 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	return b
 }
 
+// SetBlock sets a block at the given position to the given block
 func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	if pos.OutOfBounds(world.Overworld.Range()) {
 		return
@@ -71,6 +78,8 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	c.Unlock()
 }
 
+// GetNearbyBBoxes returns a list of block ounding boxes that are within the given bounding box - which is usually
+// the player's bounding box.
 func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
@@ -95,6 +104,7 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 	return blockBBoxs
 }
 
+// GetNearbyBlocks returns a list of blocks that are within the given bounding box.
 func (p *Player) GetNearbyBlocks(aabb cube.BBox) []world.Block {
 	grown := aabb.Grow(0.25)
 	min, max := grown.Min(), grown.Max()
@@ -114,6 +124,8 @@ func (p *Player) GetNearbyBlocks(aabb cube.BBox) []world.Block {
 	return blocks
 }
 
+// cleanChunks filters out any chunks that are out of the player's view, and returns a value of
+// how many chunks were cleaned
 func (p *Player) cleanChunks() (cleaned int) {
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()

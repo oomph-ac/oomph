@@ -17,7 +17,7 @@ import (
 // If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
 func (p *Player) updateMovementState() bool {
 	var exempt bool
-	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || !p.inLoadedChunk {
+	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || !p.inLoadedChunk || p.mInfo.CanNoClip {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPredictedPosition = p.Position()
@@ -433,6 +433,7 @@ type MovementInfo struct {
 	Teleporting           bool
 	Immobile              bool
 	Flying                bool
+	CanNoClip             bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool
