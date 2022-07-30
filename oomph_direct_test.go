@@ -30,9 +30,9 @@ func TestOomphDirect(t *testing.T) {
 
 	srv := server.New(&config, log)
 	srv.CloseOnProgramEnd()
-	if err := srv.Start(); err != nil {
+	/* if err := srv.Start(); err != nil {
 		log.Fatalln(err)
-	}
+	} */
 
 	go func() {
 		oomph := New(log, ":19132")
