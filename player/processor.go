@@ -30,6 +30,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
+		if pk.Tick < p.ClientFrame() {
+			p.Disconnect("AC Error: Invalid frame recieved in ticked input")
+		}
 		p.clientFrame.Store(pk.Tick)
 
 		p.processInput(pk)
@@ -159,25 +162,27 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 	case *packet.SetActorData:
-		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
-		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
-		if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
-			if widthExists {
-				width := game.Round(float64(width.(float32)), 5)
-				e.SetAABB(game.AABBFromDimensions(width, e.AABB().Height()))
+		p.Acknowledgement(func() {
+			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
+			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
+			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
+				if widthExists {
+					width := game.Round(float64(width.(float32)), 5)
+					e.SetAABB(game.AABBFromDimensions(width, e.AABB().Height()))
+				}
+				if heightExists {
+					height := game.Round(float64(height.(float32)), 5)
+					e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height))
+				}
 			}
-			if heightExists {
-				height := game.Round(float64(height.(float32)), 5)
-				e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height))
-			}
-		}
 
-		/* if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
-			flags := f.(int64)
-			mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
-			mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
-			mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
-		} */
+			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
+				flags := f.(int64)
+				p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
+				p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
+				p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
+			}
+		}, false)
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType
