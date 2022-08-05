@@ -475,7 +475,7 @@ func (p *Player) startTicking() {
 			p.flushEntityLocations()
 			p.serverTick.Inc()
 			if !p.acks.Validate() {
-				p.Disconnect("Your client was unable to respond to acknowledgements sent by the server.")
+				p.Disconnect("AC Error: Client was unable to respond to acknowledgements sent by the server.")
 			}
 
 			/* if p.serverTick.Load()%20 == 0 {
