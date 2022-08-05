@@ -137,6 +137,14 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 
 // calculateExpectedMovement calculates the expected movement of the player for it's simulation frame.
 func (p *Player) calculateExpectedMovement() {
+	// If the player is immobile, then they should not be able to move at all. Instead of calculating all
+	// of the collisions that won't be nessesary anyway as the player will be "stuck", we can just assume that their
+	// position will be the same, and that their movement will be a zero vector.
+	if p.mInfo.Immobile {
+		p.mInfo.ServerMovement = mgl64.Vec3{0, 0, 0}
+		return
+	}
+
 	if p.mInfo.MotionTicks == 0 {
 		p.mInfo.ServerMovement = p.mInfo.ServerSentMovement
 		if p.mInfo.Jumping {
