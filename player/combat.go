@@ -25,7 +25,7 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 	p.hasValidatedCombat = true
 
 	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
-		attackPos := p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62})
+		attackPos := p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62})
 		dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), attackPos)
 		if dist > 3.1 {
 			return false

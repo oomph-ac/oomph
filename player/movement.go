@@ -20,7 +20,7 @@ func (p *Player) updateMovementState() bool {
 	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || !p.inLoadedChunk || p.mInfo.CanNoClip {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
-		p.mInfo.ServerPredictedPosition = p.Position()
+		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 		p.mInfo.CanExempt = true
 		exempt = true
@@ -38,13 +38,13 @@ func (p *Player) updateMovementState() bool {
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
 // If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
-	posError, velError := p.mInfo.ServerPredictedPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
+	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
 	if posError > 0.04 || velError > 0.25 {
 		p.correctMovement()
 	}
 
 	if posError <= 0.000001 {
-		p.mInfo.ServerPredictedPosition = p.Position()
+		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 	}
 }
@@ -57,7 +57,7 @@ func (p *Player) correctMovement() {
 		return
 	}
 	p.mInfo.ExpectingFutureCorrection = true
-	pos, delta := p.mInfo.ServerPredictedPosition, p.mInfo.ServerMovement
+	pos, delta := p.mInfo.ServerPosition, p.mInfo.ServerMovement
 
 	// This packet will correct the player to the server's predicted position.
 	pk := &packet.CorrectPlayerMovePrediction{
@@ -80,8 +80,8 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.inputMode = pk.InputMode
 
 	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
-		int32(math.Floor(p.mInfo.ServerPredictedPosition[0])) >> 4,
-		int32(math.Floor(p.mInfo.ServerPredictedPosition[2])) >> 4,
+		int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4,
+		int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
 
 	/* if p.inLoadedChunk {
@@ -130,7 +130,7 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 		p.validateMovement()
 	}
 
-	pk.Position = game.Vec64To32(p.mInfo.ServerPredictedPosition.Add(mgl64.Vec3{0, 1.62}))
+	pk.Position = game.Vec64To32(p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62}))
 	p.mInfo.Teleporting = false
 	p.miMu.Unlock()
 }
@@ -158,7 +158,7 @@ func (p *Player) calculateExpectedMovement() {
 
 	v1 := 0.91
 	if p.mInfo.OnGround {
-		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition).Side(cube.FaceDown)).(block.Frictional); ok {
+		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown)).(block.Frictional); ok {
 			v1 *= b.Friction()
 			p.mInfo.InUnsupportedRewindScenario = true
 		} else {
@@ -177,7 +177,7 @@ func (p *Player) calculateExpectedMovement() {
 
 	p.simulateAddedMovementForce(v3)
 
-	climb := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition)))
+	climb := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPosition)))
 	if climb {
 		p.mInfo.ServerMovement[0] = game.ClampFloat(p.mInfo.ServerMovement.X(), -0.2, 0.2)
 		p.mInfo.ServerMovement[2] = game.ClampFloat(p.mInfo.ServerMovement.Z(), -0.2, 0.2)
@@ -243,7 +243,7 @@ func (p *Player) simulateCollisions() {
 	vel := p.mInfo.ServerMovement
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
-	moveBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition).GrowVec3(mgl64.Vec3{
+	moveBB := p.AABB().Translate(p.mInfo.ServerPosition).GrowVec3(mgl64.Vec3{
 		-0.01,
 		0,
 		-0.01,
@@ -295,7 +295,7 @@ func (p *Player) simulateCollisions() {
 		cx, cy, cz := deltaX, deltaY, deltaZ
 		deltaX, deltaY, deltaZ = vel[0], game.StepHeight, vel[2]
 
-		stepBB := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
+		stepBB := p.AABB().Translate(p.mInfo.ServerPosition)
 		cloneBB = stepBB
 		boxes = p.GetNearbyBBoxes(cloneBB.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}))
 
@@ -358,16 +358,16 @@ func (p *Player) simulateCollisions() {
 	p.mInfo.ServerMovement = vel
 
 	min, max := moveBB.Min(), moveBB.Max()
-	p.mInfo.ServerPredictedPosition = mgl64.Vec3{
+	p.mInfo.ServerPosition = mgl64.Vec3{
 		(min[0] + max[0]) / 2,
 		min[1] - p.mInfo.StepLenience,
 		(min[2] + max[2]) / 2,
 	}
 	if p.mInfo.StepLenience > 1e-4 {
-		p.mInfo.ServerPredictedPosition = p.Position() // TODO! __Proper__ step predictions
+		p.mInfo.ServerPosition = p.Position() // TODO! __Proper__ step predictions
 	}
 
-	bb := p.AABB().Translate(p.mInfo.ServerPredictedPosition)
+	bb := p.AABB().Translate(p.mInfo.ServerPosition)
 	boxes = p.GetNearbyBBoxes(bb)
 	blocks := p.GetNearbyBlocks(bb)
 
@@ -394,7 +394,7 @@ func (p *Player) simulateCollisions() {
 	}
 
 	if p.mInfo.InUnsupportedRewindScenario {
-		p.mInfo.ServerPredictedPosition = p.Position()
+		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 	}
 }
@@ -448,10 +448,10 @@ type MovementInfo struct {
 	OnGround, LastOnGround                               bool
 	InVoid                                               bool
 
-	ClientMovement          mgl64.Vec3
-	ServerSentMovement      mgl64.Vec3
-	ServerMovement          mgl64.Vec3
-	ServerPredictedPosition mgl64.Vec3
+	ClientMovement     mgl64.Vec3
+	ServerSentMovement mgl64.Vec3
+	ServerMovement     mgl64.Vec3
+	ServerPosition     mgl64.Vec3
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {

@@ -179,7 +179,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	}
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
-	p.mInfo.ServerPredictedPosition = game.Vec32To64(pos)
+	p.mInfo.ServerPosition = game.Vec32To64(pos)
 }
 
 // MoveEntity moves an entity to the given position.

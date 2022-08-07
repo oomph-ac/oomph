@@ -130,7 +130,7 @@ func (p *Player) cleanChunks() (cleaned int) {
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()
 
-	loc := p.mInfo.ServerPredictedPosition
+	loc := p.mInfo.ServerPosition
 	activePos := world.ChunkPos{int32(math.Floor(loc[0])) >> 4, int32(math.Floor(loc[2])) >> 4}
 	for pos := range p.chunks {
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
