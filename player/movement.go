@@ -445,7 +445,7 @@ type MovementInfo struct {
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool
-	OnGround, LastOnGround                               bool
+	OnGround                                             bool
 	InVoid                                               bool
 
 	ClientMovement     mgl64.Vec3
