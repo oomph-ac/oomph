@@ -4,10 +4,10 @@ go 1.18
 
 require (
 	github.com/df-mc/atomic v1.10.0
-	github.com/df-mc/dragonfly v0.7.5
+	github.com/df-mc/dragonfly v0.8.1
 	github.com/go-gl/mathgl v1.0.0
 	github.com/pelletier/go-toml v1.9.5
-	github.com/sandertv/gophertunnel v1.22.3
+	github.com/sandertv/gophertunnel v1.24.0
 	github.com/sirupsen/logrus v1.9.0
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 	golang.org/x/text v0.3.7
@@ -27,10 +27,10 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/image v0.0.0-20220722155232-062f8c9fd539 // indirect
-	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
-	golang.org/x/oauth2 v0.0.0-20220722155238-128564f6959c // indirect
-	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
+	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced // indirect
+	golang.org/x/oauth2 v0.0.0-20220808172628-8227340efae7 // indirect
+	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
