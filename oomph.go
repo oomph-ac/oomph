@@ -2,6 +2,7 @@ package oomph
 
 import (
 	"errors"
+	"github.com/oomph-ac/oomph/utils"
 	"sync"
 
 	"github.com/go-gl/mathgl/mgl64"
@@ -33,18 +34,15 @@ func New(log *logrus.Logger, localAddr string) *Oomph {
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
 // Addresses should be formatted in the following format: "ip:port" (ex: "127.0.0.1:19132").
 // If you're using dragonfly, use Listen instead of Start.
-func (o *Oomph) Start(remoteAddr string) error {
+func (o *Oomph) Start(remoteAddr string, resourcePackPath string, requirePacks bool) error {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
 		panic(err)
 	}
-	serverConn, err := minecraft.Dialer{}.Dial("raknet", remoteAddr)
-	if err != nil {
-		panic(err)
-	}
 	l, err := minecraft.ListenConfig{
-		StatusProvider: p,
-		ResourcePacks:  serverConn.ResourcePacks(),
+		StatusProvider:       p,
+		ResourcePacks:        utils.ResourcePacks(resourcePackPath),
+		TexturePacksRequired: requirePacks,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
