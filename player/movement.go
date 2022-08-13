@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -39,7 +40,10 @@ func (p *Player) updateMovementState() bool {
 // If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
 	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
-	if posError > 0.04 || velError > 0.25 {
+	if posError > 0.25 || velError > 0.25 {
+		if !p.mInfo.ExpectingFutureCorrection {
+			p.SendOomphDebug(fmt.Sprint("correcting movement: ", posError, " | ", velError))
+		}
 		p.correctMovement()
 	}
 
@@ -147,9 +151,6 @@ func (p *Player) calculateExpectedMovement() {
 
 	if p.mInfo.MotionTicks == 0 {
 		p.mInfo.ServerMovement = p.mInfo.ServerSentMovement
-		if p.mInfo.Jumping {
-			p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
-		}
 	}
 
 	if p.mInfo.Jumping && p.mInfo.OnGround {
