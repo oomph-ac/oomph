@@ -48,7 +48,7 @@ go func() {
     // 19132 is the port that players will connect to
     ac := oomph.New(logger, ":19132")
     // 6969 is the port that the main server is running on, Oomph will redirect players to this address.
-    if err := ac.Start(":6969"); err != nil {
+    if err := ac.Start(":6969", config.Resources.Folder, config.Resources.Required); err != nil {
         panic(err)
     }
     for {
