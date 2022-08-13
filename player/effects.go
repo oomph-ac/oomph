@@ -44,11 +44,6 @@ func (p *Player) tickEffects() {
 			p.mInfo.JumpVelocity = game.DefaultJumpMotion + (float64(eff.Level()) / 10)
 		case effect.SlowFalling:
 			p.mInfo.Gravity = game.SlowFallingGravity
-		case effect.Speed:
-			p.mInfo.Speed += 0.02 * float64(eff.Level())
-		case effect.Slowness:
-			// TODO: Properly account when both speed and slowness effects are applied
-			p.mInfo.Speed -= 0.015 * float64(eff.Level())
 		}
 
 		p.effects[i] = eff

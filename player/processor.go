@@ -59,14 +59,14 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			boxes := block.Model().BBox(pos, nil)
 			for _, box := range boxes {
-				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.Position())) {
+				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.mInfo.ServerPosition)) {
 					// The block would intersect with our AABB, so a block would not be placed.
 					return false
 				}
 			}
 
 			// Set the block in the world
-			p.SetBlock(pos, block)
+			p.SetBlock(pos.Side(cube.Face(t.BlockFace)), block)
 		}
 	case *packet.AdventureSettings:
 		p.MovementInfo().Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
@@ -276,7 +276,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				case packet.MobEffectAdd, packet.MobEffectModify:
 					if t, ok := effect.ByID(int(pk.EffectType)); ok {
 						if t, ok := t.(effect.LastingType); ok {
-							eff := effect.New(t, int(pk.Amplifier+1), time.Duration(pk.Duration*50)*time.Millisecond)
+							eff := effect.New(t, int(pk.Amplifier)+1, time.Duration(pk.Duration*50)*time.Millisecond)
 							p.SetEffect(pk.EffectType, eff)
 						}
 					}
