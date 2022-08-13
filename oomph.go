@@ -2,8 +2,9 @@ package oomph
 
 import (
 	"errors"
-	"github.com/oomph-ac/oomph/utils"
 	"sync"
+
+	"github.com/oomph-ac/oomph/utils"
 
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
