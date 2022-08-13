@@ -53,7 +53,7 @@ go func() {
         if err := ac.Start(":6969", config.Resources.Folder, config.Resources.Required); err != nil {
             panic(err)
         }
-    }
+    }()
     for {
         p, err := ac.Accept()
         if err != nil {
