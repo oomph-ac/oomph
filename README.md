@@ -63,4 +63,4 @@ go func() {
 
 ## Credits
 Oomph is heavily influenced by [esoteric](https://github.com/ethaniccc/Esoteric) and [lumine](https://github.com/ethaniccc/Lumine).
-thank you, Ethaniccc for providing us with these!!!
+thank you, ethaniccc for providing us with these!!!
