@@ -255,7 +255,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			c, ok := p.Chunk(chunkPos)
 			if !ok {
 				p.chkMu.Lock()
-				c = chunk.New(air, world.Overworld.Range())
+				c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
 				p.chunks[chunkPos] = c
 				p.chkMu.Unlock()
 			} else {
@@ -295,6 +295,17 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	}
 	return false
+}
+
+// dimensionFromNetworkID returns a world.Dimension from the network id.
+func dimensionFromNetworkID(id int32) world.Dimension {
+	if id == 1 {
+		return world.Nether
+	}
+	if id == 2 {
+		return world.End
+	}
+	return world.Overworld
 }
 
 // noinspection ALL
