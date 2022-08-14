@@ -103,7 +103,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		}()
 		for {
 			pk, err := conn.ReadPacket()
-			if err != nil {
+			if err != nil || p == nil {
 				return
 			}
 			if p.ClientProcess(pk) {
