@@ -18,6 +18,16 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+var air uint32
+
+func init() {
+	var found bool
+	air, found = chunk.StateToRuntimeID("minecraft:air", nil)
+	if !found {
+		panic("can't find air runtime id!")
+	}
+}
+
 // ClientProcess processes a given packet from the client.
 func (p *Player) ClientProcess(pk packet.Packet) bool {
 	cancel := false
@@ -225,17 +235,15 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
-		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
-		c, err := chunk.NetworkDecode(a, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
+		c, err := chunk.NetworkDecode(air, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
 		if err != nil {
-			c = chunk.New(a, world.Overworld.Range())
+			c = chunk.New(air, world.Overworld.Range())
 		}
 
 		c.Compact()
 		p.LoadChunk(pk.Position, c)
 		p.ready = true
 	case *packet.SubChunk:
-		a, _ := chunk.StateToRuntimeID("minecraft:air", nil)
 		for _, entry := range pk.SubChunkEntries {
 			if entry.Result != protocol.SubChunkResultSuccess {
 				continue
@@ -247,7 +255,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			c, ok := p.Chunk(chunkPos)
 			if !ok {
 				p.chkMu.Lock()
-				c = chunk.New(a, world.Overworld.Range())
+				c = chunk.New(air, world.Overworld.Range())
 				p.chunks[chunkPos] = c
 				p.chkMu.Unlock()
 			} else {
@@ -289,6 +297,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	return false
 }
 
+// noinspection ALL
+//
 //go:linkname chunk_subChunkDecode github.com/df-mc/dragonfly/server/world/chunk.decodeSubChunk
-//noinspection ALL
 func chunk_subChunkDecode(buf *bytes.Buffer, c *chunk.Chunk, index *byte, e chunk.Encoding) (*chunk.SubChunk, error)
