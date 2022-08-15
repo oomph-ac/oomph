@@ -24,7 +24,9 @@ func (p *Player) ClientData() login.ClientData {
 // ClientCacheEnabled specifies if the conn has the client cache, used for caching chunks client-side, enabled or
 // not. Some platforms, like the Nintendo Switch, have this disabled at all times.
 func (p *Player) ClientCacheEnabled() bool {
-	return p.conn.ClientCacheEnabled()
+	// todo: support client cache
+	//return p.conn.ClientCacheEnabled()
+	return false
 }
 
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
