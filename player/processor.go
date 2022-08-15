@@ -261,16 +261,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			} else {
 				c.Unlock()
 			}
-			if pk.CacheEnabled {
-				// todo: process client cache subchunks
-			} else {
-				var index byte
-				sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
-				if err != nil {
-					panic(err)
-				}
-				c.Sub()[index] = sub
+			var index byte
+			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+			if err != nil {
+				panic(err)
 			}
+			c.Sub()[index] = sub
 		}
 	case *packet.ChunkRadiusUpdated:
 		p.chunkRadius = int(pk.ChunkRadius) + 4
