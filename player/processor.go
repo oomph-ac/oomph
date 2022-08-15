@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 	_ "unsafe"
 
@@ -46,6 +47,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		p.processInput(pk)
+		p.SendOomphDebug(fmt.Sprintf("move forward: %v", p.mInfo.MoveForward))
+		p.SendOomphDebug(fmt.Sprintf(">>>>>move strafe: %v", p.mInfo.MoveStrafe))
 		p.acks.HasTicked = true
 		p.cleanChunks()
 		p.tickEntityLocations()
