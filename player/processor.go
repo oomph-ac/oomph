@@ -47,8 +47,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		p.processInput(pk)
-		p.SendOomphDebug(fmt.Sprintf("move forward: %v", p.mInfo.MoveForward))
-		p.SendOomphDebug(fmt.Sprintf(">>>>>move strafe: %v", p.mInfo.MoveStrafe))
+		p.SendOomphDebug(fmt.Sprintf("%v", p.Block(cube.PosFromVec3(p.Position().Sub(mgl64.Vec3{0, 1, 0})))))
 		p.acks.HasTicked = true
 		p.cleanChunks()
 		p.tickEntityLocations()
