@@ -61,7 +61,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.processInput(pk)
 		p.acks.HasTicked = true
 		p.cleanChunks()
-		p.tickEntityLocations()
 
 		p.hasValidatedCombat = false
 	case *packet.LevelSoundEvent:
@@ -217,14 +216,16 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}, false)
 		}
 	case *packet.UpdateAttributes:
-		pk.Tick = p.ClientFrame()
+		//pk.Tick = p.ClientFrame()
 		if pk.EntityRuntimeID == p.rid {
 			for _, a := range pk.Attributes {
-				if a.Name == "minecraft:health" && a.Value <= 0 {
-					p.dead = true
-				} else if a.Name == "minecraft:movement" {
-					p.mInfo.Speed = float64(a.Value)
-				}
+				p.Acknowledgement(func() {
+					if a.Name == "minecraft:health" && a.Value <= 0 {
+						p.dead = true
+					} else if a.Name == "minecraft:movement" {
+						p.mInfo.Speed = float64(a.Value)
+					}
+				}, false)
 			}
 		}
 	case *packet.SetActorMotion:
@@ -244,8 +245,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			// The server movement is updated to the knockback sent by this packet. Regardless of wether
 			// the client has recieved knockback - the server's movement should be the knockback sent by the server.
 			//p.mInfo.UpdateServerSentVelocity(velocity)
-		} else if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok && !e.Player() {
-			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
 		if !p.mPredictions {
