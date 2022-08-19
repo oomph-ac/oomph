@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 	_ "unsafe"
 
@@ -34,6 +35,19 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	p.clicking = false
 
 	switch pk := pk.(type) {
+	case *packet.TickSync:
+		// The tick sync packet is sent once by the client on join and the server responds with another.
+		// From what I can tell, the client frame is supposed to be rewound to `ServerReceptionTime` in the
+		// tick sync sent by the server, but as of now it seems to be useless.
+		// To replicate the same behaviour, we get the current "server" tick, and
+		// send an acknowledgement to the client (replicating when the client receives a TickSync from the server)
+		// and once the client responds, the client tick (not frame) value is set to the server tick the acknowledgement
+		// was sent in.
+		// SPOILER: I plan on using this in the future for something combat related.
+		curr := p.serverTick.Load()
+		p.Acknowledgement(func() {
+			p.clientTick.Store(curr)
+		}, false)
 	case *packet.NetworkStackLatency:
 		p.ackMu.Lock()
 		cancel = p.acks.Handle(pk.Timestamp)
@@ -44,6 +58,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.Disconnect("AC Error: Invalid frame recieved in ticked input")
 		}
 		p.clientFrame.Store(pk.Tick)
+
+		fmt.Println(p.clientTick.Load(), p.serverTick.Load(), p.serverTick.Load()-p.clientTick.Load())
 
 		p.processInput(pk)
 		p.acks.HasTicked = true
