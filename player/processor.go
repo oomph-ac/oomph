@@ -2,7 +2,6 @@ package player
 
 import (
 	"bytes"
-	"fmt"
 	"time"
 	_ "unsafe"
 
@@ -58,8 +57,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.Disconnect("AC Error: Invalid frame recieved in ticked input")
 		}
 		p.clientFrame.Store(pk.Tick)
-
-		fmt.Println(p.clientTick.Load(), p.serverTick.Load(), p.serverTick.Load()-p.clientTick.Load())
 
 		p.processInput(pk)
 		p.acks.HasTicked = true
@@ -251,6 +248,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.queuedEntityMotionInterpolations[pk.EntityRuntimeID] = game.Vec32To64(pk.Velocity)
 		}
 	case *packet.LevelChunk:
+		if !p.mPredictions {
+			return false
+		}
+
 		c, err := chunk.NetworkDecode(air, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
 		if err != nil {
 			c = chunk.New(air, world.Overworld.Range())
@@ -260,6 +261,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.LoadChunk(pk.Position, c)
 		p.ready = true
 	case *packet.SubChunk:
+		if !p.mPredictions {
+			return false
+		}
+
 		for _, entry := range pk.SubChunkEntries {
 			if entry.Result != protocol.SubChunkResultSuccess {
 				continue

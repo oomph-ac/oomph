@@ -53,8 +53,9 @@ type Player struct {
 	effects  map[int32]effect.Effect
 	effectMu sync.Mutex
 
-	mInfo *MovementInfo
-	miMu  sync.Mutex
+	mInfo        *MovementInfo
+	mPredictions bool
+	miMu         sync.Mutex
 
 	queueMu                          sync.Mutex
 	queuedEntityLocations            map[uint64]utils.LocationData
@@ -141,7 +142,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewTimerA(),
 		},
 
-		mInfo: &MovementInfo{},
+		mInfo:        &MovementInfo{},
+		mPredictions: true,
 
 		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
 	}
@@ -240,6 +242,10 @@ func (p *Player) MovementInfo() *MovementInfo {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 	return p.mInfo
+}
+
+func (p *Player) EnableMovementPredictions(enabled bool) {
+	p.mPredictions = enabled
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.
