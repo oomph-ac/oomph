@@ -1,11 +1,7 @@
 package player
 
 import (
-	"math"
-
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/entity"
-	"github.com/oomph-ac/oomph/utils"
 )
 
 // SearchEntity queries the player for an entity, using the runtime ID specified. The second return value is false if
@@ -33,57 +29,4 @@ func (p *Player) RemoveEntity(rid uint64) {
 	p.entityMu.Lock()
 	delete(p.entities, rid)
 	p.entityMu.Unlock()
-}
-
-// tickEntityLocations ticks entity locations to simulate what the client would see.
-func (p *Player) tickEntityLocations() {
-	for _, e := range p.entities {
-		if increments := e.NewLocationIncrements(); increments > 0 {
-			delta := e.ReceivedPosition().Sub(e.LastPosition()).Mul(1 / float64(e.NewLocationIncrements()))
-			if !e.Player() {
-				interp := e.InterpolatedMotion()
-				fric := 0.98
-				if e.OnGround() {
-					fric *= 0.6
-				}
-				if math.Abs(interp[0]) > 0.005 || math.Abs(interp[1]) > 0.005 || math.Abs(interp[2]) > 0.005 {
-					sub := interp.Mul(fric)
-					delta = delta.Sub(sub)
-					e.ClientInterpolation(sub)
-				}
-				// This is actually an INFERENCE on how the SetActor interpolation works
-				// TODO: Abuse Tal to find out how the SetActorMotion interpolation works for non-player entities
-			}
-			pos := e.Position().Add(delta)
-			e.Move(pos, false)
-			e.DecrementNewLocationIncrements()
-		}
-		e.IncrementTeleportationTicks()
-	}
-}
-
-// flushEntityLocations clears the queued entity location map, and sends an acknowledgement to the player
-// This allows us to know when the client has received positions of other entities.
-func (p *Player) flushEntityLocations() {
-	p.queueMu.Lock()
-	defer p.queueMu.Unlock()
-
-	posQueue := p.queuedEntityLocations
-	p.queuedEntityLocations = make(map[uint64]utils.LocationData)
-	interpolationQueue := p.queuedEntityMotionInterpolations
-	p.queuedEntityMotionInterpolations = make(map[uint64]mgl64.Vec3)
-
-	p.Acknowledgement(func() {
-		for rid, dat := range posQueue {
-			if e, valid := p.SearchEntity(rid); valid {
-				e.UpdateReceivedPosition(dat.Position, dat.OnGround, e.Player())
-				e.ResetNewLocationIncrements()
-			}
-		}
-		for rid, motion := range interpolationQueue {
-			if e, valid := p.SearchEntity(rid); valid {
-				e.ClientInterpolation(motion)
-			}
-		}
-	}, true)
 }
