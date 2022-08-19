@@ -216,14 +216,16 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}, false)
 		}
 	case *packet.UpdateAttributes:
-		pk.Tick = p.ClientFrame()
+		//pk.Tick = p.ClientFrame()
 		if pk.EntityRuntimeID == p.rid {
 			for _, a := range pk.Attributes {
-				if a.Name == "minecraft:health" && a.Value <= 0 {
-					p.dead = true
-				} else if a.Name == "minecraft:movement" {
-					p.mInfo.Speed = float64(a.Value)
-				}
+				p.Acknowledgement(func() {
+					if a.Name == "minecraft:health" && a.Value <= 0 {
+						p.dead = true
+					} else if a.Name == "minecraft:movement" {
+						p.mInfo.Speed = float64(a.Value)
+					}
+				}, false)
 			}
 		}
 	case *packet.SetActorMotion:
