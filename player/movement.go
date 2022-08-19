@@ -38,12 +38,12 @@ func (p *Player) updateMovementState() bool {
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
 // If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
-	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
-	if posError > 0.0001 && velError > 0.0001 {
+	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement)
+	if posError.LenSqr() > 0.0009 && velError.LenSqr() > 0.0009 {
 		p.correctMovement()
 	}
 
-	if velError <= 1e-8 {
+	if velError.LenSqr() <= 1e-8 && posError.LenSqr() <= 0.0001 {
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 	}
@@ -83,6 +83,7 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.Move(pk)
 
 	if !p.mPredictions {
+		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.ServerMovement = p.mInfo.ClientMovement
 		return
 	}

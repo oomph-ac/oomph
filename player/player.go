@@ -57,9 +57,8 @@ type Player struct {
 	mPredictions bool
 	miMu         sync.Mutex
 
-	queueMu                          sync.Mutex
-	queuedEntityLocations            map[uint64]utils.LocationData
-	queuedEntityMotionInterpolations map[uint64]mgl64.Vec3
+	queueMu               sync.Mutex
+	queuedEntityLocations map[uint64]utils.LocationData
 
 	gameMode  int32
 	inputMode uint32
@@ -160,13 +159,13 @@ func (p *Player) Conn() *minecraft.Conn {
 
 // Move moves the player to the given position.
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
-	data := p.Entity()
-	data.Move(game.Vec32To64(pk.Position), true)
+	data, pos := p.Entity(), game.Vec32To64(pk.Position)
+	data.Move(pos, true)
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 
-	//p.mInfo.ClientMovement = data.Position().Sub(data.LastPosition())
-	p.mInfo.ClientMovement = game.Vec32To64(pk.Delta)
+	p.mInfo.ClientMovement = pos.Sub(data.LastPosition())
+	//p.mInfo.ClientMovement = game.Vec32To64(pk.Delta)
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -190,6 +189,7 @@ func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, ground bool) {
 	if _, ok := p.SearchEntity(rid); ok {
 		p.queueMu.Lock()
 		p.queuedEntityLocations[rid] = utils.LocationData{
+			Tick:     p.serverTick.Load(),
 			Position: pos,
 			OnGround: ground,
 		}
@@ -478,11 +478,25 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
-			p.flushEntityLocations()
-			p.serverTick.Inc()
+			p.queueMu.Lock()
+			for rid, dat := range p.queuedEntityLocations {
+				if e, valid := p.SearchEntity(rid); valid {
+					e.UpdatePosition(dat, e.Player())
+				}
+			}
+			p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+			p.queueMu.Unlock()
+
+			p.entityMu.Lock()
+			for _, e := range p.entities {
+				e.TickPosition(p.serverTick.Load())
+			}
+			p.entityMu.Unlock()
+
 			if !p.acks.Validate() {
 				p.Disconnect("AC Error: Client was unable to respond to acknowledgements sent by the server.")
 			}
+			p.serverTick.Inc()
 
 			/* if p.serverTick.Load()%20 == 0 {
 				curr := time.Now()
