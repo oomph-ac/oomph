@@ -77,7 +77,15 @@ func (p *Player) correctMovement() {
 // if the player is sprinting, jumping, or in a loaded chunk.
 func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.miMu.Lock()
+	defer p.miMu.Unlock()
+
 	p.inputMode = pk.InputMode
+	p.Move(pk)
+
+	if !p.mPredictions {
+		p.mInfo.ServerMovement = p.mInfo.ClientMovement
+		return
+	}
 
 	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
 		int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4,
@@ -93,8 +101,6 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 			int32(math.Floor(p.mInfo.ServerPredictedPosition[2])) >> 4,
 		}, "is not a loaded chunk")
 	} */
-
-	p.Move(pk)
 
 	p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
 	p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
@@ -132,7 +138,6 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 
 	pk.Position = game.Vec64To32(p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62}))
 	p.mInfo.Teleporting = false
-	p.miMu.Unlock()
 }
 
 // calculateExpectedMovement calculates the expected movement of the player for it's simulation frame.
