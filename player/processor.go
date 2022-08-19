@@ -92,8 +92,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.SetBlock(pos.Side(cube.Face(t.BlockFace)), block)
 		}
 	case *packet.AdventureSettings:
-		p.MovementInfo().Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
-		p.MovementInfo().CanNoClip = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagNoClip)
+		p.mInfo.Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
+		p.mInfo.CanNoClip = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagNoClip)
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 			p.dead = false
