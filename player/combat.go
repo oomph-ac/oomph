@@ -24,9 +24,26 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 	}
 	p.hasValidatedCombat = true
 
+	// This determines what tick we should rewind to get an entity position for lag compensation.
+	// Lag compensation is limited to 250ms in this case, so we want two things:
+	// 1) The tick we should rewind to should be no more than 5 ticks (250ms) in the past.
+	// 2) The tick we should rewind to should not be higher than the current server tick
+	tick, stick := p.clientTick.Load(), p.serverTick.Load()
+	if tick < stick-5 {
+		tick = stick - 5
+	}
+	if tick > stick {
+		tick = stick
+	}
+	attackPos := p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62})
+
 	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
-		attackPos := p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62})
-		dist := game.AABBVectorDistance(t.AABB().Translate(t.Position()), attackPos)
+		rew := t.RewindPosition(tick)
+		if rew == nil {
+			return false
+		}
+
+		dist := game.AABBVectorDistance(t.AABB().Translate(rew.Position), attackPos)
 		if dist > 3.1 {
 			return false
 		}
@@ -35,9 +52,9 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 		// which would allow the player to attack another entity without actually looking at them.
 		if p.inputMode != packet.InputModeTouch {
-			targetAABB := t.AABB().Grow(0.1).Translate(t.Position())
+			targetAABB := t.AABB().Grow(0.1).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
-			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3.01)))
+			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3)))
 			return ok
 		}
 	}
