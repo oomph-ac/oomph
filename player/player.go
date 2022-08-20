@@ -164,8 +164,8 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 
-	p.mInfo.ClientMovement = pos.Sub(data.LastPosition())
-	//p.mInfo.ClientMovement = game.Vec32To64(pk.Delta)
+	//p.mInfo.ClientMovement = pos.Sub(data.LastPosition())
+	p.mInfo.ClientMovement = game.Vec32To64(pk.Delta)
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -495,6 +495,18 @@ func (p *Player) startTicking() {
 
 			if !p.acks.Validate() {
 				p.Disconnect("AC Error: Client was unable to respond to acknowledgements sent by the server.")
+			}
+
+			// If the client tick and the server tick are 5 ticks apart from each other, we
+			// will try and re-sync the client tick back to a "healthy" state, where it is at least 5 ticks
+			// within range of the server tick.
+			sTick, cTick := int64(p.serverTick.Load()), int64(p.serverTick.Load())
+			if sTick%20 == 0 && sTick != 0 {
+				if game.AbsInt64(sTick-cTick) > 5 {
+					p.Acknowledgement(func() {
+						p.clientTick.Store(uint64(sTick))
+					}, false)
+				}
 			}
 			p.serverTick.Inc()
 
