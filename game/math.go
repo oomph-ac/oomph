@@ -13,6 +13,13 @@ func Round(val float64, precision int) float64 {
 	return math.Round(val*pwr) / pwr
 }
 
+func AbsInt64(a int64) int64 {
+	if a < 0 {
+		a = -a
+	}
+	return a
+}
+
 // Vec32To64 converts a 32-bit vector to a 64-bit one.
 func Vec32To64(vec3 mgl32.Vec3) mgl64.Vec3 {
 	return mgl64.Vec3{float64(vec3[0]), float64(vec3[1]), float64(vec3[2])}
