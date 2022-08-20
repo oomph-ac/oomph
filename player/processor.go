@@ -10,7 +10,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
@@ -42,7 +41,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		// send an acknowledgement to the client (replicating when the client receives a TickSync from the server)
 		// and once the client responds, the client tick (not frame) value is set to the server tick the acknowledgement
 		// was sent in.
-		// SPOILER: I plan on using this in the future for something combat related.
 		curr := p.serverTick.Load()
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
@@ -174,11 +172,18 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.rid {
 			teleport := pk.Mode == packet.MoveModeTeleport
-			if teleport {
-				p.Acknowledgement(func() {
-					p.Teleport(pk.Position, teleport)
-				}, false)
+			if !teleport {
+				return false
 			}
+
+			if pk.Tick != 0 {
+				p.Teleport(pk.Position, teleport)
+				return false
+			}
+
+			p.Acknowledgement(func() {
+				p.Teleport(pk.Position, teleport)
+			}, false)
 			return false
 		}
 
@@ -216,36 +221,38 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}, false)
 		}
 	case *packet.UpdateAttributes:
-		//pk.Tick = p.ClientFrame()
+		pk.Tick = 0 // prevent any rewind from being done to prevent shit-fuckery with incorrect movement
 		if pk.EntityRuntimeID == p.rid {
-			for _, a := range pk.Attributes {
-				p.Acknowledgement(func() {
+			p.Acknowledgement(func() {
+				for _, a := range pk.Attributes {
 					if a.Name == "minecraft:health" && a.Value <= 0 {
 						p.dead = true
 					} else if a.Name == "minecraft:movement" {
 						p.mInfo.Speed = float64(a.Value)
 					}
-				}, false)
-			}
+				}
+			}, false)
 		}
 	case *packet.SetActorMotion:
-		if pk.EntityRuntimeID == p.rid {
-			velocity := mgl64.Vec3{
-				float64(pk.Velocity[0]),
-				float64(pk.Velocity[1]),
-				float64(pk.Velocity[2]),
-			}
-
-			// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
-			// does take knockback when it recieves it.
-			p.Acknowledgement(func() {
-				p.mInfo.UpdateServerSentVelocity(velocity)
-			}, false)
-
-			// The server movement is updated to the knockback sent by this packet. Regardless of wether
-			// the client has recieved knockback - the server's movement should be the knockback sent by the server.
-			//p.mInfo.UpdateServerSentVelocity(velocity)
+		if pk.EntityRuntimeID != p.rid {
+			return false
 		}
+
+		velocity := game.Vec32To64(pk.Velocity)
+
+		// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
+		// of the player instead of waiting for an acknowledgement. This will ensure that players
+		// with very high latency do not get a significant advantage due to them receiving knockback late.
+		if int64(p.serverTick.Load())-int64(p.clientTick.Load()) > 5 {
+			p.mInfo.UpdateServerSentVelocity(velocity)
+			return false
+		}
+
+		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
+		// does take knockback when it recieves it.
+		p.Acknowledgement(func() {
+			p.mInfo.UpdateServerSentVelocity(velocity)
+		}, false)
 	case *packet.LevelChunk:
 		if !p.mPredictions {
 			return false
@@ -293,9 +300,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if ok {
-			p.Acknowledgement(func() {
-				p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
-			}, false)
+			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
 		}
 	case *packet.MobEffect:
 		if pk.EntityRuntimeID == p.rid {
