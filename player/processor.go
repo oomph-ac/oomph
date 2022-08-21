@@ -170,24 +170,26 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 	case *packet.MovePlayer:
-		if pk.EntityRuntimeID == p.rid {
-			teleport := pk.Mode == packet.MoveModeTeleport
-			if !teleport {
-				return false
-			}
-
-			if pk.Tick != 0 {
-				p.Teleport(pk.Position, teleport)
-				return false
-			}
-
-			p.Acknowledgement(func() {
-				p.Teleport(pk.Position, teleport)
-			}, false)
+		if pk.EntityRuntimeID != p.rid {
+			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
 			return false
 		}
 
-		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
+		if pk.Mode != packet.MoveModeTeleport {
+			return false
+		}
+
+		// If rewind is being applied with this packet, teleport the player instantly on the server
+		// instead of waiting for the client to acknowledge the packet.
+		if pk.Tick != 0 {
+			p.Teleport(pk.Position, true)
+			return false
+		}
+
+		p.Acknowledgement(func() {
+			p.Teleport(pk.Position, true)
+		}, false)
+
 	case *packet.SetActorData:
 		p.Acknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
@@ -215,24 +217,27 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.gameMode = pk.GameType
 		}, false)
 	case *packet.RemoveActor:
-		if pk.EntityUniqueID != p.uid {
-			p.Acknowledgement(func() {
-				p.RemoveEntity(uint64(pk.EntityUniqueID))
-			}, false)
+		if pk.EntityUniqueID == p.uid {
+			return false
 		}
+		p.Acknowledgement(func() {
+			p.RemoveEntity(uint64(pk.EntityUniqueID))
+		}, false)
 	case *packet.UpdateAttributes:
 		pk.Tick = 0 // prevent any rewind from being done to prevent shit-fuckery with incorrect movement
-		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				for _, a := range pk.Attributes {
-					if a.Name == "minecraft:health" && a.Value <= 0 {
-						p.dead = true
-					} else if a.Name == "minecraft:movement" {
-						p.mInfo.Speed = float64(a.Value)
-					}
-				}
-			}, false)
+		if pk.EntityRuntimeID != p.rid {
+			return false
 		}
+
+		p.Acknowledgement(func() {
+			for _, a := range pk.Attributes {
+				if a.Name == "minecraft:health" && a.Value <= 0 {
+					p.dead = true
+				} else if a.Name == "minecraft:movement" {
+					p.mInfo.Speed = float64(a.Value)
+				}
+			}
+		}, false)
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID != p.rid {
 			return false
