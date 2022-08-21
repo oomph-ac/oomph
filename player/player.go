@@ -497,16 +497,11 @@ func (p *Player) startTicking() {
 				p.Disconnect("AC Error: Client was unable to respond to acknowledgements sent by the server.")
 			}
 
-			// If the client tick and the server tick are 5 ticks apart from each other, we
-			// will try and re-sync the client tick back to a "healthy" state, where it is at least 5 ticks
-			// within range of the server tick.
-			sTick, cTick := int64(p.serverTick.Load()), int64(p.serverTick.Load())
+			sTick := p.serverTick.Load()
 			if sTick%20 == 0 && sTick != 0 {
-				if game.AbsInt64(sTick-cTick) > 5 {
-					p.Acknowledgement(func() {
-						p.clientTick.Store(uint64(sTick))
-					}, false)
-				}
+				p.Acknowledgement(func() {
+					p.clientTick.Store(sTick)
+				}, false)
 			}
 			p.serverTick.Inc()
 
