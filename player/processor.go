@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"strconv"
 	"time"
 	_ "unsafe"
 
@@ -57,6 +58,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		p.processInput(pk)
+		p.SendOomphDebug(strconv.FormatBool(p.mInfo.Immobile))
+
 		p.acks.HasTicked = true
 		p.cleanChunks()
 
