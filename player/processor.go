@@ -45,6 +45,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 		}, false)
+		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
 		p.ackMu.Lock()
 		cancel = p.acks.Handle(pk.Timestamp)
