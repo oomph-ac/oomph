@@ -120,6 +120,7 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
 		p.mInfo.Sneaking = false
 	}
+
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
 	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
