@@ -297,11 +297,14 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	check.TrackViolation()
 
 	ctx := event.C()
-	p.handler().HandleFlag(ctx, check, params)
+	log := true
+	p.handler().HandleFlag(ctx, check, params, &log)
 	if ctx.Cancelled() {
 		return
 	}
-	p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params, true))
+	if log {
+		p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params, true))
+	}
 	if now, max := check.Violations(), check.MaxViolations(); now >= max {
 		go func() {
 			message := fmt.Sprintf("§7[§6oomph§7] §bcaught lackin!\n§6cheat detected: §b%s%s", name, variant)
