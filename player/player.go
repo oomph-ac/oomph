@@ -141,7 +141,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewTimerA(),
 		},
 
-		mInfo:        &MovementInfo{},
+		mInfo: &MovementInfo{
+			Speed: 0.1,
+		},
 		mPredictions: true,
 
 		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
