@@ -32,6 +32,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	cancel := false
 	p.clicking = false
 
+	if p.closed {
+		return false
+	}
+
 	switch pk := pk.(type) {
 	case *packet.TickSync:
 		// The tick sync packet is sent once by the client on join and the server responds with another.
@@ -129,6 +133,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 // ServerProcess processes a given packet from the server.
 func (p *Player) ServerProcess(pk packet.Packet) bool {
+	if p.closed {
+		return false
+	}
+
 	switch pk := pk.(type) {
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.rid {
@@ -190,11 +198,11 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position, true)
 		}, false)
-
 	case *packet.SetActorData:
 		p.Acknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
+
 			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
 				if widthExists {
 					width := game.Round(float64(width.(float32)), 5)
@@ -221,6 +229,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		if pk.EntityUniqueID == p.uid {
 			return false
 		}
+
 		p.Acknowledgement(func() {
 			p.RemoveEntity(uint64(pk.EntityUniqueID))
 		}, false)
@@ -281,10 +290,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			if entry.Result != protocol.SubChunkResultSuccess {
 				continue
 			}
+
 			chunkPos := protocol.ChunkPos{
 				pk.Position[0] + int32(entry.Offset[0]),
 				pk.Position[2] + int32(entry.Offset[2]),
 			}
+
 			c, ok := p.Chunk(chunkPos)
 			if !ok {
 				p.chkMu.Lock()
@@ -294,11 +305,13 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			} else {
 				c.Unlock()
 			}
+
 			var index byte
 			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
 			if err != nil {
 				panic(err)
 			}
+
 			c.Sub()[index] = sub
 		}
 	case *packet.ChunkRadiusUpdated:
@@ -309,21 +322,23 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
 		}
 	case *packet.MobEffect:
-		if pk.EntityRuntimeID == p.rid {
-			p.Acknowledgement(func() {
-				switch pk.Operation {
-				case packet.MobEffectAdd, packet.MobEffectModify:
-					if t, ok := effect.ByID(int(pk.EffectType)); ok {
-						if t, ok := t.(effect.LastingType); ok {
-							eff := effect.New(t, int(pk.Amplifier)+1, time.Duration(pk.Duration*50)*time.Millisecond)
-							p.SetEffect(pk.EffectType, eff)
-						}
-					}
-				case packet.MobEffectRemove:
-					p.RemoveEffect(pk.EffectType)
-				}
-			}, false)
+		if pk.EntityRuntimeID != p.rid {
+			return false
 		}
+
+		p.Acknowledgement(func() {
+			switch pk.Operation {
+			case packet.MobEffectAdd, packet.MobEffectModify:
+				if t, ok := effect.ByID(int(pk.EffectType)); ok {
+					if t, ok := t.(effect.LastingType); ok {
+						eff := effect.New(t, int(pk.Amplifier)+1, time.Duration(pk.Duration*50)*time.Millisecond)
+						p.SetEffect(pk.EffectType, eff)
+					}
+				}
+			case packet.MobEffectRemove:
+				p.RemoveEffect(pk.EffectType)
+			}
+		}, false)
 	}
 	return false
 }

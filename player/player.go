@@ -69,6 +69,7 @@ type Player struct {
 	dead               bool
 	inLoadedChunk      bool
 	hasValidatedCombat bool
+	closed             bool
 
 	clickMu       sync.Mutex
 	clicking      bool
@@ -441,6 +442,8 @@ func (p *Player) Disconnect(reason string) {
 // Close closes the player.
 func (p *Player) Close() error {
 	p.once.Do(func() {
+		p.closed = true
+
 		p.checkMu.Lock()
 		p.checks = nil
 		p.checkMu.Unlock()
