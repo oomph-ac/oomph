@@ -2,12 +2,13 @@ package player
 
 import (
 	"context"
+	"net"
+	"time"
+
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"net"
-	"time"
 )
 
 // IdentityData returns the login.IdentityData of a player. It contains the UUID, XUID and username of the connection.

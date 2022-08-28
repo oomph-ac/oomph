@@ -5,6 +5,7 @@ import (
 	"time"
 	_ "unsafe"
 
+	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
@@ -48,7 +49,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		curr := p.serverTick.Load()
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
-		}, false)
+		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
 		p.ackMu.Lock()
@@ -56,13 +57,12 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.ackMu.Unlock()
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
-		if pk.Tick < p.ClientFrame() {
-			p.Disconnect("AC Error: Invalid frame recieved in ticked input")
-		}
 		p.clientFrame.Store(pk.Tick)
 
 		p.processInput(pk)
-		p.acks.HasTicked = true
+		if p.acks != nil {
+			p.acks.HasTicked = true
+		}
 		p.cleanChunks()
 
 		p.hasValidatedCombat = false
@@ -75,27 +75,34 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			cancel = !p.validateCombat(hit)
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
-			pos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
-			block, ok := world.BlockByRuntimeID(t.BlockRuntimeID)
+			i, ok := world.ItemByRuntimeID(t.HeldItem.Stack.NetworkID, int16(t.HeldItem.Stack.MetadataValue))
 			if !ok {
-				// The block somehow doesn't exist, so nothing can be done.
 				return false
 			}
 
-			boxes := block.Model().BBox(pos, nil)
+			b, ok := i.(world.Block)
+			if !ok {
+				return false
+			}
+
+			replacePos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
+			fb := p.Block(replacePos)
+
+			if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
+				replacePos = replacePos.Side(cube.Face(t.BlockFace))
+			}
+
+			boxes := b.Model().BBox(replacePos, nil)
 			for _, box := range boxes {
-				if box.Translate(pos.Vec3()).IntersectsWith(p.AABB().Translate(p.mInfo.ServerPosition)) {
+				if box.Translate(replacePos.Vec3()).IntersectsWith(p.AABB().Translate(game.Vec32To64(t.Position))) {
 					// The block would intersect with our AABB, so a block would not be placed.
 					return false
 				}
 			}
 
 			// Set the block in the world
-			p.SetBlock(pos.Side(cube.Face(t.BlockFace)), block)
+			p.SetBlock(replacePos, b)
 		}
-	case *packet.AdventureSettings:
-		p.mInfo.Flying = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagFlying)
-		p.mInfo.CanNoClip = utils.HasFlag(uint64(pk.Flags), packet.AdventureFlagNoClip)
 	case *packet.Respawn:
 		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
 			p.dead = false
@@ -104,21 +111,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if p.serverConn != nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
-		}
-	case *packet.Login:
-		if os, ok := map[string]protocol.DeviceOS{
-			"1739947436": protocol.DeviceAndroid,
-			"1810924247": protocol.DeviceIOS,
-			"1944307183": protocol.DeviceFireOS,
-			"896928775":  protocol.DeviceWin10,
-			"2044456598": protocol.DeviceOrbis,
-			"2047319603": protocol.DeviceNX,
-			"1828326430": protocol.DeviceXBOX,
-			"1916611344": protocol.DeviceWP,
-		}[p.IdentityData().TitleID]; ok {
-			p.gamePlatform = os
-		} else {
-			p.gamePlatform = protocol.DeviceLinux
 		}
 	}
 
@@ -144,40 +136,44 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
 				game.Vec32To64(pk.Position),
 				game.Vec32To64(pk.Velocity),
 				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
 				true,
 			))
-		}, false)
+		}, pk)
+		return true
 	case *packet.AddActor:
 		if pk.EntityRuntimeID == p.rid {
 			// We are the player.
 			return false
 		}
 
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
 				game.Vec32To64(pk.Position),
 				game.Vec32To64(pk.Velocity),
 				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
 				false,
 			))
-		}, false)
+		}, pk)
+		return true
 	case *packet.MoveActorAbsolute:
-		if pk.EntityRuntimeID == p.rid {
-			teleport := utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport)
-			if teleport {
-				p.Acknowledgement(func() {
-					p.Teleport(pk.Position, teleport)
-				}, false)
-			}
+		if pk.EntityRuntimeID != p.rid {
+			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 			return false
 		}
 
-		p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
+		if !utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
+			return false
+		}
+
+		p.GroupedAcknowledgement(func() {
+			p.Teleport(pk.Position, true)
+		}, pk)
+		return true
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.rid {
 			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
@@ -195,11 +191,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			p.Teleport(pk.Position, true)
-		}, false)
+		}, pk)
+		return true
 	case *packet.SetActorData:
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
 
@@ -220,26 +217,29 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
 				p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
 			}
-		}, false)
+		}, pk)
+		return true
 	case *packet.SetPlayerGameType:
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			p.gameMode = pk.GameType
-		}, false)
+		}, pk)
+		return true
 	case *packet.RemoveActor:
 		if pk.EntityUniqueID == p.uid {
 			return false
 		}
 
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			p.RemoveEntity(uint64(pk.EntityUniqueID))
-		}, false)
+		}, pk)
+		return true
 	case *packet.UpdateAttributes:
 		pk.Tick = 0 // prevent any rewind from being done to prevent shit-fuckery with incorrect movement
 		if pk.EntityRuntimeID != p.rid {
 			return false
 		}
 
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			for _, a := range pk.Attributes {
 				if a.Name == "minecraft:health" && a.Value <= 0 {
 					p.dead = true
@@ -247,7 +247,8 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 					p.mInfo.Speed = float64(a.Value)
 				}
 			}
-		}, false)
+		}, pk)
+		return true
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID != p.rid {
 			return false
@@ -258,16 +259,16 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if int64(p.serverTick.Load())-int64(p.clientTick.Load()) > 5 {
+		if int64(p.serverTick.Load())-int64(p.clientTick.Load()) >= 5 {
 			p.mInfo.UpdateServerSentVelocity(velocity)
 			return false
 		}
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 		// does take knockback when it recieves it.
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			p.mInfo.UpdateServerSentVelocity(velocity)
-		}, false)
+		}, pk)
 	case *packet.LevelChunk:
 		if !p.mPredictions {
 			return false
@@ -277,56 +278,61 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		if err != nil {
 			c = chunk.New(air, world.Overworld.Range())
 		}
-
 		c.Compact()
-		p.LoadChunk(pk.Position, c)
-		p.ready = true
+
+		p.Acknowledgement(func() {
+			p.LoadChunk(pk.Position, c)
+		})
 	case *packet.SubChunk:
 		if !p.mPredictions {
 			return false
 		}
 
-		for _, entry := range pk.SubChunkEntries {
-			if entry.Result != protocol.SubChunkResultSuccess {
-				continue
-			}
+		p.Acknowledgement(func() {
+			for _, entry := range pk.SubChunkEntries {
+				if entry.Result != protocol.SubChunkResultSuccess {
+					continue
+				}
 
-			chunkPos := protocol.ChunkPos{
-				pk.Position[0] + int32(entry.Offset[0]),
-				pk.Position[2] + int32(entry.Offset[2]),
-			}
+				chunkPos := protocol.ChunkPos{
+					pk.Position[0] + int32(entry.Offset[0]),
+					pk.Position[2] + int32(entry.Offset[2]),
+				}
 
-			c, ok := p.Chunk(chunkPos)
-			if !ok {
-				p.chkMu.Lock()
-				c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
-				p.chunks[chunkPos] = c
-				p.chkMu.Unlock()
-			} else {
-				c.Unlock()
-			}
+				c, ok := p.Chunk(chunkPos)
+				if !ok {
+					p.chkMu.Lock()
+					c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
+					p.chunks[chunkPos] = c
+					p.chkMu.Unlock()
+				} else {
+					c.Unlock()
+				}
 
-			var index byte
-			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
-			if err != nil {
-				panic(err)
-			}
+				var index byte
+				sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+				if err != nil {
+					panic(err)
+				}
 
-			c.Sub()[index] = sub
-		}
+				c.Sub()[index] = sub
+			}
+		})
 	case *packet.ChunkRadiusUpdated:
 		p.chunkRadius = int(pk.ChunkRadius) + 4
 	case *packet.UpdateBlock:
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
-		if ok {
-			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+		if !ok {
+			return false
 		}
+
+		p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
 	case *packet.MobEffect:
 		if pk.EntityRuntimeID != p.rid {
 			return false
 		}
 
-		p.Acknowledgement(func() {
+		p.GroupedAcknowledgement(func() {
 			switch pk.Operation {
 			case packet.MobEffectAdd, packet.MobEffectModify:
 				if t, ok := effect.ByID(int(pk.EffectType)); ok {
@@ -338,7 +344,16 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			case packet.MobEffectRemove:
 				p.RemoveEffect(pk.EffectType)
 			}
-		}, false)
+		}, pk)
+		return true
+	case *packet.UpdateAbilities:
+		p.GroupedAcknowledgement(func() {
+			for _, l := range pk.Layers {
+				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
+				p.mInfo.CanFly = utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
+			}
+		}, pk)
+		return true
 	}
 	return false
 }
