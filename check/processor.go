@@ -11,6 +11,8 @@ type Processor interface {
 	ServerTick() uint64
 	// ClientTick returns the current client tick of the processor
 	ClientTick() uint64
+	// ClientFrame returns the current simulation frame of the processor.
+	ClientFrame() uint64
 
 	// IdentityData returns the login.IdentityData of a processor. It contains the UUID, XUID and username of the connection.
 	IdentityData() login.IdentityData
