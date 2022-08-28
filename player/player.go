@@ -535,7 +535,7 @@ func (p *Player) startTicking() {
 			}
 			p.serverTick.Inc()
 
-			if p.serverTick.Load()%20 == 0 {
+			/* if p.serverTick.Load()%20 == 0 {
 				curr := time.Now()
 				p.Acknowledgement(func() {
 					ms := time.Since(curr).Milliseconds()
@@ -546,7 +546,7 @@ func (p *Player) startTicking() {
 					}
 					p.conn.WritePacket(msgpk)
 				})
-			}
+			} */
 		}
 	}
 }
