@@ -17,7 +17,7 @@ import (
 // If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
 func (p *Player) updateMovementState() bool {
 	var exempt bool
-	if !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || !p.inLoadedChunk || p.mInfo.CanNoClip {
+	if !p.inLoadedChunk || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || p.mInfo.NoClip {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
@@ -39,16 +39,18 @@ func (p *Player) updateMovementState() bool {
 // If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
 	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
-	if posError > 0.04 || velError > 0.04 {
+
+	if posError > 0.04 || velError > 0.25 {
 		p.correctMovement()
+		return
 	}
 
-	if posError <= 1e-8 {
-		p.mInfo.ServerPosition = p.Position()
-	}
-
-	if velError <= 1e-8 {
+	if velError <= 1e-6 {
 		p.mInfo.ServerMovement = p.mInfo.ClientMovement
+	}
+
+	if posError <= 1e-6 {
+		p.mInfo.ServerPosition = p.Position()
 	}
 }
 
@@ -56,24 +58,19 @@ func (p *Player) validateMovement() {
 // the player has not recieved a correction yet, if the player is teleporting, or if the player is in an unsupported rewind scenario
 // (determined by the people that made the rewind system) - in which case movement corrections will not work properly.
 func (p *Player) correctMovement() {
-	if p.mInfo.ExpectingFutureCorrection || p.mInfo.CanExempt || p.mInfo.Teleporting || p.mInfo.InUnsupportedRewindScenario {
+	if p.mInfo.CanExempt || p.mInfo.Teleporting || p.mInfo.InUnsupportedRewindScenario {
 		return
 	}
-	p.mInfo.ExpectingFutureCorrection = true
-	pos, delta := p.mInfo.ServerPosition, p.mInfo.ServerMovement
 
+	pos, delta := p.mInfo.ServerPosition, p.mInfo.ServerMovement
 	// This packet will correct the player to the server's predicted position.
 	pk := &packet.CorrectPlayerMovePrediction{
-		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62})),
+		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62 + 1e-3})),
 		Delta:    game.Vec64To32(delta),
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
 	}
 	p.conn.WritePacket(pk)
-
-	p.Acknowledgement(func() {
-		p.mInfo.ExpectingFutureCorrection = false
-	}, false)
 }
 
 // processInput processes the input packet sent by the client to the server. This also updates some of the movement states such as
@@ -95,16 +92,6 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 		int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4,
 		int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
-
-	/* if p.inLoadedChunk {
-		b, _ := p.Block(cube.PosFromVec3(p.mInfo.ServerPredictedPosition.Sub(mgl64.Vec3{0, 1}))).EncodeBlock()
-		fmt.Println("block below is", b)
-	} else {
-		fmt.Println(protocol.ChunkPos{
-			int32(math.Floor(p.mInfo.ServerPredictedPosition[0])) >> 4,
-			int32(math.Floor(p.mInfo.ServerPredictedPosition[2])) >> 4,
-		}, "is not a loaded chunk")
-	} */
 
 	p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
 	p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
@@ -128,14 +115,9 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.mInfo.InVoid = p.Position().Y() < -128
 
 	p.mInfo.JumpVelocity = game.DefaultJumpMotion
-	//p.mInfo.Speed = game.NormalMovementSpeed
 	p.mInfo.Gravity = game.NormalGravity
 
 	p.tickEffects()
-
-	/* if p.mInfo.Sprinting {
-		p.mInfo.Speed *= 1.3
-	} */
 
 	if p.updateMovementState() {
 		p.validateMovement()
@@ -167,7 +149,6 @@ func (p *Player) calculateExpectedMovement() {
 	if p.mInfo.OnGround {
 		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown)).(block.Frictional); ok {
 			v1 *= b.Friction()
-			p.mInfo.InUnsupportedRewindScenario = true
 		} else {
 			v1 *= 0.6
 		}
@@ -203,7 +184,7 @@ func (p *Player) calculateExpectedMovement() {
 		p.mInfo.ServerMovement[1] = 0.3
 	}
 
-	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 0.0001 {
+	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 1e-10 {
 		p.mInfo.ServerMovement[0] = 0
 	}
 	if mgl64.Abs(p.mInfo.ServerMovement[1]) < 0.0001 {
@@ -251,9 +232,9 @@ func (p *Player) simulateCollisions() {
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
 	moveBB := p.AABB().Translate(p.mInfo.ServerPosition).GrowVec3(mgl64.Vec3{
-		-0.01,
+		-1e-4,
 		0,
-		-0.01,
+		-1e-4,
 	})
 	cloneBB := moveBB
 	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))
@@ -336,12 +317,8 @@ func (p *Player) simulateCollisions() {
 
 	if !mgl64.FloatEqual(vel[1], deltaY) {
 		p.mInfo.VerticallyCollided = true
-		if vel[1] < 0 {
-			p.mInfo.OnGround = true
-		} else {
-			p.mInfo.OnGround = false
-		}
-		vel[1] = deltaY
+		p.mInfo.OnGround = vel[1] < 0
+		vel[1] = 0
 	} else {
 		p.mInfo.OnGround = false
 		p.mInfo.VerticallyCollided = false
@@ -349,14 +326,14 @@ func (p *Player) simulateCollisions() {
 
 	if !mgl64.FloatEqual(vel[0], deltaX) {
 		p.mInfo.XCollision = true
-		vel[0] = deltaX
+		vel[0] = 0
 	} else {
 		p.mInfo.XCollision = false
 	}
 
 	if !mgl64.FloatEqual(vel[2], deltaZ) {
 		p.mInfo.ZCollision = true
-		vel[2] = deltaZ
+		vel[2] = 0
 	} else {
 		p.mInfo.ZCollision = false
 	}
@@ -375,7 +352,7 @@ func (p *Player) simulateCollisions() {
 	}
 
 	bb := p.AABB().Translate(p.mInfo.ServerPosition)
-	boxes = p.GetNearbyBBoxes(bb)
+	//boxes = p.GetNearbyBBoxes(bb)
 	blocks := p.GetNearbyBlocks(bb)
 
 	/* The following checks below determine wether or not the player is in an unspported rewind scenario.
@@ -384,9 +361,9 @@ func (p *Player) simulateCollisions() {
 	are met. */
 
 	// This check determines if the player is inside any blocks
-	if cube.AnyIntersections(boxes, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
+	/* if cube.AnyIntersections(boxes, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
 		p.mInfo.InUnsupportedRewindScenario = true
-	}
+	} */
 
 	// This check determines if the player is near liquids
 	for _, bl := range blocks {
@@ -432,7 +409,6 @@ type MovementInfo struct {
 	CanExempt bool
 
 	InUnsupportedRewindScenario bool
-	ExpectingFutureCorrection   bool
 
 	MoveForward, MoveStrafe float64
 	JumpVelocity            float64
@@ -447,8 +423,8 @@ type MovementInfo struct {
 	Sprinting, SprintDown bool
 	Teleporting           bool
 	Immobile              bool
-	Flying                bool
-	CanNoClip             bool
+	CanFly, Flying        bool
+	NoClip                bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool

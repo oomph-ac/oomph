@@ -128,8 +128,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		c: make(chan struct{}),
 
 		checks: []check.Check{
-			check.NewAimAssistA(),
-
 			check.NewAutoClickerA(),
 			check.NewAutoClickerB(),
 			check.NewAutoClickerC(),
@@ -140,6 +138,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewOSSpoofer(),
 
 			check.NewTimerA(),
+
+			check.NewInvalidA(),
 		},
 
 		mInfo: &MovementInfo{
@@ -251,9 +251,31 @@ func (p *Player) EnableMovementPredictions(enabled bool) {
 	p.mPredictions = enabled
 }
 
+func (p *Player) GroupedAcknowledgement(f func(), pk packet.Packet) {
+	if p.acks == nil {
+		return
+	}
+
+	t := int64(rand.Int31()) * 1000 // Ensure that we don't get screwed over because the number is too fat.
+	if t < 0 {
+		t *= -1
+	}
+
+	_ = p.conn.WritePacket(pk)
+	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
+
+	if p.gamePlatform == protocol.DeviceNX {
+		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
+	}
+
+	p.ackMu.Lock()
+	p.acks.Add(t, f)
+	p.ackMu.Unlock()
+}
+
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Find something with similar usage to NSL - it will possibly be removed in future versions of Minecraft
-func (p *Player) Acknowledgement(f func(), flush bool) {
+func (p *Player) Acknowledgement(f func()) {
 	// Do not attempt to send an acknowledgement if the player is closed
 	if p.acks == nil {
 		return
@@ -273,10 +295,6 @@ func (p *Player) Acknowledgement(f func(), flush bool) {
 	p.ackMu.Lock()
 	p.acks.Add(t, f)
 	p.ackMu.Unlock()
-
-	if flush {
-		_ = p.conn.Flush()
-	}
 }
 
 // Debug debugs the given check data to the console and other relevant sources.
@@ -509,22 +527,26 @@ func (p *Player) startTicking() {
 			if sTick%20 == 0 && sTick != 0 {
 				p.Acknowledgement(func() {
 					p.clientTick.Store(sTick)
-				}, false)
+				})
+
+				if sTick >= 100 {
+					p.ready = true
+				}
 			}
 			p.serverTick.Inc()
 
-			/* if p.serverTick.Load()%20 == 0 {
+			if p.serverTick.Load()%20 == 0 {
 				curr := time.Now()
 				p.Acknowledgement(func() {
 					ms := time.Since(curr).Milliseconds()
-					msg := fmt.Sprint("RTT: ", ms, "ms")
+					msg := fmt.Sprint("NSL Latency: ", ms, "ms | RTT: ", p.conn.Latency().Milliseconds()*2, "ms")
 					msgpk := &packet.Text{
 						TextType: packet.TextTypeTip,
 						Message:  msg,
 					}
 					p.conn.WritePacket(msgpk)
-				}, true)
-			} */
+				})
+			}
 		}
 	}
 }

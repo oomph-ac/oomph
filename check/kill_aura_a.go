@@ -36,11 +36,11 @@ func (k *KillAuraA) Process(p Processor, pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.Animate:
 		if pk.ActionType == packet.AnimateActionSwingArm {
-			k.lastSwingTick = p.ClientTick()
+			k.lastSwingTick = p.ClientFrame()
 		}
 	case *packet.InventoryTransaction:
 		if data, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
-			currentTick := p.ClientTick()
+			currentTick := p.ClientFrame()
 			tickDiff := currentTick - k.lastSwingTick
 			if tickDiff > 4 {
 				p.Flag(k, k.violationAfterTicks(currentTick, 600), map[string]any{
