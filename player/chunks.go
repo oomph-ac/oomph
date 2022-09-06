@@ -105,22 +105,23 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 }
 
 // GetNearbyBlocks returns a list of blocks that are within the given bounding box.
-func (p *Player) GetNearbyBlocks(aabb cube.BBox) []world.Block {
+func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
 	grown := aabb.Grow(0.25)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
 	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
 
 	// A prediction of one BBox per block, plus an additional 2, in case
-	var blocks []world.Block
+	blocks := make(map[cube.Pos]world.Block)
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
-				blocks = append(blocks, p.Block(pos))
+				blocks[pos] = p.Block(pos)
 			}
 		}
 	}
+
 	return blocks
 }
 

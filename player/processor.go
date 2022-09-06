@@ -49,6 +49,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		curr := p.serverTick.Load()
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
+			p.isSyncedWithServer = true
+			p.ready = true
 		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
@@ -75,6 +77,23 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			cancel = !p.validateCombat(hit)
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
+			defer func() {
+				p.lastRightClickData = t
+				p.lastRightClickTick = p.ClientFrame()
+			}()
+
+			spam := false
+			if p.lastRightClickData != nil {
+				spam = p.ClientFrame()-p.lastRightClickTick < 2
+				spam = spam && p.lastRightClickData.Position == t.Position
+				spam = spam && p.lastRightClickData.BlockPosition == t.BlockPosition
+				spam = spam && p.lastRightClickData.ClickedPosition == t.ClickedPosition
+			}
+
+			if spam {
+				return true
+			}
+
 			i, ok := world.ItemByRuntimeID(t.HeldItem.Stack.NetworkID, int16(t.HeldItem.Stack.MetadataValue))
 			if !ok {
 				return false
@@ -104,9 +123,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.SetBlock(replacePos, b)
 		}
 	case *packet.Respawn:
-		if pk.EntityRuntimeID == p.rid && pk.State == packet.RespawnStateClientReadyToSpawn {
-			p.dead = false
+		if pk.EntityRuntimeID != p.rid {
+			return false
 		}
+
+		p.dead = pk.State != packet.RespawnStateClientReadyToSpawn
 	case *packet.Text:
 		if p.serverConn != nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
@@ -120,6 +141,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	for _, c := range p.checks {
 		cancel = c.Process(p, pk) || cancel
 	}
+
 	return cancel
 }
 
@@ -196,22 +218,31 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}, pk)
 		return true
 	case *packet.SetActorData:
+		pk.Tick = 0 // prevent rewind from causing weird behavior client-side
+
+		if pk.EntityRuntimeID == p.rid {
+			p.lastSentActorData = pk
+		}
+
 		p.GroupedAcknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
 
 			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
 				if widthExists {
-					width := game.Round(float64(width.(float32)), 5)
-					e.SetAABB(game.AABBFromDimensions(width, e.AABB().Height()))
+					e.SetAABB(game.AABBFromDimensions(float64(width.(float32)), e.AABB().Height()))
 				}
+
 				if heightExists {
-					height := game.Round(float64(height.(float32)), 5)
-					e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height))
+					e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), float64(height.(float32))))
 				}
 			}
 
-			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; pk.EntityRuntimeID == p.rid && ok {
+			if pk.EntityRuntimeID != p.rid {
+				return
+			}
+
+			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
 				flags := f.(int64)
 				p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
 				p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
@@ -239,9 +270,11 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
+		p.lastSentAttributes = pk
 		p.GroupedAcknowledgement(func() {
 			for _, a := range pk.Attributes {
 				if a.Name == "minecraft:health" && a.Value <= 0 {
+					p.isSyncedWithServer = false
 					p.dead = true
 				} else if a.Name == "minecraft:movement" {
 					p.mInfo.Speed = float64(a.Value)

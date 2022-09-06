@@ -35,6 +35,9 @@ type Processor interface {
 
 	// Ready returns true if the processor is ready/spawned in.
 	Ready() bool
+	// IsSyncedWithServer returns true if the player has responded to an acknowledgement when
+	// attempting to sync client and server ticks.
+	IsSyncedWithServer() bool
 
 	// GameMode returns the current game mode of the processor.
 	GameMode() int32
@@ -60,5 +63,6 @@ type Processor interface {
 	// Flag flags the given check with the given parameters.
 	Flag(check Check, violations float64, params map[string]any)
 
+	// SendOomphDebug sends a debug message to the processor.
 	SendOomphDebug(message string)
 }
