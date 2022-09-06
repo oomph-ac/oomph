@@ -35,7 +35,7 @@ func New(log *logrus.Logger, localAddr string) *Oomph {
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
 // Addresses should be formatted in the following format: "ip:port" (ex: "127.0.0.1:19132").
 // If you're using dragonfly, use Listen instead of Start.
-func (o *Oomph) Start(remoteAddr string, resourcePackPath string, requirePacks bool) error {
+func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []minecraft.Protocol, requirePacks bool) error {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
 		panic(err)
@@ -44,6 +44,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, requirePacks b
 		StatusProvider:       p,
 		ResourcePacks:        utils.ResourcePacks(resourcePackPath),
 		TexturePacksRequired: requirePacks,
+		AcceptedProtocols:    protocols,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
@@ -72,6 +73,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data := serverConn.GameData()
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 60
+	data.PlayerMovementSettings.ServerAuthoritativeBlockBreaking = false
 
 	var g sync.WaitGroup
 	g.Add(2)
@@ -91,7 +93,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	p := player.NewPlayer(o.log, conn, serverConn)
 	p.MovementInfo().ServerPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
-	p.MovementInfo().ServerMovement = mgl64.Vec3{0, 0, 0}
+	p.MovementInfo().ServerMovement = mgl64.Vec3{0, -0.0784, 0}
 	o.players <- p
 
 	g.Add(2)

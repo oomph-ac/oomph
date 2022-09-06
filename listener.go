@@ -2,6 +2,7 @@ package oomph
 
 import (
 	"errors"
+
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/oomph-ac/oomph/player"
@@ -15,11 +16,12 @@ type listener struct {
 }
 
 // Listen listens for oomph connections, this should be used instead of Start for dragonfly servers.
-func (o *Oomph) Listen(srv *server.Server, name string, requirePacks bool) error {
+func (o *Oomph) Listen(srv *server.Server, name string, protocols []minecraft.Protocol, requirePacks bool) error {
 	l, err := minecraft.ListenConfig{
 		StatusProvider:       minecraft.NewStatusProvider(name),
 		ResourcePacks:        srv.Resources(),
 		TexturePacksRequired: requirePacks,
+		AcceptedProtocols:    protocols,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
