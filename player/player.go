@@ -155,7 +155,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewOSSpoofer(),
 
 			check.NewTimerA(),
-			//check.NewTimerB(),
+			check.NewTimerB(),
 
 			check.NewInvalidA(),
 		},
