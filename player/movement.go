@@ -17,7 +17,7 @@ import (
 // If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
 func (p *Player) updateMovementState() bool {
 	var exempt bool
-	if !p.inLoadedChunk || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || p.mInfo.NoClip {
+	if p.inLoadedChunkTicks < 100 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || p.mInfo.NoClip {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
@@ -63,14 +63,44 @@ func (p *Player) correctMovement() {
 	}
 
 	pos, delta := p.mInfo.ServerPosition, p.mInfo.ServerMovement
+
+	// Send block updates for blocks around the player - to make sure that the world state
+	// on the client is the same as the server's.
+	for bpos, b := range p.GetNearbyBlocks(p.AABB().Translate(p.mInfo.ServerPosition)) {
+		layer := uint32(0)
+		if _, ok := b.(world.Liquid); ok {
+			layer = 1
+		}
+
+		p.conn.WritePacket(&packet.UpdateBlock{
+			Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
+			NewBlockRuntimeID: world.BlockRuntimeID(b),
+			Flags:             packet.BlockUpdateNeighbours,
+			Layer:             layer,
+		})
+	}
+
+	// This will send the most recent actor data to the client to ensure that all
+	// actor data is the same on the client and server (sprinting, sneaking, swimming, etc.)
+	if p.lastSentActorData != nil {
+		p.lastSentActorData.Tick = p.ClientFrame()
+		p.conn.WritePacket(p.lastSentActorData)
+	}
+
+	// This will send the most recent player attributes to the client to ensure
+	// all attributes are the same on the client and server (health, speed, etc.)
+	if p.lastSentAttributes != nil {
+		p.lastSentAttributes.Tick = p.ClientFrame()
+		p.conn.WritePacket(p.lastSentAttributes)
+	}
+
 	// This packet will correct the player to the server's predicted position.
-	pk := &packet.CorrectPlayerMovePrediction{
+	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
 		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62 + 1e-3})),
 		Delta:    game.Vec64To32(delta),
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
-	}
-	p.conn.WritePacket(pk)
+	})
 }
 
 // processInput processes the input packet sent by the client to the server. This also updates some of the movement states such as
@@ -92,6 +122,12 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 		int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4,
 		int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
+
+	if p.inLoadedChunk {
+		p.inLoadedChunkTicks++
+	} else {
+		p.inLoadedChunkTicks = 0
+	}
 
 	p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
 	p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
@@ -158,7 +194,7 @@ func (p *Player) calculateExpectedMovement() {
 	if p.mInfo.OnGround {
 		v3 = p.mInfo.Speed * math.Pow((0.91*0.6)/v1, 3)
 	} else if p.mInfo.Sprinting {
-		v3 = 0.026
+		v3 = 0.026 // 0.02 + (0.02 * 0.3)
 	} else {
 		v3 = 0.02
 	}
@@ -187,10 +223,10 @@ func (p *Player) calculateExpectedMovement() {
 	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 1e-10 {
 		p.mInfo.ServerMovement[0] = 0
 	}
-	if mgl64.Abs(p.mInfo.ServerMovement[1]) < 0.0001 {
+	if mgl64.Abs(p.mInfo.ServerMovement[1]) < 1e-10 {
 		p.mInfo.ServerMovement[1] = 0
 	}
-	if mgl64.Abs(p.mInfo.ServerMovement[2]) < 0.0001 {
+	if mgl64.Abs(p.mInfo.ServerMovement[2]) < 1e-10 {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
@@ -208,17 +244,19 @@ func (p *Player) calculateExpectedMovement() {
 // simulateAddedMovementForce simulates the additional movement force created by the player's mf/ms and rotation values
 func (p *Player) simulateAddedMovementForce(f float64) {
 	v := math.Pow(p.mInfo.MoveForward, 2) + math.Pow(p.mInfo.MoveStrafe, 2)
-	if v >= 1e-4 {
-		v = math.Sqrt(v)
-		if v < 1 {
-			v = 1
-		}
-		v = f / v
-		mf, ms := p.mInfo.MoveForward*v, p.mInfo.MoveStrafe*v
-		v2, v3 := game.MCSin(p.entity.Rotation().Z()*math.Pi/180), game.MCCos(p.entity.Rotation().Z()*math.Pi/180)
-		p.mInfo.ServerMovement[0] += ms*v3 - mf*v2
-		p.mInfo.ServerMovement[2] += ms*v2 + mf*v3
+	if v < 1e-4 {
+		return
 	}
+
+	v = math.Sqrt(v)
+	if v < 1 {
+		v = 1
+	}
+	v = f / v
+	mf, ms := p.mInfo.MoveForward*v, p.mInfo.MoveStrafe*v
+	v2, v3 := game.MCSin(p.entity.Rotation().Z()*math.Pi/180), game.MCCos(p.entity.Rotation().Z()*math.Pi/180)
+	p.mInfo.ServerMovement[0] += ms*v3 - mf*v2
+	p.mInfo.ServerMovement[2] += ms*v2 + mf*v3
 }
 
 // simulateCollisions simulates the player's collisions with blocks
@@ -231,16 +269,13 @@ func (p *Player) simulateCollisions() {
 	vel := p.mInfo.ServerMovement
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
-	moveBB := p.AABB().Translate(p.mInfo.ServerPosition).GrowVec3(mgl64.Vec3{
-		-1e-4,
-		0,
-		-1e-4,
-	})
+	moveBB := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-1e-8)
 	cloneBB := moveBB
 	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))
 
 	if p.mInfo.OnGround && p.mInfo.Sneaking {
 		mov := 0.05
+
 		for ; deltaX != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{deltaX, -1, 0}))) == 0; vel[0] = deltaX {
 			if deltaX < mov && deltaX >= -mov {
 				deltaX = 0
@@ -250,7 +285,27 @@ func (p *Player) simulateCollisions() {
 				deltaX += mov
 			}
 		}
+
 		for ; deltaZ != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{0, -1, deltaZ}))) == 0; vel[2] = deltaZ {
+			if deltaZ < mov && deltaZ >= -mov {
+				deltaZ = 0
+			} else if deltaZ > 0 {
+				deltaZ -= mov
+			} else {
+				deltaZ += mov
+			}
+		}
+
+		for ; deltaX != 0 && deltaZ != 0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{deltaX, -1, deltaZ}))) == 0; vel[2] = deltaZ {
+			if deltaX < mov && deltaX >= -mov {
+				deltaX = 0
+			} else if deltaX > 0 {
+				deltaX -= mov
+			} else {
+				deltaX += mov
+			}
+			vel[0] = deltaX
+
 			if deltaZ < mov && deltaZ >= -mov {
 				deltaZ = 0
 			} else if deltaZ > 0 {
@@ -315,27 +370,21 @@ func (p *Player) simulateCollisions() {
 		}
 	}
 
-	if !mgl64.FloatEqual(vel[1], deltaY) {
-		p.mInfo.VerticallyCollided = true
+	p.mInfo.OnGround = false
+	p.mInfo.VerticallyCollided = !mgl64.FloatEqual(vel[1], deltaY)
+	if p.mInfo.VerticallyCollided {
 		p.mInfo.OnGround = vel[1] < 0
 		vel[1] = 0
-	} else {
-		p.mInfo.OnGround = false
-		p.mInfo.VerticallyCollided = false
 	}
 
-	if !mgl64.FloatEqual(vel[0], deltaX) {
-		p.mInfo.XCollision = true
+	p.mInfo.XCollision = !mgl64.FloatEqual(vel[0], deltaX)
+	if p.mInfo.XCollision {
 		vel[0] = 0
-	} else {
-		p.mInfo.XCollision = false
 	}
 
-	if !mgl64.FloatEqual(vel[2], deltaZ) {
-		p.mInfo.ZCollision = true
+	p.mInfo.ZCollision = !mgl64.FloatEqual(vel[2], deltaZ)
+	if p.mInfo.ZCollision {
 		vel[2] = 0
-	} else {
-		p.mInfo.ZCollision = false
 	}
 
 	p.mInfo.HorizontallyCollided = p.mInfo.XCollision || p.mInfo.ZCollision
@@ -351,7 +400,7 @@ func (p *Player) simulateCollisions() {
 		p.mInfo.ServerPosition = p.Position() // TODO! __Proper__ step predictions
 	}
 
-	bb := p.AABB().Translate(p.mInfo.ServerPosition)
+	bb := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-1e-6)
 	//boxes = p.GetNearbyBBoxes(bb)
 	blocks := p.GetNearbyBlocks(bb)
 
@@ -367,12 +416,9 @@ func (p *Player) simulateCollisions() {
 
 	// This check determines if the player is near liquids
 	for _, bl := range blocks {
-		switch bl.(type) {
-		case world.Liquid:
+		_, ok := bl.(world.Liquid)
+		if ok {
 			p.mInfo.InUnsupportedRewindScenario = true
-		}
-
-		if p.mInfo.InUnsupportedRewindScenario {
 			break
 		}
 	}
@@ -398,11 +444,13 @@ func (p *Player) simulateHorizontalFriction(friction float64) {
 // simulateJump simulates the jump movement of the player
 func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
-	if p.mInfo.Sprinting {
-		force := p.entity.Rotation().Z() * 0.017453292
-		p.mInfo.ServerMovement[0] -= game.MCSin(force) * 0.2
-		p.mInfo.ServerMovement[2] += game.MCCos(force) * 0.2
+	if !p.mInfo.Sprinting {
+		return
 	}
+
+	force := p.entity.Rotation().Z() * 0.017453292
+	p.mInfo.ServerMovement[0] -= game.MCSin(force) * 0.2
+	p.mInfo.ServerMovement[2] += game.MCCos(force) * 0.2
 }
 
 type MovementInfo struct {
