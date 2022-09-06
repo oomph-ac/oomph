@@ -38,7 +38,7 @@ func (t *TimerB) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	if p.Dead() {
+	if p.Dead() || !p.Ready() {
 		t.balance = 0
 		t.lastTime = 0
 		return false
