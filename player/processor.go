@@ -387,6 +387,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}
 		}, pk)
 		return true
+	case *packet.ChangeDimension:
+		p.ready = false
+		p.GroupedAcknowledgement(func() {
+			p.ready = true
+		}, pk)
+
 	}
 	return false
 }
