@@ -71,7 +71,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
+			p.validateCombat(nil)
 		}
+	case *packet.MobEquipment:
+		p.lastEquipmentData = pk
 	case *packet.InventoryTransaction:
 		if hit, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			cancel = !p.validateCombat(hit)
