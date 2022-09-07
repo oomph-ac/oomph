@@ -9,21 +9,33 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
+	p.lastAttackData = pk
+	p.needsCombatValidation = true
+}
+
 // validateCombat checks if the player's attack was valid for the tick. If combat is found to be legitimate, this function
 // will return true. Note that if multiple attacks are recieved in a tick, this function will only validate the first
 // processed in the tick, and any other hits will be ignored until next tick.
-func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bool {
-	if p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure {
-		return true
+func (p *Player) validateCombat() {
+	defer func() {
+		p.needsCombatValidation = false
+	}()
+
+	// There is no combat that needs to be validated as of now.
+	if !p.needsCombatValidation {
+		return
 	}
 
-	// Only validate one combat input per client tick - since we insinuate that combat should be
-	// validated per tick (and not frame like the MC:BE client - the MC:JE client does combat on tick), there can only be one hit result.
-	// This will also save server resources as it won't have to validate multiple hit results sent in one tick.
-	if p.hasValidatedCombat {
-		return false
+	// If the player is in a gamemode that has extended reach, there is no need to validate combat.
+	if p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure {
+		return
 	}
-	p.hasValidatedCombat = true
+
+	// The server connection or player is null, so we won't be able to send the attack packet anywhere.
+	if p.serverConn == nil || p == nil {
+		return
+	}
 
 	// This determines what tick we should rewind to get an entity position for lag compensation.
 	// Lag compensation is limited to 250ms in this case, so we want two things:
@@ -38,11 +50,11 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 	}
 	attackPos := p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62})
 
-	if hit == nil {
+	if p.lastAttackData == nil {
 		// We're going to be unable to create an inventory transaction for this hit if no equipment data is
 		// available. Return false because nothing else can be done here.
 		if p.lastEquipmentData == nil {
-			return false
+			return
 		}
 
 		// We're not going to be able to check if the client mispredicted a hit in this case as
@@ -50,7 +62,7 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 		// will not be the one used for attacking and does not represent where the player touched their
 		// screen at.
 		if p.inputMode == packet.InputModeTouch {
-			return false
+			return
 		}
 
 		p.entityMu.Lock()
@@ -99,18 +111,23 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 			//p.SendOomphDebug(fmt.Sprint("client mispredicted missed hit! sent attack on entity ", eid, " with dist ", math.Sqrt(min)))
 		}
 
-		return valid
+		return
+	}
+
+	hit, ok := p.lastAttackData.TransactionData.(*protocol.UseItemOnEntityTransactionData)
+	if !ok { // This should never happen, as lastAttackData will only be sent when an attack is detected
+		return
 	}
 
 	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
 		rew := t.RewindPosition(tick)
 		if rew == nil {
-			return false
+			return
 		}
 
 		dist := game.AABBVectorDistance(t.AABB().Translate(rew.Position), attackPos)
 		if dist > 3.1 {
-			return false
+			return
 		}
 
 		// If a player's input mode is touch, then a raycast will not be performed to validate combat.
@@ -120,9 +137,10 @@ func (p *Player) validateCombat(hit *protocol.UseItemOnEntityTransactionData) bo
 			targetAABB := t.AABB().Grow(0.15).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3)))
-			return ok
+
+			if ok {
+				p.serverConn.WritePacket(p.lastAttackData)
+			}
 		}
 	}
-
-	return true
 }

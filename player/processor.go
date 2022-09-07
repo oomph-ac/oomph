@@ -62,22 +62,25 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		p.processInput(pk)
+		p.validateCombat()
+
 		if p.acks != nil {
 			p.acks.HasTicked = true
 		}
 		p.cleanChunks()
 
-		p.hasValidatedCombat = false
+		p.needsCombatValidation = false
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
-			p.validateCombat(nil)
+			p.updateCombatData(nil)
 		}
 	case *packet.MobEquipment:
 		p.lastEquipmentData = pk
 	case *packet.InventoryTransaction:
-		if hit, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-			cancel = !p.validateCombat(hit)
+		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+			cancel = true
+			p.updateCombatData(pk)
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
 			defer func() {

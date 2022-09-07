@@ -65,10 +65,10 @@ type Player struct {
 
 	gamePlatform protocol.DeviceOS
 
-	ready              bool
-	dead               bool
-	hasValidatedCombat bool
-	closed             bool
+	ready                 bool
+	dead                  bool
+	needsCombatValidation bool
+	closed                bool
 
 	isSyncedWithServer, awaitingSync bool
 	nextSyncTick                     uint64
@@ -89,6 +89,7 @@ type Player struct {
 	lastRightClickData *protocol.UseItemTransactionData
 	lastRightClickTick uint64
 
+	lastAttackData     *packet.InventoryTransaction
 	lastEquipmentData  *packet.MobEquipment
 	lastSentAttributes *packet.UpdateAttributes
 	lastSentActorData  *packet.SetActorData
