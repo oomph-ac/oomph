@@ -89,6 +89,7 @@ type Player struct {
 	lastRightClickData *protocol.UseItemTransactionData
 	lastRightClickTick uint64
 
+	lastEquipmentData  *packet.MobEquipment
 	lastSentAttributes *packet.UpdateAttributes
 	lastSentActorData  *packet.SetActorData
 
