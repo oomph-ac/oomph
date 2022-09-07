@@ -32,7 +32,7 @@ func (a *InvalidA) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	if a.lastFrame > i.Tick {
+	if a.lastFrame != 0 && i.Tick == 0 {
 		p.Flag(a, 1, map[string]any{
 			"Current":  i.Tick,
 			"Previous": a.lastFrame,
