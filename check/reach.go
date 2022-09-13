@@ -69,8 +69,8 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		bb := e.AABB().Translate(e.CurrentPosition()).Grow(0.1)
 		dist := game.AABBVectorDistance(bb, attackPos)
 		if dist > 3.1 {
-			if r.Buff(1, 6) >= 5 {
-				p.Flag(r, r.violationAfterTicks(p.ClientFrame(), 600), map[string]any{
+			if r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 5 {
+				p.Flag(r, 1, map[string]any{
 					"rawDist": game.Round(dist, 4),
 				})
 				r.cancelNext = true
@@ -91,9 +91,9 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 
 		dist2 := result.Position().Sub(attackPos).Len()
-		if dist2 > 3.01 && math.Abs(dist-dist2) < 0.4 {
-			if r.Buff(1, 6) >= 3 {
-				p.Flag(r, r.violationAfterTicks(p.ClientFrame(), 600), map[string]any{
+		if dist2 > 3.04 && math.Abs(dist-dist2) < 0.4 {
+			if r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 3 {
+				p.Flag(r, 1, map[string]any{
 					"dist": game.Round(dist2, 4),
 				})
 				r.cancelNext = true
