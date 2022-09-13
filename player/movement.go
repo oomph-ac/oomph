@@ -21,7 +21,7 @@ func (p *Player) updateMovementState() bool {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
-		p.mInfo.ServerMovement = p.mInfo.ClientMovement
+		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 		p.mInfo.CanExempt = true
 		exempt = true
 	} else {
@@ -38,7 +38,11 @@ func (p *Player) updateMovementState() bool {
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
 // If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
-	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientMovement).LenSqr()
+	if p.movementMode != utils.ModeSemiAuthoritative {
+		return
+	}
+
+	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement).LenSqr()
 
 	if posError > 0.04 || velError > 0.25 {
 		p.correctMovement()
@@ -46,7 +50,7 @@ func (p *Player) validateMovement() {
 	}
 
 	if velError <= 1e-6 {
-		p.mInfo.ServerMovement = p.mInfo.ClientMovement
+		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 	}
 
 	if posError <= 1e-6 {
@@ -58,6 +62,11 @@ func (p *Player) validateMovement() {
 // the player has not recieved a correction yet, if the player is teleporting, or if the player is in an unsupported rewind scenario
 // (determined by the people that made the rewind system) - in which case movement corrections will not work properly.
 func (p *Player) correctMovement() {
+	// Do not correct player movement if the movement mode is not fully server authoritative because it can lead to issues.
+	if p.movementMode == utils.ModeSemiAuthoritative {
+		return
+	}
+
 	if p.mInfo.CanExempt || p.mInfo.Teleporting || p.mInfo.InUnsupportedRewindScenario {
 		return
 	}
@@ -112,9 +121,9 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	p.inputMode = pk.InputMode
 	p.Move(pk)
 
-	if !p.mPredictions {
+	if p.movementMode == utils.ModeClientAuthoritative {
 		p.mInfo.ServerPosition = p.Position()
-		p.mInfo.ServerMovement = p.mInfo.ClientMovement
+		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 		return
 	}
 
@@ -155,11 +164,23 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 
 	p.tickEffects()
 
+	if utils.HasFlag(pk.InputData, packet.InputFlagPerformItemInteraction) && pk.ItemInteractionData.ActionType == protocol.UseItemActionBreakBlock {
+		b, _ := world.BlockByRuntimeID(air)
+		p.SetBlock(cube.Pos{
+			int(pk.ItemInteractionData.BlockPosition[0]),
+			int(pk.ItemInteractionData.BlockPosition[1]),
+			int(pk.ItemInteractionData.BlockPosition[2]),
+		}, b)
+	}
+
 	if p.updateMovementState() {
 		p.validateMovement()
 	}
 
-	pk.Position = game.Vec64To32(p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62}))
+	if p.movementMode == utils.ModeFullAuthoritative {
+		pk.Position = game.Vec64To32(p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62}))
+	}
+
 	p.mInfo.Teleporting = false
 }
 
@@ -237,6 +258,8 @@ func (p *Player) calculateExpectedMovement() {
 		p.mInfo.Sprinting = false
 	}
 
+	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
+
 	p.simulateGravity()
 	p.simulateHorizontalFriction(v1)
 }
@@ -269,7 +292,7 @@ func (p *Player) simulateCollisions() {
 	vel := p.mInfo.ServerMovement
 	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
 
-	moveBB := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-1e-8)
+	moveBB := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-5e-4)
 	cloneBB := moveBB
 	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))
 
@@ -425,7 +448,7 @@ func (p *Player) simulateCollisions() {
 
 	if p.mInfo.InUnsupportedRewindScenario {
 		p.mInfo.ServerPosition = p.Position()
-		p.mInfo.ServerMovement = p.mInfo.ClientMovement
+		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 	}
 }
 
@@ -479,10 +502,10 @@ type MovementInfo struct {
 	OnGround                                             bool
 	InVoid                                               bool
 
-	ClientMovement     mgl64.Vec3
-	ServerSentMovement mgl64.Vec3
-	ServerMovement     mgl64.Vec3
-	ServerPosition     mgl64.Vec3
+	ClientPredictedMovement, ClientMovement mgl64.Vec3
+	ServerSentMovement                      mgl64.Vec3
+	ServerMovement, OldServerMovement       mgl64.Vec3
+	ServerPosition                          mgl64.Vec3
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {

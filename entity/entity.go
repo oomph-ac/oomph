@@ -118,6 +118,12 @@ func (e *Entity) HasUpdated(tick uint64) bool {
 	return e.updatedTick == tick
 }
 
+func (e *Entity) CurrentPosition() mgl64.Vec3 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.position
+}
+
 func (e *Entity) RewindPosition(tick uint64) *utils.LocationData {
 	e.mu.Lock()
 	defer e.mu.Unlock()

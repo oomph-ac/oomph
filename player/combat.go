@@ -32,11 +32,6 @@ func (p *Player) validateCombat() {
 		return
 	}
 
-	// The server connection or player is null, so we won't be able to send the attack packet anywhere.
-	if p.serverConn == nil || p == nil {
-		return
-	}
-
 	// This determines what tick we should rewind to get an entity position for lag compensation.
 	// Lag compensation is limited to 250ms in this case, so we want two things:
 	// 1) The tick we should rewind to should be no more than 5 ticks (250ms) in the past.

@@ -33,17 +33,21 @@ func (*AutoClickerB) MaxViolations() float64 {
 
 // Process ...
 func (a *AutoClickerB) Process(p Processor, _ packet.Packet) bool {
-	if p.Clicking() {
-		a.samples = append(a.samples, p.ClickDelay())
-		if len(a.samples) == 20 {
-			if !slices.Contains(a.samples, 0) && p.CPS() >= 18 {
-				p.Flag(a, a.violationAfterTicks(p.ClientTick(), 300), map[string]any{
-					"CPS": p.CPS(),
-				})
-			}
-			a.samples = make([]uint64, 0)
-		}
+	if !p.Clicking() {
+		return false
 	}
+
+	a.samples = append(a.samples, p.ClickDelay())
+	if len(a.samples) != 20 {
+		return false
+	}
+
+	if !slices.Contains(a.samples, 0) && p.CPS() >= 18 {
+		p.Flag(a, a.violationAfterTicks(p.ClientTick(), 300), map[string]any{
+			"CPS": p.CPS(),
+		})
+	}
+	a.samples = make([]uint64, 0)
 
 	return false
 }

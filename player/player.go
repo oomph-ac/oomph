@@ -35,6 +35,9 @@ type Player struct {
 	rid uint64
 	uid int64
 
+	movementMode int
+	combatMode   int
+
 	locale language.Tag
 
 	ackMu sync.Mutex
@@ -53,9 +56,8 @@ type Player struct {
 	effects  map[int32]effect.Effect
 	effectMu sync.Mutex
 
-	mInfo        *MovementInfo
-	mPredictions bool
-	miMu         sync.Mutex
+	mInfo *MovementInfo
+	miMu  sync.Mutex
 
 	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]utils.LocationData
@@ -154,6 +156,12 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 			check.NewKillAuraA(),
 
+			check.NewMovementA(),
+			check.NewMovementB(),
+
+			check.NewVelocityA(),
+			check.NewVelocityB(),
+
 			check.NewOSSpoofer(),
 
 			check.NewTimerA(),
@@ -165,7 +173,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		mInfo: &MovementInfo{
 			Speed: 0.1,
 		},
-		mPredictions: true,
+
+		movementMode: utils.ModeFullAuthoritative,
+		combatMode:   utils.ModeFullAuthoritative,
 
 		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
 	}
@@ -187,8 +197,8 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
 	data.IncrementTeleportationTicks()
 
-	//p.mInfo.ClientMovement = pos.Sub(data.LastPosition())
-	p.mInfo.ClientMovement = game.Vec32To64(pk.Delta)
+	p.mInfo.ClientMovement = p.Position().Sub(data.LastPosition())
+	p.mInfo.ClientPredictedMovement = game.Vec32To64(pk.Delta)
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
@@ -261,14 +271,67 @@ func (p *Player) AABB() cube.BBox {
 	return p.Entity().AABB()
 }
 
+// MovementInfo returns the movement information of the player
 func (p *Player) MovementInfo() *MovementInfo {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 	return p.mInfo
 }
 
-func (p *Player) EnableMovementPredictions(enabled bool) {
-	p.mPredictions = enabled
+// TakingKnockback returns whether the player is currently taking knockback.
+func (p *Player) TakingKnockback() bool {
+	p.miMu.Lock()
+	defer p.miMu.Unlock()
+	return p.mInfo.MotionTicks <= 1
+}
+
+// ClientMovement returns the client's movement as a Vec3
+func (p *Player) ClientMovement() mgl64.Vec3 {
+	p.miMu.Lock()
+	defer p.miMu.Unlock()
+	return p.mInfo.ClientMovement
+}
+
+// ServerMovement returns a Vec3 of how the server predicts the client will move.
+func (p *Player) ServerMovement() mgl64.Vec3 {
+	p.miMu.Lock()
+	defer p.miMu.Unlock()
+	return p.mInfo.ServerMovement
+}
+
+// OldServerMovement returns a Vec3 of how the server predicted the client moved in the previous tick.
+func (p *Player) OldServerMovement() mgl64.Vec3 {
+	p.miMu.Lock()
+	defer p.miMu.Unlock()
+	return p.mInfo.OldServerMovement
+}
+
+// MovementMode returns the movement mode of the player. The player's movement mode will determine how
+// much authority over movement oomph has.
+func (p *Player) MovementMode() int {
+	return p.movementMode
+}
+
+// CombatMode returns the combat mode of the player. The combat mode will determine how much authority
+// over combat oomph has.
+func (p *Player) CombatMode() int {
+	return p.combatMode
+}
+
+func (p *Player) SetMovementMode(mode int) {
+	if mode < utils.ModeClientAuthoritative || mode > utils.ModeFullAuthoritative {
+		panic(fmt.Errorf("invalid movement mode %v", mode))
+	}
+
+	p.movementMode = mode
+}
+
+func (p *Player) SetCombatMode(mode int) {
+	if mode < utils.ModeClientAuthoritative || mode > utils.ModeFullAuthoritative {
+		panic(fmt.Errorf("invalid combat mode %v", mode))
+	}
+
+	p.combatMode = mode
 }
 
 func (p *Player) GroupedAcknowledgement(f func(), pk packet.Packet) {
@@ -335,7 +398,9 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	}
 
 	name, variant := check.Name()
-	check.TrackViolation()
+	check.AddViolation(violations)
+
+	params["latency"] = p.stackLatency
 
 	ctx := event.C()
 	log := true
@@ -546,23 +611,36 @@ func (p *Player) startTicking() {
 			// of the entity to the position sent. This position is not one of the rewinded positions, but
 			// rather the position sent by the server that will be interpolated later by e.TickPosition().
 			p.queueMu.Lock()
-			for rid, dat := range p.queuedEntityLocations {
-				if e, valid := p.SearchEntity(rid); valid {
-					e.UpdatePosition(dat, e.Player())
+			if p.combatMode == utils.ModeFullAuthoritative {
+				for rid, dat := range p.queuedEntityLocations {
+					if e, valid := p.SearchEntity(rid); valid {
+						e.UpdatePosition(dat, e.Player())
+					}
 				}
+				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+			} else {
+				p.Acknowledgement(func() {
+					for rid, dat := range p.queuedEntityLocations {
+						if e, valid := p.SearchEntity(rid); valid {
+							e.UpdatePosition(dat, e.Player())
+						}
+					}
+					p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+				})
 			}
-			p.queuedEntityLocations = make(map[uint64]utils.LocationData)
 			p.queueMu.Unlock()
 
 			// This code ticks positions for entities, this is used for the rewind combat system, so that we
 			// can rewind back in time to what the client sees.
-			p.entityMu.Lock()
-			for _, e := range p.entities {
-				e.TickPosition(p.serverTick.Load())
+			if p.combatMode == utils.ModeFullAuthoritative {
+				p.entityMu.Lock()
+				for _, e := range p.entities {
+					e.TickPosition(p.serverTick.Load())
+				}
+				p.entityMu.Unlock()
 			}
-			p.entityMu.Unlock()
 
-			// If the player is not responding to acknowledgements, we have to kick them to prevent potentially
+			// If the player is not responding to acknowledgements, we have to kick them to prevent
 			// abusive behavior (bypasses).
 			if !p.acks.Validate() {
 				p.Disconnect("Error: Client was unable to respond to acknowledgements sent by the server.")

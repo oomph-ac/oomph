@@ -21,9 +21,9 @@ func (b *basic) Buff(n float64, max ...float64) float64 {
 	return b.buffer
 }
 
-// TrackViolation ...
-func (b *basic) TrackViolation() {
-	b.violations++
+// AddViolation...
+func (b *basic) AddViolation(v float64) {
+	b.violations += v
 }
 
 // Violations ...
