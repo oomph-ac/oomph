@@ -61,6 +61,7 @@ type Player struct {
 
 	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]utils.LocationData
+	queuedLocationPackets []packet.Packet
 
 	gameMode  int32
 	inputMode uint32
@@ -155,6 +156,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewAutoClickerD(),
 
 			check.NewKillAuraA(),
+
+			check.NewReachA(),
 
 			check.NewMovementA(),
 			check.NewMovementB(),
@@ -619,14 +622,21 @@ func (p *Player) startTicking() {
 				}
 				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
 			} else {
+				for _, lpk := range p.queuedLocationPackets {
+					p.conn.WritePacket(lpk)
+				}
+				p.queuedLocationPackets = make([]packet.Packet, 0)
+
+				queue := p.queuedEntityLocations
 				p.Acknowledgement(func() {
-					for rid, dat := range p.queuedEntityLocations {
+					for rid, dat := range queue {
 						if e, valid := p.SearchEntity(rid); valid {
 							e.UpdatePosition(dat, e.Player())
 						}
 					}
-					p.queuedEntityLocations = make(map[uint64]utils.LocationData)
 				})
+				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+				p.conn.Flush()
 			}
 			p.queueMu.Unlock()
 
