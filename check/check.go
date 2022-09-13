@@ -11,8 +11,8 @@ type Check interface {
 	// Description is a description of what this check is for.
 	Description() string
 
-	// TrackViolation will increment the violations on the check by one.
-	TrackViolation()
+	// AddViolation will increment the violations by the given amount
+	AddViolation(v float64)
 	// Violations will return the violations the check has currently tracked.
 	Violations() float64
 	// MaxViolations will return the maximum violations the check can track.
