@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block/cube/trace"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -58,7 +59,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			r.attackData = nil
 		}()
 
-		attackPos := game.Vec32To64(r.attackData.Position)
+		attackPos := p.Entity().Position().Add(mgl64.Vec3{0, 1.62})
 
 		e, ok := p.SearchEntity(r.attackData.TargetEntityRuntimeID)
 		if !ok {
