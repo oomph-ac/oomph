@@ -61,8 +61,24 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
 
+		if p.movementMode == utils.ModeSemiAuthoritative {
+			defer func() {
+				p.mInfo.ServerPosition = p.Position()
+				//p.mInfo.ServerMovement = game.Vec32To64(pk.Delta)
+			}()
+		}
+
 		p.processInput(pk)
-		p.validateCombat()
+
+		if p.combatMode == utils.ModeFullAuthoritative {
+			p.validateCombat()
+		} else {
+			p.entityMu.Lock()
+			for _, e := range p.entities {
+				e.TickPosition(p.serverTick.Load())
+			}
+			p.entityMu.Unlock()
+		}
 
 		if p.acks != nil {
 			p.acks.HasTicked = true
@@ -79,7 +95,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.lastEquipmentData = pk
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-			cancel = true
+			cancel = p.combatMode == utils.ModeFullAuthoritative
 			p.updateCombatData(pk)
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
@@ -89,6 +105,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}()
 
 			spam := false
+
+			// This code will detect if the client is sending this packet due to a right click bug where this will be spammed to the server.
 			if p.lastRightClickData != nil {
 				spam = p.ClientFrame()-p.lastRightClickTick < 2
 				spam = spam && p.lastRightClickData.Position == t.Position
@@ -97,6 +115,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}
 
 			if spam {
+				// Cancel the sending of this packet if we determine that it's the right click spam bug.
 				return true
 			}
 
@@ -295,12 +314,14 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		velocity := game.Vec32To64(pk.Velocity)
 
-		// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
-		// of the player instead of waiting for an acknowledgement. This will ensure that players
-		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if int64(p.serverTick.Load())-int64(p.clientTick.Load()) >= 5 {
-			p.mInfo.UpdateServerSentVelocity(velocity)
-			return false
+		if p.movementMode == utils.ModeFullAuthoritative {
+			// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
+			// of the player instead of waiting for an acknowledgement. This will ensure that players
+			// with very high latency do not get a significant advantage due to them receiving knockback late.
+			if int64(p.serverTick.Load())-int64(p.clientTick.Load()) >= 5 {
+				p.mInfo.UpdateServerSentVelocity(velocity)
+				return false
+			}
 		}
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
@@ -308,8 +329,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		p.GroupedAcknowledgement(func() {
 			p.mInfo.UpdateServerSentVelocity(velocity)
 		}, pk)
+		return true
 	case *packet.LevelChunk:
-		if !p.mPredictions {
+		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
 		}
 
@@ -323,7 +345,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.LoadChunk(pk.Position, c)
 		})
 	case *packet.SubChunk:
-		if !p.mPredictions {
+		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
 		}
 
@@ -365,7 +387,15 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+		if p.movementMode == utils.ModeFullAuthoritative {
+			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+			return false
+		}
+
+		p.GroupedAcknowledgement(func() {
+			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+		}, pk)
+		return true
 	case *packet.MobEffect:
 		if pk.EntityRuntimeID != p.rid {
 			return false

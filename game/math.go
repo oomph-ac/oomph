@@ -7,17 +7,27 @@ import (
 	"github.com/go-gl/mathgl/mgl64"
 )
 
-// Round will round a number to a given precision.
+// Round will round a float64 to a given precision.
 func Round(val float64, precision int) float64 {
 	pwr := math.Pow(10, float64(precision))
 	return math.Round(val*pwr) / pwr
 }
 
+// AbsInt64 will return the absolute value of an int64.
 func AbsInt64(a int64) int64 {
 	if a < 0 {
 		a = -a
 	}
+
 	return a
+}
+
+func AbsFloat32(v float32) float32 {
+	if v < 0 {
+		v = -v
+	}
+
+	return v
 }
 
 // Vec32To64 converts a 32-bit vector to a 64-bit one.

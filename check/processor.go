@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 )
@@ -25,6 +26,18 @@ type Processor interface {
 	SearchEntity(rid uint64) (*entity.Entity, bool)
 	// Entity returns the entity data of the processor.
 	Entity() *entity.Entity
+
+	// MovementMode returns the movement mode of the processor.
+	MovementMode() int
+	// CombatMode returns the combat mode of the processor.
+	CombatMode() int
+
+	// ServerMovement returns a Vec3 of how the server predicts the client will move.
+	ServerMovement() mgl64.Vec3
+	// OldServerMovement returns a Vec3 of how the server predicted the client moved in the previous tick.
+	OldServerMovement() mgl64.Vec3
+	// ClientMovement returns the client's movement as a Vec3
+	ClientMovement() mgl64.Vec3
 
 	// ClickDelay returns the delay between the current click and the last one.
 	ClickDelay() uint64
@@ -57,6 +70,8 @@ type Processor interface {
 	Dead() bool
 	// Clicking returns true if the processor is clicking.
 	Clicking() bool
+	// TakingKnockback returns true if the processor is currently taking knockback.
+	TakingKnockback() bool
 
 	// Debug debugs the given parameters to the processor.
 	Debug(check Check, params map[string]any)
