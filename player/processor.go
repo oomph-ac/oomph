@@ -210,6 +210,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.rid {
 			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
+			if p.combatMode == utils.ModeSemiAuthoritative {
+				p.queuedLocationPackets = append(p.queuedLocationPackets, pk)
+				return true
+			}
 			return false
 		}
 
@@ -224,6 +228,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.rid {
 			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
+			if p.combatMode == utils.ModeSemiAuthoritative {
+				p.queuedLocationPackets = append(p.queuedLocationPackets, pk)
+				return true
+			}
 			return false
 		}
 
