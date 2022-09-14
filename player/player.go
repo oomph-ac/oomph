@@ -552,7 +552,7 @@ func (p *Player) Name() string {
 func (p *Player) SendOomphDebug(message string) {
 	p.conn.WritePacket(&packet.Text{
 		TextType: packet.TextTypeChat,
-		Message:  "§l§7[§gO§7]§r " + message,
+		Message:  "§l§7[§goomph§7]§r " + message,
 		XUID:     "",
 	})
 }
