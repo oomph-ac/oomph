@@ -68,6 +68,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}()
 		}
 
+		p.cleanChunks()
 		p.processInput(pk)
 
 		if p.combatMode == utils.ModeFullAuthoritative {
@@ -83,7 +84,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if p.acks != nil {
 			p.acks.HasTicked = true
 		}
-		p.cleanChunks()
 
 		p.needsCombatValidation = false
 	case *packet.LevelSoundEvent:
