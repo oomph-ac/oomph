@@ -347,8 +347,10 @@ func (p *Player) GroupedAcknowledgement(f func(), pk packet.Packet) {
 		t *= -1
 	}
 
+	p.conn.Flush()
 	_ = p.conn.WritePacket(pk)
 	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
+	p.conn.Flush()
 
 	if p.gamePlatform == protocol.DeviceNX {
 		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
@@ -552,7 +554,7 @@ func (p *Player) Name() string {
 func (p *Player) SendOomphDebug(message string) {
 	p.conn.WritePacket(&packet.Text{
 		TextType: packet.TextTypeChat,
-		Message:  "§l§7[§goomph§7]§r " + message,
+		Message:  "§l§7[§eoomph§7]§r " + message,
 		XUID:     "",
 	})
 }

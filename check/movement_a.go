@@ -25,7 +25,7 @@ func (*MovemntA) Description() string {
 }
 
 func (*MovemntA) MaxViolations() float64 {
-	return 20
+	return math.MaxInt64
 }
 
 func (m *MovemntA) Process(p Processor, pk packet.Packet) bool {
