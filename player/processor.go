@@ -322,14 +322,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		velocity := game.Vec32To64(pk.Velocity)
 
-		if p.movementMode == utils.ModeFullAuthoritative {
+		if p.movementMode == utils.ModeFullAuthoritative && int64(p.serverTick.Load())-int64(p.clientTick.Load()) >= 5 {
 			// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
 			// of the player instead of waiting for an acknowledgement. This will ensure that players
 			// with very high latency do not get a significant advantage due to them receiving knockback late.
-			if int64(p.serverTick.Load())-int64(p.clientTick.Load()) >= 5 {
-				p.mInfo.UpdateServerSentVelocity(velocity)
-				return false
-			}
+			p.mInfo.UpdateServerSentVelocity(velocity)
+			return false
 		}
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
