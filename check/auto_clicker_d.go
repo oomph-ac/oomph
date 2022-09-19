@@ -63,7 +63,7 @@ func (a *AutoClickerD) Process(p Processor, _ packet.Packet) bool {
 	} else {
 		a.Buff(-0.5)
 	}
-	a.samples = []float64{}
+	a.samples = a.samples[:0]
 
 	return false
 }

@@ -104,21 +104,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.lastRightClickTick = p.ClientFrame()
 			}()
 
-			spam := false
-
-			// This code will detect if the client is sending this packet due to a right click bug where this will be spammed to the server.
-			if p.lastRightClickData != nil {
-				spam = p.ClientFrame()-p.lastRightClickTick < 2
-				spam = spam && p.lastRightClickData.Position == t.Position
-				spam = spam && p.lastRightClickData.BlockPosition == t.BlockPosition
-				spam = spam && p.lastRightClickData.ClickedPosition == t.ClickedPosition
-			}
-
-			if spam {
-				// Cancel the sending of this packet if we determine that it's the right click spam bug.
-				return true
-			}
-
 			i, ok := world.ItemByRuntimeID(t.HeldItem.Stack.NetworkID, int16(t.HeldItem.Stack.MetadataValue))
 			if !ok {
 				return false
@@ -146,6 +131,21 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			// Set the block in the world
 			p.SetBlock(replacePos, b)
+
+			spam := false
+
+			// This code will detect if the client is sending this packet due to a right click bug where this will be spammed to the server.
+			if p.lastRightClickData != nil {
+				spam = p.ClientFrame()-p.lastRightClickTick < 2
+				spam = spam && p.lastRightClickData.Position == t.Position
+				spam = spam && p.lastRightClickData.BlockPosition == t.BlockPosition
+				spam = spam && p.lastRightClickData.ClickedPosition == t.ClickedPosition
+			}
+
+			if spam {
+				// Cancel the sending of this packet if we determine that it's the right click spam bug.
+				return true
+			}
 		}
 	case *packet.Respawn:
 		if pk.EntityRuntimeID != p.rid {
