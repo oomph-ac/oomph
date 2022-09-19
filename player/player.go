@@ -625,7 +625,7 @@ func (p *Player) startTicking() {
 				for _, lpk := range p.queuedLocationPackets {
 					p.conn.WritePacket(lpk)
 				}
-				p.queuedLocationPackets = make([]packet.Packet, 0)
+				p.queuedLocationPackets = p.queuedLocationPackets[:0]
 
 				queue := p.queuedEntityLocations
 				p.Acknowledgement(func() {

@@ -47,7 +47,7 @@ func (a *AutoClickerB) Process(p Processor, _ packet.Packet) bool {
 			"CPS": p.CPS(),
 		})
 	}
-	a.samples = make([]uint64, 0)
+	a.samples = a.samples[:0]
 
 	return false
 }
