@@ -4,7 +4,6 @@ import (
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block/cube/trace"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -59,23 +58,32 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			r.attackData = nil
 		}()
 
-		attackPos := p.Entity().Position().Add(mgl64.Vec3{0, 1.62})
+		attackPos := game.Vec32To64(r.attackData.Position)
 
 		e, ok := p.SearchEntity(r.attackData.TargetEntityRuntimeID)
 		if !ok {
 			return false
 		}
 
-		bb := e.AABB().Translate(e.CurrentPosition()).Grow(0.1)
-		dist := game.AABBVectorDistance(bb, attackPos)
-		if dist > 3.1 {
-			if r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 5 {
-				p.Flag(r, 1, map[string]any{
-					"rawDist": game.Round(dist, 4),
-				})
-				r.cancelNext = true
+		dist1, entPos, dPos := 6969.0, e.LastPosition(), e.Position().Sub(e.LastPosition()).Mul(1.0/10.0)
+		for i := 0.0; i < 10; i++ {
+			if i != 0 {
+				entPos = entPos.Add(dPos)
 			}
-		} else {
+
+			bb := e.AABB().Translate(entPos).Grow(0.1)
+			dist := game.AABBVectorDistance(bb, attackPos)
+			if dist1 > dist {
+				dist1 = dist
+			}
+		}
+
+		if dist1 > 3.1 && r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 5 {
+			p.Flag(r, 1, map[string]any{
+				"rawDist": game.Round(dist1, 4),
+			})
+			r.cancelNext = true
+		} else if dist1 <= 3.1 {
 			r.Buff(-0.01, 10)
 		}
 
@@ -83,23 +91,49 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
-		result, ok := trace.BBoxIntercept(bb, attackPos, attackPos.Add(dV.Mul(7)))
+		dist2, valid := 6969.0, false
+		rot := game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
+		dRot := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X()).Sub(rot).Mul(1.0 / 10.0)
+		entPos = e.LastPosition()
 
-		if !ok {
+		for i := 0.0; i < 10; i++ {
+			if i != 0 {
+				entPos = entPos.Add(dPos)
+			}
+
+			for x := 0; x < 10; x++ {
+				if x != 0 {
+					rot = rot.Add(dRot)
+				}
+				bb := e.AABB().Translate(entPos).Grow(0.1)
+				result, ok := trace.BBoxIntercept(bb, attackPos, attackPos.Add(rot.Mul(7.0)))
+				if !ok {
+					continue
+				}
+
+				valid = true
+				dist := result.Position().Sub(attackPos).LenSqr()
+				if dist2 > dist {
+					dist2 = dist
+				}
+			}
+		}
+
+		if !valid {
 			return false
 		}
 
-		dist2 := result.Position().Sub(attackPos).Len()
-		if dist2 > 3.04 && math.Abs(dist-dist2) < 0.4 {
-			if r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 3 {
-				p.Flag(r, 1, map[string]any{
-					"dist": game.Round(dist2, 4),
-				})
-				r.cancelNext = true
-			}
-		} else {
+		// 3^2 = 9
+		if dist2 <= 9 {
 			r.Buff(-0.01, 6)
+			return false
+		}
+
+		if r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 3 {
+			p.Flag(r, 1, map[string]any{
+				"dist": game.Round(math.Sqrt(dist2), 4),
+			})
+			r.cancelNext = true
 		}
 	}
 

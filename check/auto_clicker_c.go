@@ -13,7 +13,9 @@ type AutoClickerC struct {
 
 // NewAutoClickerC creates a new AutoClickerC check.
 func NewAutoClickerC() *AutoClickerC {
-	return &AutoClickerC{}
+	c := &AutoClickerC{}
+	c.samples = make([]float64, 0, 20)
+	return c
 }
 
 // Name ...
@@ -38,7 +40,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) bool {
 	}
 
 	a.samples = append(a.samples, float64(p.ClickDelay()))
-	if len(a.samples) < 20 {
+	if len(a.samples) != 20 {
 		return false
 	}
 
@@ -64,7 +66,7 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) bool {
 	} else {
 		a.buffer = 0
 	}
-	a.samples = []float64{}
+	a.samples = a.samples[:0]
 
 	return false
 }
