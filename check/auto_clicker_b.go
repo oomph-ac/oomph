@@ -13,7 +13,9 @@ type AutoClickerB struct {
 
 // NewAutoClickerB creates a new AutoClickerB check.
 func NewAutoClickerB() *AutoClickerB {
-	return &AutoClickerB{}
+	c := &AutoClickerB{}
+	c.samples = make([]uint64, 0, 20)
+	return c
 }
 
 // Name ...
