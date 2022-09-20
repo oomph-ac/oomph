@@ -13,7 +13,9 @@ type AutoClickerD struct {
 
 // NewAutoClickerD creates a new AutoClickerD check.
 func NewAutoClickerD() *AutoClickerD {
-	return &AutoClickerD{}
+	c := &AutoClickerD{}
+	c.samples = make([]float64, 0, 20)
+	return c
 }
 
 // Name ...
@@ -38,7 +40,7 @@ func (a *AutoClickerD) Process(p Processor, _ packet.Packet) bool {
 	}
 
 	a.samples = append(a.samples, float64(p.ClickDelay()))
-	if len(a.samples) < 20 {
+	if len(a.samples) != 20 {
 		// Not enough samples, wait until we have more.
 		return false
 	}
