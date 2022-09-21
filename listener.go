@@ -15,9 +15,9 @@ type listener struct {
 	o *Oomph
 }
 
-// SetOomphListener sets the oomph listener in the server config, this should be used instead of Start() for dragonfly servers.
-func (o *Oomph) SetOomphListener(conf *server.Config, name string, protocols []minecraft.Protocol, requirePacks bool) {
-	conf.Listeners = []func(conf server.Config) (server.Listener, error){func(_ server.Config) (server.Listener, error) {
+// Listen adds the oomph listener in the server config, this should be used instead of Start() for dragonfly servers.
+func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.Protocol, requirePacks bool) {
+	conf.Listeners = append(conf.Listeners, func(_ server.Config) (server.Listener, error) {
 		l, err := minecraft.ListenConfig{
 			StatusProvider:       minecraft.NewStatusProvider(name),
 			ResourcePacks:        conf.Resources,
@@ -34,7 +34,7 @@ func (o *Oomph) SetOomphListener(conf *server.Config, name string, protocols []m
 			Listener: l,
 			o:        o,
 		}, nil
-	}}
+	})
 }
 
 // Accept accepts an incoming player into the server. It blocks until a player connects to the server.
