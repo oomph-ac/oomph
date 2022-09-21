@@ -423,7 +423,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		return true
 	case *packet.UpdateAbilities:
 		p.GroupedAcknowledgement(func() {
-			for _, l := range pk.Layers {
+			for _, l := range pk.AbilityData.Layers {
 				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
 				p.mInfo.CanFly = utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
 			}
