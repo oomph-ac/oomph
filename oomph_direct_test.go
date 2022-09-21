@@ -28,24 +28,21 @@ func TestOomphDirect(t *testing.T) {
 		log.Fatalln(err)
 	}
 
+	oomph := New(log, ":19132")
+	oomph.SetOomphListener(&cfg, cfg.Name, []minecraft.Protocol{}, false)
+
 	srv := cfg.New()
 	srv.CloseOnProgramEnd()
-	/* if err := srv.Start(); err != nil {
-		log.Fatalln(err)
-	} */
 
 	go func() {
-		oomph := New(log, ":19132")
-		if err := oomph.Listen(&cfg, cfg.Name, []minecraft.Protocol{}, false); err != nil {
-			log.Fatalln(err)
-		}
-
 		for {
 			if _, err := oomph.Accept(); err != nil {
 				return
 			}
 		}
 	}()
+
+	srv.Listen()
 
 	for srv.Accept(func(p *player.Player) {
 		p.ShowCoordinates()

@@ -15,26 +15,26 @@ type listener struct {
 	o *Oomph
 }
 
-// Listen listens for oomph connections, this should be used instead of Start for dragonfly servers.
-func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.Protocol, requirePacks bool) error {
-	l, err := minecraft.ListenConfig{
-		StatusProvider:       minecraft.NewStatusProvider(name),
-		ResourcePacks:        conf.Resources,
-		TexturePacksRequired: requirePacks,
-		AcceptedProtocols:    protocols,
-	}.Listen("raknet", o.addr)
-	if err != nil {
-		return err
-	}
-	o.log.Infof("Oomph is now listening on %v.\n", o.addr)
-	conf.Listeners = conf.Listeners[:0]
-	conf.Listeners = append(conf.Listeners, func(_ server.Config) (server.Listener, error) {
+// SetOomphListener sets the oomph listener in the server config, this should be used instead of Start() for dragonfly servers.
+func (o *Oomph) SetOomphListener(conf *server.Config, name string, protocols []minecraft.Protocol, requirePacks bool) {
+	conf.Listeners = []func(conf server.Config) (server.Listener, error){func(_ server.Config) (server.Listener, error) {
+		l, err := minecraft.ListenConfig{
+			StatusProvider:       minecraft.NewStatusProvider(name),
+			ResourcePacks:        conf.Resources,
+			TexturePacksRequired: requirePacks,
+			AcceptedProtocols:    protocols,
+		}.Listen("raknet", o.addr)
+		if err != nil {
+			return nil, err
+		}
+
+		conf.Log.Infof("Oomph is listening on %v", l.Addr())
+
 		return listener{
 			Listener: l,
 			o:        o,
 		}, nil
-	})
-	return nil
+	}}
 }
 
 // Accept accepts an incoming player into the server. It blocks until a player connects to the server.
