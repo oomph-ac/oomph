@@ -3,6 +3,7 @@ package check
 import (
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 )
 
@@ -28,9 +29,9 @@ type Processor interface {
 	Entity() *entity.Entity
 
 	// MovementMode returns the movement mode of the processor.
-	MovementMode() int
+	MovementMode() utils.AuthorityType
 	// CombatMode returns the combat mode of the processor.
-	CombatMode() int
+	CombatMode() utils.AuthorityType
 
 	// ServerMovement returns a Vec3 of how the server predicts the client will move.
 	ServerMovement() mgl64.Vec3
