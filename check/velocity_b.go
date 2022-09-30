@@ -43,18 +43,21 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 	xDiff, zDiff := math.Abs(xKb-p.ClientMovement()[0]), math.Abs(zKb-p.ClientMovement()[2])
 	pct := (math.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math.Hypot(xKb, zKb)) * 100
 
-	if xDiff <= 1e-4 && zDiff <= 1e-4 {
-		v.Buff(-0.1, 10)
+	threshold := 1e-4
+	if p.OnGround() {
+		threshold = 6e-3
+	}
+
+	if xDiff <= threshold && zDiff <= threshold {
+		v.violations = math.Max(0, v.violations-0.2)
 		return false
 	}
 
-	if v.Buff(1, 6) >= 3 {
-		p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
-			"pct":   fmt.Sprint(game.Round(pct, 4), "%"),
-			"xDiff": game.Round(xDiff, 4),
-			"zDiff": game.Round(zDiff, 4),
-		})
-	}
+	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
+		"pct":   fmt.Sprint(game.Round(pct, 4), "%"),
+		"xDiff": game.Round(xDiff, 4),
+		"zDiff": game.Round(zDiff, 4),
+	})
 
 	return false
 }

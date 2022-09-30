@@ -4,15 +4,20 @@ import (
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block/cube/trace"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+const interpolationInterations float64 = 8
+
 type ReachA struct {
-	attackData *protocol.UseItemOnEntityTransactionData
-	cancelNext bool
+	attackData                *protocol.UseItemOnEntityTransactionData
+	currentEntPos, lastEntPos mgl64.Vec3
+	cancelNext                bool
+	secondaryBuffer           float64
 	basic
 }
 
@@ -29,7 +34,7 @@ func (*ReachA) Description() string {
 }
 
 func (*ReachA) MaxViolations() float64 {
-	return 25
+	return 15
 }
 
 func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
@@ -52,6 +57,14 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return true
 		}
 
+		e, ok := p.SearchEntity(d.TargetEntityRuntimeID)
+		if !ok {
+			return false
+		}
+
+		r.lastEntPos = e.LastPosition()
+		r.currentEntPos = e.Position()
+
 		r.attackData = d
 	} else if i, ok := pk.(*packet.PlayerAuthInput); ok && r.attackData != nil {
 		defer func() {
@@ -60,48 +73,52 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 
 		attackPos := game.Vec32To64(r.attackData.Position)
 
+		// We're checking this again because within the span of the attack being sent and the
+		// client sending an input packet, the entity could have been removed.
 		e, ok := p.SearchEntity(r.attackData.TargetEntityRuntimeID)
 		if !ok {
 			return false
 		}
 
-		dist1, entPos, dPos := 6969.0, e.LastPosition(), e.Position().Sub(e.LastPosition()).Mul(1.0/10.0)
-		for i := 0.0; i < 10; i++ {
+		bbDist, entPos, dPos := 6969.0, r.lastEntPos, r.currentEntPos.Sub(r.lastEntPos).Mul(1.0/interpolationInterations)
+		for i := 0.0; i < interpolationInterations; i++ {
 			if i != 0 {
 				entPos = entPos.Add(dPos)
 			}
 
 			bb := e.AABB().Translate(entPos).Grow(0.1)
 			dist := game.AABBVectorDistance(bb, attackPos)
-			if dist1 > dist {
-				dist1 = dist
+			if bbDist > dist {
+				bbDist = dist
 			}
 		}
 
-		if dist1 > 3.1 && r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 5 {
+		if bbDist > 3.15 {
 			p.Flag(r, 1, map[string]any{
-				"rawDist": game.Round(dist1, 4),
+				"dist": game.Round(bbDist, 4),
+				"type": "bb-dist",
 			})
 			r.cancelNext = true
-		} else if dist1 <= 3.1 {
-			r.Buff(-0.01, 10)
+			return false
 		}
+		r.violations = math.Max(0, r.violations-0.001)
 
 		if i.InputMode == packet.InputModeTouch {
 			return false
 		}
 
-		dist2, valid := 6969.0, false
+		minDist, valid := 6969.0, false
+		distAvg, totalHits := 0.0, 0.0
 		rot := game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
-		dRot := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X()).Sub(rot).Mul(1.0 / 10.0)
-		entPos = e.LastPosition()
+		dRot := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X()).Sub(rot).Mul(1.0 / interpolationInterations)
+		entPos = r.lastEntPos
 
-		for i := 0.0; i < 10; i++ {
+		for i := 0.0; i < interpolationInterations; i++ {
 			if i != 0 {
 				entPos = entPos.Add(dPos)
 			}
 
-			for x := 0; x < 10; x++ {
+			for x := 0.0; x < interpolationInterations; x++ {
 				if x != 0 {
 					rot = rot.Add(dRot)
 				}
@@ -112,29 +129,45 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 				}
 
 				valid = true
-				dist := result.Position().Sub(attackPos).LenSqr()
-				if dist2 > dist {
-					dist2 = dist
+				dist := result.Position().Sub(attackPos).Len()
+				distAvg += dist
+				totalHits++
+				if minDist > dist {
+					minDist = dist
 				}
 			}
 		}
 
 		if !valid {
+			if r.Buff(1, 5) >= 4.5 {
+				p.Flag(r, 1, map[string]any{
+					"type": "hitbox",
+				})
+				r.cancelNext = true
+			}
+
+			return false
+		}
+		r.Buff(-0.025, 5)
+
+		distAvg /= totalHits
+		if distAvg <= 3.0001 {
+			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.0075)
+			r.violations = math.Max(0, r.violations-0.001)
 			return false
 		}
 
-		// 3^2 = 9
-		if dist2 <= 9 {
-			r.Buff(-0.01, 6)
-			return false
-		}
+		r.secondaryBuffer++
+		r.secondaryBuffer = math.Min(r.secondaryBuffer, 5)
 
-		if r.Buff(r.violationAfterTicks(p.ClientFrame(), 600), 6) >= 3 {
+		if r.secondaryBuffer > 1 {
 			p.Flag(r, 1, map[string]any{
-				"dist": game.Round(math.Sqrt(dist2), 4),
+				"dist": game.Round(distAvg, 4),
+				"type": "raycast",
 			})
-			r.cancelNext = true
 		}
+
+		r.cancelNext = true
 	}
 
 	return false

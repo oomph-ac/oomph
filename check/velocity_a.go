@@ -47,17 +47,15 @@ func (v *VelocityA) Process(p Processor, pk packet.Packet) bool {
 		v.knockback = p.ServerMovement()[1]
 	}()
 
-	diff, pct := math.Abs(v.knockback-p.ClientMovement()[1]), p.ClientMovement()[1]/v.knockback
+	diff, pct := math.Abs(v.knockback-p.ClientMovement()[1]), (p.ClientMovement()[1]/v.knockback)*100
 	if diff <= 1e-4 {
-		v.Buff(-0.1, 10)
+		v.violations = math.Max(0, v.violations-0.1)
 		return false
 	}
 
-	if v.Buff(1, 10) >= 8 {
-		p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
-			"pct": fmt.Sprint(game.Round(pct, 4), "%"),
-		})
-	}
+	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
+		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
+	})
 
 	return false
 }
