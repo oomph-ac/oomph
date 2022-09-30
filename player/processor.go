@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"math"
 	"time"
 	_ "unsafe"
 
@@ -349,6 +350,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		c.Compact()
 
 		p.Acknowledgement(func() {
+			pos := protocol.ChunkPos{int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4, int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4}
+			if pos == pk.Position && p.ChunkExists(pos) {
+				p.inLoadedChunkTicks = 0
+			}
 			p.LoadChunk(pk.Position, c)
 		})
 	case *packet.SubChunk:
