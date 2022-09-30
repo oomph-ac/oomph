@@ -35,8 +35,8 @@ type Player struct {
 	rid uint64
 	uid int64
 
-	movementMode int
-	combatMode   int
+	movementMode utils.AuthorityType
+	combatMode   utils.AuthorityType
 
 	locale language.Tag
 
@@ -309,29 +309,21 @@ func (p *Player) OldServerMovement() mgl64.Vec3 {
 
 // MovementMode returns the movement mode of the player. The player's movement mode will determine how
 // much authority over movement oomph has.
-func (p *Player) MovementMode() int {
+func (p *Player) MovementMode() utils.AuthorityType {
 	return p.movementMode
 }
 
 // CombatMode returns the combat mode of the player. The combat mode will determine how much authority
 // over combat oomph has.
-func (p *Player) CombatMode() int {
+func (p *Player) CombatMode() utils.AuthorityType {
 	return p.combatMode
 }
 
-func (p *Player) SetMovementMode(mode int) {
-	if mode < utils.ModeClientAuthoritative || mode > utils.ModeFullAuthoritative {
-		panic(fmt.Errorf("invalid movement mode %v", mode))
-	}
-
+func (p *Player) SetMovementMode(mode utils.AuthorityType) {
 	p.movementMode = mode
 }
 
-func (p *Player) SetCombatMode(mode int) {
-	if mode < utils.ModeClientAuthoritative || mode > utils.ModeFullAuthoritative {
-		panic(fmt.Errorf("invalid combat mode %v", mode))
-	}
-
+func (p *Player) SetCombatMode(mode utils.AuthorityType) {
 	p.combatMode = mode
 }
 
