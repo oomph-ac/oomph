@@ -66,8 +66,6 @@ type Player struct {
 	gameMode  int32
 	inputMode uint32
 
-	gamePlatform protocol.DeviceOS
-
 	ready                 bool
 	dead                  bool
 	needsCombatValidation bool
@@ -350,7 +348,7 @@ func (p *Player) GroupedAcknowledgement(f func(), pk packet.Packet) {
 	_ = p.conn.WritePacket(pk)
 	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
 
-	if p.gamePlatform == protocol.DeviceNX {
+	if p.ClientData().DeviceOS == protocol.DeviceNX {
 		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
 	}
 
@@ -374,7 +372,7 @@ func (p *Player) Acknowledgement(f func()) {
 
 	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
 
-	if p.gamePlatform == protocol.DeviceNX {
+	if p.ClientData().DeviceOS == protocol.DeviceNX {
 		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
 	}
 
@@ -428,10 +426,6 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	}
 }
 
-func (p *Player) GamePlatform() protocol.DeviceOS {
-	return p.gamePlatform
-}
-
 // Ready returns true if the player is ready/spawned in.
 func (p *Player) Ready() bool {
 	return p.ready
@@ -461,6 +455,11 @@ func (p *Player) Sneaking() bool {
 // Sprinting returns true if the player is currently sprinting.
 func (p *Player) Sprinting() bool {
 	return p.MovementInfo().Sprinting
+}
+
+// OnGround returns true if the player is currently on the ground.
+func (p *Player) OnGround() bool {
+	return p.MovementInfo().OnGround
 }
 
 // Teleporting returns true if the player is currently teleporting.
@@ -625,7 +624,7 @@ func (p *Player) startTicking() {
 				for _, lpk := range p.queuedLocationPackets {
 					p.conn.WritePacket(lpk)
 				}
-				p.queuedLocationPackets = p.queuedLocationPackets[:0]
+				p.queuedLocationPackets = nil
 
 				queue := p.queuedEntityLocations
 				p.Acknowledgement(func() {
@@ -636,7 +635,7 @@ func (p *Player) startTicking() {
 					}
 				})
 				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
-				p.conn.Flush()
+				go p.conn.Flush()
 			}
 			p.queueMu.Unlock()
 

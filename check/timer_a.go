@@ -43,7 +43,7 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	// Here, we check if the client is simulating ahead of the server.
-	if p.ClientTick() > p.ServerTick() {
+	if int64(p.ClientTick())-int64(p.ServerTick()) >= 2 {
 		p.Flag(t, 1, map[string]any{
 			"Server Tick": p.ServerTick(),
 			"Client Tick": p.ClientTick(),

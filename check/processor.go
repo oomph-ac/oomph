@@ -41,8 +41,6 @@ type Processor interface {
 
 	// ClickDelay returns the delay between the current click and the last one.
 	ClickDelay() uint64
-	// Click adds a click to the processor's click history.
-	Click()
 	// CPS returns the clicks per second of the processor.
 	CPS() int
 
@@ -56,6 +54,8 @@ type Processor interface {
 	GameMode() int32
 	// Sneaking returns true if the processor is currently sneaking.
 	Sneaking() bool
+	// OnGround returns true if the processor is currently on the ground.
+	OnGround() bool
 	// Sprinting returns true if the processor is currently sprinting.
 	Sprinting() bool
 	// Teleporting returns true if the processor is currently teleporting.

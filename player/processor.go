@@ -63,8 +63,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 		if p.movementMode == utils.ModeSemiAuthoritative {
 			defer func() {
+				// After processing movement and letting checks validate movement, set the server's position and movement to the client's.
 				p.mInfo.ServerPosition = p.Position()
-				//p.mInfo.ServerMovement = game.Vec32To64(pk.Delta)
+				p.mInfo.ServerMovement = game.Vec32To64(pk.Delta)
 			}()
 		}
 
