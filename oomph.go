@@ -3,6 +3,7 @@ package oomph
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/oomph-ac/oomph/utils"
 
@@ -45,6 +46,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 		ResourcePacks:        utils.ResourcePacks(resourcePackPath),
 		TexturePacksRequired: requirePacks,
 		AcceptedProtocols:    protocols,
+		FlushRate:            -1,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
@@ -76,6 +78,20 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.RewindHistorySize = 60
 	data.PlayerMovementSettings.ServerAuthoritativeBlockBreaking = false
 
+	ready := false
+	go func() {
+		for {
+			if ready {
+				break
+			}
+
+			conn.Flush()
+			serverConn.Flush()
+
+			time.Sleep(time.Second / 2)
+		}
+	}()
+
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
@@ -92,6 +108,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 
+	ready = true
 	p := player.NewPlayer(o.log, conn, serverConn)
 	p.MovementInfo().ServerPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
 	p.MovementInfo().ServerMovement = mgl64.Vec3{0, -0.0784, 0}
@@ -105,9 +122,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			p.PacketMu.Lock()
-			defer p.PacketMu.Unlock()
-
 			pk, err := conn.ReadPacket()
 			if err != nil || p == nil {
 				return
@@ -130,9 +144,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			p.PacketMu.Lock()
-			defer p.PacketMu.Unlock()
-
 			pk, err := serverConn.ReadPacket()
 			if err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {

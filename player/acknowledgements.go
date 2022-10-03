@@ -1,26 +1,35 @@
 package player
 
+import (
+	"math/rand"
+
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+)
+
 type Acknowledgements struct {
-	AcknowledgeMap map[int64]func()
-	HasTicked      bool
+	AcknowledgeMap   map[int64][]func()
+	HasTicked        bool
+	CurrentTimestamp int64
 
 	awaitResTicks uint64
 }
 
 // Add adds an acknowledgement to run in the future to the map of acknowledgements.
-func (a *Acknowledgements) Add(i int64, f func()) {
-	a.AcknowledgeMap[i] = f
+func (a *Acknowledgements) Add(f func()) {
+	a.AcknowledgeMap[a.CurrentTimestamp] = append(a.AcknowledgeMap[a.CurrentTimestamp], f)
 }
 
 // Handle gets the acknowledgement in the map with the timestamp given in the function. If there is no acknowledgement
 // found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
 // "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
 func (a *Acknowledgements) Handle(i int64) bool {
-	call, ok := a.AcknowledgeMap[i]
+	calls, ok := a.AcknowledgeMap[i]
 	if ok {
 		a.awaitResTicks = 0
 		a.Remove(i)
-		call()
+		for _, f := range calls {
+			f()
+		}
 	}
 	return ok
 }
@@ -28,6 +37,19 @@ func (a *Acknowledgements) Handle(i int64) bool {
 // Remove removes an acknowledgement from the map of acknowledgements.
 func (a *Acknowledgements) Remove(i int64) {
 	delete(a.AcknowledgeMap, i)
+}
+
+// Refresh sets a new timestamp for the acknowledgements.
+func (a *Acknowledgements) Refresh() {
+	a.CurrentTimestamp = int64(rand.Uint32()) * 1000
+}
+
+// Create creats a new acknowledgement packet and returns it.
+func (a *Acknowledgements) Create() *packet.NetworkStackLatency {
+	return &packet.NetworkStackLatency{
+		Timestamp:     a.CurrentTimestamp,
+		NeedsResponse: true,
+	}
 }
 
 // Validate checks if the client is still responding to acknowledgements sent to it. If it's determined that
