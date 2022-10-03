@@ -3,7 +3,6 @@ package player
 import (
 	"fmt"
 
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -39,8 +38,6 @@ type Player struct {
 	combatMode   utils.AuthorityType
 
 	locale language.Tag
-
-	PacketMu sync.Mutex
 
 	ackMu sync.Mutex
 	acks  *Acknowledgements
@@ -125,7 +122,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		h: NopHandler{},
 
 		acks: &Acknowledgements{
-			AcknowledgeMap: make(map[int64]func()),
+			AcknowledgeMap: make(map[int64][]func()),
 		},
 
 		entity: entity.NewEntity(
@@ -182,8 +179,11 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
 	}
+
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
 	p.chunkRadius = p.conn.ChunkRadius() + 4
+	p.acks.Refresh()
+
 	go p.startTicking()
 	return p
 }
@@ -334,54 +334,16 @@ func (p *Player) SetCombatMode(mode utils.AuthorityType) {
 	p.combatMode = mode
 }
 
-func (p *Player) GroupedAcknowledgement(f func(), pk packet.Packet) {
-	if p.acks == nil {
-		return
-	}
-
-	t := int64(rand.Int31()) * 1000 // Ensure that we don't get screwed over because the number is too fat.
-	if t < 0 {
-		t *= -1
-	}
-
-	// <- if conn flushes here no problem
-	p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
-	// <- if conn flushes here then the second ack is reliable
-	p.conn.WritePacket(pk)
-	// <- if conn flushes here then the first ack is reliable
-	p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t + 69000, NeedsResponse: true})
-	// <- if conn flushes here no problem
-
-	if p.ClientData().DeviceOS == protocol.DeviceNX {
-		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
-	}
-
-	p.ackMu.Lock()
-	p.acks.Add(t, f)
-	p.ackMu.Unlock()
-}
-
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Find something with similar usage to NSL - it will possibly be removed in future versions of Minecraft
 func (p *Player) Acknowledgement(f func()) {
 	// Do not attempt to send an acknowledgement if the player is closed
-	if p.acks == nil {
+	if p.closed {
 		return
 	}
 
-	t := int64(rand.Int31()) * 1000 // Ensure that we don't get screwed over because the number is too fat.
-	if t < 0 {
-		t *= -1
-	}
-
-	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
-
-	if p.ClientData().DeviceOS == protocol.DeviceNX {
-		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
-	}
-
 	p.ackMu.Lock()
-	p.acks.Add(t, f)
+	p.acks.Add(f)
 	p.ackMu.Unlock()
 }
 
@@ -615,9 +577,6 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
-			p.PacketMu.Lock()
-			defer p.PacketMu.Unlock()
-
 			// If there's a position for the entity sent by the server, we will update the server position
 			// of the entity to the position sent. This position is not one of the rewinded positions, but
 			// rather the position sent by the server that will be interpolated later by e.TickPosition().
@@ -691,11 +650,19 @@ func (p *Player) startTicking() {
 				})
 			}
 
-			p.conn.Flush()
+			p.ackMu.Lock()
+			p.conn.WritePacket(p.acks.Create())
 
-			delta := time.Since(p.lastServerTicked).Milliseconds()
+			p.conn.Flush()
+			if p.serverConn != nil {
+				p.serverConn.Flush()
+			}
+
+			p.acks.Refresh()
+			p.ackMu.Unlock()
+
 			p.lastServerTicked = time.Now()
-			p.serverTick.Add(uint64(delta / 50))
+			p.serverTick.Inc()
 		}
 	}
 }

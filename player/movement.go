@@ -38,7 +38,7 @@ func (p *Player) updateMovementState() bool {
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
 // If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
-	if p.movementMode != utils.ModeSemiAuthoritative {
+	if p.movementMode != utils.ModeFullAuthoritative {
 		return
 	}
 

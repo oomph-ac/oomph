@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -32,6 +33,10 @@ func (v *VelocityA) MaxViolations() float64 {
 func (v *VelocityA) Process(p Processor, pk packet.Packet) bool {
 	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
+		return false
+	}
+
+	if p.MovementMode() != utils.ModeSemiAuthoritative {
 		return false
 	}
 
