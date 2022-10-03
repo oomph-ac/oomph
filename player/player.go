@@ -40,6 +40,8 @@ type Player struct {
 
 	locale language.Tag
 
+	PacketMu sync.Mutex
+
 	ackMu sync.Mutex
 	acks  *Acknowledgements
 
@@ -62,7 +64,6 @@ type Player struct {
 
 	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]utils.LocationData
-	queuedLocationPackets []packet.Packet
 
 	gameMode  int32
 	inputMode uint32
@@ -614,6 +615,9 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
+			p.PacketMu.Lock()
+			defer p.PacketMu.Unlock()
+
 			// If there's a position for the entity sent by the server, we will update the server position
 			// of the entity to the position sent. This position is not one of the rewinded positions, but
 			// rather the position sent by the server that will be interpolated later by e.TickPosition().
@@ -626,11 +630,6 @@ func (p *Player) startTicking() {
 				}
 				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
 			} else {
-				for _, lpk := range p.queuedLocationPackets {
-					p.conn.WritePacket(lpk)
-				}
-				p.queuedLocationPackets = nil
-
 				queue := p.queuedEntityLocations
 				p.Acknowledgement(func() {
 					for rid, dat := range queue {
@@ -640,7 +639,6 @@ func (p *Player) startTicking() {
 					}
 				})
 				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
-				go p.conn.Flush()
 			}
 			p.queueMu.Unlock()
 
@@ -692,6 +690,8 @@ func (p *Player) startTicking() {
 					p.isLatencyUpdated = true
 				})
 			}
+
+			p.conn.Flush()
 
 			delta := time.Since(p.lastServerTicked).Milliseconds()
 			p.lastServerTicked = time.Now()
