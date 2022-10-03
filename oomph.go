@@ -65,6 +65,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	serverConn, err := minecraft.Dialer{
 		IdentityData: conn.IdentityData(),
 		ClientData:   conn.ClientData(),
+		FlushRate:    -1,
 	}.Dial("raknet", remoteAddr)
 	if err != nil {
 		return
@@ -104,6 +105,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
+			p.PacketMu.Lock()
+			defer p.PacketMu.Unlock()
+
 			pk, err := conn.ReadPacket()
 			if err != nil || p == nil {
 				return
@@ -126,6 +130,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
+			p.PacketMu.Lock()
+			defer p.PacketMu.Unlock()
+
 			pk, err := serverConn.ReadPacket()
 			if err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
