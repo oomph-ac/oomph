@@ -185,37 +185,31 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
 				game.Vec32To64(pk.Position),
 				game.Vec32To64(pk.Velocity),
 				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
 				true,
 			))
-		}, pk)
-		return true
+		})
 	case *packet.AddActor:
 		if pk.EntityRuntimeID == p.rid {
 			// We are the player.
 			return false
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
 				game.Vec32To64(pk.Position),
 				game.Vec32To64(pk.Velocity),
 				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
 				false,
 			))
-		}, pk)
-		return true
+		})
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.rid {
 			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
-			if p.combatMode == utils.ModeSemiAuthoritative {
-				p.queuedLocationPackets = append(p.queuedLocationPackets, pk)
-				return true
-			}
 			return false
 		}
 
@@ -223,17 +217,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.Teleport(pk.Position, true)
-		}, pk)
-		return true
+		})
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.rid {
 			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
-			if p.combatMode == utils.ModeSemiAuthoritative {
-				p.queuedLocationPackets = append(p.queuedLocationPackets, pk)
-				return true
-			}
 			return false
 		}
 
@@ -248,10 +237,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.Teleport(pk.Position, true)
-		}, pk)
-		return true
+		})
 	case *packet.SetActorData:
 		pk.Tick = 0 // prevent rewind from causing weird behavior client-side
 
@@ -259,7 +247,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.lastSentActorData = pk
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
 
@@ -283,22 +271,19 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
 				p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
 			}
-		}, pk)
-		return true
+		})
 	case *packet.SetPlayerGameType:
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType
-		}, pk)
-		return true
+		})
 	case *packet.RemoveActor:
 		if pk.EntityUniqueID == p.uid {
 			return false
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.RemoveEntity(uint64(pk.EntityUniqueID))
-		}, pk)
-		return true
+		})
 	case *packet.UpdateAttributes:
 		pk.Tick = 0 // prevent any rewind from being done to prevent shit-fuckery with incorrect movement
 		if pk.EntityRuntimeID != p.rid {
@@ -306,7 +291,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 
 		p.lastSentAttributes = pk
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			for _, a := range pk.Attributes {
 				if a.Name == "minecraft:health" && a.Value <= 0 {
 					p.isSyncedWithServer = false
@@ -315,8 +300,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 					p.mInfo.Speed = float64(a.Value)
 				}
 			}
-		}, pk)
-		return true
+		})
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID != p.rid {
 			return false
@@ -334,10 +318,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 		// does take knockback when it recieves it.
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.mInfo.UpdateServerSentVelocity(velocity)
-		}, pk)
-		return true
+		})
 	case *packet.LevelChunk:
 		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
@@ -404,16 +387,15 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
-		}, pk)
-		return true
+		})
 	case *packet.MobEffect:
 		if pk.EntityRuntimeID != p.rid {
 			return false
 		}
 
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			switch pk.Operation {
 			case packet.MobEffectAdd, packet.MobEffectModify:
 				if t, ok := effect.ByID(int(pk.EffectType)); ok {
@@ -425,22 +407,19 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			case packet.MobEffectRemove:
 				p.RemoveEffect(pk.EffectType)
 			}
-		}, pk)
-		return true
+		})
 	case *packet.UpdateAbilities:
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			for _, l := range pk.AbilityData.Layers {
 				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
 				p.mInfo.CanFly = utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
 			}
-		}, pk)
-		return true
+		})
 	case *packet.ChangeDimension:
 		p.ready = false
-		p.GroupedAcknowledgement(func() {
+		p.Acknowledgement(func() {
 			p.ready = true
-		}, pk)
-
+		})
 	}
 	return false
 }
