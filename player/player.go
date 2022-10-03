@@ -44,6 +44,7 @@ type Player struct {
 	acks  *Acknowledgements
 
 	clientTick, clientFrame, serverTick atomic.Uint64
+	lastServerTicked                    time.Time
 
 	hMutex sync.RWMutex
 	h      Handler
@@ -246,6 +247,11 @@ func (p *Player) ServerTick() uint64 {
 	return p.serverTick.Load()
 }
 
+// ServerTickingStable will return true if the ticking goroutine has ticked within the past 50 milliseconds.
+func (p *Player) ServerTickingStable() bool {
+	return time.Since(p.lastServerTicked).Milliseconds() <= 50
+}
+
 // ClientTick returns the current client tick. This is measured by the amount of PlayerAuthInput packets the
 // client has sent. (since the packet is sent every client tick)
 func (p *Player) ClientTick() uint64 {
@@ -337,8 +343,13 @@ func (p *Player) GroupedAcknowledgement(f func(), pk packet.Packet) {
 		t *= -1
 	}
 
-	_ = p.conn.WritePacket(pk)
-	_ = p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
+	// <- if conn flushes here no problem
+	p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t, NeedsResponse: true})
+	// <- if conn flushes here then the second ack is reliable
+	p.conn.WritePacket(pk)
+	// <- if conn flushes here then the first ack is reliable
+	p.conn.WritePacket(&packet.NetworkStackLatency{Timestamp: t + 69000, NeedsResponse: true})
+	// <- if conn flushes here no problem
 
 	if p.ClientData().DeviceOS == protocol.DeviceNX {
 		t /= 1000 // PS4 clients divide the timestamp by 1000 when sending it back
@@ -596,6 +607,8 @@ func (p *Player) Handle(h Handler) {
 func (p *Player) startTicking() {
 	t := time.NewTicker(time.Second / 20)
 	defer t.Stop()
+
+	p.lastServerTicked = time.Now()
 	for {
 		select {
 		case <-p.c:
@@ -680,7 +693,9 @@ func (p *Player) startTicking() {
 				})
 			}
 
-			p.serverTick.Inc()
+			delta := time.Since(p.lastServerTicked).Milliseconds()
+			p.lastServerTicked = time.Now()
+			p.serverTick.Add(uint64(delta / 50))
 		}
 	}
 }
