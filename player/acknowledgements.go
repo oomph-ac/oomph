@@ -46,6 +46,10 @@ func (a *Acknowledgements) Refresh() {
 
 // Create creats a new acknowledgement packet and returns it.
 func (a *Acknowledgements) Create() *packet.NetworkStackLatency {
+	if len(a.AcknowledgeMap[a.CurrentTimestamp]) == 0 {
+		return nil
+	}
+
 	return &packet.NetworkStackLatency{
 		Timestamp:     a.CurrentTimestamp,
 		NeedsResponse: true,
