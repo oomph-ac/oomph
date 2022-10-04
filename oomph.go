@@ -78,7 +78,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.RewindHistorySize = 60
 	data.PlayerMovementSettings.ServerAuthoritativeBlockBreaking = false
 
-	ready := make(chan struct{})
+	finished := make(chan struct{})
 	go func() {
 		t := time.NewTicker(time.Second / 20)
 		defer t.Stop()
@@ -86,7 +86,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			select {
 			case <-t.C:
 				serverConn.Flush()
-			case <-ready:
+			case <-finished:
 				return
 			}
 		}
@@ -96,19 +96,21 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	g.Add(2)
 	go func() {
 		if err := conn.StartGame(data); err != nil {
+			finished <- struct{}{}
 			return
 		}
 		g.Done()
 	}()
 	go func() {
 		if err := serverConn.DoSpawn(); err != nil {
+			finished <- struct{}{}
 			return
 		}
 		g.Done()
 	}()
 	g.Wait()
 
-	ready <- struct{}{}
+	finished <- struct{}{}
 
 	p := player.NewPlayer(o.log, conn, serverConn)
 	p.MovementInfo().ServerPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
