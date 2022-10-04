@@ -581,59 +581,64 @@ func (p *Player) flushConns() {
 	p.ackMu.Unlock()
 }
 
-func (p *Player) ackEntityPositions() {
+// tickEntitiesPos ticks the position of all entities
+func (p *Player) tickEntitiesPos() {
+	p.entityMu.Lock()
+	for _, e := range p.entities {
+		e.TickPosition(p.serverTick.Load())
+	}
+	p.entityMu.Unlock()
+}
+
+// ackEntityPos prepares to acknowledge the position of all entities in the queue.
+func (p *Player) ackEntitiesPos() {
+	defer func() {
+		p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+		p.queueMu.Unlock()
+	}()
+	p.queueMu.Lock()
+
 	// If there's a position for the entity sent by the server, we will update the server position
 	// of the entity to the position sent. This position is not one of the rewinded positions, but
 	// rather the position sent by the server that will be interpolated later by e.TickPosition().
-	p.queueMu.Lock()
 	if p.combatMode == utils.ModeFullAuthoritative {
 		for rid, dat := range p.queuedEntityLocations {
 			if e, valid := p.SearchEntity(rid); valid {
 				e.UpdatePosition(dat, e.Player())
 			}
 		}
-		p.queuedEntityLocations = make(map[uint64]utils.LocationData)
-	} else {
-		queue := p.queuedEntityLocations
-		p.Acknowledgement(func() {
-			for rid, dat := range queue {
-				if e, valid := p.SearchEntity(rid); valid {
-					e.UpdatePosition(dat, e.Player())
-				}
-			}
-		})
-		p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+		return
 	}
-	p.queueMu.Unlock()
+
+	queue := p.queuedEntityLocations
+	p.Acknowledgement(func() {
+		for rid, dat := range queue {
+			if e, valid := p.SearchEntity(rid); valid {
+				e.UpdatePosition(dat, e.Player())
+			}
+		}
+	})
 }
 
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
-	t := time.NewTicker(time.Second / 100)
+	t := time.NewTicker(time.Second / 20)
 	defer t.Stop()
 
-	rT := uint64(0)
 	p.lastServerTicked = time.Now()
 	for {
 		select {
 		case <-p.c:
 			return
 		case <-t.C:
-			rT++
-			p.ackEntityPositions()
-			if rT%5 != 0 {
-				p.flushConns()
-				continue
-			}
+			// This will prepare the entity positions to be acknowledged.
+			p.ackEntitiesPos()
 
-			// This code ticks positions for entities, this is used for the rewind combat system, so that we
-			// can rewind back in time to what the client sees.
+			// This code ticks positions for entities on server tick, this is used for the rewind combat system, so that we
+			// can rewind back in time to what the client sees. Of course, this is not 100% accurate to what the client sees due
+			// to extra interpolation code in the client, but it should be close enough.
 			if p.combatMode == utils.ModeFullAuthoritative {
-				p.entityMu.Lock()
-				for _, e := range p.entities {
-					e.TickPosition(p.serverTick.Load())
-				}
-				p.entityMu.Unlock()
+				p.tickEntitiesPos()
 			}
 
 			// If the player is not responding to acknowledgements, we have to kick them to prevent
