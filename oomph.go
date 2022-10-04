@@ -3,7 +3,6 @@ package oomph
 import (
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/oomph-ac/oomph/utils"
 
@@ -78,43 +77,26 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.RewindHistorySize = 60
 	data.PlayerMovementSettings.ServerAuthoritativeBlockBreaking = false
 
-	finished := make(chan struct{})
-	go func() {
-		t := time.NewTicker(time.Second / 20)
-		defer t.Stop()
-		for {
-			select {
-			case <-t.C:
-				serverConn.Flush()
-			case <-finished:
-				return
-			}
-		}
-	}()
+	p := player.NewPlayer(o.log, conn, serverConn)
+	p.MovementInfo().ServerPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
+	p.MovementInfo().ServerMovement = mgl64.Vec3{0, -0.0784, 0}
 
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
 		if err := conn.StartGame(data); err != nil {
-			finished <- struct{}{}
 			return
 		}
 		g.Done()
 	}()
 	go func() {
 		if err := serverConn.DoSpawn(); err != nil {
-			finished <- struct{}{}
 			return
 		}
 		g.Done()
 	}()
 	g.Wait()
 
-	finished <- struct{}{}
-
-	p := player.NewPlayer(o.log, conn, serverConn)
-	p.MovementInfo().ServerPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
-	p.MovementInfo().ServerMovement = mgl64.Vec3{0, -0.0784, 0}
 	o.players <- p
 
 	g.Add(2)
