@@ -76,11 +76,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if p.combatMode == utils.ModeFullAuthoritative {
 			p.validateCombat()
 		} else {
-			p.entityMu.Lock()
-			for _, e := range p.entities {
-				e.TickPosition(p.serverTick.Load())
-			}
-			p.entityMu.Unlock()
+			p.tickEntitiesPos()
 		}
 
 		if p.acks != nil {
