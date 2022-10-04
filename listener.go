@@ -23,6 +23,7 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 			ResourcePacks:        conf.Resources,
 			TexturePacksRequired: requirePacks,
 			AcceptedProtocols:    protocols,
+			FlushRate:            -1,
 		}.Listen("raknet", o.addr)
 		if err != nil {
 			return nil, err

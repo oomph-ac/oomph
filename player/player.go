@@ -566,40 +566,65 @@ func (p *Player) Handle(h Handler) {
 	p.h = h
 }
 
+func (p *Player) flushConns() {
+	p.ackMu.Lock()
+	if pk := p.acks.Create(); pk != nil {
+		p.conn.WritePacket(pk)
+	}
+
+	p.conn.Flush()
+	if p.serverConn != nil {
+		p.serverConn.Flush()
+	}
+
+	p.acks.Refresh()
+	p.ackMu.Unlock()
+}
+
+func (p *Player) ackEntityPositions() {
+	// If there's a position for the entity sent by the server, we will update the server position
+	// of the entity to the position sent. This position is not one of the rewinded positions, but
+	// rather the position sent by the server that will be interpolated later by e.TickPosition().
+	p.queueMu.Lock()
+	if p.combatMode == utils.ModeFullAuthoritative {
+		for rid, dat := range p.queuedEntityLocations {
+			if e, valid := p.SearchEntity(rid); valid {
+				e.UpdatePosition(dat, e.Player())
+			}
+		}
+		p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+	} else {
+		queue := p.queuedEntityLocations
+		p.Acknowledgement(func() {
+			for rid, dat := range queue {
+				if e, valid := p.SearchEntity(rid); valid {
+					e.UpdatePosition(dat, e.Player())
+				}
+			}
+		})
+		p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+	}
+	p.queueMu.Unlock()
+}
+
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
-	t := time.NewTicker(time.Second / 20)
+	t := time.NewTicker(time.Second / 100)
 	defer t.Stop()
 
+	rT := uint64(0)
 	p.lastServerTicked = time.Now()
 	for {
 		select {
 		case <-p.c:
 			return
 		case <-t.C:
-			// If there's a position for the entity sent by the server, we will update the server position
-			// of the entity to the position sent. This position is not one of the rewinded positions, but
-			// rather the position sent by the server that will be interpolated later by e.TickPosition().
-			p.queueMu.Lock()
-			if p.combatMode == utils.ModeFullAuthoritative {
-				for rid, dat := range p.queuedEntityLocations {
-					if e, valid := p.SearchEntity(rid); valid {
-						e.UpdatePosition(dat, e.Player())
-					}
-				}
-				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
-			} else {
-				queue := p.queuedEntityLocations
-				p.Acknowledgement(func() {
-					for rid, dat := range queue {
-						if e, valid := p.SearchEntity(rid); valid {
-							e.UpdatePosition(dat, e.Player())
-						}
-					}
-				})
-				p.queuedEntityLocations = make(map[uint64]utils.LocationData)
+			rT++
+			p.ackEntityPositions()
+			if rT%5 != 0 {
+				p.flushConns()
+				continue
 			}
-			p.queueMu.Unlock()
 
 			// This code ticks positions for entities, this is used for the rewind combat system, so that we
 			// can rewind back in time to what the client sees.
@@ -650,16 +675,7 @@ func (p *Player) startTicking() {
 				})
 			}
 
-			p.ackMu.Lock()
-			p.conn.WritePacket(p.acks.Create())
-
-			p.conn.Flush()
-			if p.serverConn != nil {
-				p.serverConn.Flush()
-			}
-
-			p.acks.Refresh()
-			p.ackMu.Unlock()
+			p.flushConns()
 
 			p.lastServerTicked = time.Now()
 			p.serverTick.Inc()
