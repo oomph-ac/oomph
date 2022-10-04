@@ -622,15 +622,22 @@ func (p *Player) ackEntitiesPos() {
 
 // startTicking ticks the player until the connection is closed.
 func (p *Player) startTicking() {
-	t := time.NewTicker(time.Second / 20)
+	t := time.NewTicker(time.Second / 1000)
 	defer t.Stop()
 
+	rT := 0
 	p.lastServerTicked = time.Now()
 	for {
 		select {
 		case <-p.c:
 			return
 		case <-t.C:
+			rT++
+			if rT%50 != 0 {
+				p.ackEntitiesPos()
+				p.flushConns()
+				continue
+			}
 			// This will prepare the entity positions to be acknowledged.
 			p.ackEntitiesPos()
 
