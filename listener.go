@@ -17,6 +17,7 @@ type listener struct {
 
 // Listen adds the oomph listener in the server config, this should be used instead of Start() for dragonfly servers.
 func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.Protocol, requirePacks bool) {
+	conf.Listeners = nil
 	conf.Listeners = append(conf.Listeners, func(_ server.Config) (server.Listener, error) {
 		l, err := minecraft.ListenConfig{
 			StatusProvider:       minecraft.NewStatusProvider(name),
