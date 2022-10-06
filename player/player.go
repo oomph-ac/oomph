@@ -682,8 +682,14 @@ func (p *Player) startTicking() {
 
 			p.flushConns()
 
+			delta := time.Since(p.lastServerTicked).Milliseconds()
 			p.lastServerTicked = time.Now()
-			p.serverTick.Inc()
+
+			if delta > 50 {
+				p.serverTick.Add(uint64(delta / 50))
+			} else {
+				p.serverTick.Inc()
+			}
 		}
 	}
 }

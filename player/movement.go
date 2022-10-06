@@ -63,7 +63,7 @@ func (p *Player) validateMovement() {
 // (determined by the people that made the rewind system) - in which case movement corrections will not work properly.
 func (p *Player) correctMovement() {
 	// Do not correct player movement if the movement mode is not fully server authoritative because it can lead to issues.
-	if p.movementMode == utils.ModeSemiAuthoritative {
+	if p.movementMode != utils.ModeFullAuthoritative {
 		return
 	}
 
