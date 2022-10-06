@@ -48,10 +48,10 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 	xDiff, zDiff := math.Abs(xKb-p.ClientMovement()[0]), math.Abs(zKb-p.ClientMovement()[2])
 	pct := (math.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math.Hypot(xKb, zKb)) * 100
 
-	threshold := 1e-4
-	if p.OnGround() {
+	threshold := 5e-4
+	/* if p.OnGround() {
 		threshold = 6e-3
-	}
+	} */
 
 	if xDiff <= threshold && zDiff <= threshold {
 		v.violations = math.Max(0, v.violations-0.2)
