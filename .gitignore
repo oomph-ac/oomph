@@ -4,3 +4,4 @@ token.tok
 tests/*
 players/*
 world/*
+.DS_Store
