@@ -1,6 +1,8 @@
 package check
 
 import (
+	"math"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -26,7 +28,7 @@ func (*TimerA) Description() string {
 
 // MaxViolations ...
 func (*TimerA) MaxViolations() float64 {
-	return 1
+	return math.MaxFloat64
 }
 
 // Process ...
