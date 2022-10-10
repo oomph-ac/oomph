@@ -1,6 +1,10 @@
 package check
 
-import "github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+import (
+	"math"
+
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+)
 
 type InvalidA struct {
 	lastFrame uint64
@@ -23,7 +27,7 @@ func (*InvalidA) Description() string {
 
 // MaxViolations ...
 func (*InvalidA) MaxViolations() float64 {
-	return 1
+	return math.MaxFloat64
 }
 
 func (a *InvalidA) Process(p Processor, pk packet.Packet) bool {
