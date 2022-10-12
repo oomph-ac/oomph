@@ -237,7 +237,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.Teleport(pk.Position, true)
 		})
 	case *packet.SetActorData:
-		pk.Tick = 0 // prevent rewind from causing weird behavior client-side
+		pk.Tick = 0 // prevent rewind from happening
 
 		if pk.EntityRuntimeID == p.rid {
 			p.lastSentActorData = pk
@@ -281,7 +281,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.RemoveEntity(uint64(pk.EntityUniqueID))
 		})
 	case *packet.UpdateAttributes:
-		pk.Tick = 0 // prevent any rewind from being done to prevent shit-fuckery with incorrect movement
+		pk.Tick = 0 // prevent any rewind from being done
 		if pk.EntityRuntimeID != p.rid {
 			return false
 		}
@@ -304,10 +304,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		velocity := game.Vec32To64(pk.Velocity)
 
+		// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
+		// of the player instead of waiting for an acknowledgement. This will ensure that players
+		// with very high latency do not get a significant advantage due to them receiving knockback late.
 		if p.movementMode == utils.ModeFullAuthoritative && int64(p.serverTick.Load())-int64(p.clientTick.Load()) >= 5 {
-			// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
-			// of the player instead of waiting for an acknowledgement. This will ensure that players
-			// with very high latency do not get a significant advantage due to them receiving knockback late.
 			p.mInfo.UpdateServerSentVelocity(velocity)
 			return false
 		}
@@ -373,6 +373,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.ChunkRadiusUpdated:
 		p.chunkRadius = int(pk.ChunkRadius) + 4
 	case *packet.UpdateBlock:
+		if p.movementMode == utils.ModeClientAuthoritative {
+			return false
+		}
+
 		b, ok := world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if !ok {
 			return false
