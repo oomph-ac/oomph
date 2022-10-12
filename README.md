@@ -12,58 +12,56 @@ specific one.
 Oomph can be used in direct mode with dragonfly. This means it runs directly on a dragonfly server 
 and connections are server -> client instead of server -> proxy -> client.
 ```go
-srv := server.New(&config.Config, logger)
-srv.SetName("Velvet")
-srv.CloseOnProgramEnd()
-if err := srv.Start(); err != nil {
-    logger.Fatalln(err)
+config, err := readConfig(log)
+if err != nil {
+    panic(err)
 }
 
-// AntiCheat start
+// Anti-cheat start
 if config.Oomph.Enabled {
+    ac := oomph.New(log, ":19132")
+    ac.Listen(&config, config.Name, []minecraft.Protocol{}, false)
     go func() {
-        ac := oomph.New(logger, config.Oomph.Address)
-        if err := ac.Listen(srv, config.Server.Name, config.Resources.Required); err != nil {
-            panic(err)
-        }
         for {
             p, err := ac.Accept()
             if err != nil {
                 return
             }
-            p.Handle(newOomphHandler(p)) // Handle flags and punishments
+            p.SetCombatMode(2)
+            p.SetMovementMode(2)
         }
     }()
 }
-// AntiCheat end
 
-for srv.Accept(nil) {
-}
+srv := config.New()
+srv.CloseOnProgramEnd()
+srv.Listen()
 ```
 
 ## Usage (Proxy)
 If you aren't using Dragonfly you'll have to use Oomph as a proxy.
 ```go
-go func() {
-    // 19132 is the port that players will connect to
-    ac := oomph.New(logger, ":19132")
-    // Start oomph in another go routine so you can handle players while it accepts.
-    go func(){
-        // 6969 is the port that the main server is running on, Oomph will redirect players to this address.
-        if err := ac.Start(":6969", config.Resources.Folder, config.Resources.Required); err != nil {
-            panic(err)
-        }
-    }()
+// 19132 is the port that players will connect to
+ac := oomph.New(logger, ":19132")
+// Accept oomph connections in another goroutine.
+go func(){
     for {
         p, err := ac.Accept()
         if err != nil {
             return
         }
-        p.Handle(newOomphHandler(p)) // Handle flags and punishments
-    }
+        p.Handle(newOomphHandler(p)) // The oomph handler can handle flags and punishments
+    } 
 }()
+
+// 6969 is the port that the main server is running on, Oomph will redirect players to this address.
+if err := ac.Start(":6969", config.Resources.Folder, []minecraft.Protocol{}, config.Resources.Required); err != nil {
+    panic(err)
+}
 ```
 
 ## Credits
-Oomph is heavily influenced by [esoteric](https://github.com/ethaniccc/Esoteric) and [lumine](https://github.com/ethaniccc/Lumine).
-thank you, ethaniccc for providing us with these!!!
+Oomph is heavily influenced by [Esoteric](https://github.com/ethaniccc/Esoteric) and [Lumine](https://github.com/ethaniccc/Lumine).
+Thanks, ethaniccc!
+
+you're welcome Lolz thx for making base of oomph Tal -ethan
