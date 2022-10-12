@@ -11,7 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolationInterations float64 = 8
+const interpolationIterations float64 = 8
 
 type ReachA struct {
 	attackData                *protocol.UseItemOnEntityTransactionData
@@ -80,8 +80,8 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		bbDist, entPos, dPos := 6969.0, r.lastEntPos, r.currentEntPos.Sub(r.lastEntPos).Mul(1.0/interpolationInterations)
-		for i := 0.0; i < interpolationInterations; i++ {
+		bbDist, entPos, dPos := 6969.0, r.lastEntPos, r.currentEntPos.Sub(r.lastEntPos).Mul(1.0/interpolationIterations)
+		for i := 0.0; i < interpolationIterations; i++ {
 			if i != 0 {
 				entPos = entPos.Add(dPos)
 			}
@@ -110,15 +110,15 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		minDist, valid := 6969.0, false
 		distAvg, totalHits := 0.0, 0.0
 		rot := game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
-		dRot := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X()).Sub(rot).Mul(1.0 / interpolationInterations)
+		dRot := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X()).Sub(rot).Mul(1.0 / interpolationIterations)
 		entPos = r.lastEntPos
 
-		for i := 0.0; i < interpolationInterations; i++ {
+		for i := 0.0; i < interpolationIterations; i++ {
 			if i != 0 {
 				entPos = entPos.Add(dPos)
 			}
 
-			for x := 0.0; x < interpolationInterations; x++ {
+			for x := 0.0; x < interpolationIterations; x++ {
 				if x != 0 {
 					rot = rot.Add(dRot)
 				}
