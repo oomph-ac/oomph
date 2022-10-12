@@ -5,3 +5,4 @@ tests/*
 players/*
 world/*
 .DS_Store
+.fleet/
