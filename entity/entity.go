@@ -106,7 +106,15 @@ func (e *Entity) UpdatePosition(dat utils.LocationData, offset bool) {
 
 	e.serverPosition = dat.Position
 	e.onGround = dat.OnGround
-	e.newPosRotationIncrements = 3
+
+	if dat.Teleport {
+		e.ResetTeleportationTicks()
+		e.newPosRotationIncrements = 1
+	} else {
+		e.IncrementTeleportationTicks()
+		e.newPosRotationIncrements = 3
+	}
+
 	if offset {
 		e.serverPosition[1] -= 1.62
 	}
