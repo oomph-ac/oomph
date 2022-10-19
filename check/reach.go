@@ -57,8 +57,16 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return true
 		}
 
+		if p.Teleporting() {
+			return false
+		}
+
 		e, ok := p.SearchEntity(d.TargetEntityRuntimeID)
 		if !ok {
+			return false
+		}
+
+		if e.TeleportationTicks() <= 30 {
 			return false
 		}
 

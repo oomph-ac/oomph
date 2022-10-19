@@ -45,8 +45,11 @@ func (t *TimerB) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	currentTime := p.ServerTick()
-	if t.lastTime == 0 {
+	defer func() {
 		t.lastTime = currentTime
+	}()
+
+	if t.lastTime == 0 {
 		return false
 	}
 
@@ -59,7 +62,6 @@ func (t *TimerB) Process(p Processor, pk packet.Packet) bool {
 		p.Flag(t, 1, map[string]any{"Balance": t.balance})
 		t.balance = 0
 	}
-	t.lastTime = currentTime
 
 	return false
 }

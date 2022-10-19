@@ -205,7 +205,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		})
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.rid {
-			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
+			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 			return false
 		}
 
@@ -218,7 +218,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		})
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.rid {
-			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.OnGround)
+			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.Mode == packet.MoveModeTeleport, pk.OnGround)
 			return false
 		}
 
@@ -237,7 +237,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.Teleport(pk.Position, true)
 		})
 	case *packet.SetActorData:
-		pk.Tick = 0 // prevent rewind from happening
+		pk.Tick = p.ClientFrame() // prevent rewind from happening
 
 		if pk.EntityRuntimeID == p.rid {
 			p.lastSentActorData = pk

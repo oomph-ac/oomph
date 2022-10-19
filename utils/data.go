@@ -14,4 +14,5 @@ type LocationData struct {
 	Tick     uint64
 	Position mgl64.Vec3
 	OnGround bool
+	Teleport bool
 }
