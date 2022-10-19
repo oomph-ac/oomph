@@ -44,17 +44,24 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	xKb, zKb := p.OldServerMovement()[0], p.OldServerMovement()[2]
+	if xKb < 0.001 && zKb < 0.001 {
+		return false
+	}
 
 	xDiff, zDiff := math.Abs(xKb-p.ClientMovement()[0]), math.Abs(zKb-p.ClientMovement()[2])
 	pct := (math.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math.Hypot(xKb, zKb)) * 100
-
 	threshold := 5e-4
-	/* if p.OnGround() {
-		threshold = 6e-3
-	} */
 
 	if xDiff <= threshold && zDiff <= threshold {
 		v.violations = math.Max(0, v.violations-0.2)
+		v.Buff(-3)
+		return false
+	}
+
+	// TODO: *This* velocity check can sometimes false for some reason. The root cause right now is still
+	// unknown - but a buffer should do for now until I can investigate further. The vertical velocity
+	// detection (A) does not false afaik.
+	if v.Buff(1, 8) < 6 {
 		return false
 	}
 

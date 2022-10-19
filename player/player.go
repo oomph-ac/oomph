@@ -220,7 +220,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 }
 
 // MoveEntity moves an entity to the given position.
-func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, ground bool) {
+func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, teleport bool, ground bool) {
 	// If the entity exists, we can queue the location for an update.
 	if _, ok := p.SearchEntity(rid); ok {
 		p.queueMu.Lock()
@@ -228,6 +228,7 @@ func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, ground bool) {
 			Tick:     p.serverTick.Load(),
 			Position: pos,
 			OnGround: ground,
+			Teleport: teleport,
 		}
 		p.queueMu.Unlock()
 	}
@@ -569,12 +570,15 @@ func (p *Player) Handle(h Handler) {
 func (p *Player) flushConns() {
 	p.ackMu.Lock()
 	if pk := p.acks.Create(); pk != nil {
+		if p.ClientData().DeviceOS == protocol.DeviceNX {
+			pk.Timestamp /= 1000
+		}
 		p.conn.WritePacket(pk)
 	}
 
-	p.conn.Flush()
+	go p.conn.Flush()
 	if p.serverConn != nil {
-		p.serverConn.Flush()
+		go p.serverConn.Flush()
 	}
 
 	p.acks.Refresh()
