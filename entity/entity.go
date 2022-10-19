@@ -108,10 +108,10 @@ func (e *Entity) UpdatePosition(dat utils.LocationData, offset bool) {
 	e.onGround = dat.OnGround
 
 	if dat.Teleport {
-		e.ResetTeleportationTicks()
+		e.teleportTicks = 0
 		e.newPosRotationIncrements = 1
 	} else {
-		e.IncrementTeleportationTicks()
+		e.teleportTicks++
 		e.newPosRotationIncrements = 3
 	}
 
