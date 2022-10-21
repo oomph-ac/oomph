@@ -58,7 +58,7 @@ func (t *TimerB) Process(p Processor, pk packet.Packet) bool {
 
 	// The time difference should be one (tick), so we subtract one from the time difference and add it to the balance.
 	t.balance += int64(timeDiff) - 1
-	if t.balance == -5 {
+	if t.balance == -5 && p.ServerTicked() {
 		p.Flag(t, 1, map[string]any{"Balance": t.balance})
 		t.balance = 0
 	}

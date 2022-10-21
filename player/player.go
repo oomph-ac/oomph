@@ -42,6 +42,9 @@ type Player struct {
 	ackMu sync.Mutex
 	acks  *Acknowledgements
 
+	clientPks, svrPks   []packet.Packet
+	clientPkMu, svrPkMu sync.Mutex
+
 	clientTick, clientFrame, serverTick atomic.Uint64
 	lastServerTicked                    time.Time
 
@@ -219,6 +222,19 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	p.mInfo.ServerPosition = game.Vec32To64(pos)
 }
 
+func (p *Player) QueuePacket(pk packet.Packet, client bool) {
+	if client {
+		p.clientPkMu.Lock()
+		p.clientPks = append(p.clientPks, pk)
+		p.clientPkMu.Unlock()
+		return
+	}
+
+	p.svrPkMu.Lock()
+	p.svrPks = append(p.svrPks, pk)
+	p.svrPkMu.Unlock()
+}
+
 // MoveEntity moves an entity to the given position.
 func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, teleport bool, ground bool) {
 	// If the entity exists, we can queue the location for an update.
@@ -249,8 +265,8 @@ func (p *Player) ServerTick() uint64 {
 	return p.serverTick.Load()
 }
 
-// ServerTickingStable will return true if the ticking goroutine has ticked within the past 50 milliseconds.
-func (p *Player) ServerTickingStable() bool {
+// ServerTicked will return true if the ticking goroutine has ticked within the past 50 milliseconds.
+func (p *Player) ServerTicked() bool {
 	return time.Since(p.lastServerTicked).Milliseconds() <= 50
 }
 
@@ -594,7 +610,7 @@ func (p *Player) tickEntitiesPos() {
 	p.entityMu.Unlock()
 }
 
-// ackEntityPos prepares to acknowledge the position of all entities in the queue.
+// ackEntitiesPos prepares to acknowledge the position of all entities in the queue.
 func (p *Player) ackEntitiesPos() {
 	defer func() {
 		p.queuedEntityLocations = make(map[uint64]utils.LocationData)
@@ -635,6 +651,20 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
+			/* p.clientPkMu.Lock()
+			for _, cpk := range p.clientPks {
+				p.ClientProcess(cpk)
+			}
+			p.clientPks = nil
+			p.clientPkMu.Unlock()
+
+			p.svrPkMu.Lock()
+			for _, spk := range p.svrPks {
+				p.ServerProcess(spk)
+			}
+			p.svrPks = nil
+			p.svrPkMu.Unlock() */
+
 			// This will prepare the entity positions to be acknowledged.
 			p.ackEntitiesPos()
 
