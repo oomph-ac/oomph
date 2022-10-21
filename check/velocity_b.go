@@ -48,11 +48,9 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	xDiff, zDiff := math.Abs(xKb-p.ClientMovement()[0]), math.Abs(zKb-p.ClientMovement()[2])
 	pct := (math.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math.Hypot(xKb, zKb)) * 100
-	threshold := 5e-4
 
-	if xDiff <= threshold && zDiff <= threshold {
+	if math.Abs(100.0-pct) <= 0.01 {
 		v.violations = math.Max(0, v.violations-0.2)
 		v.Buff(-3)
 		return false
@@ -66,9 +64,7 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
-		"pct":   fmt.Sprint(game.Round(pct, 4), "%"),
-		"xDiff": game.Round(xDiff, 4),
-		"zDiff": game.Round(zDiff, 4),
+		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
 	})
 
 	return false

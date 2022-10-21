@@ -237,7 +237,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.Teleport(pk.Position, true)
 		})
 	case *packet.SetActorData:
-		pk.Tick = p.ClientFrame() // prevent rewind from happening
+		pk.Tick = 0 // prevent rewind from happening
 
 		if pk.EntityRuntimeID == p.rid {
 			p.lastSentActorData = pk

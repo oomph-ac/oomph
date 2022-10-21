@@ -40,7 +40,7 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) bool {
 
 	// The check cannot be run at this point in time because the client has not recieved
 	// a sync yet from the server.
-	if !p.IsSyncedWithServer() || !p.ServerTickingStable() {
+	if !p.IsSyncedWithServer() || !p.ServerTicked() {
 		return false
 	}
 

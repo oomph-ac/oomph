@@ -11,7 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolationIterations float64 = 8
+const interpolationIterations float64 = 10
 
 type ReachA struct {
 	attackData                *protocol.UseItemOnEntityTransactionData
@@ -115,6 +115,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
+		// As of now, minDist is only here if I feel as if it's needed in the future of this check.
 		minDist, valid := 6969.0, false
 		distAvg, totalHits := 0.0, 0.0
 		rot := game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
@@ -126,8 +127,8 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 				entPos = entPos.Add(dPos)
 			}
 
-			for x := 0.0; x < interpolationIterations; x++ {
-				if x != 0 {
+			for j := 0.0; j < interpolationIterations; j++ {
+				if j != 0 {
 					rot = rot.Add(dRot)
 				}
 				bb := e.AABB().Translate(entPos).Grow(0.1)
@@ -138,11 +139,17 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 
 				valid = true
 				dist := result.Position().Sub(attackPos).Len()
-				distAvg += dist
-				totalHits++
+				if dist > 7 { // This shouldn't be possible since we're only traversing 7 blocks.
+					valid = false
+					continue
+				}
+
 				if minDist > dist {
 					minDist = dist
 				}
+
+				totalHits++
+				distAvg += dist
 			}
 		}
 
@@ -157,6 +164,49 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 		r.Buff(-0.025, 5)
+
+		distAvg /= totalHits
+		if distAvg <= 3.0001 {
+			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.0075)
+			r.violations = math.Max(0, r.violations-0.0015)
+			return false
+		}
+
+		// There could be something wrong with our position by one tick, so we'll also
+		// account for that and check if the distance is still over ~3 blocks.
+		entPos = e.LastPosition()
+		dPos = e.Position().Sub(entPos).Mul(1.0 / interpolationIterations)
+		rot = game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
+		totalHits = 0.0
+		distAvg = 0.0
+		for x := 0.0; x < interpolationIterations; x++ {
+			if x != 0 {
+				entPos = entPos.Add(dPos)
+			}
+
+			for y := 0.0; y < interpolationIterations; y++ {
+				if y != 0 {
+					rot = rot.Add(dRot)
+				}
+				bb := e.AABB().Translate(entPos).Grow(0.1)
+				result, ok := trace.BBoxIntercept(bb, attackPos, attackPos.Add(rot.Mul(7.0)))
+				if !ok {
+					continue
+				}
+
+				dist := result.Position().Sub(attackPos).Len()
+				if dist > 7 { // This shouldn't be possible since we're only traversing 7 blocks.
+					continue
+				}
+
+				if minDist > dist {
+					minDist = dist
+				}
+
+				totalHits++
+				distAvg += dist
+			}
+		}
 
 		distAvg /= totalHits
 		if distAvg <= 3.0001 {

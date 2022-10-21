@@ -11,8 +11,8 @@ import (
 type Processor interface {
 	// ServerTick returns the current "server" tick of the processor.
 	ServerTick() uint64
-	// ServerTickingStable will return true if the ticking goroutine has ticked within the past 50 milliseconds.
-	ServerTickingStable() bool
+	// ServerTicked will return true if the ticking goroutine has ticked within the past 50 milliseconds.
+	ServerTicked() bool
 	// ClientTick returns the current client tick of the processor
 	ClientTick() uint64
 	// ClientFrame returns the current simulation frame of the processor.
