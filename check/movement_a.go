@@ -8,27 +8,27 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-type MovemntA struct {
+type MovementA struct {
 	basic
 }
 
-func NewMovementA() *MovemntA {
-	return &MovemntA{}
+func NewMovementA() *MovementA {
+	return &MovementA{}
 }
 
-func (*MovemntA) Name() (string, string) {
+func (*MovementA) Name() (string, string) {
 	return "Movement", "A"
 }
 
-func (*MovemntA) Description() string {
+func (*MovementA) Description() string {
 	return "This checks if a player's vertical movement is invalid."
 }
 
-func (*MovemntA) MaxViolations() float64 {
-	return math.MaxInt64
+func (*MovementA) MaxViolations() float64 {
+	return 30
 }
 
-func (m *MovemntA) Process(p Processor, pk packet.Packet) bool {
+func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
 	i, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return false
@@ -41,7 +41,7 @@ func (m *MovemntA) Process(p Processor, pk packet.Packet) bool {
 	diff := i.Delta[1] - float32(p.ServerMovement()[1])
 	if game.AbsFloat32(diff) < 0.01 {
 		m.Buff(-0.5, 6)
-		m.violations = math.Max(0, m.violations-0.25)
+		m.violations = math.Max(0, m.violations-0.5)
 		return false
 	}
 

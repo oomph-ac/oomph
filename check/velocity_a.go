@@ -58,6 +58,8 @@ func (v *VelocityA) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
+	p.SendOomphDebug(fmt.Sprint("got: ", p.ClientMovement()[1], " expected: ", v.knockback, " diff: ", diff, " pct: ", pct))
+
 	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
 		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
 	})
