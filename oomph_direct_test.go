@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/df-mc/dragonfly/server/entity/healing"
+	"github.com/df-mc/dragonfly/server/entity"
 	"github.com/df-mc/dragonfly/server/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 
@@ -47,7 +47,7 @@ func TestOomphDirect(t *testing.T) {
 	for srv.Accept(func(p *player.Player) {
 		p.ShowCoordinates()
 		p.SetGameMode(world.GameModeSurvival)
-		p.Heal(20, healing.SourceFood{})
+		p.Heal(20, entity.FoodHealingSource{})
 		p.AddFood(20)
 	}) {
 	}
