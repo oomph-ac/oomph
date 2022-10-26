@@ -42,20 +42,11 @@ func (p *Player) validateMovement() {
 		return
 	}
 
-	posError, velError := p.mInfo.ServerPosition.Sub(p.Position()).LenSqr(), p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement).LenSqr()
-
-	if posError > 0.04 || velError > 0.25 {
-		p.correctMovement()
+	if p.mInfo.ServerPosition.Sub(p.Position()).LenSqr() <= 0.09 {
 		return
 	}
 
-	if velError <= 1e-6 {
-		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
-	}
-
-	if posError <= 1e-6 {
-		p.mInfo.ServerPosition = p.Position()
-	}
+	p.correctMovement()
 }
 
 // correctMovement sends a movement correction to the player. Exemptions can be made to prevent sending corrections, such as if
@@ -84,7 +75,7 @@ func (p *Player) correctMovement() {
 		p.conn.WritePacket(&packet.UpdateBlock{
 			Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 			NewBlockRuntimeID: world.BlockRuntimeID(b),
-			Flags:             packet.BlockUpdateNeighbours,
+			Flags:             packet.BlockUpdatePriority,
 			Layer:             layer,
 		})
 	}
