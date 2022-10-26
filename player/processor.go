@@ -127,9 +127,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				}
 			}
 
-			// Set the block in the world
-			p.SetBlock(replacePos, b)
-
 			spam := false
 
 			// This code will detect if the client is sending this packet due to a right click bug where this will be spammed to the server.
@@ -142,8 +139,22 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			if spam {
 				// Cancel the sending of this packet if we determine that it's the right click spam bug.
+				l := uint32(0)
+				if _, ok := fb.(world.Liquid); ok {
+					l = 1
+				}
+
+				p.conn.WritePacket(&packet.UpdateBlock{
+					Position:          protocol.BlockPos{int32(replacePos.X()), int32(replacePos.Y()), int32(replacePos.Z())},
+					NewBlockRuntimeID: world.BlockRuntimeID(fb),
+					Layer:             l,
+					Flags:             packet.BlockUpdatePriority,
+				})
 				return true
 			}
+
+			// Set the block in the world
+			p.SetBlock(replacePos, b)
 		}
 	case *packet.Respawn:
 		if pk.EntityRuntimeID != p.rid {
