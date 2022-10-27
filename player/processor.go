@@ -139,15 +139,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			if spam {
 				// Cancel the sending of this packet if we determine that it's the right click spam bug.
-				l := uint32(0)
-				if _, ok := fb.(world.Liquid); ok {
-					l = 1
-				}
-
+				// TODO: Correctly interpret the block's layer.
 				p.conn.WritePacket(&packet.UpdateBlock{
 					Position:          protocol.BlockPos{int32(replacePos.X()), int32(replacePos.Y()), int32(replacePos.Z())},
 					NewBlockRuntimeID: world.BlockRuntimeID(fb),
-					Layer:             l,
+					Layer:             0,
 					Flags:             packet.BlockUpdatePriority,
 				})
 				return true
@@ -382,7 +378,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			}
 		})
 	case *packet.ChunkRadiusUpdated:
-		p.chunkRadius = int(pk.ChunkRadius) + 4
+		p.Acknowledgement(func() {
+			p.chunkRadius = int(pk.ChunkRadius)
+		})
 	case *packet.UpdateBlock:
 		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
