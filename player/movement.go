@@ -21,6 +21,7 @@ func (p *Player) updateMovementState() bool {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
+		p.mInfo.OldServerMovement = p.mInfo.ServerMovement
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 		p.mInfo.CanExempt = true
 		exempt = true
@@ -67,16 +68,11 @@ func (p *Player) correctMovement() {
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
 	for bpos, b := range p.GetNearbyBlocks(p.AABB().Translate(p.mInfo.ServerPosition)) {
-		layer := uint32(0)
-		if _, ok := b.(world.Liquid); ok {
-			layer = 1
-		}
-
 		p.conn.WritePacket(&packet.UpdateBlock{
 			Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 			NewBlockRuntimeID: world.BlockRuntimeID(b),
 			Flags:             packet.BlockUpdatePriority,
-			Layer:             layer,
+			Layer:             0,
 		})
 	}
 

@@ -52,19 +52,15 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 
 	if math.Abs(100.0-pct) <= 0.01 {
 		v.violations = math.Max(0, v.violations-0.2)
-		v.Buff(-3)
 		return false
 	}
 
-	// TODO: *This* velocity check can sometimes false for some reason. The root cause right now is still
-	// unknown - but a buffer should do for now until I can investigate further. The vertical velocity
-	// detection (A) does not false afaik.
-	if v.Buff(1, 8) < 6 {
-		return false
-	}
+	//fmt.Println(fmt.Sprint(p.ClientMovement()[0], " ", p.OldServerMovement()[0], " ", p.ClientMovement()[2], " ", p.OldServerMovement()[2], " || ", pct, "%"))
 
 	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
-		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
+		"pct":      fmt.Sprint(game.Round(pct, 4), "%"),
+		"got":      []float64{p.ClientMovement()[0], p.ClientMovement()[2]},
+		"expected": []float64{xKb, zKb},
 	})
 
 	return false
