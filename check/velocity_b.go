@@ -50,7 +50,7 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 
 	pct := (math.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math.Hypot(xKb, zKb)) * 100
 
-	if math.Abs(100.0-pct) <= 0.01 {
+	if math.Abs(100.0-pct) <= 0.1 {
 		v.violations = math.Max(0, v.violations-0.2)
 		return false
 	}

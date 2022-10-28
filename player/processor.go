@@ -365,6 +365,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 					p.chunks[chunkPos] = c
 					p.chkMu.Unlock()
 				} else {
+					pos := protocol.ChunkPos{int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4, int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4}
+					if pos == chunkPos {
+						p.inLoadedChunkTicks = 0
+					}
 					c.Unlock()
 				}
 
