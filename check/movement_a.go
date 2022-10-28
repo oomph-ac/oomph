@@ -25,7 +25,7 @@ func (*MovementA) Description() string {
 }
 
 func (*MovementA) MaxViolations() float64 {
-	return 30
+	return 60
 }
 
 func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
@@ -40,8 +40,8 @@ func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
 
 	diff := i.Delta[1] - float32(p.ServerMovement()[1])
 	if game.AbsFloat32(diff) < 0.01 {
-		m.Buff(-0.5, 6)
-		m.violations = math.Max(0, m.violations-0.5)
+		m.Buff(-1, 6)
+		m.violations = math.Max(0, m.violations-1)
 		return false
 	}
 
