@@ -55,9 +55,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
-		p.ackMu.Lock()
-		cancel = p.acks.Handle(pk.Timestamp)
-		p.ackMu.Unlock()
+		cancel = p.Acknowledgements().Handle(pk.Timestamp)
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
@@ -79,8 +77,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.tickEntitiesPos()
 		}
 
-		if p.acks != nil {
-			p.acks.HasTicked = true
+		if acks := p.Acknowledgements(); acks != nil {
+			acks.HasTicked = true
 		}
 
 		p.needsCombatValidation = false
