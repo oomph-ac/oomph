@@ -215,10 +215,10 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		r.secondaryBuffer++
+		r.secondaryBuffer += r.violationAfterTicks(p.ClientFrame(), 200)
 		r.secondaryBuffer = math.Min(r.secondaryBuffer, 5)
 
-		if r.secondaryBuffer > 1 {
+		if r.secondaryBuffer > 2.5 {
 			p.Flag(r, 1, map[string]any{
 				"dist": game.Round(distAvg, 4),
 				"type": "raycast",
