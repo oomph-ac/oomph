@@ -185,7 +185,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
 	p.chunkRadius = p.conn.ChunkRadius() + 4
-	p.acks.Refresh()
+	p.Acknowledgements().Refresh()
 
 	go p.startTicking()
 	return p
@@ -296,6 +296,12 @@ func (p *Player) AABB() cube.BBox {
 	return p.Entity().AABB()
 }
 
+func (p *Player) Acknowledgements() *Acknowledgements {
+	p.ackMu.Lock()
+	defer p.ackMu.Unlock()
+	return p.acks
+}
+
 // MovementInfo returns the movement information of the player
 func (p *Player) MovementInfo() *MovementInfo {
 	p.miMu.Lock()
@@ -359,9 +365,7 @@ func (p *Player) Acknowledgement(f func()) {
 		return
 	}
 
-	p.ackMu.Lock()
-	p.acks.Add(f)
-	p.ackMu.Unlock()
+	p.Acknowledgements().Add(f)
 }
 
 // Debug debugs the given check data to the console and other relevant sources.
@@ -584,21 +588,21 @@ func (p *Player) Handle(h Handler) {
 }
 
 func (p *Player) flushConns() {
-	p.ackMu.Lock()
-	if pk := p.acks.Create(); pk != nil {
-		if p.ClientData().DeviceOS == protocol.DeviceNX {
-			pk.Timestamp /= 1000
-		}
+	acks := p.Acknowledgements()
+	if pk := acks.Create(); pk != nil {
 		p.conn.WritePacket(pk)
+		if p.ClientData().DeviceOS == protocol.DeviceNX {
+			acks.AcknowledgeMap[pk.Timestamp/1000] = acks.AcknowledgeMap[pk.Timestamp]
+			delete(acks.AcknowledgeMap, pk.Timestamp)
+		}
+
+		acks.Refresh()
 	}
 
-	go p.conn.Flush()
+	p.conn.Flush()
 	if p.serverConn != nil {
-		go p.serverConn.Flush()
+		p.serverConn.Flush()
 	}
-
-	p.acks.Refresh()
-	p.ackMu.Unlock()
 }
 
 // tickEntitiesPos ticks the position of all entities
@@ -677,7 +681,7 @@ func (p *Player) startTicking() {
 
 			// If the player is not responding to acknowledgements, we have to kick them to prevent
 			// abusive behavior (bypasses).
-			if !p.acks.Validate() {
+			if !p.Acknowledgements().Validate() {
 				p.Disconnect("Error: Client was unable to respond to acknowledgements sent by the server.")
 			}
 
