@@ -17,7 +17,7 @@ import (
 // If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
 func (p *Player) updateMovementState() bool {
 	var exempt bool
-	if p.inLoadedChunkTicks < 100 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || (p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure) || p.mInfo.NoClip {
+	if p.inLoadedChunkTicks < 100 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
