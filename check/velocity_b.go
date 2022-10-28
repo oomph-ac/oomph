@@ -58,9 +58,7 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 	//fmt.Println(fmt.Sprint(p.ClientMovement()[0], " ", p.OldServerMovement()[0], " ", p.ClientMovement()[2], " ", p.OldServerMovement()[2], " || ", pct, "%"))
 
 	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
-		"pct":      fmt.Sprint(game.Round(pct, 4), "%"),
-		"got":      []float64{p.ClientMovement()[0], p.ClientMovement()[2]},
-		"expected": []float64{xKb, zKb},
+		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
 	})
 
 	return false
