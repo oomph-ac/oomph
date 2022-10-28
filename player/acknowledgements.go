@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"math/rand"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -26,7 +25,6 @@ func (a *Acknowledgements) Add(f func()) {
 func (a *Acknowledgements) Handle(i int64) bool {
 	calls, ok := a.AcknowledgeMap[i]
 	if ok {
-		fmt.Println(len(calls), "calls on timestamp", i)
 		a.awaitResTicks = 0
 		a.Remove(i)
 		for _, f := range calls {
