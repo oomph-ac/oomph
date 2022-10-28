@@ -2,6 +2,7 @@ package player
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -12,10 +13,14 @@ type Acknowledgements struct {
 	CurrentTimestamp int64
 
 	awaitResTicks uint64
+	mu            sync.Mutex
 }
 
 // Add adds an acknowledgement to run in the future to the map of acknowledgements.
 func (a *Acknowledgements) Add(f func()) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	a.AcknowledgeMap[a.CurrentTimestamp] = append(a.AcknowledgeMap[a.CurrentTimestamp], f)
 }
 
@@ -23,7 +28,10 @@ func (a *Acknowledgements) Add(f func()) {
 // found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
 // "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
 func (a *Acknowledgements) Handle(i int64) bool {
+	a.mu.Lock()
 	calls, ok := a.AcknowledgeMap[i]
+	a.mu.Unlock()
+
 	if ok {
 		a.awaitResTicks = 0
 		a.Remove(i)
@@ -36,16 +44,25 @@ func (a *Acknowledgements) Handle(i int64) bool {
 
 // Remove removes an acknowledgement from the map of acknowledgements.
 func (a *Acknowledgements) Remove(i int64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	delete(a.AcknowledgeMap, i)
 }
 
 // Refresh sets a new timestamp for the acknowledgements.
 func (a *Acknowledgements) Refresh() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	a.CurrentTimestamp = int64(rand.Uint32()) * 1000
 }
 
 // Create creats a new acknowledgement packet and returns it.
 func (a *Acknowledgements) Create() *packet.NetworkStackLatency {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if len(a.AcknowledgeMap[a.CurrentTimestamp]) == 0 {
 		return nil
 	}
@@ -60,6 +77,9 @@ func (a *Acknowledgements) Create() *packet.NetworkStackLatency {
 // the client is not responding despite ticking, this function will return false. This is to prevent modified
 // clients from breaking certain systems by simply ignoring acknowledgements we send.
 func (a *Acknowledgements) Validate() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if !a.HasTicked {
 		return true
 	}

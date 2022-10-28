@@ -39,8 +39,7 @@ type Player struct {
 
 	locale language.Tag
 
-	ackMu sync.Mutex
-	acks  *Acknowledgements
+	acks *Acknowledgements
 
 	clientPks, svrPks   []packet.Packet
 	clientPkMu, svrPkMu sync.Mutex
@@ -297,8 +296,6 @@ func (p *Player) AABB() cube.BBox {
 }
 
 func (p *Player) Acknowledgements() *Acknowledgements {
-	p.ackMu.Lock()
-	defer p.ackMu.Unlock()
 	return p.acks
 }
 
@@ -557,10 +554,6 @@ func (p *Player) Close() error {
 		p.checkMu.Lock()
 		p.checks = nil
 		p.checkMu.Unlock()
-
-		p.ackMu.Lock()
-		p.acks = nil
-		p.ackMu.Unlock()
 
 		p.chkMu.Lock()
 		p.chunks = nil
