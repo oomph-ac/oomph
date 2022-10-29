@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block/cube/trace"
@@ -11,7 +12,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolationIterations float64 = 10
+const interpolationIterations float64 = 5
 
 type ReachA struct {
 	attackData                *protocol.UseItemOnEntityTransactionData
@@ -154,31 +155,31 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 
 		if !valid {
-			if r.Buff(1, 5) >= 4.5 {
+			/* if r.Buff(1, 5) >= 4.5 {
 				p.Flag(r, 1, map[string]any{
 					"type": "hitbox",
-				})
+				}) ??????????????????? why is this falsing
 				r.cancelNext = true
-			}
+			} */
+			r.cancelNext = true
 
 			return false
 		}
 		r.Buff(-0.025, 5)
 
-		distAvg /= totalHits
-		if distAvg <= 3.0001 {
-			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.0075)
-			r.violations = math.Max(0, r.violations-0.0015)
+		p.SendOomphDebug(fmt.Sprint(minDist, " blocks"))
+
+		if minDist <= 3.01 && math.Abs(minDist-bbDist) < 0.3 {
+			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.02)
+			r.violations = math.Max(0, r.violations-0.0025)
 			return false
 		}
 
 		// There could be something wrong with our position by one tick, so we'll also
 		// account for that and check if the distance is still over ~3 blocks.
-		entPos = e.LastPosition()
+		/* entPos = e.LastPosition()
 		dPos = e.Position().Sub(entPos).Mul(1.0 / interpolationIterations)
 		rot = game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
-		totalHits = 0.0
-		distAvg = 0.0
 		for x := 0.0; x < interpolationIterations; x++ {
 			if x != 0 {
 				entPos = entPos.Add(dPos)
@@ -209,18 +210,19 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 
 		distAvg /= totalHits
-		if distAvg <= 3.0001 {
-			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.0075)
-			r.violations = math.Max(0, r.violations-0.001)
+		if minDist <= 3.01 {
+			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.02)
+			r.violations = math.Max(0, r.violations-0.0025)
 			return false
-		}
+		} */
 
-		r.secondaryBuffer += r.violationAfterTicks(p.ClientFrame(), 200)
-		r.secondaryBuffer = math.Min(r.secondaryBuffer, 5)
+		r.secondaryBuffer += r.violationAfterTicks(p.ClientFrame(), 160)
+		r.secondaryBuffer = math.Min(r.secondaryBuffer, 10)
 
-		if r.secondaryBuffer > 2.5 {
+		if r.secondaryBuffer > 5 {
 			p.Flag(r, 1, map[string]any{
-				"dist": game.Round(distAvg, 4),
+				"dist": game.Round(minDist, 4),
+				"avg":  game.Round(distAvg, 4),
 				"type": "raycast",
 			})
 		}
