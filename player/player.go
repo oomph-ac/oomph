@@ -237,7 +237,9 @@ func (p *Player) QueuePacket(pk packet.Packet, client bool) {
 // MoveEntity moves an entity to the given position.
 func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, teleport bool, ground bool) {
 	// If the entity exists, we can queue the location for an update.
-	if _, ok := p.SearchEntity(rid); ok {
+	if e, ok := p.SearchEntity(rid); ok {
+		e.SetServerPosition(pos)
+
 		p.queueMu.Lock()
 		p.queuedEntityLocations[rid] = utils.LocationData{
 			Tick:     p.serverTick.Load(),
@@ -719,7 +721,7 @@ func (p *Player) startTicking() {
 				})
 			}
 
-			p.flushConns()
+			go p.flushConns()
 
 			delta := time.Since(p.lastServerTicked).Milliseconds()
 			p.lastServerTicked = time.Now()

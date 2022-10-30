@@ -16,6 +16,8 @@ type Entity struct {
 	position mgl64.Vec3
 	// lastPosition is the previous position of the entity in the world.
 	lastPosition mgl64.Vec3
+	// recievedPosition is the position of the entity on the server-side
+	recievedPosition mgl64.Vec3
 	// serverPosition is the position of the entity on the server-side
 	serverPosition mgl64.Vec3
 	// newPosRotationIncrements is used for smoothing out the position of entities.
@@ -50,7 +52,7 @@ func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
 	return &Entity{
 		position:                 position,
 		lastPosition:             position,
-		serverPosition:           position.Add(velocity),
+		recievedPosition:         position.Add(velocity),
 		rotation:                 rotation,
 		lastRotation:             rotation,
 		aabb:                     defaultAABB,
@@ -58,6 +60,34 @@ func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
 		onGround:                 true,
 		newPosRotationIncrements: 3,
 	}
+}
+
+// SetServerPosition sets the position of the entity on the server-side.
+func (e *Entity) SetServerPosition(pos mgl64.Vec3) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.player {
+		pos[1] -= 1.62
+	}
+
+	e.serverPosition = pos
+}
+
+// ServerPosition returns the position of the entity on the server-side.
+func (e *Entity) ServerPosition() mgl64.Vec3 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.serverPosition
+}
+
+// RecievedPosition returns the position of the entity that the client has recieved.
+func (e *Entity) RecievedPosition() mgl64.Vec3 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.recievedPosition
 }
 
 // Position returns the position of the entity.
@@ -87,7 +117,7 @@ func (e *Entity) Move(pos mgl64.Vec3, offset bool) {
 
 func (e *Entity) TickPosition(tick uint64) {
 	if e.newPosRotationIncrements > 0 {
-		delta := e.serverPosition.Sub(e.position)
+		delta := e.recievedPosition.Sub(e.position)
 		e.lastPosition = e.position
 		e.position = e.position.Add(delta.Mul(1 / float64(e.newPosRotationIncrements)))
 		e.newPosRotationIncrements--
@@ -104,7 +134,7 @@ func (e *Entity) UpdatePosition(dat utils.LocationData, offset bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.serverPosition = dat.Position
+	e.recievedPosition = dat.Position
 	e.onGround = dat.OnGround
 
 	if dat.Teleport {
@@ -116,7 +146,7 @@ func (e *Entity) UpdatePosition(dat utils.LocationData, offset bool) {
 	}
 
 	if offset {
-		e.serverPosition[1] -= 1.62
+		e.recievedPosition[1] -= 1.62
 	}
 
 	e.updatedTick = dat.Tick

@@ -21,7 +21,7 @@ func (p *Player) updateMovementState() bool {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
-		p.mInfo.OldServerMovement = p.mInfo.ServerMovement
+		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 		p.mInfo.CanExempt = true
 		exempt = true

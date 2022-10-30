@@ -10,7 +10,6 @@ import (
 )
 
 type VelocityA struct {
-	knockback float64
 	basic
 }
 
@@ -40,19 +39,17 @@ func (v *VelocityA) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	if p.TakingKnockback() {
-		v.knockback = p.OldServerMovement()[1]
-	}
-
-	if v.knockback < 0.1 {
+	if !p.TakingKnockback() {
 		return false
 	}
 
-	defer func() {
-		v.knockback = p.ServerMovement()[1]
-	}()
+	kb := p.OldServerMovement()[1]
 
-	diff, pct := math.Abs(v.knockback-p.ClientMovement()[1]), (p.ClientMovement()[1]/v.knockback)*100
+	if kb < 0.1 {
+		return false
+	}
+
+	diff, pct := math.Abs(kb-p.ClientMovement()[1]), (p.ClientMovement()[1]/kb)*100
 	if diff <= 1e-4 {
 		v.violations = math.Max(0, v.violations-0.1)
 		return false

@@ -11,7 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolationIterations float64 = 5
+const interpolationIterations float64 = 7
 
 type ReachA struct {
 	attackData                *protocol.UseItemOnEntityTransactionData
@@ -34,7 +34,7 @@ func (*ReachA) Description() string {
 }
 
 func (*ReachA) MaxViolations() float64 {
-	return 15
+	return math.MaxFloat64
 }
 
 func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
@@ -102,10 +102,10 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 
 		if bbDist > 3.15 {
-			p.Flag(r, 1, map[string]any{
+			/*p.Flag(r, 1, map[string]any{
 				"dist": game.Round(bbDist, 4),
 				"type": "bb-dist",
-			})
+			})*/
 			r.cancelNext = true
 			return false
 		}
@@ -115,7 +115,6 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		// As of now, minDist is only here if I feel as if it's needed in the future of this check.
 		minDist, valid := 6969.0, false
 		distAvg, totalHits := 0.0, 0.0
 		rot := game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
@@ -154,13 +153,12 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 
 		if !valid {
-			/* if r.Buff(1, 5) >= 4.5 {
-				p.Flag(r, 1, map[string]any{
+			if r.Buff(1, 5) >= 4.5 {
+				/*p.Flag(r, 1, map[string]any{
 					"type": "hitbox",
-				}) ??????????????????? why is this falsing
+				})*/
 				r.cancelNext = true
-			} */
-			r.cancelNext = true
+			}
 
 			return false
 		}
@@ -174,7 +172,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 
 		// There could be something wrong with our position by one tick, so we'll also
 		// account for that and check if the distance is still over ~3 blocks.
-		/* entPos = e.LastPosition()
+		entPos = e.LastPosition()
 		dPos = e.Position().Sub(entPos).Mul(1.0 / interpolationIterations)
 		rot = game.DirectionVector(p.Entity().LastRotation().Z(), p.Entity().LastRotation().X())
 		for x := 0.0; x < interpolationIterations; x++ {
@@ -211,20 +209,14 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.02)
 			r.violations = math.Max(0, r.violations-0.0025)
 			return false
-		} */
+		}
 
 		r.secondaryBuffer += r.violationAfterTicks(p.ClientFrame(), 200)
 		r.secondaryBuffer = math.Min(r.secondaryBuffer, 10)
 
 		if r.secondaryBuffer > 5 {
-			p.Flag(r, minDist-3.0, map[string]any{
-				"dist": game.Round(minDist, 4),
-				"avg":  game.Round(distAvg, 4),
-				"type": "raycast",
-			})
+			r.cancelNext = true
 		}
-
-		r.cancelNext = true
 	}
 
 	return false
