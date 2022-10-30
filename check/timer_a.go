@@ -2,12 +2,17 @@ package check
 
 import (
 	"math"
+	"time"
 
+	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // TimerA checks for the timer cheat by using a balance system.
 type TimerA struct {
+	balance    float64
+	lastTime   time.Time
+	initalized bool
 	basic
 }
 
@@ -38,18 +43,29 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	// The check cannot be run at this point in time because the client has not recieved
-	// a sync yet from the server.
-	if !p.IsSyncedWithServer() || !p.ServerTicked() {
+	curr := time.Now()
+	// Get how many milliseconds have passed since the last input packet.
+	timeDiff := float64(time.Since(t.lastTime).Microseconds()) / 1000
+
+	defer func() {
+		t.lastTime = curr
+	}()
+
+	if p.Respawned() || !p.Ready() {
+		t.balance = 0
 		return false
 	}
 
-	// Here, we check if the client is simulating ahead of the server.
-	if p.ClientTick() > p.ServerTick() {
-		p.Flag(t, 1, map[string]any{
-			"Server Tick": p.ServerTick(),
-			"Client Tick": p.ClientTick(),
-		})
+	if !t.initalized {
+		t.initalized = true
+		return false
+	}
+
+	// The time difference should be one tick (50ms), so we subtract 50ms from the time difference and then add it to the balance.
+	t.balance += timeDiff - 50
+	if t.balance <= -150 {
+		p.Flag(t, 1, map[string]any{"Balance": game.Round(t.balance, 2)})
+		t.balance = 0
 	}
 
 	return false

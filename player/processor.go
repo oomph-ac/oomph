@@ -51,11 +51,17 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
-			p.ready = true
 		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
 		cancel = p.Acknowledgements().Handle(pk.Timestamp)
+
+		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
+		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
+		// TODO: Figure out wtf is going on and get rid of this hack (aka never!)
+		if p.ClientData().DeviceOS == protocol.DeviceOrbis {
+			cancel = cancel || p.Acknowledgements().Handle(pk.Timestamp*1000)
+		}
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
@@ -81,6 +87,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			acks.HasTicked = true
 		}
 
+		defer func() {
+			p.respawned = false
+		}()
 		p.needsCombatValidation = false
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
@@ -150,12 +159,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			// Set the block in the world
 			p.SetBlock(replacePos, b)
 		}
-	case *packet.Respawn:
-		if pk.EntityRuntimeID != p.rid {
-			return false
-		}
-
-		p.dead = pk.State != packet.RespawnStateClientReadyToSpawn
 	case *packet.Text:
 		if p.serverConn != nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
@@ -323,6 +326,8 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.mInfo.UpdateServerSentVelocity(velocity)
 		})
 	case *packet.LevelChunk:
+		p.ready = true
+
 		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
 		}
@@ -341,6 +346,8 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.LoadChunk(pk.Position, c)
 		})
 	case *packet.SubChunk:
+		p.ready = true
+
 		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
 		}
@@ -426,10 +433,14 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				p.mInfo.CanFly = utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
 			}
 		})
-	case *packet.ChangeDimension:
-		p.ready = false
+	case *packet.Respawn:
+		if pk.EntityRuntimeID != p.rid || pk.State != packet.RespawnStateReadyToSpawn {
+			return false
+		}
+
 		p.Acknowledgement(func() {
-			p.ready = true
+			p.dead = false
+			p.respawned = true
 		})
 	}
 	return false

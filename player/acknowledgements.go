@@ -55,7 +55,12 @@ func (a *Acknowledgements) Refresh() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	a.CurrentTimestamp = int64(rand.Uint32()) * 1000
+	for {
+		a.CurrentTimestamp = int64(rand.Uint32()) * 1000
+		if _, ok := a.AcknowledgeMap[a.CurrentTimestamp]; !ok {
+			break
+		}
+	}
 }
 
 // Create creats a new acknowledgement packet and returns it.
