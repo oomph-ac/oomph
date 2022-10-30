@@ -52,10 +52,13 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 
 	if math.Abs(100.0-pct) <= 0.1 {
 		v.violations = math.Max(0, v.violations-0.2)
+		v.Buff(-0.2, 5)
 		return false
 	}
 
-	//fmt.Println(fmt.Sprint(p.ClientMovement()[0], " ", p.OldServerMovement()[0], " ", p.ClientMovement()[2], " ", p.OldServerMovement()[2], " || ", pct, "%"))
+	if v.Buff(1, 5) < 3 {
+		return false
+	}
 
 	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
 		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
