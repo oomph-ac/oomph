@@ -71,6 +71,8 @@ type Processor interface {
 	Flying() bool
 	// Dead returns true if the processor is currently dead.
 	Dead() bool
+	// Respawned returns true if the processor has respawned.
+	Respawned() bool
 	// Clicking returns true if the processor is clicking.
 	Clicking() bool
 	// TakingKnockback returns true if the processor is currently taking knockback.

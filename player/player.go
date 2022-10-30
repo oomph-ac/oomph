@@ -68,6 +68,7 @@ type Player struct {
 	inputMode uint32
 
 	ready                 bool
+	respawned             bool
 	dead                  bool
 	needsCombatValidation bool
 	closed                bool
@@ -167,7 +168,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewOSSpoofer(),
 
 			check.NewTimerA(),
-			check.NewTimerB(),
 
 			check.NewInvalidA(),
 		},
@@ -471,6 +471,11 @@ func (p *Player) Dead() bool {
 	return p.dead
 }
 
+// Respawned returns true if the player is respawning into the world.
+func (p *Player) Respawned() bool {
+	return p.respawned
+}
+
 // InLoadedChunk returns true if the player is in a chunk loaded by it's world
 func (p *Player) InLoadedChunk() bool {
 	return p.inLoadedChunk
@@ -584,9 +589,12 @@ func (p *Player) flushConns() {
 	acks := p.Acknowledgements()
 	if pk := acks.Create(); pk != nil {
 		p.conn.WritePacket(pk)
-		if p.ClientData().DeviceOS == protocol.DeviceNX {
+
+		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
+		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
+		// TODO: Figure out wtf is going on and get rid of this hack (aka never!)
+		if p.ClientData().DeviceOS == protocol.DeviceOrbis {
 			acks.AcknowledgeMap[pk.Timestamp/1000] = acks.AcknowledgeMap[pk.Timestamp]
-			delete(acks.AcknowledgeMap, pk.Timestamp)
 		}
 
 		acks.Refresh()

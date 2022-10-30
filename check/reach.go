@@ -1,7 +1,6 @@
 package check
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block/cube/trace"
@@ -167,8 +166,6 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 		r.Buff(-0.025, 5)
 
-		p.SendOomphDebug(fmt.Sprint(minDist, " blocks"))
-
 		if minDist <= 3.01 && math.Abs(minDist-bbDist) < 0.3 {
 			r.secondaryBuffer = math.Max(0, r.secondaryBuffer-0.02)
 			r.violations = math.Max(0, r.violations-0.0025)
@@ -216,11 +213,11 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		} */
 
-		r.secondaryBuffer += r.violationAfterTicks(p.ClientFrame(), 160)
+		r.secondaryBuffer += r.violationAfterTicks(p.ClientFrame(), 200)
 		r.secondaryBuffer = math.Min(r.secondaryBuffer, 10)
 
 		if r.secondaryBuffer > 5 {
-			p.Flag(r, 1, map[string]any{
+			p.Flag(r, minDist-3.0, map[string]any{
 				"dist": game.Round(minDist, 4),
 				"avg":  game.Round(distAvg, 4),
 				"type": "raycast",
