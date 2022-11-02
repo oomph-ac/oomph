@@ -158,6 +158,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewKillAuraA(),
 
 			check.NewReachA(),
+			check.NewReachB(),
 
 			check.NewMovementA(),
 			check.NewMovementB(),
