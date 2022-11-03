@@ -90,9 +90,14 @@ func (p *Player) correctMovement() {
 		p.conn.WritePacket(p.lastSentAttributes)
 	}
 
+	diffVec := pos.Sub(p.Position())
+	diffVec[0] = game.ClampFloat(diffVec[0], -0.03, 0.03)
+	diffVec[1] = game.ClampFloat(diffVec[1], -0.03, 0.03)
+	diffVec[2] = game.ClampFloat(diffVec[2], -0.03, 0.03)
+
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
-		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62 + 1e-3})),
+		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62 + 1e-3}).Add(diffVec)),
 		Delta:    game.Vec64To32(delta),
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
@@ -228,13 +233,13 @@ func (p *Player) calculateExpectedMovement() {
 		p.mInfo.ServerMovement[1] = 0.3
 	}
 
-	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 1e-10 {
+	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 0.005 {
 		p.mInfo.ServerMovement[0] = 0
 	}
-	if mgl64.Abs(p.mInfo.ServerMovement[1]) < 1e-10 {
+	if mgl64.Abs(p.mInfo.ServerMovement[1]) < 0.005 {
 		p.mInfo.ServerMovement[1] = 0
 	}
-	if mgl64.Abs(p.mInfo.ServerMovement[2]) < 1e-10 {
+	if mgl64.Abs(p.mInfo.ServerMovement[2]) < 0.005 {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
