@@ -217,9 +217,12 @@ func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
 	} else {
 		data.IncrementTeleportationTicks()
 	}
+
+	p.miMu.Lock()
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
 	p.mInfo.ServerPosition = game.Vec32To64(pos)
+	p.miMu.Unlock()
 }
 
 func (p *Player) QueuePacket(pk packet.Packet, client bool) {
