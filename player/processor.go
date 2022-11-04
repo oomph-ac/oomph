@@ -271,9 +271,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
 				flags := f.(int64)
+
+				p.miMu.Lock()
 				p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
 				p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
 				p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
+				p.miMu.Unlock()
 			}
 		})
 	case *packet.SetPlayerGameType:
@@ -301,7 +304,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 					p.isSyncedWithServer = false
 					p.dead = true
 				} else if a.Name == "minecraft:movement" {
+					p.miMu.Lock()
 					p.mInfo.Speed = float64(a.Value)
+					p.miMu.Unlock()
 				}
 			}
 		})
@@ -316,14 +321,19 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
 		if p.movementMode == utils.ModeFullAuthoritative && int64(p.serverTick.Load())-int64(p.clientTick.Load()) >= 5 {
+			p.miMu.Lock()
 			p.mInfo.UpdateServerSentVelocity(velocity)
+			p.miMu.Unlock()
+
 			return false
 		}
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 		// does take knockback when it recieves it.
 		p.Acknowledgement(func() {
+			p.miMu.Lock()
 			p.mInfo.UpdateServerSentVelocity(velocity)
+			p.miMu.Unlock()
 		})
 	case *packet.LevelChunk:
 		p.ready = true
@@ -430,8 +440,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	case *packet.UpdateAbilities:
 		p.Acknowledgement(func() {
 			for _, l := range pk.AbilityData.Layers {
+				p.miMu.Lock()
 				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
 				p.mInfo.CanFly = utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
+				p.miMu.Unlock()
 			}
 		})
 	case *packet.Respawn:
