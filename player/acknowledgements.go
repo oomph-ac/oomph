@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -98,4 +99,20 @@ func (a *Acknowledgements) Validate() bool {
 
 	a.awaitResTicks++
 	return a.awaitResTicks < 200
+}
+
+func (p *Player) sendAck() {
+	acks := p.Acknowledgements()
+	if pk := acks.Create(); pk != nil {
+		p.conn.WritePacket(pk)
+
+		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
+		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
+		// TODO: Figure out wtf is going on and get rid of this hack (aka never!)
+		if p.ClientData().DeviceOS == protocol.DeviceOrbis {
+			acks.AcknowledgeMap[pk.Timestamp/1000] = acks.AcknowledgeMap[pk.Timestamp]
+		}
+
+		acks.Refresh()
+	}
 }
