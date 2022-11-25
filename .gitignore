@@ -2,6 +2,7 @@
 config.toml
 token.tok
 tests/*
+tests2/*
 players/*
 world/*
 .DS_Store
