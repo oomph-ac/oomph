@@ -11,7 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolatedFrames float64 = 4
+const interpolatedFrames float64 = 7
 
 type ReachA struct {
 	eid             uint64
@@ -73,25 +73,19 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		rewind := e.RewindPosition(p.ServerTick() - 3)
-		if rewind == nil {
-			return false
-		}
-
-		//bb := e.AABB().Translate(e.LastPosition()).Grow(0.1)
+		bb := e.AABB().Translate(e.LastPosition()).Grow(0.1)
 		pe := p.Entity()
 
 		cDv, lDv := game.DirectionVector(pe.Rotation()[2], pe.Rotation()[0]),
 			game.DirectionVector(pe.LastRotation()[2], pe.LastRotation()[0])
 		cAtkPos, lAtkPos := pe.Position().Add(mgl64.Vec3{0, 1.62}), pe.LastPosition().Add(mgl64.Vec3{0, 1.62})
-		cEntPos, lEntPos := e.LastPosition(), rewind.Position
-		dvDelta, atkPosDelta, entPosDelta := cDv.Sub(lDv).Mul(1/interpolatedFrames),
-			cAtkPos.Sub(lAtkPos).Mul(1/interpolatedFrames), cEntPos.Sub(lEntPos).Mul(1/interpolatedFrames)
-		uAtkPos, uDv, uEntPos := lAtkPos, lDv, lEntPos
+		dvDelta, atkPosDelta := cDv.Sub(lDv).Mul(1/interpolatedFrames),
+			cAtkPos.Sub(lAtkPos).Mul(1/interpolatedFrames)
+		uAtkPos, uDv := lAtkPos, lDv
 
 		minDist, valid := 6900.0, false
 
-		// This will require for (interpolatedFrame ^ 3) raycasts to be performed.
+		// This will require for (interpolatedFrame ^ 2) raycasts to be performed.
 		// We need to interpolate the attack position and the direction vector.
 		for x := 0.0; x < interpolatedFrames; x++ {
 			if x != 0 {
@@ -103,26 +97,19 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 					uDv = uDv.Add(dvDelta)
 				}
 
-				for z := 0.0; z < interpolatedFrames; z++ {
-					if z != 0 {
-						uEntPos = uEntPos.Add(entPosDelta)
-					}
+				result, ok := trace.BBoxIntercept(bb, uAtkPos, uAtkPos.Add(uDv.Mul(7.0)))
+				if !ok {
+					continue
+				}
 
-					bb := e.AABB().Translate(uEntPos).Grow(0.1)
-					result, ok := trace.BBoxIntercept(bb, uAtkPos, uAtkPos.Add(uDv.Mul(7.0)))
-					if !ok {
-						continue
-					}
+				dist := result.Position().Sub(uAtkPos).Len()
+				if dist > 7 { // This is impossible as we only traversed 7 blocks.
+					continue
+				}
 
-					dist := result.Position().Sub(uAtkPos).Len()
-					if dist > 7 { // This is impossible as we only traversed 7 blocks.
-						continue
-					}
-
-					valid = true
-					if dist < minDist {
-						minDist = dist
-					}
+				valid = true
+				if dist < minDist {
+					minDist = dist
 				}
 			}
 		}
