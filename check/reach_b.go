@@ -6,6 +6,7 @@ import (
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+    "math"
 )
 
 type ReachB struct {
@@ -25,7 +26,7 @@ func (*ReachB) Description() string {
 }
 
 func (*ReachB) MaxViolations() float64 {
-	return 30
+	return math.MaxFloat64
 }
 
 func (r *ReachB) Process(p Processor, pk packet.Packet) bool {
@@ -56,6 +57,7 @@ func (r *ReachB) Process(p Processor, pk packet.Packet) bool {
 	dist := game.AABBVectorDistance(bb, p.Entity().Position().Add(mgl64.Vec3{0, 1.62}))
 
 	if dist < 3.1 {
+        r.violations = math.Max(r.violations - 0.02, 0)
 		return false
 	}
 
