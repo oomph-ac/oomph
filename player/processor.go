@@ -127,11 +127,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}
 
 			boxes := b.Model().BBox(replacePos, nil)
-			for _, box := range boxes {
-				if box.Translate(replacePos.Vec3()).IntersectsWith(p.AABB().Translate(game.Vec32To64(t.Position))) {
-					// The block would intersect with our AABB, so a block would not be placed.
-					return false
-				}
+			bb := p.AABB().Translate(game.Vec32To64(t.Position))
+			if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
+				return false
 			}
 
 			spam := false
@@ -144,20 +142,21 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				spam = spam && p.lastRightClickData.ClickedPosition == t.ClickedPosition
 			}
 
-			if spam {
-				// Cancel the sending of this packet if we determine that it's the right click spam bug.
-				// TODO: Correctly interpret the block's layer.
-				p.conn.WritePacket(&packet.UpdateBlock{
-					Position:          protocol.BlockPos{int32(replacePos.X()), int32(replacePos.Y()), int32(replacePos.Z())},
-					NewBlockRuntimeID: world.BlockRuntimeID(fb),
-					Layer:             0,
-					Flags:             packet.BlockUpdatePriority,
-				})
-				return true
+			if !spam {
+				// Set the block in the world
+				p.SetBlock(replacePos, b)
+				return false
 			}
 
-			// Set the block in the world
-			p.SetBlock(replacePos, b)
+			// Cancel the sending of this packet if we determine that it's the right click spam bug.
+			// TODO: Correctly interpret the block's layer.
+			p.conn.WritePacket(&packet.UpdateBlock{
+				Position:          protocol.BlockPos{int32(replacePos.X()), int32(replacePos.Y()), int32(replacePos.Z())},
+				NewBlockRuntimeID: world.BlockRuntimeID(fb),
+				Layer:             0,
+				Flags:             packet.BlockUpdatePriority,
+			})
+			return true
 		}
 	case *packet.Text:
 		if p.serverConn != nil {
