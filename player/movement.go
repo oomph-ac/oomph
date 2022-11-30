@@ -6,6 +6,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
@@ -466,6 +467,11 @@ func (p *Player) simulateJump() {
 	force := p.entity.Rotation().Z() * 0.017453292
 	p.mInfo.ServerMovement[0] -= game.MCSin(force) * 0.2
 	p.mInfo.ServerMovement[2] += game.MCCos(force) * 0.2
+}
+
+func (p *Player) setMovementToClient(d mgl32.Vec3) {
+	p.mInfo.ServerPosition = p.Position()
+	p.mInfo.ServerMovement = game.Vec32To64(d)
 }
 
 type MovementInfo struct {
