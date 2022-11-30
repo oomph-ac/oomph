@@ -526,10 +526,15 @@ func (p *Player) ClickDelay() uint64 {
 	return p.clickDelay
 }
 
-// StackLatency returns the tick stack latency of the player. This value also contains
+// StackLatency returns the tick stack latency of the player in milliseconds. This value also contains
 // some processing delays of the server.
 func (p *Player) StackLatency() int64 {
 	return p.stackLatency
+}
+
+// TickLatency returns the tick stack latency of the player in ticks.
+func (p *Player) TickLatency() int64 {
+	return int64(p.ServerTick()) - int64(p.ClientTick())
 }
 
 // IsLatencyUpdated returns true if the processor has updated its latency.
