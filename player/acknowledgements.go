@@ -1,7 +1,7 @@
 package player
 
 import (
-    "math/rand"
+	"math/rand"
 	"sync"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -27,25 +27,34 @@ func (a *Acknowledgements) Add(f func()) {
 
 // AddMap adds a list of functions in the AcknowledgeMap with a specified timestamp.
 func (a *Acknowledgements) AddMap(m []func(), t int64) {
-    a.mu.Lock()
-    defer a.mu.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-    a.AcknowledgeMap[t] = m
+	a.AcknowledgeMap[t] = m
 }
 
 func (a *Acknowledgements) GetMap(t int64) ([]func(), bool) {
-    m, ok := a.AcknowledgeMap[t]
-    if !ok {
-        return nil, false
-    }
+	m, ok := a.AcknowledgeMap[t]
+	if !ok {
+		return nil, false
+	}
 
-    return m, true
+	return m, true
 }
 
 // Handle gets the acknowledgement in the map with the timestamp given in the function. If there is no acknowledgement
 // found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
 // "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
-func (a *Acknowledgements) Handle(i int64) bool {
+func (a *Acknowledgements) Handle(i int64, tryOther bool) bool {
+	ok := a.tryHandle(i)
+	if !ok && tryOther {
+		ok = a.tryHandle(i)
+	}
+
+	return ok
+}
+
+func (a *Acknowledgements) tryHandle(i int64) bool {
 	a.mu.Lock()
 	calls, ok := a.AcknowledgeMap[i]
 	a.mu.Unlock()
@@ -57,6 +66,7 @@ func (a *Acknowledgements) Handle(i int64) bool {
 			f()
 		}
 	}
+
 	return ok
 }
 
@@ -121,10 +131,10 @@ func (a *Acknowledgements) Validate() bool {
 func (p *Player) sendAck() {
 	acks := p.Acknowledgements()
 	if pk := acks.Create(); pk != nil {
-        m, ok := acks.GetMap(acks.CurrentTimestamp)
-        if !ok {
-            return
-        }
+		m, ok := acks.GetMap(acks.CurrentTimestamp)
+		if !ok {
+			return
+		}
 		p.conn.WritePacket(pk)
 
 		// NetworkStackLatency behavior on Playstation devices sends the original timestamp

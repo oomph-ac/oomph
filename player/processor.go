@@ -54,25 +54,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
-		cancel = p.Acknowledgements().Handle(pk.Timestamp)
-
-		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
-		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
-		// TODO: Figure out wtf is going on and get rid of this hack (aka never!)
-		if p.ClientData().DeviceOS == protocol.DeviceOrbis {
-			cancel = cancel || p.Acknowledgements().Handle(pk.Timestamp*1000)
-		}
+		cancel = p.Acknowledgements().Handle(pk.Timestamp, p.ClientData().DeviceOS == protocol.DeviceOrbis)
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
-
-		if p.movementMode == utils.ModeSemiAuthoritative {
-			defer func() {
-				// After processing movement and letting checks validate movement, set the server's position and movement to the client's.
-				p.mInfo.ServerPosition = p.Position()
-				p.mInfo.ServerMovement = game.Vec32To64(pk.Delta)
-			}()
-		}
 
 		p.cleanChunks()
 		p.processInput(pk)
@@ -86,11 +71,12 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if acks := p.Acknowledgements(); acks != nil {
 			acks.HasTicked = true
 		}
-
-		defer func() {
-			p.respawned = false
-		}()
 		p.needsCombatValidation = false
+
+		defer p.SetRespawned(false)
+		if p.movementMode == utils.ModeSemiAuthoritative {
+			defer p.setMovementToClient(pk.Delta)
+		}
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Click()
@@ -104,59 +90,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.updateCombatData(pk)
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
-			defer func() {
-				p.lastRightClickData = t
-				p.lastRightClickTick = p.ClientFrame()
-			}()
-
-			i, ok := world.ItemByRuntimeID(t.HeldItem.Stack.NetworkID, int16(t.HeldItem.Stack.MetadataValue))
-			if !ok {
-				return false
-			}
-
-			b, ok := i.(world.Block)
-			if !ok {
-				return false
-			}
-
-			replacePos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
-			fb := p.Block(replacePos)
-
-			if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
-				replacePos = replacePos.Side(cube.Face(t.BlockFace))
-			}
-
-			boxes := b.Model().BBox(replacePos, nil)
-			bb := p.AABB().Translate(game.Vec32To64(t.Position))
-			if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
-				return false
-			}
-
-			spam := false
-
-			// This code will detect if the client is sending this packet due to a right click bug where this will be spammed to the server.
-			if p.lastRightClickData != nil {
-				spam = p.ClientFrame()-p.lastRightClickTick < 2
-				spam = spam && p.lastRightClickData.Position == t.Position
-				spam = spam && p.lastRightClickData.BlockPosition == t.BlockPosition
-				spam = spam && p.lastRightClickData.ClickedPosition == t.ClickedPosition
-			}
-
-			if !spam {
-				// Set the block in the world
-				p.SetBlock(replacePos, b)
-				return false
-			}
-
-			// Cancel the sending of this packet if we determine that it's the right click spam bug.
-			// TODO: Correctly interpret the block's layer.
-			p.conn.WritePacket(&packet.UpdateBlock{
-				Position:          protocol.BlockPos{int32(replacePos.X()), int32(replacePos.Y()), int32(replacePos.Z())},
-				NewBlockRuntimeID: world.BlockRuntimeID(fb),
-				Layer:             0,
-				Flags:             packet.BlockUpdatePriority,
-			})
-			return true
+			cancel = p.handleBlockPlace(t)
 		}
 	case *packet.Text:
 		if p.serverConn != nil {
@@ -456,6 +390,62 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		})
 	}
 	return false
+}
+
+func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
+	defer func() {
+		p.lastRightClickData = t
+		p.lastRightClickTick = p.ClientFrame()
+	}()
+
+	i, ok := world.ItemByRuntimeID(t.HeldItem.Stack.NetworkID, int16(t.HeldItem.Stack.MetadataValue))
+	if !ok {
+		return false
+	}
+
+	b, ok := i.(world.Block)
+	if !ok {
+		return false
+	}
+
+	replacePos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
+	fb := p.Block(replacePos)
+
+	if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
+		replacePos = replacePos.Side(cube.Face(t.BlockFace))
+	}
+
+	boxes := b.Model().BBox(replacePos, nil)
+	bb := p.AABB().Translate(game.Vec32To64(t.Position))
+	if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
+		return false
+	}
+
+	spam := false
+
+	// This code will detect if the client is sending this packet due to a right click bug where this will be spammed to the server.
+	if p.lastRightClickData != nil {
+		spam = p.ClientFrame()-p.lastRightClickTick < 2
+		spam = spam && p.lastRightClickData.Position == t.Position
+		spam = spam && p.lastRightClickData.BlockPosition == t.BlockPosition
+		spam = spam && p.lastRightClickData.ClickedPosition == t.ClickedPosition
+	}
+
+	if !spam {
+		// Set the block in the world
+		p.SetBlock(replacePos, b)
+		return false
+	}
+
+	// Cancel the sending of this packet if we determine that it's the right click spam bug.
+	// TODO: Correctly interpret the block's layer.
+	p.conn.WritePacket(&packet.UpdateBlock{
+		Position:          protocol.BlockPos{int32(replacePos.X()), int32(replacePos.Y()), int32(replacePos.Z())},
+		NewBlockRuntimeID: world.BlockRuntimeID(fb),
+		Layer:             0,
+		Flags:             packet.BlockUpdatePriority,
+	})
+	return true
 }
 
 // dimensionFromNetworkID returns a world.Dimension from the network id.

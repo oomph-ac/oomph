@@ -484,6 +484,11 @@ func (p *Player) Respawned() bool {
 	return p.respawned
 }
 
+// SetRespawned sets the respawned state of the player.
+func (p *Player) SetRespawned(v bool) {
+	p.respawned = v
+}
+
 // InLoadedChunk returns true if the player is in a chunk loaded by it's world
 func (p *Player) InLoadedChunk() bool {
 	return p.inLoadedChunk
