@@ -86,8 +86,7 @@ type Player struct {
 	clickDelay    uint64
 	cps           int
 
-	stackLatency     int64
-	isLatencyUpdated bool
+	stackLatency int64
 
 	lastRightClickData *protocol.UseItemTransactionData
 	lastRightClickTick uint64
@@ -140,8 +139,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		effects: make(map[int32]effect.Effect),
 
-		stackLatency:     0,
-		isLatencyUpdated: true,
+		stackLatency: 0,
 
 		gameMode: data.PlayerGameMode,
 
@@ -399,21 +397,25 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	if ctx.Cancelled() {
 		return
 	}
+
 	if log {
 		p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params, true))
 	}
-	if now, max := check.Violations(), check.MaxViolations(); now >= max {
-		go func() {
-			message := fmt.Sprintf("§7[§6oomph§7] §bcaught lackin!\n§6cheat detected: §b%s%s", name, variant)
 
-			ctx = event.C()
-			p.handler().HandlePunishment(ctx, check, &message)
-			if !ctx.Cancelled() {
-				p.log.Infof("%s was detected and punished for using %s%s.", p.Name(), name, variant)
-				p.Disconnect(message)
-			}
-		}()
+	if now, max := check.Violations(), check.MaxViolations(); now < max {
+		return
 	}
+
+	go func() {
+		message := fmt.Sprintf("§7[§6oomph§7] §bcaught lackin!\n§6cheat detected: §b%s%s", name, variant)
+
+		ctx = event.C()
+		p.handler().HandlePunishment(ctx, check, &message)
+		if !ctx.Cancelled() {
+			p.log.Infof("%s was detected and punished for using %s%s.", p.Name(), name, variant)
+			p.Disconnect(message)
+		}
+	}()
 }
 
 // Ready returns true if the player is ready/spawned in.
@@ -537,11 +539,6 @@ func (p *Player) TickLatency() int64 {
 	return int64(p.ServerTick()) - int64(p.ClientTick())
 }
 
-// IsLatencyUpdated returns true if the processor has updated its latency.
-func (p *Player) IsLatencyUpdated() bool {
-	return p.isLatencyUpdated
-}
-
 // Name returns the player's display name.
 func (p *Player) Name() string {
 	return p.IdentityData().DisplayName
@@ -622,26 +619,61 @@ func (p *Player) ackEntitiesPos() {
 	}()
 	p.queueMu.Lock()
 
+	queue := p.queuedEntityLocations
+
 	// If there's a position for the entity sent by the server, we will update the server position
 	// of the entity to the position sent. This position is not one of the rewinded positions, but
 	// rather the position sent by the server that will be interpolated later by e.TickPosition().
 	if p.combatMode == utils.ModeFullAuthoritative {
-		for rid, dat := range p.queuedEntityLocations {
-			if e, valid := p.SearchEntity(rid); valid {
-				e.UpdatePosition(dat, e.Player())
-			}
-		}
+		p.updateEntityPositions(queue)
 		return
 	}
 
-	queue := p.queuedEntityLocations
 	p.Acknowledgement(func() {
-		for rid, dat := range queue {
-			if e, valid := p.SearchEntity(rid); valid {
-				e.UpdatePosition(dat, e.Player())
-			}
-		}
+		p.updateEntityPositions(queue)
 	})
+}
+
+// updateEntityPositions updates the positions of all entities in the queue passed in the function.
+func (p *Player) updateEntityPositions(m map[uint64]utils.LocationData) {
+	for rid, dat := range m {
+		if e, valid := p.SearchEntity(rid); valid {
+			e.UpdatePosition(dat, e.Player())
+		}
+	}
+}
+
+func (p *Player) updateLatency() {
+	curr := time.Now()
+	p.Acknowledgement(func() {
+		p.stackLatency = time.Since(curr).Milliseconds()
+	})
+}
+
+func (p *Player) tryDoSync() {
+	sTick := p.serverTick.Load()
+	if sTick >= p.nextSyncTick {
+		p.isSyncedWithServer = false
+	}
+
+	// This will sync the server's and client's tick to match. This is mainly
+	// done for scenarios where the client will be simulating slower than the server.
+	if !p.dead && !p.isSyncedWithServer && !p.awaitingSync {
+		p.awaitingSync = true
+		p.Acknowledgement(func() {
+			// Only sync the tick if the client is behind what it should be. If the the ticks
+			// are the same then there is no need for this to run. If the client is currently ahead,
+			// it should be equal to the server tick the next time the server attempts a sync. If not,
+			// the client is probably simulating faster than the server (us), and a timer detection would
+			// pick this up.
+			if p.clientTick.Load() < sTick {
+				p.clientTick.Store(sTick)
+			}
+			p.isSyncedWithServer = true
+			p.awaitingSync = false
+			p.nextSyncTick = p.ServerTick() + 100
+		})
+	}
 }
 
 // startTicking ticks the player until the connection is closed.
@@ -655,20 +687,6 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
-			/* p.clientPkMu.Lock()
-			for _, cpk := range p.clientPks {
-				p.ClientProcess(cpk)
-			}
-			p.clientPks = nil
-			p.clientPkMu.Unlock()
-
-			p.svrPkMu.Lock()
-			for _, spk := range p.svrPks {
-				p.ServerProcess(spk)
-			}
-			p.svrPks = nil
-			p.svrPkMu.Unlock() */
-
 			// This will prepare the entity positions to be acknowledged.
 			p.ackEntitiesPos()
 
@@ -685,40 +703,9 @@ func (p *Player) startTicking() {
 				p.Disconnect("Error: Client was unable to respond to acknowledgements sent by the server.")
 			}
 
-			sTick := p.serverTick.Load()
-			if sTick >= p.nextSyncTick {
-				p.isSyncedWithServer = false
-			}
-
-			// This will sync the server's and client's tick to match. This is mainly
-			// done for scenarios where the client will be simulating slower than the server.
-			if !p.dead && !p.isSyncedWithServer && !p.awaitingSync {
-				p.awaitingSync = true
-				p.Acknowledgement(func() {
-					// Only sync the tick if the client is behind what it should be. If the the ticks
-					// are the same then there is no need for this to run. If the client is currently ahead,
-					// it should be equal to the server tick the next time the server attempts a sync. If not,
-					// the client is probably simulating faster than the server (us), and a timer detection would
-					// pick this up.
-					if p.clientTick.Load() < sTick {
-						p.clientTick.Store(sTick)
-					}
-					p.isSyncedWithServer = true
-					p.awaitingSync = false
-					p.nextSyncTick = p.ServerTick() + 100
-				})
-			}
-
-			if p.isLatencyUpdated {
-				p.isLatencyUpdated = false
-				curr := time.Now()
-				p.Acknowledgement(func() {
-					p.stackLatency = time.Since(curr).Milliseconds()
-					p.isLatencyUpdated = true
-				})
-			}
-
-			go p.flushConns()
+			p.tryDoSync()
+			p.updateLatency()
+			p.flushConns()
 
 			delta := time.Since(p.lastServerTicked).Milliseconds()
 			p.lastServerTicked = time.Now()
