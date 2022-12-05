@@ -17,6 +17,8 @@ func BlockClimbable(b world.Block) bool {
 	return false
 }
 
+// BoxesIntersect returns wether or not the first given box intersects with
+// the other boxes in the given list.
 func BoxesIntersect(bb cube.BBox, boxes []cube.BBox, bpos mgl64.Vec3) bool {
 	for _, box := range boxes {
 		if box.Translate(bpos).IntersectsWith(bb) {
@@ -25,4 +27,9 @@ func BoxesIntersect(bb cube.BBox, boxes []cube.BBox, bpos mgl64.Vec3) bool {
 	}
 
 	return true
+}
+
+// BlockToCubePos converts protocol.BlockPos into cube.Pos
+func BlockToCubePos(p [3]int32) cube.Pos {
+	return cube.Pos{int(p[0]), int(p[1]), int(p[2])}
 }

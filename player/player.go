@@ -317,6 +317,13 @@ func (p *Player) TakingKnockback() bool {
 	return p.mInfo.MotionTicks <= 1
 }
 
+// UpdateServerVelocity updates the server velocity of the player.
+func (p *Player) UpdateServerVelocity(v mgl64.Vec3) {
+	p.miMu.Lock()
+	p.mInfo.UpdateServerSentVelocity(v)
+	p.miMu.Unlock()
+}
+
 // ClientMovement returns the client's movement as a Vec3
 func (p *Player) ClientMovement() mgl64.Vec3 {
 	p.miMu.Lock()

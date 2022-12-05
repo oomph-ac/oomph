@@ -92,9 +92,9 @@ func (p *Player) correctMovement() {
 	}
 
 	diffVec := pos.Sub(p.Position())
-	diffVec[0] = game.ClampFloat(diffVec[0], -0.03, 0.03)
-	diffVec[1] = game.ClampFloat(diffVec[1], -0.03, 0.03)
-	diffVec[2] = game.ClampFloat(diffVec[2], -0.03, 0.03)
+	diffVec[0] = game.ClampFloat(diffVec[0], -0.1, 0.1)
+	diffVec[1] = game.ClampFloat(diffVec[1], -0.1, 0.1)
+	diffVec[2] = game.ClampFloat(diffVec[2], -0.1, 0.1)
 
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
@@ -159,11 +159,7 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagPerformItemInteraction) && pk.ItemInteractionData.ActionType == protocol.UseItemActionBreakBlock {
 		b, _ := world.BlockByRuntimeID(air)
-		p.SetBlock(cube.Pos{
-			int(pk.ItemInteractionData.BlockPosition[0]),
-			int(pk.ItemInteractionData.BlockPosition[1]),
-			int(pk.ItemInteractionData.BlockPosition[2]),
-		}, b)
+		p.SetBlock(utils.BlockToCubePos(pk.ItemInteractionData.BlockPosition), b)
 	}
 
 	if p.updateMovementState() {
