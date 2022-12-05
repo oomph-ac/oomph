@@ -2,7 +2,6 @@ package player
 
 import (
 	"bytes"
-	"math"
 	"time"
 	_ "unsafe"
 
@@ -93,7 +92,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			cancel = p.handleBlockPlace(t)
 		}
 	case *packet.Text:
-		if p.serverConn != nil {
+		if p.serverConn == nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
@@ -169,7 +168,8 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		// If rewind is being applied with this packet, teleport the player instantly on the server
 		// instead of waiting for the client to acknowledge the packet.
-		if pk.Tick != 0 {
+		if p.movementMode == utils.ModeFullAuthoritative {
+			pk.Tick = p.ClientFrame()
 			p.Teleport(pk.Position, true)
 			return false
 		}
@@ -184,33 +184,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.lastSentActorData = pk
 		}
 
+		if p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= 5 {
+			p.handleSetActorData(pk)
+		}
+
 		p.Acknowledgement(func() {
-			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
-			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
-
-			if e, ok := p.SearchEntity(pk.EntityRuntimeID); ok {
-				if widthExists {
-					e.SetAABB(game.AABBFromDimensions(float64(width.(float32)), e.AABB().Height()))
-				}
-
-				if heightExists {
-					e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), float64(height.(float32))))
-				}
-			}
-
-			if pk.EntityRuntimeID != p.rid {
-				return
-			}
-
-			if f, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
-				flags := f.(int64)
-
-				p.miMu.Lock()
-				p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
-				p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
-				p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
-				p.miMu.Unlock()
-			}
+			p.handleSetActorData(pk)
 		})
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
@@ -247,89 +226,32 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		if pk.EntityRuntimeID != p.rid {
 			return false
 		}
-
-		velocity := game.Vec32To64(pk.Velocity)
+		v := game.Vec32To64(pk.Velocity)
 
 		// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
 		if p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= 5 {
-			p.miMu.Lock()
-			p.mInfo.UpdateServerSentVelocity(velocity)
-			p.miMu.Unlock()
-
+			p.UpdateServerVelocity(v)
 			return false
 		}
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 		// does take knockback when it recieves it.
 		p.Acknowledgement(func() {
-			p.miMu.Lock()
-			p.mInfo.UpdateServerSentVelocity(velocity)
-			p.miMu.Unlock()
+			p.UpdateServerVelocity(v)
 		})
 	case *packet.LevelChunk:
-		p.ready = true
-
-		if p.movementMode == utils.ModeClientAuthoritative {
-			return false
-		}
-
-		c, err := chunk.NetworkDecode(air, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
-		if err != nil {
-			c = chunk.New(air, world.Overworld.Range())
-		}
-		c.Compact()
-
-		p.Acknowledgement(func() {
-			pos := protocol.ChunkPos{int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4, int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4}
-			if pos == pk.Position && p.ChunkExists(pos) {
-				p.inLoadedChunkTicks = 0
-			}
-			p.LoadChunk(pk.Position, c)
-		})
+		p.handleLevelChunk(pk)
 	case *packet.SubChunk:
-		p.ready = true
-
-		if p.movementMode == utils.ModeClientAuthoritative {
-			return false
+		switch p.movementMode {
+		case utils.ModeSemiAuthoritative:
+			p.Acknowledgement(func() {
+				p.handleSubChunk(pk)
+			})
+		case utils.ModeFullAuthoritative:
+			p.handleSubChunk(pk)
 		}
-
-		p.Acknowledgement(func() {
-			pos := protocol.ChunkPos{int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4, int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4}
-
-			for _, entry := range pk.SubChunkEntries {
-				if entry.Result != protocol.SubChunkResultSuccess {
-					continue
-				}
-
-				chunkPos := protocol.ChunkPos{
-					pk.Position[0] + int32(entry.Offset[0]),
-					pk.Position[2] + int32(entry.Offset[2]),
-				}
-
-				c, ok := p.Chunk(chunkPos)
-				if !ok {
-					p.chkMu.Lock()
-					c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
-					p.chunks[chunkPos] = c
-					p.chkMu.Unlock()
-				} else {
-					if pos == chunkPos {
-						p.inLoadedChunkTicks = 0
-					}
-					c.Unlock()
-				}
-
-				var index byte
-				sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
-				if err != nil {
-					panic(err)
-				}
-
-				c.Sub()[index] = sub
-			}
-		})
 	case *packet.ChunkRadiusUpdated:
 		p.Acknowledgement(func() {
 			p.chunkRadius = int(pk.ChunkRadius)
@@ -345,12 +267,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 
 		if p.movementMode == utils.ModeFullAuthoritative {
-			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
 			return false
 		}
 
 		p.Acknowledgement(func() {
-			p.SetBlock(cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}, b)
+			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
 		})
 	case *packet.MobEffect:
 		if pk.EntityRuntimeID != p.rid {
@@ -358,17 +280,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 
 		p.Acknowledgement(func() {
-			switch pk.Operation {
-			case packet.MobEffectAdd, packet.MobEffectModify:
-				if t, ok := effect.ByID(int(pk.EffectType)); ok {
-					if t, ok := t.(effect.LastingType); ok {
-						eff := effect.New(t, int(pk.Amplifier)+1, time.Duration(pk.Duration*50)*time.Millisecond)
-						p.SetEffect(pk.EffectType, eff)
-					}
-				}
-			case packet.MobEffectRemove:
-				p.RemoveEffect(pk.EffectType)
-			}
+			p.handleMobEffect(pk)
 		})
 	case *packet.UpdateAbilities:
 		p.Acknowledgement(func() {
@@ -392,6 +304,56 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 	return false
 }
 
+func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
+	p.ready = true
+	c, err := chunk.NetworkDecode(air, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
+	if err != nil {
+		c = chunk.New(air, world.Overworld.Range())
+	}
+	c.Compact()
+
+	switch p.movementMode {
+	case utils.ModeSemiAuthoritative:
+		p.Acknowledgement(func() {
+			p.LoadChunk(pk.Position, c)
+		})
+	case utils.ModeFullAuthoritative:
+		p.LoadChunk(pk.Position, c)
+	}
+}
+
+func (p *Player) handleSubChunk(pk *packet.SubChunk) {
+	p.ready = true
+	for _, entry := range pk.SubChunkEntries {
+		if entry.Result != protocol.SubChunkResultSuccess {
+			continue
+		}
+
+		chunkPos := protocol.ChunkPos{
+			pk.Position[0] + int32(entry.Offset[0]),
+			pk.Position[2] + int32(entry.Offset[2]),
+		}
+
+		c, ok := p.Chunk(chunkPos)
+		if !ok {
+			p.chkMu.Lock()
+			c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
+			p.chunks[chunkPos] = c
+			p.chkMu.Unlock()
+		} else {
+			c.Unlock()
+		}
+
+		var index byte
+		sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+		if err != nil {
+			panic(err)
+		}
+
+		c.Sub()[index] = sub
+	}
+}
+
 func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	defer func() {
 		p.lastRightClickData = t
@@ -408,7 +370,7 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		return false
 	}
 
-	replacePos := cube.Pos{int(t.BlockPosition.X()), int(t.BlockPosition.Y()), int(t.BlockPosition.Z())}
+	replacePos := utils.BlockToCubePos(t.BlockPosition)
 	fb := p.Block(replacePos)
 
 	if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
@@ -446,6 +408,65 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		Flags:             packet.BlockUpdatePriority,
 	})
 	return true
+}
+
+func (p *Player) handleMobEffect(pk *packet.MobEffect) {
+	switch pk.Operation {
+	case packet.MobEffectAdd, packet.MobEffectModify:
+		t, ok := effect.ByID(int(pk.EffectType))
+		if !ok {
+			return
+		}
+
+		e, ok := t.(effect.LastingType)
+		if !ok {
+			return
+		}
+
+		eff := effect.New(e, int(pk.Amplifier)+1, time.Duration(pk.Duration*50)*time.Millisecond)
+		p.SetEffect(pk.EffectType, eff)
+	case packet.MobEffectRemove:
+		p.RemoveEffect(pk.EffectType)
+	}
+}
+
+func (p *Player) handleSetActorData(pk *packet.SetActorData) {
+	isPlayer := pk.EntityRuntimeID == p.rid
+	width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
+	height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
+
+	e, ok := p.SearchEntity(pk.EntityRuntimeID)
+	if isPlayer {
+		e = p.Entity()
+		ok = true
+	}
+
+	if !ok {
+		return
+	}
+
+	if widthExists {
+		e.SetAABB(game.AABBFromDimensions(float64(width.(float32)), e.AABB().Height()))
+	}
+	if heightExists {
+		e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), float64(height.(float32))))
+	}
+
+	if !isPlayer {
+		return
+	}
+
+	f, ok := pk.EntityMetadata[entity.DataKeyFlags]
+	if !ok {
+		return
+	}
+	flags := f.(int64)
+
+	p.miMu.Lock()
+	p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
+	p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
+	p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
+	p.miMu.Unlock()
 }
 
 // dimensionFromNetworkID returns a world.Dimension from the network id.
