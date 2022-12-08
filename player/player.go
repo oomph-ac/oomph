@@ -194,6 +194,11 @@ func (p *Player) Conn() *minecraft.Conn {
 	return p.conn
 }
 
+// Log returns the logger of the player.
+func (p *Player) Log() *logrus.Logger {
+	return p.log
+}
+
 // Move moves the player to the given position.
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
 	data, pos := p.Entity(), game.Vec32To64(pk.Position)
