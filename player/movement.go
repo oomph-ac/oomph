@@ -98,7 +98,7 @@ func (p *Player) correctMovement() {
 
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
-		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62 + 1e-3}).Add(diffVec)),
+		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62 + 1e-3}).Sub(diffVec)),
 		Delta:    game.Vec64To32(delta),
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
