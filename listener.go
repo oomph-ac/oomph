@@ -7,6 +7,7 @@ import (
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sirupsen/logrus"
 )
 
 // listener is a Dragonfly listener implementation for direct Oomph.
@@ -56,7 +57,7 @@ func (l listener) Accept() (session.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := player.NewPlayer(l.o.log, c.(*minecraft.Conn), nil)
+	p := player.NewPlayer(logrus.New(), c.(*minecraft.Conn), nil)
 	l.o.players <- p
 	return p, err
 }

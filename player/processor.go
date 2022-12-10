@@ -92,7 +92,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			cancel = p.handleBlockPlace(t)
 		}
 	case *packet.Text:
-		if p.serverConn == nil {
+		if p.serverConn != nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
