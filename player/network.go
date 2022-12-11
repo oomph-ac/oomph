@@ -63,12 +63,24 @@ func (p *Player) WritePacket(pk packet.Packet) error {
 
 // ReadPacket will call minecraft.Conn.ReadPacket and process the packet with oomph.
 func (p *Player) ReadPacket() (pk packet.Packet, err error) {
+	p.tMu.Lock()
+	if len(p.toSend) > 0 {
+		pk = p.toSend[0]
+		p.toSend = p.toSend[1:]
+		p.tMu.Unlock()
+
+		return pk, err
+	}
+	p.tMu.Unlock()
+
 	if pk, err = p.conn.ReadPacket(); err != nil {
 		return nil, err
 	}
+
 	if p.ClientProcess(pk) {
 		return p.ReadPacket()
 	}
+
 	return pk, err
 }
 

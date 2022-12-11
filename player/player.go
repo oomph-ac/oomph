@@ -103,6 +103,9 @@ type Player struct {
 	checkMu sync.Mutex
 	checks  []check.Check
 
+	toSend []packet.Packet
+	tMu    sync.Mutex
+
 	c    chan struct{}
 	once sync.Once
 
@@ -146,6 +149,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		inLoadedChunk: false,
 
 		c: make(chan struct{}),
+
+		toSend: make([]packet.Packet, 0),
 
 		checks: []check.Check{
 			check.NewAutoClickerA(),
@@ -617,6 +622,19 @@ func (p *Player) flushConns() {
 	if p.serverConn != nil {
 		p.serverConn.Flush()
 	}
+}
+
+// sendPacketToServer sends a packet to the server
+func (p *Player) sendPacketToServer(pk packet.Packet) {
+	if p.serverConn == nil {
+		p.tMu.Lock()
+		p.toSend = append(p.toSend, pk)
+		p.tMu.Unlock()
+
+		return
+	}
+
+	p.serverConn.WritePacket(pk)
 }
 
 // tickEntitiesPos ticks the position of all entities
