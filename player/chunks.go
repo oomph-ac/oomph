@@ -48,9 +48,6 @@ func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
 
 // Block returns the block found at the given position
 func (p *Player) Block(pos cube.Pos) world.Block {
-	p.chkMu.Lock()
-	defer p.chkMu.Unlock()
-
 	if pos.OutOfBounds(world.Overworld.Range()) {
 		return block.Air{}
 	}
@@ -67,9 +64,6 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 
 // SetBlock sets a block at the given position to the given block
 func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
-	p.chkMu.Lock()
-	defer p.chkMu.Unlock()
-
 	if pos.OutOfBounds(world.Overworld.Range()) {
 		return
 	}
