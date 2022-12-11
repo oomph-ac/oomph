@@ -93,7 +93,7 @@ func (p *Player) validateCombat() {
 		p.entityMu.Unlock()
 
 		if valid {
-			p.serverConn.WritePacket(&packet.InventoryTransaction{
+			p.sendPacketToServer(&packet.InventoryTransaction{
 				TransactionData: &protocol.UseItemOnEntityTransactionData{
 					TargetEntityRuntimeID: eid,
 					ActionType:            protocol.UseItemOnEntityActionAttack,
@@ -134,7 +134,7 @@ func (p *Player) validateCombat() {
 			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3)))
 
 			if ok {
-				p.serverConn.WritePacket(p.lastAttackData)
+				p.sendPacketToServer(p.lastAttackData)
 			}
 		}
 	}
