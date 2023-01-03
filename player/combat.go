@@ -1,6 +1,8 @@
 package player
 
 import (
+	"fmt"
+
 	"github.com/df-mc/dragonfly/server/block/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
@@ -33,30 +35,26 @@ func (p *Player) validateCombat() {
 	}
 
 	// This determines what tick we should rewind to get an entity position for lag compensation.
-	// Lag compensation is limited to 250ms in this case, so we want two things:
-	// 1) The tick we should rewind to should be no more than 5 ticks (250ms) in the past.
+	// Lag compensation is limited to 300ms in this case, so we want two things:
+	// 1) The tick we should rewind to should be no more than 6 ticks (300ms) in the past.
 	// 2) The tick we should rewind to should not be higher than the current server tick
-	tick, stick := p.clientTick.Load(), p.serverTick.Load()
-	if tick < stick-5 {
-		tick = stick - 5
+	tick, stick, cut := p.clientTick.Load(), p.serverTick.Load(), uint64(NetworkLatencyCutoff)
+	if tick < stick-cut {
+		tick = stick - cut
 	}
 	if tick > stick {
 		tick = stick
 	}
+
 	attackPos := p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62})
 
 	if p.lastAttackData == nil {
-		// We're going to be unable to create an inventory transaction for this hit if no equipment data is
-		// available. Return false because nothing else can be done here.
-		if p.lastEquipmentData == nil {
+		if p.inputMode == packet.InputModeTouch {
 			return
 		}
 
-		// We're not going to be able to check if the client mispredicted a hit in this case as
-		// touch players can disable touch controls, which means the yaw/pitch sent by the client
-		// will not be the one used for attacking and does not represent where the player touched their
-		// screen at.
-		if p.inputMode == packet.InputModeTouch {
+		// We're going to be unable to create an inventory transaction for this hit if no equipment data is available.
+		if p.lastEquipmentData == nil {
 			return
 		}
 
@@ -77,7 +75,8 @@ func (p *Player) validateCombat() {
 				continue
 			}
 
-			targetAABB := e.AABB().Grow(0.15).Translate(rew.Position)
+			targetAABB := e.AABB().Grow(0.125).Translate(rew.Position)
+
 			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3)))
 			if !ok {
 				continue
@@ -103,7 +102,6 @@ func (p *Player) validateCombat() {
 					ClickedPosition:       mgl32.Vec3{},
 				},
 			})
-			//p.SendOomphDebug(fmt.Sprint("client mispredicted missed hit! sent attack on entity ", eid, " with dist ", math.Sqrt(min)))
 		}
 
 		return
@@ -129,12 +127,14 @@ func (p *Player) validateCombat() {
 		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 		// which would allow the player to attack another entity without actually looking at them.
 		if p.inputMode != packet.InputModeTouch {
-			targetAABB := t.AABB().Grow(0.15).Translate(rew.Position)
+			targetAABB := t.AABB().Grow(0.125).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3)))
 
 			if ok {
 				p.sendPacketToServer(p.lastAttackData)
+			} else if p.debugger.ServerCombat {
+				p.SendOomphDebug(fmt.Sprint("hit invalidated! raycast failed && {pos: ", game.RoundVec64(rew.Position, 4), " yaw: ", game.Round(p.Rotation()[2], 2)), packet.TextTypeChat)
 			}
 		}
 	}
