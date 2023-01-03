@@ -33,7 +33,11 @@ func (a *Acknowledgements) AddMap(m []func(), t int64) {
 	a.AcknowledgeMap[t] = m
 }
 
+// GetMap returns the list of functions in the AcknowledgeMap with the specified timestamp.
 func (a *Acknowledgements) GetMap(t int64) ([]func(), bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	m, ok := a.AcknowledgeMap[t]
 	if !ok {
 		return nil, false
