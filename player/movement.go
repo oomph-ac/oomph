@@ -68,13 +68,16 @@ func (p *Player) correctMovement() {
 
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
-	for bpos, b := range p.GetNearbyBlocks(p.AABB().Translate(p.mInfo.ServerPosition)) {
-		p.conn.WritePacket(&packet.UpdateBlock{
-			Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
-			NewBlockRuntimeID: world.BlockRuntimeID(b),
-			Flags:             packet.BlockUpdatePriority,
-			Layer:             0,
-		})
+	if p.mInfo.RefreshBlockTicks >= 30 {
+		for bpos, b := range p.GetNearbyBlocks(p.AABB().Translate(p.mInfo.ServerPosition)) {
+			p.conn.WritePacket(&packet.UpdateBlock{
+				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
+				NewBlockRuntimeID: world.BlockRuntimeID(b),
+				Flags:             packet.BlockUpdatePriority,
+				Layer:             0,
+			})
+		}
+		p.mInfo.RefreshBlockTicks = 0
 	}
 
 	// This will send the most recent actor data to the client to ensure that all
@@ -481,7 +484,8 @@ type MovementInfo struct {
 	Speed                   float64
 	StepLenience            float64
 
-	MotionTicks uint64
+	MotionTicks       uint64
+	RefreshBlockTicks uint64
 
 	Sneaking, SneakDown   bool
 	Jumping, JumpDown     bool
@@ -509,4 +513,5 @@ func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
 
 func (m *MovementInfo) UpdateTickStatus() {
 	m.MotionTicks++
+	m.RefreshBlockTicks++
 }

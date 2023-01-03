@@ -26,10 +26,14 @@ import (
 	"golang.org/x/text/language"
 )
 
+var NetworkLatencyCutoff int64 = 6
+
 // Player contains information about a player, such as its virtual world or AABB.
 type Player struct {
 	log              *logrus.Logger
 	conn, serverConn *minecraft.Conn
+
+	debugger *Debugger
 
 	rid uint64
 	uid int64
@@ -117,6 +121,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	data := conn.GameData()
 	p := &Player{
 		log: log,
+
+		debugger: &Debugger{},
 
 		conn:       conn,
 		serverConn: serverConn,
@@ -406,7 +412,7 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	name, variant := check.Name()
 	check.AddViolation(violations)
 
-	params["latency"] = p.stackLatency
+	params["latency"] = fmt.Sprint(p.stackLatency, "ms")
 
 	ctx := event.C()
 	log := true
@@ -567,10 +573,10 @@ func (p *Player) Name() string {
 }
 
 // SendOomphDebug sends a debug message to the processor.
-func (p *Player) SendOomphDebug(message string) {
+func (p *Player) SendOomphDebug(message string, t byte) {
 	p.conn.WritePacket(&packet.Text{
-		TextType: packet.TextTypeChat,
-		Message:  "§l§7[§eoomph§7]§r " + message,
+		TextType: t,
+		Message:  "§l§7[§eoomph§7]§r§f " + message,
 		XUID:     "",
 	})
 }
@@ -682,6 +688,11 @@ func (p *Player) updateLatency() {
 	curr := time.Now()
 	p.Acknowledgement(func() {
 		p.stackLatency = time.Since(curr).Milliseconds()
+		if !p.debugger.Latency {
+			return
+		}
+
+		p.SendOomphDebug(fmt.Sprint("RTT + Processing Delays: ", p.stackLatency, "ms"), packet.TextTypePopup)
 	})
 }
 
@@ -696,17 +707,10 @@ func (p *Player) tryDoSync() {
 	if !p.dead && !p.isSyncedWithServer && !p.awaitingSync {
 		p.awaitingSync = true
 		p.Acknowledgement(func() {
-			// Only sync the tick if the client is behind what it should be. If the the ticks
-			// are the same then there is no need for this to run. If the client is currently ahead,
-			// it should be equal to the server tick the next time the server attempts a sync. If not,
-			// the client is probably simulating faster than the server (us), and a timer detection would
-			// pick this up.
-			if p.clientTick.Load() < sTick {
-				p.clientTick.Store(sTick)
-			}
+			p.clientTick.Store(sTick)
 			p.isSyncedWithServer = true
 			p.awaitingSync = false
-			p.nextSyncTick = p.ServerTick() + 100
+			p.nextSyncTick = p.ServerTick() + uint64(p.TickLatency()) + 1
 		})
 	}
 }
@@ -722,6 +726,15 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
+			// This code calculates how much the server tick should be incremented by. This is done by checking the
+			// difference between the last time the server ticked and the current time.
+			delta := time.Since(p.lastServerTicked).Milliseconds()
+			if delta > 50 {
+				p.serverTick.Add(uint64(delta / 50))
+			} else {
+				p.serverTick.Inc()
+			}
+
 			// This will prepare the entity positions to be acknowledged.
 			p.ackEntitiesPos()
 
@@ -742,14 +755,7 @@ func (p *Player) startTicking() {
 			p.updateLatency()
 			p.flushConns()
 
-			delta := time.Since(p.lastServerTicked).Milliseconds()
 			p.lastServerTicked = time.Now()
-
-			if delta > 50 {
-				p.serverTick.Add(uint64(delta / 50))
-			} else {
-				p.serverTick.Inc()
-			}
 		}
 	}
 }

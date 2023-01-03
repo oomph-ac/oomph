@@ -124,7 +124,7 @@ func (e *Entity) TickPosition(tick uint64) {
 	}
 
 	e.positionBuffer = append(e.positionBuffer, utils.LocationData{Tick: tick, Position: e.position})
-	if len(e.positionBuffer) > 5 {
+	if len(e.positionBuffer) > 6 {
 		e.positionBuffer = e.positionBuffer[1:]
 	}
 }

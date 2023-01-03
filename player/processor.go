@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"strings"
 	"time"
 	_ "unsafe"
 
@@ -92,6 +93,29 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			cancel = p.handleBlockPlace(t)
 		}
 	case *packet.Text:
+		cmd := strings.Split(pk.Message, " ")
+		if cmd[0] == ".oomph_debug" {
+			if len(cmd) != 3 {
+				p.SendOomphDebug("Usage: .oomph_debug <mode> <value>", packet.TextTypeChat)
+				return true
+			}
+
+			b := cmd[2] == "on" || cmd[2] == "true"
+
+			switch cmd[1] {
+			case "latency":
+				p.debugger.Latency = b
+			case "server_combat":
+				p.debugger.ServerCombat = b
+			case "server_kb":
+			case "server_knockback":
+				p.debugger.ServerKnockback = b
+			default:
+				p.SendOomphDebug("Unknown debug mode: "+cmd[1], packet.TextTypeChat)
+			}
+			return true
+		}
+
 		if p.serverConn != nil {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
@@ -184,8 +208,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.lastSentActorData = pk
 		}
 
-		if p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= 5 {
+		if p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= NetworkLatencyCutoff {
+			pk.Tick = p.ClientFrame()
 			p.handleSetActorData(pk)
+			return false
 		}
 
 		p.Acknowledgement(func() {
@@ -228,10 +254,10 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 		v := game.Vec32To64(pk.Velocity)
 
-		// If the player is behind by more than 5 ticks (250ms), then instantly set the KB
+		// If the player is behind by more than 6 ticks (300ms), then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= 5 {
+		if p.movementMode == utils.ModeFullAuthoritative && (p.TickLatency() >= NetworkLatencyCutoff || p.debugger.ServerKnockback) {
 			p.UpdateServerVelocity(v)
 			return false
 		}
@@ -407,6 +433,7 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		Layer:             0,
 		Flags:             packet.BlockUpdatePriority,
 	})
+	p.SendOomphDebug("cancelled block place spam", packet.TextTypeChat)
 	return true
 }
 
