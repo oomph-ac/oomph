@@ -92,9 +92,6 @@ type Player struct {
 
 	stackLatency int64
 
-	lastRightClickData *protocol.UseItemTransactionData
-	lastRightClickTick uint64
-
 	lastAttackData     *packet.InventoryTransaction
 	lastEquipmentData  *packet.MobEquipment
 	lastSentAttributes *packet.UpdateAttributes

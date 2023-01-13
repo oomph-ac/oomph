@@ -16,12 +16,10 @@ func NewKillAuraA() *KillAuraA {
 	return &KillAuraA{}
 }
 
-// Name ...
 func (*KillAuraA) Name() (string, string) {
 	return "KillAura", "A"
 }
 
-// Description ...
 func (*KillAuraA) Description() string {
 	return "This checks if a player is attacking without swinging their arm."
 }
