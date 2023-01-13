@@ -51,6 +51,18 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
+			go func() {
+				time.Sleep(time.Second * 2)
+				p.conn.WritePacket(&packet.LevelEvent{
+					EventType: packet.LevelEventSimTimeScale,
+					Position:  mgl32.Vec3{1.02},
+				})
+				time.Sleep(time.Second * 5)
+				p.conn.WritePacket(&packet.LevelEvent{
+					EventType: packet.LevelEventSimTimeScale,
+					Position:  mgl32.Vec3{1},
+				})
+			}()
 		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
@@ -280,7 +292,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 	case *packet.ChunkRadiusUpdated:
 		p.Acknowledgement(func() {
-			p.chunkRadius = int(pk.ChunkRadius)
+			p.chunkRadius = int(pk.ChunkRadius) + 4
 		})
 	case *packet.UpdateBlock:
 		if p.movementMode == utils.ModeClientAuthoritative {
@@ -381,11 +393,6 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 }
 
 func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
-	defer func() {
-		p.lastRightClickData = t
-		p.lastRightClickTick = p.ClientFrame()
-	}()
-
 	i, ok := world.ItemByRuntimeID(t.HeldItem.Stack.NetworkID, int16(t.HeldItem.Stack.MetadataValue))
 	if !ok {
 		return false
@@ -409,32 +416,9 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		return false
 	}
 
-	spam := false
-
-	// This code will detect if the client is sending this packet due to a right click bug where this will be spammed to the server.
-	if p.lastRightClickData != nil {
-		spam = p.ClientFrame()-p.lastRightClickTick < 2
-		spam = spam && p.lastRightClickData.Position == t.Position
-		spam = spam && p.lastRightClickData.BlockPosition == t.BlockPosition
-		spam = spam && p.lastRightClickData.ClickedPosition == t.ClickedPosition
-	}
-
-	if !spam {
-		// Set the block in the world
-		p.SetBlock(replacePos, b)
-		return false
-	}
-
-	// Cancel the sending of this packet if we determine that it's the right click spam bug.
-	// TODO: Correctly interpret the block's layer.
-	p.conn.WritePacket(&packet.UpdateBlock{
-		Position:          protocol.BlockPos{int32(replacePos.X()), int32(replacePos.Y()), int32(replacePos.Z())},
-		NewBlockRuntimeID: world.BlockRuntimeID(fb),
-		Layer:             0,
-		Flags:             packet.BlockUpdatePriority,
-	})
-	p.SendOomphDebug("cancelled block place spam", packet.TextTypeChat)
-	return true
+	// Set the block in the world
+	p.SetBlock(replacePos, b)
+	return false
 }
 
 func (p *Player) handleMobEffect(pk *packet.MobEffect) {

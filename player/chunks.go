@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -13,6 +14,7 @@ import (
 // LoadChunk adds a chunk to the map of chunks
 func (p *Player) LoadChunk(pos protocol.ChunkPos, c *chunk.Chunk) {
 	p.chkMu.Lock()
+	delete(p.chunks, pos)
 	p.chunks[pos] = c
 	p.chkMu.Unlock()
 }
@@ -58,7 +60,10 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	rid := c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
 	c.Unlock()
 
-	b, _ := world.BlockByRuntimeID(rid)
+	b, found := world.BlockByRuntimeID(rid)
+	if !found {
+		fmt.Println("BLOCK NOT FOUND, RETURN AIR")
+	}
 	return b
 }
 
