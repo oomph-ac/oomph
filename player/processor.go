@@ -51,18 +51,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
-			go func() {
-				time.Sleep(time.Second * 2)
-				p.conn.WritePacket(&packet.LevelEvent{
-					EventType: packet.LevelEventSimTimeScale,
-					Position:  mgl32.Vec3{1.02},
-				})
-				time.Sleep(time.Second * 5)
-				p.conn.WritePacket(&packet.LevelEvent{
-					EventType: packet.LevelEventSimTimeScale,
-					Position:  mgl32.Vec3{1},
-				})
-			}()
 		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
