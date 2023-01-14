@@ -7,10 +7,11 @@ import (
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
-	"github.com/df-mc/dragonfly/server/block/cube"
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
@@ -147,9 +148,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.Acknowledgement(func() {
 			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
-				game.Vec32To64(pk.Position),
-				game.Vec32To64(pk.Velocity),
-				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
+				pk.Position,
+				pk.Velocity,
+				mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw},
 				true,
 			))
 		})
@@ -161,15 +162,15 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		p.Acknowledgement(func() {
 			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
-				game.Vec32To64(pk.Position),
-				game.Vec32To64(pk.Velocity),
-				game.Vec32To64(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}),
+				pk.Position,
+				pk.Velocity,
+				mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw},
 				false,
 			))
 		})
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.rid {
-			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
+			p.MoveEntity(pk.EntityRuntimeID, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 			return false
 		}
 
@@ -178,11 +179,11 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 
 		p.Acknowledgement(func() {
-			p.Teleport(pk.Position, true)
+			p.Teleport(pk.Position)
 		})
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.rid {
-			p.MoveEntity(pk.EntityRuntimeID, game.Vec32To64(pk.Position), pk.Mode == packet.MoveModeTeleport, pk.OnGround)
+			p.MoveEntity(pk.EntityRuntimeID, pk.Position, pk.Mode == packet.MoveModeTeleport, pk.OnGround)
 			return false
 		}
 
@@ -194,12 +195,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		// instead of waiting for the client to acknowledge the packet.
 		if p.movementMode == utils.ModeFullAuthoritative {
 			pk.Tick = p.ClientFrame()
-			p.Teleport(pk.Position, true)
+			p.Teleport(pk.Position)
 			return false
 		}
 
 		p.Acknowledgement(func() {
-			p.Teleport(pk.Position, true)
+			p.Teleport(pk.Position)
 		})
 	case *packet.SetActorData:
 		pk.Tick = 0 // prevent rewind from happening
@@ -243,7 +244,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 					p.dead = true
 				} else if a.Name == "minecraft:movement" {
 					p.miMu.Lock()
-					p.mInfo.Speed = float64(a.Value)
+					p.mInfo.Speed = a.Value
 					p.miMu.Unlock()
 				}
 			}
@@ -252,20 +253,19 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		if pk.EntityRuntimeID != p.rid {
 			return false
 		}
-		v := game.Vec32To64(pk.Velocity)
 
 		// If the player is behind by more than 6 ticks (300ms), then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
 		if p.movementMode == utils.ModeFullAuthoritative && (p.TickLatency() >= NetworkLatencyCutoff || p.debugger.ServerKnockback) {
-			p.UpdateServerVelocity(v)
+			p.UpdateServerVelocity(pk.Velocity)
 			return false
 		}
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 		// does take knockback when it recieves it.
 		p.Acknowledgement(func() {
-			p.UpdateServerVelocity(v)
+			p.UpdateServerVelocity(pk.Velocity)
 		})
 	case *packet.LevelChunk:
 		p.handleLevelChunk(pk)
@@ -398,8 +398,13 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		replacePos = replacePos.Side(cube.Face(t.BlockFace))
 	}
 
-	boxes := b.Model().BBox(replacePos, nil)
-	bb := p.AABB().Translate(game.Vec32To64(t.Position))
+	bx := b.Model().BBox(df_cube.Pos(replacePos), nil)
+	boxes := make([]cube.BBox, 0)
+	for _, b := range bx {
+		boxes = append(boxes, game.DFBoxToCubeBox(b))
+	}
+
+	bb := p.AABB().Translate(t.Position)
 	if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
 		return false
 	}
@@ -445,10 +450,10 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 	}
 
 	if widthExists {
-		e.SetAABB(game.AABBFromDimensions(float64(width.(float32)), e.AABB().Height()))
+		e.SetAABB(game.AABBFromDimensions(width.(float32), e.AABB().Height()))
 	}
 	if heightExists {
-		e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), float64(height.(float32))))
+		e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height.(float32)))
 	}
 
 	if !isPlayer {

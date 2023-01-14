@@ -2,12 +2,14 @@ package player
 
 import (
 	"fmt"
-	"math"
 
+	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	"github.com/df-mc/dragonfly/server/block/cube"
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
@@ -50,7 +52,7 @@ func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
 
 // Block returns the block found at the given position
 func (p *Player) Block(pos cube.Pos) world.Block {
-	if pos.OutOfBounds(world.Overworld.Range()) {
+	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
 	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
@@ -69,7 +71,7 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 
 // SetBlock sets a block at the given position to the given block
 func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
-	if pos.OutOfBounds(world.Overworld.Range()) {
+	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return
 	}
 
@@ -88,8 +90,8 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 	grown := aabb.Grow(1)
 	min, max := grown.Min(), grown.Max()
-	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
-	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
+	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
+	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 
 	// A prediction of one BBox per block, plus an additional 2, in case
 	var blockBBoxs []cube.BBox
@@ -97,10 +99,11 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
-				boxes := p.Block(pos).Model().BBox(pos, nil)
+				boxes := p.Block(pos).Model().BBox(df_cube.Pos(pos), nil)
 				for _, box := range boxes {
-					if box.Translate(pos.Vec3()).IntersectsWith(aabb) {
-						blockBBoxs = append(blockBBoxs, box.Translate(pos.Vec3()))
+					b := game.DFBoxToCubeBox(box)
+					if b.Translate(pos.Vec3()).IntersectsWith(aabb) {
+						blockBBoxs = append(blockBBoxs, b.Translate(pos.Vec3()))
 					}
 				}
 			}
@@ -113,8 +116,8 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
 	grown := aabb.Grow(0.25)
 	min, max := grown.Min(), grown.Max()
-	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
-	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
+	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
+	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 
 	// A prediction of one BBox per block, plus an additional 2, in case
 	blocks := make(map[cube.Pos]world.Block)
@@ -137,10 +140,10 @@ func (p *Player) cleanChunks() (cleaned int) {
 	defer p.chkMu.Unlock()
 
 	loc := p.mInfo.ServerPosition
-	activePos := world.ChunkPos{int32(math.Floor(loc[0])) >> 4, int32(math.Floor(loc[2])) >> 4}
+	activePos := world.ChunkPos{int32(math32.Floor(loc[0])) >> 4, int32(math32.Floor(loc[2])) >> 4}
 	for pos := range p.chunks {
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
-		dist := math.Sqrt(float64(diffX*diffX) + float64(diffZ*diffZ))
+		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
 		if int(dist) > p.chunkRadius {
 			delete(p.chunks, pos)
 			cleaned++

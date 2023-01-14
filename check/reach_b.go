@@ -1,12 +1,13 @@
 package check
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"math"
+
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-    "math"
 )
 
 type ReachB struct {
@@ -54,10 +55,10 @@ func (r *ReachB) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	bb := e.AABB().Translate(e.Position()).Grow(0.1)
-	dist := game.AABBVectorDistance(bb, p.Entity().Position().Add(mgl64.Vec3{0, 1.62}))
+	dist := game.AABBVectorDistance(bb, p.Entity().Position().Add(mgl32.Vec3{0, 1.62}))
 
 	if dist < 3.1 {
-        r.violations = math.Max(r.violations - 0.02, 0)
+		r.violations = math.Max(r.violations-0.02, 0)
 		return false
 	}
 
@@ -66,7 +67,7 @@ func (r *ReachB) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	p.Flag(r, r.violationAfterTicks(p.ClientFrame(), 300), map[string]any{
-		"dist": game.Round(dist, 2),
+		"dist": game.Round32(dist, 2),
 	})
 
 	return true

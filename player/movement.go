@@ -1,13 +1,13 @@
 package player
 
 import (
-	"math"
+	"fmt"
 
+	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -44,8 +44,13 @@ func (p *Player) validateMovement() {
 		return
 	}
 
-	if p.mInfo.ServerPosition.Sub(p.Position()).LenSqr() <= 0.09 {
+	absVec := game.AbsVec32(p.mInfo.ServerPosition.Sub(p.Position()))
+	if absVec[0] < 0.05 && absVec[1] < 0.05 && absVec[2] < 0.05 {
+		p.SendOomphDebug(fmt.Sprint(absVec, " @ ", p.ClientFrame()), packet.TextTypeChat)
 		return
+	} else {
+		fmt.Println(absVec)
+		p.SendOomphDebug("§c"+fmt.Sprint(absVec, " @ ", p.ClientFrame()), packet.TextTypeChat)
 	}
 
 	p.correctMovement()
@@ -101,8 +106,8 @@ func (p *Player) correctMovement() {
 
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
-		Position: game.Vec64To32(pos.Add(mgl64.Vec3{0, 1.62 + 1e-3}).Sub(diffVec)),
-		Delta:    game.Vec64To32(delta),
+		Position: pos.Add(mgl32.Vec3{0, 1.62 + 1e-3}),
+		Delta:    delta,
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
 	})
@@ -124,8 +129,8 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	}
 
 	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
-		int32(math.Floor(p.mInfo.ServerPosition[0])) >> 4,
-		int32(math.Floor(p.mInfo.ServerPosition[2])) >> 4,
+		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
+		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
 
 	if p.inLoadedChunk {
@@ -134,8 +139,8 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 		p.inLoadedChunkTicks = 0
 	}
 
-	p.mInfo.MoveForward = float64(pk.MoveVector.Y()) * 0.98
-	p.mInfo.MoveStrafe = float64(pk.MoveVector.X()) * 0.98
+	p.mInfo.MoveForward = float32(pk.MoveVector.Y()) * 0.98
+	p.mInfo.MoveStrafe = float32(pk.MoveVector.X()) * 0.98
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
 		p.mInfo.Sprinting = true
@@ -170,7 +175,7 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 	}
 
 	if p.movementMode == utils.ModeFullAuthoritative {
-		pk.Position = game.Vec64To32(p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62}))
+		pk.Position = p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
 	}
 
 	p.mInfo.Teleporting = false
@@ -182,7 +187,7 @@ func (p *Player) calculateExpectedMovement() {
 	// of the collisions that won't be nessesary anyway as the player will be "stuck", we can just assume that their
 	// position will be the same, and that their movement will be a zero vector.
 	if p.mInfo.Immobile {
-		p.mInfo.ServerMovement = mgl64.Vec3{0, 0, 0}
+		p.mInfo.ServerMovement = mgl32.Vec3{0, 0, 0}
 		return
 	}
 
@@ -194,18 +199,18 @@ func (p *Player) calculateExpectedMovement() {
 		p.simulateJump()
 	}
 
-	v1 := 0.91
+	v1 := float32(0.91)
 	if p.mInfo.OnGround {
 		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown)).(block.Frictional); ok {
-			v1 *= b.Friction()
+			v1 *= float32(b.Friction())
 		} else {
 			v1 *= 0.6
 		}
 	}
 
-	var v3 float64
+	var v3 float32
 	if p.mInfo.OnGround {
-		v3 = p.mInfo.Speed * math.Pow((0.91*0.6)/v1, 3)
+		v3 = p.mInfo.Speed * math32.Pow((0.91*0.6)/v1, 3)
 	} else if p.mInfo.Sprinting {
 		v3 = 0.026 // 0.02 + (0.02 * 0.3)
 	} else {
@@ -233,13 +238,13 @@ func (p *Player) calculateExpectedMovement() {
 		p.mInfo.ServerMovement[1] = 0.3
 	}
 
-	if mgl64.Abs(p.mInfo.ServerMovement[0]) < 0.005 {
+	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 0.005 {
 		p.mInfo.ServerMovement[0] = 0
 	}
-	if mgl64.Abs(p.mInfo.ServerMovement[1]) < 0.005 {
+	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 0.005 {
 		p.mInfo.ServerMovement[1] = 0
 	}
-	if mgl64.Abs(p.mInfo.ServerMovement[2]) < 0.005 {
+	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 0.005 {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
@@ -257,19 +262,19 @@ func (p *Player) calculateExpectedMovement() {
 }
 
 // simulateAddedMovementForce simulates the additional movement force created by the player's mf/ms and rotation values
-func (p *Player) simulateAddedMovementForce(f float64) {
-	v := math.Pow(p.mInfo.MoveForward, 2) + math.Pow(p.mInfo.MoveStrafe, 2)
+func (p *Player) simulateAddedMovementForce(f float32) {
+	v := math32.Pow(p.mInfo.MoveForward, 2) + math32.Pow(p.mInfo.MoveStrafe, 2)
 	if v < 1e-4 {
 		return
 	}
 
-	v = math.Sqrt(v)
+	v = math32.Sqrt(v)
 	if v < 1 {
 		v = 1
 	}
 	v = f / v
 	mf, ms := p.mInfo.MoveForward*v, p.mInfo.MoveStrafe*v
-	v2, v3 := game.MCSin(p.entity.Rotation().Z()*math.Pi/180), game.MCCos(p.entity.Rotation().Z()*math.Pi/180)
+	v2, v3 := game.MCSin(p.entity.Rotation().Z()*math32.Pi/180), game.MCCos(p.entity.Rotation().Z()*math32.Pi/180)
 	p.mInfo.ServerMovement[0] += ms*v3 - mf*v2
 	p.mInfo.ServerMovement[2] += ms*v2 + mf*v3
 }
@@ -289,9 +294,9 @@ func (p *Player) simulateCollisions() {
 	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))
 
 	if p.mInfo.OnGround && p.mInfo.Sneaking {
-		mov := 0.05
+		mov := float32(0.05)
 
-		for ; deltaX != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{deltaX, -1, 0}))) == 0; vel[0] = deltaX {
+		for ; deltaX != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl32.Vec3{deltaX, -1, 0}))) == 0; vel[0] = deltaX {
 			if deltaX < mov && deltaX >= -mov {
 				deltaX = 0
 			} else if deltaX > 0 {
@@ -301,7 +306,7 @@ func (p *Player) simulateCollisions() {
 			}
 		}
 
-		for ; deltaZ != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{0, -1, deltaZ}))) == 0; vel[2] = deltaZ {
+		for ; deltaZ != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl32.Vec3{0, -1, deltaZ}))) == 0; vel[2] = deltaZ {
 			if deltaZ < mov && deltaZ >= -mov {
 				deltaZ = 0
 			} else if deltaZ > 0 {
@@ -311,7 +316,7 @@ func (p *Player) simulateCollisions() {
 			}
 		}
 
-		for ; deltaX != 0 && deltaZ != 0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl64.Vec3{deltaX, -1, deltaZ}))) == 0; vel[2] = deltaZ {
+		for ; deltaX != 0 && deltaZ != 0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl32.Vec3{deltaX, -1, deltaZ}))) == 0; vel[2] = deltaZ {
 			if deltaX < mov && deltaX >= -mov {
 				deltaX = 0
 			} else if deltaX > 0 {
@@ -335,7 +340,7 @@ func (p *Player) simulateCollisions() {
 	for _, blockBBox := range boxes {
 		deltaY = moveBB.YOffset(blockBBox, deltaY)
 	}
-	moveBB = moveBB.Translate(mgl64.Vec3{0, deltaY})
+	moveBB = moveBB.Translate(mgl32.Vec3{0, deltaY})
 
 	flag := p.mInfo.OnGround || (vel[1] != deltaY && vel[1] < 0)
 
@@ -343,11 +348,11 @@ func (p *Player) simulateCollisions() {
 	for _, blockBBox := range boxes {
 		deltaX = moveBB.XOffset(blockBBox, deltaX)
 	}
-	moveBB = moveBB.Translate(mgl64.Vec3{deltaX})
+	moveBB = moveBB.Translate(mgl32.Vec3{deltaX})
 	for _, blockBBox := range boxes {
 		deltaZ = moveBB.ZOffset(blockBBox, deltaZ)
 	}
-	moveBB = moveBB.Translate(mgl64.Vec3{0, 0, deltaZ})
+	moveBB = moveBB.Translate(mgl32.Vec3{0, 0, deltaZ})
 
 	if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
 		cx, cy, cz := deltaX, deltaY, deltaZ
@@ -355,21 +360,21 @@ func (p *Player) simulateCollisions() {
 
 		stepBB := p.AABB().Translate(p.mInfo.ServerPosition)
 		cloneBB = stepBB
-		boxes = p.GetNearbyBBoxes(cloneBB.Extend(mgl64.Vec3{deltaX, deltaY, deltaZ}))
+		boxes = p.GetNearbyBBoxes(cloneBB.Extend(mgl32.Vec3{deltaX, deltaY, deltaZ}))
 
 		for _, blockBBox := range boxes {
 			deltaY = stepBB.YOffset(blockBBox, deltaY)
 		}
-		stepBB = stepBB.Translate(mgl64.Vec3{0, deltaY})
+		stepBB = stepBB.Translate(mgl32.Vec3{0, deltaY})
 
 		for _, blockBBox := range boxes {
 			deltaX = stepBB.XOffset(blockBBox, deltaX)
 		}
-		stepBB = stepBB.Translate(mgl64.Vec3{deltaX})
+		stepBB = stepBB.Translate(mgl32.Vec3{deltaX})
 		for _, blockBBox := range boxes {
 			deltaZ = stepBB.ZOffset(blockBBox, deltaZ)
 		}
-		stepBB = stepBB.Translate(mgl64.Vec3{0, 0, deltaZ})
+		stepBB = stepBB.Translate(mgl32.Vec3{0, 0, deltaZ})
 
 		reverseDeltaY := -deltaY
 		for _, blockBBox := range boxes {
@@ -377,7 +382,7 @@ func (p *Player) simulateCollisions() {
 		}
 		deltaY += reverseDeltaY
 
-		if (math.Pow(cx, 2)+math.Pow(cz, 2)) >= (math.Pow(deltaX, 2)+math.Pow(deltaZ, 2)) || mgl64.FloatEqual(deltaY, 0) {
+		if (math32.Pow(cx, 2)+math32.Pow(cz, 2)) >= (math32.Pow(deltaX, 2)+math32.Pow(deltaZ, 2)) || mgl32.FloatEqual(deltaY, 0) {
 			deltaX, deltaY, deltaZ = cx, cy, cz
 		} else {
 			p.mInfo.StepLenience += deltaY
@@ -386,18 +391,18 @@ func (p *Player) simulateCollisions() {
 	}
 
 	p.mInfo.OnGround = false
-	p.mInfo.VerticallyCollided = !mgl64.FloatEqual(vel[1], deltaY)
+	p.mInfo.VerticallyCollided = !mgl32.FloatEqual(vel[1], deltaY)
 	if p.mInfo.VerticallyCollided {
 		p.mInfo.OnGround = vel[1] < 0
 		vel[1] = 0
 	}
 
-	p.mInfo.XCollision = !mgl64.FloatEqual(vel[0], deltaX)
+	p.mInfo.XCollision = !mgl32.FloatEqual(vel[0], deltaX)
 	if p.mInfo.XCollision {
 		vel[0] = 0
 	}
 
-	p.mInfo.ZCollision = !mgl64.FloatEqual(vel[2], deltaZ)
+	p.mInfo.ZCollision = !mgl32.FloatEqual(vel[2], deltaZ)
 	if p.mInfo.ZCollision {
 		vel[2] = 0
 	}
@@ -406,7 +411,7 @@ func (p *Player) simulateCollisions() {
 	p.mInfo.ServerMovement = vel
 
 	min, max := moveBB.Min(), moveBB.Max()
-	p.mInfo.ServerPosition = mgl64.Vec3{
+	p.mInfo.ServerPosition = mgl32.Vec3{
 		(min[0] + max[0]) / 2,
 		min[1] - p.mInfo.StepLenience,
 		(min[2] + max[2]) / 2,
@@ -451,7 +456,7 @@ func (p *Player) simulateGravity() {
 }
 
 // simulateHorizontalFriction simulates the horizontal friction of the player
-func (p *Player) simulateHorizontalFriction(friction float64) {
+func (p *Player) simulateHorizontalFriction(friction float32) {
 	p.mInfo.ServerMovement[0] *= friction
 	p.mInfo.ServerMovement[2] *= friction
 }
@@ -470,7 +475,7 @@ func (p *Player) simulateJump() {
 
 func (p *Player) setMovementToClient(d mgl32.Vec3) {
 	p.mInfo.ServerPosition = p.Position()
-	p.mInfo.ServerMovement = game.Vec32To64(d)
+	p.mInfo.ServerMovement = d
 }
 
 type MovementInfo struct {
@@ -478,14 +483,14 @@ type MovementInfo struct {
 
 	InUnsupportedRewindScenario bool
 
-	MoveForward, MoveStrafe float64
-	JumpVelocity            float64
-	Gravity                 float64
-	Speed                   float64
-	StepLenience            float64
+	MoveForward, MoveStrafe float32
+	JumpVelocity            float32
+	Gravity                 float32
+	Speed                   float32
+	StepLenience            float32
 
-	MotionTicks       uint64
-	RefreshBlockTicks uint64
+	MotionTicks       uint32
+	RefreshBlockTicks uint32
 
 	Sneaking, SneakDown   bool
 	Jumping, JumpDown     bool
@@ -500,13 +505,13 @@ type MovementInfo struct {
 	OnGround                                             bool
 	InVoid                                               bool
 
-	ClientPredictedMovement, ClientMovement mgl64.Vec3
-	ServerSentMovement                      mgl64.Vec3
-	ServerMovement, OldServerMovement       mgl64.Vec3
-	ServerPosition                          mgl64.Vec3
+	ClientPredictedMovement, ClientMovement mgl32.Vec3
+	ServerSentMovement                      mgl32.Vec3
+	ServerMovement, OldServerMovement       mgl32.Vec3
+	ServerPosition                          mgl32.Vec3
 }
 
-func (m *MovementInfo) UpdateServerSentVelocity(velo mgl64.Vec3) {
+func (m *MovementInfo) UpdateServerSentVelocity(velo mgl32.Vec3) {
 	m.ServerSentMovement = velo
 	m.MotionTicks = 0
 }

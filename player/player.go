@@ -8,16 +8,14 @@ import (
 	"time"
 
 	"github.com/df-mc/atomic"
-	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/check"
 	"github.com/oomph-ac/oomph/entity"
-	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -134,9 +132,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		},
 
 		entity: entity.NewEntity(
-			game.Vec32To64(data.PlayerPosition),
-			mgl64.Vec3{},
-			game.Vec32To64(mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw}),
+			data.PlayerPosition,
+			mgl32.Vec3{},
+			mgl32.Vec3{data.Pitch, data.Yaw, data.Yaw},
 			true,
 		),
 
@@ -209,30 +207,23 @@ func (p *Player) Log() *logrus.Logger {
 
 // Move moves the player to the given position.
 func (p *Player) Move(pk *packet.PlayerAuthInput) {
-	data, pos := p.Entity(), game.Vec32To64(pk.Position)
+	data, pos := p.Entity(), pk.Position
 	data.Move(pos, true)
-	data.Rotate(mgl64.Vec3{float64(pk.Pitch), float64(pk.HeadYaw), float64(pk.Yaw)})
+	data.Rotate(mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw})
 	data.IncrementTeleportationTicks()
 
 	p.mInfo.ClientMovement = p.Position().Sub(data.LastPosition())
-	p.mInfo.ClientPredictedMovement = game.Vec32To64(pk.Delta)
+	p.mInfo.ClientPredictedMovement = pk.Delta
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
-func (p *Player) Teleport(pos mgl32.Vec3, reset bool) {
+func (p *Player) Teleport(pos mgl32.Vec3) {
 	pos = pos.Sub(mgl32.Vec3{0, 1.62})
-	data := p.Entity()
-	data.Move(game.Vec32To64(pos), true)
-	if reset {
-		data.ResetTeleportationTicks()
-	} else {
-		data.IncrementTeleportationTicks()
-	}
 
 	p.miMu.Lock()
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
-	p.mInfo.ServerPosition = game.Vec32To64(pos)
+	p.mInfo.ServerPosition = pos
 	p.miMu.Unlock()
 }
 
@@ -250,7 +241,7 @@ func (p *Player) QueuePacket(pk packet.Packet, client bool) {
 }
 
 // MoveEntity moves an entity to the given position.
-func (p *Player) MoveEntity(rid uint64, pos mgl64.Vec3, teleport bool, ground bool) {
+func (p *Player) MoveEntity(rid uint64, pos mgl32.Vec3, teleport bool, ground bool) {
 	// If the entity exists, we can queue the location for an update.
 	if e, ok := p.SearchEntity(rid); ok {
 		e.SetServerPosition(pos)
@@ -298,12 +289,12 @@ func (p *Player) ClientFrame() uint64 {
 }
 
 // Position returns the position of the player.
-func (p *Player) Position() mgl64.Vec3 {
+func (p *Player) Position() mgl32.Vec3 {
 	return p.Entity().Position()
 }
 
 // Rotation returns the rotation of the player.
-func (p *Player) Rotation() mgl64.Vec3 {
+func (p *Player) Rotation() mgl32.Vec3 {
 	return p.Entity().Rotation()
 }
 
@@ -331,28 +322,28 @@ func (p *Player) TakingKnockback() bool {
 }
 
 // UpdateServerVelocity updates the server velocity of the player.
-func (p *Player) UpdateServerVelocity(v mgl64.Vec3) {
+func (p *Player) UpdateServerVelocity(v mgl32.Vec3) {
 	p.miMu.Lock()
 	p.mInfo.UpdateServerSentVelocity(v)
 	p.miMu.Unlock()
 }
 
 // ClientMovement returns the client's movement as a Vec3
-func (p *Player) ClientMovement() mgl64.Vec3 {
+func (p *Player) ClientMovement() mgl32.Vec3 {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 	return p.mInfo.ClientMovement
 }
 
 // ServerMovement returns a Vec3 of how the server predicts the client will move.
-func (p *Player) ServerMovement() mgl64.Vec3 {
+func (p *Player) ServerMovement() mgl32.Vec3 {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 	return p.mInfo.ServerMovement
 }
 
 // OldServerMovement returns a Vec3 of how the server predicted the client moved in the previous tick.
-func (p *Player) OldServerMovement() mgl64.Vec3 {
+func (p *Player) OldServerMovement() mgl32.Vec3 {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 	return p.mInfo.OldServerMovement

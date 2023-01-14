@@ -48,8 +48,8 @@ func (a *AutoClickerD) Process(p Processor, _ packet.Packet) bool {
 	cps := p.CPS()
 	kurtosis, skewness, outliers, deviation := game.Kurtosis(a.samples), game.Skewness(a.samples), game.Outliers(a.samples), game.StandardDeviation(a.samples)
 	p.Debug(a, map[string]any{
-		"Kurtosis":  game.Round(kurtosis, 2),
-		"Skewness":  game.Round(skewness, 2),
+		"Kurtosis":  game.Round64(kurtosis, 2),
+		"Skewness":  game.Round64(skewness, 2),
 		"Outliers":  outliers,
 		"Deviation": deviation,
 		"CPS":       cps,
@@ -57,8 +57,8 @@ func (a *AutoClickerD) Process(p Processor, _ packet.Packet) bool {
 	if kurtosis <= 0.05 && skewness < 0 && outliers == 0 && deviation <= 25 && cps >= 9 {
 		if a.Buff(1, 2) > 1 {
 			p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]any{
-				"Kurtosis": game.Round(kurtosis, 2),
-				"Skewness": game.Round(skewness, 2),
+				"Kurtosis": game.Round64(kurtosis, 2),
+				"Skewness": game.Round64(skewness, 2),
 				"CPS":      cps,
 			})
 		}

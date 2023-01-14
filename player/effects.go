@@ -41,7 +41,7 @@ func (p *Player) tickEffects() {
 
 		switch eff.Type().(type) {
 		case effect.JumpBoost:
-			p.mInfo.JumpVelocity = game.DefaultJumpMotion + (float64(eff.Level()) / 10)
+			p.mInfo.JumpVelocity = game.DefaultJumpMotion + (float32(eff.Level()) / 10)
 		case effect.SlowFalling:
 			p.mInfo.Gravity = game.SlowFallingGravity
 		}
