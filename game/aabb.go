@@ -37,5 +37,11 @@ func AABBVectorDistance(a cube.BBox, v mgl32.Vec3) float32 {
 	x := math32.Max(a.Min().X()-v.X(), math32.Max(0, v.X()-a.Max().X()))
 	y := math32.Max(a.Min().Y()-v.Y(), math32.Max(0, v.Y()-a.Max().Y()))
 	z := math32.Max(a.Min().Z()-v.Z(), math32.Max(0, v.Z()-a.Max().Z()))
-	return math32.Sqrt(math32.Pow(x, 2) + math32.Pow(y, 2) + math32.Pow(z, 2))
+
+	dist := math32.Sqrt(math32.Pow(x, 2) + math32.Pow(y, 2) + math32.Pow(z, 2))
+	if dist == mgl32.NaN {
+		dist = 0
+	}
+
+	return dist
 }
