@@ -3,8 +3,8 @@ package entity
 import (
 	"sync"
 
-	"github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/utils"
 )
 
@@ -13,13 +13,13 @@ type Entity struct {
 	// mu protects all the following fields.
 	mu sync.Mutex
 	// position is the current position of the entity in the world.
-	position mgl64.Vec3
+	position mgl32.Vec3
 	// lastPosition is the previous position of the entity in the world.
-	lastPosition mgl64.Vec3
+	lastPosition mgl32.Vec3
 	// recievedPosition is the position of the entity on the server-side
-	recievedPosition mgl64.Vec3
+	recievedPosition mgl32.Vec3
 	// serverPosition is the position of the entity on the server-side
-	serverPosition mgl64.Vec3
+	serverPosition mgl32.Vec3
 	// newPosRotationIncrements is used for smoothing out the position of entities.
 	newPosRotationIncrements int
 	// positionBuffer is the buffer of the previous positions of the entity.
@@ -28,9 +28,9 @@ type Entity struct {
 	updatedTick uint64
 	// rotation represents the rotation of an entity. The first value is the pitch, and the second and third represent
 	// the yaw and head yaw, the latter of which only being applicable for certain entities, such as players.
-	rotation mgl64.Vec3
+	rotation mgl32.Vec3
 	// lastRotation is the rotation that the entity was in right before rotation was updated.
-	lastRotation mgl64.Vec3
+	lastRotation mgl32.Vec3
 	// teleportTicks is the amount of client ticks that have passed since the entity has teleported.
 	teleportTicks uint32
 	// aabb represents the bounding box of the entity.
@@ -48,7 +48,7 @@ var defaultAABB = cube.Box(
 )
 
 // NewEntity creates a new entity with the provided parameters.
-func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
+func NewEntity(position, velocity, rotation mgl32.Vec3, player bool) *Entity {
 	return &Entity{
 		position:                 position,
 		lastPosition:             position,
@@ -63,7 +63,7 @@ func NewEntity(position, velocity, rotation mgl64.Vec3, player bool) *Entity {
 }
 
 // SetServerPosition sets the position of the entity on the server-side.
-func (e *Entity) SetServerPosition(pos mgl64.Vec3) {
+func (e *Entity) SetServerPosition(pos mgl32.Vec3) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -75,7 +75,7 @@ func (e *Entity) SetServerPosition(pos mgl64.Vec3) {
 }
 
 // ServerPosition returns the position of the entity on the server-side.
-func (e *Entity) ServerPosition() mgl64.Vec3 {
+func (e *Entity) ServerPosition() mgl32.Vec3 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -83,7 +83,7 @@ func (e *Entity) ServerPosition() mgl64.Vec3 {
 }
 
 // RecievedPosition returns the position of the entity that the client has recieved.
-func (e *Entity) RecievedPosition() mgl64.Vec3 {
+func (e *Entity) RecievedPosition() mgl32.Vec3 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -91,21 +91,21 @@ func (e *Entity) RecievedPosition() mgl64.Vec3 {
 }
 
 // Position returns the position of the entity.
-func (e *Entity) Position() mgl64.Vec3 {
+func (e *Entity) Position() mgl32.Vec3 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.position
 }
 
 // LastPosition returns the last position of the entity.
-func (e *Entity) LastPosition() mgl64.Vec3 {
+func (e *Entity) LastPosition() mgl32.Vec3 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.lastPosition
 }
 
 // Move moves the entity to the provided position.
-func (e *Entity) Move(pos mgl64.Vec3, offset bool) {
+func (e *Entity) Move(pos mgl32.Vec3, offset bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.lastPosition = e.position
@@ -119,7 +119,7 @@ func (e *Entity) TickPosition(tick uint64) {
 	if e.newPosRotationIncrements > 0 {
 		delta := e.recievedPosition.Sub(e.position)
 		e.lastPosition = e.position
-		e.position = e.position.Add(delta.Mul(1 / float64(e.newPosRotationIncrements)))
+		e.position = e.position.Add(delta.Mul(1 / float32(e.newPosRotationIncrements)))
 		e.newPosRotationIncrements--
 	}
 
@@ -170,21 +170,21 @@ func (e *Entity) RewindPosition(tick uint64) *utils.LocationData {
 }
 
 // Rotation returns the rotation of the entity.
-func (e *Entity) Rotation() mgl64.Vec3 {
+func (e *Entity) Rotation() mgl32.Vec3 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.rotation
 }
 
 // LastRotation returns the last rotation of the entity.
-func (e *Entity) LastRotation() mgl64.Vec3 {
+func (e *Entity) LastRotation() mgl32.Vec3 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.lastRotation
 }
 
 // Rotate rotates the entity to the provided rotation.
-func (e *Entity) Rotate(rotation mgl64.Vec3) {
+func (e *Entity) Rotate(rotation mgl32.Vec3) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.lastRotation = e.rotation

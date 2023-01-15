@@ -3,9 +3,8 @@ package player
 import (
 	"fmt"
 
-	"github.com/df-mc/dragonfly/server/block/cube/trace"
+	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -46,7 +45,7 @@ func (p *Player) validateCombat() {
 		tick = stick
 	}
 
-	attackPos := p.mInfo.ServerPosition.Add(mgl64.Vec3{0, 1.62})
+	attackPos := p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
 
 	if p.lastAttackData == nil {
 		if p.inputMode == packet.InputModeTouch {
@@ -59,7 +58,7 @@ func (p *Player) validateCombat() {
 		}
 
 		p.entityMu.Lock()
-		min, valid, eid := 69000.0, false, uint64(0)
+		min, valid, eid := float32(69000.0), false, uint64(0)
 		dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 		for id, e := range p.entities {
 			if id == p.rid {
@@ -98,7 +97,7 @@ func (p *Player) validateCombat() {
 					ActionType:            protocol.UseItemOnEntityActionAttack,
 					HotBarSlot:            int32(p.lastEquipmentData.HotBarSlot),
 					HeldItem:              p.lastEquipmentData.NewItem,
-					Position:              game.Vec64To32(p.mInfo.ServerPosition),
+					Position:              p.mInfo.ServerPosition,
 					ClickedPosition:       mgl32.Vec3{},
 				},
 			})
@@ -134,7 +133,7 @@ func (p *Player) validateCombat() {
 			if ok {
 				p.sendPacketToServer(p.lastAttackData)
 			} else if p.debugger.ServerCombat {
-				p.SendOomphDebug(fmt.Sprint("hit invalidated! raycast failed && {pos: ", game.RoundVec64(rew.Position, 4), " yaw: ", game.Round(p.Rotation()[2], 2)), packet.TextTypeChat)
+				p.SendOomphDebug(fmt.Sprint("hit invalidated! raycast failed && {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
 			}
 		}
 	}
