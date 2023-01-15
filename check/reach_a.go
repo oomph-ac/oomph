@@ -3,15 +3,15 @@ package check
 import (
 	"math"
 
-	"github.com/df-mc/dragonfly/server/block/cube/trace"
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/ethaniccc/float32-cube/cube/trace"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolatedFrames float64 = 7
+const interpolatedFrames float32 = 7
 
 type ReachA struct {
 	eid             uint64
@@ -78,21 +78,21 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 
 		cDv, lDv := game.DirectionVector(pe.Rotation()[2], pe.Rotation()[0]),
 			game.DirectionVector(pe.LastRotation()[2], pe.LastRotation()[0])
-		cAtkPos, lAtkPos := pe.Position().Add(mgl64.Vec3{0, 1.62}), pe.LastPosition().Add(mgl64.Vec3{0, 1.62})
+		cAtkPos, lAtkPos := pe.Position().Add(mgl32.Vec3{0, 1.62}), pe.LastPosition().Add(mgl32.Vec3{0, 1.62})
 		dvDelta, atkPosDelta := cDv.Sub(lDv).Mul(1/interpolatedFrames),
 			cAtkPos.Sub(lAtkPos).Mul(1/interpolatedFrames)
 		uAtkPos, uDv := lAtkPos, lDv
 
-		minDist, valid := 6900.0, false
+		minDist, valid := float32(6900.0), false
 
 		// This will require for (interpolatedFrame ^ 2) raycasts to be performed.
 		// We need to interpolate the attack position and the direction vector.
-		for x := 0.0; x < interpolatedFrames; x++ {
+		for x := float32(0.0); x < interpolatedFrames; x++ {
 			if x != 0 {
 				uAtkPos = uAtkPos.Add(atkPosDelta)
 			}
 
-			for y := 0.0; y < interpolatedFrames; y++ {
+			for y := float32(0.0); y < interpolatedFrames; y++ {
 				if y != 0 {
 					uDv = uDv.Add(dvDelta)
 				}
@@ -130,7 +130,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 
 		p.Flag(r, 1, map[string]any{
-			"dist": game.Round(minDist, 2),
+			"dist": game.Round32(minDist, 2),
 		})
 		r.cancelNext = true
 	}

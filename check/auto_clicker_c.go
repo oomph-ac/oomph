@@ -47,8 +47,8 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) bool {
 	cps := p.CPS()
 	deviation, skewness := game.StandardDeviation(a.samples), game.Skewness(a.samples)
 	p.Debug(a, map[string]any{
-		"Deviation": game.Round(deviation, 3),
-		"Skewness":  game.Round(skewness, 3),
+		"Deviation": game.Round64(deviation, 3),
+		"Skewness":  game.Round64(skewness, 3),
 		"CPS":       cps,
 	})
 	if deviation <= 20 && (skewness > 1 || skewness == 0.0) && cps >= 12 {
@@ -58,8 +58,8 @@ func (a *AutoClickerC) Process(p Processor, _ packet.Packet) bool {
 		}
 		if a.Buff(1) >= e {
 			p.Flag(a, a.violationAfterTicks(p.ClientTick(), 400), map[string]any{
-				"Deviation": game.Round(deviation, 3),
-				"Skewness":  game.Round(skewness, 3),
+				"Deviation": game.Round64(deviation, 3),
+				"Skewness":  game.Round64(skewness, 3),
 				"CPS":       cps,
 			})
 		}

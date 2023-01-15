@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/chewxy/math32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -49,14 +50,14 @@ func (v *VelocityA) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	diff, pct := math.Abs(kb-p.ClientMovement()[1]), (p.ClientMovement()[1]/kb)*100
+	diff, pct := math32.Abs(kb-p.ClientMovement()[1]), (p.ClientMovement()[1]/kb)*100
 	if diff <= 1e-4 {
 		v.violations = math.Max(0, v.violations-0.1)
 		return false
 	}
 
 	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
-		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
+		"pct": fmt.Sprint(game.Round32(pct, 4), "%"),
 	})
 
 	return false

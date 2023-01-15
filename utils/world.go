@@ -2,9 +2,9 @@ package utils
 
 import (
 	"github.com/df-mc/dragonfly/server/block"
-	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 // BlockClimbable returns whether the given block is climbable.
@@ -19,7 +19,7 @@ func BlockClimbable(b world.Block) bool {
 
 // BoxesIntersect returns wether or not the first given box intersects with
 // the other boxes in the given list.
-func BoxesIntersect(bb cube.BBox, boxes []cube.BBox, bpos mgl64.Vec3) bool {
+func BoxesIntersect(bb cube.BBox, boxes []cube.BBox, bpos mgl32.Vec3) bool {
 	for _, box := range boxes {
 		if box.Translate(bpos).IntersectsWith(bb) {
 			return false

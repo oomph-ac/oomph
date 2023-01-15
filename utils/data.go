@@ -1,6 +1,6 @@
 package utils
 
-import "github.com/go-gl/mathgl/mgl64"
+import "github.com/go-gl/mathgl/mgl32"
 
 type AuthorityType byte
 
@@ -12,7 +12,7 @@ const (
 
 type LocationData struct {
 	Tick     uint64
-	Position mgl64.Vec3
+	Position mgl32.Vec3
 	OnGround bool
 	Teleport bool
 }

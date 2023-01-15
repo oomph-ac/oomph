@@ -58,6 +58,7 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 	p := player.NewPlayer(logrus.New(), c.(*minecraft.Conn), nil)
+	p.SetRuntimeID(1)
 	l.o.players <- p
 	return p, err
 }

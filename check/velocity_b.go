@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/chewxy/math32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -48,9 +49,9 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	pct := (math.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math.Hypot(xKb, zKb)) * 100
+	pct := (math32.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math32.Hypot(xKb, zKb)) * 100
 
-	if math.Abs(100.0-pct) <= 0.1 {
+	if math32.Abs(100.0-pct) <= 0.1 {
 		v.violations = math.Max(0, v.violations-0.2)
 		v.Buff(-0.2, 5)
 		return false
@@ -61,7 +62,7 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	p.Flag(v, v.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
-		"pct": fmt.Sprint(game.Round(pct, 4), "%"),
+		"pct": fmt.Sprint(game.Round32(pct, 4), "%"),
 	})
 
 	return false

@@ -6,10 +6,9 @@ import (
 
 	"github.com/oomph-ac/oomph/utils"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
-	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
@@ -78,8 +77,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.ServerAuthoritativeBlockBreaking = false
 
 	p := player.NewPlayer(logrus.New(), conn, serverConn)
-	p.MovementInfo().ServerPosition = game.Vec32To64(data.PlayerPosition).Sub(mgl64.Vec3{0, 1.62})
-	p.MovementInfo().ServerMovement = mgl64.Vec3{0, -0.0784, 0}
+	p.MovementInfo().ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
+	p.MovementInfo().ServerMovement = mgl32.Vec3{0, -0.0784, 0}
 
 	var g sync.WaitGroup
 	g.Add(2)
