@@ -44,13 +44,11 @@ func (p *Player) validateMovement() {
 		return
 	}
 
-	absVec := game.AbsVec32(p.mInfo.ServerPosition.Sub(p.Position()))
-	if absVec[0] < 0.05 && absVec[1] < 0.05 && absVec[2] < 0.05 {
-		p.SendOomphDebug(fmt.Sprint(absVec, " @ ", p.ClientFrame()), packet.TextTypeChat)
+	diff := p.mInfo.ServerPosition.Sub(p.Position())
+	p.SendOomphDebug("diff="+fmt.Sprint(game.RoundVec32(diff, 5)), packet.TextTypeChat)
+
+	if diff.LenSqr() < 0.09 {
 		return
-	} else {
-		fmt.Println(absVec)
-		p.SendOomphDebug("§c"+fmt.Sprint(absVec, " @ ", p.ClientFrame()), packet.TextTypeChat)
 	}
 
 	p.correctMovement()
@@ -99,11 +97,6 @@ func (p *Player) correctMovement() {
 		p.conn.WritePacket(p.lastSentAttributes)
 	}
 
-	diffVec := pos.Sub(p.Position())
-	diffVec[0] = game.ClampFloat(diffVec[0], -0.1, 0.1)
-	diffVec[1] = game.ClampFloat(diffVec[1], -0.1, 0.1)
-	diffVec[2] = game.ClampFloat(diffVec[2], -0.1, 0.1)
-
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
 		Position: pos.Add(mgl32.Vec3{0, 1.62 + 1e-3}),
@@ -139,8 +132,8 @@ func (p *Player) processInput(pk *packet.PlayerAuthInput) {
 		p.inLoadedChunkTicks = 0
 	}
 
-	p.mInfo.MoveForward = float32(pk.MoveVector.Y()) * 0.98
-	p.mInfo.MoveStrafe = float32(pk.MoveVector.X()) * 0.98
+	p.mInfo.MoveForward = pk.MoveVector.Y() * 0.98
+	p.mInfo.MoveStrafe = pk.MoveVector.X() * 0.98
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
 		p.mInfo.Sprinting = true
@@ -447,6 +440,11 @@ func (p *Player) simulateCollisions() {
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 	}
+
+	/* diff := p.Position().Sub(p.mInfo.ServerPosition)
+	p.mInfo.ServerPosition[0] += game.ClampFloat(diff[0], -0.01, 0.01)
+	p.mInfo.ServerPosition[1] += game.ClampFloat(diff[1], -0.01, 0.01)
+	p.mInfo.ServerPosition[2] += game.ClampFloat(diff[2], -0.01, 0.01) */
 }
 
 // simulateGravity simulates the gravity of the player

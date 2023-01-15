@@ -195,6 +195,11 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	return p
 }
 
+// SetRuntimeID sets the runtime ID of the player.
+func (p *Player) SetRuntimeID(id uint64) {
+	p.rid = id
+}
+
 // Conn returns the connection of the player.
 func (p *Player) Conn() *minecraft.Conn {
 	return p.conn
