@@ -3,7 +3,7 @@ package check
 import (
 	"math"
 
-	"github.com/oomph-ac/oomph/game"
+	"github.com/chewxy/math32"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -39,7 +39,7 @@ func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	diff := i.Delta[1] - float32(p.ServerMovement()[1])
-	if game.AbsFloat32(diff) < 0.01 {
+	if math32.Abs(diff) < 0.01 {
 		m.Buff(-1, 6)
 		m.violations = math.Max(0, m.violations-1)
 		return false

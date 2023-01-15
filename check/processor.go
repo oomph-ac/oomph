@@ -1,7 +1,7 @@
 package check
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -36,11 +36,11 @@ type Processor interface {
 	CombatMode() utils.AuthorityType
 
 	// ServerMovement returns a Vec3 of how the server predicts the client will move.
-	ServerMovement() mgl64.Vec3
+	ServerMovement() mgl32.Vec3
 	// OldServerMovement returns a Vec3 of how the server predicted the client moved in the previous tick.
-	OldServerMovement() mgl64.Vec3
+	OldServerMovement() mgl32.Vec3
 	// ClientMovement returns the client's movement as a Vec3
-	ClientMovement() mgl64.Vec3
+	ClientMovement() mgl32.Vec3
 
 	// ClickDelay returns the delay between the current click and the last one.
 	ClickDelay() uint64
