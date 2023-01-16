@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"github.com/chewxy/math32"
 	"strings"
 	"time"
 	_ "unsafe"
@@ -61,7 +62,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		p.cleanChunks()
-		p.processInput(pk)
+		p.handlePlayerAuthInput(pk)
 
 		if p.combatMode == utils.ModeFullAuthoritative {
 			p.validateCombat()
@@ -76,7 +77,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 		defer p.SetRespawned(false)
 		if p.movementMode == utils.ModeSemiAuthoritative {
-			defer p.setMovementToClient(pk.Delta)
+			defer p.setMovementToClient()
 		}
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
@@ -328,6 +329,80 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		})
 	}
 	return false
+}
+
+// handlePlayerAuthInput processes the input packet sent by the client to the server. This also updates some of the movement states such as
+// if the player is sprinting, jumping, or in a loaded chunk.
+func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
+	p.miMu.Lock()
+	defer p.miMu.Unlock()
+
+	p.inputMode = pk.InputMode
+	p.Move(pk)
+
+	if p.movementMode == utils.ModeClientAuthoritative {
+		p.setMovementToClient()
+		return
+	}
+
+	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
+		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
+		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
+	})
+
+	if p.inLoadedChunk {
+		p.inLoadedChunkTicks++
+	} else {
+		p.inLoadedChunkTicks = 0
+	}
+
+	p.mInfo.ForwardImpulse = pk.MoveVector.Y() * 0.98
+	p.mInfo.LeftImpulse = pk.MoveVector.X() * 0.98
+
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+		p.mInfo.Sprinting = true
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+		p.mInfo.Sprinting = false
+	}
+
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+		p.mInfo.Sneaking = true
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+		p.mInfo.Sneaking = false
+	}
+
+	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
+	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
+	p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+	p.mInfo.InVoid = p.Position().Y() < -128
+
+	p.mInfo.JumpVelocity = game.DefaultJumpMotion
+	p.mInfo.Gravity = game.NormalGravity
+
+	p.tickEffects()
+
+	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) {
+		for _, action := range pk.BlockActions {
+			if action.Action != protocol.PlayerActionPredictDestroyBlock {
+				continue
+			}
+
+			pos := utils.BlockToCubePos(action.BlockPos).Side(cube.Face(action.Face))
+			b, _ := world.BlockByRuntimeID(air)
+			p.SetBlock(pos, b)
+		}
+	}
+
+	if p.updateMovementState() {
+		p.validateMovement()
+	}
+
+	if p.movementMode == utils.ModeFullAuthoritative {
+		pk.Position = p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
+	}
+
+	p.mInfo.Teleporting = false
 }
 
 func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
