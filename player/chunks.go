@@ -1,8 +1,6 @@
 package player
 
 import (
-	"fmt"
-
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -62,10 +60,7 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	rid := c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
 	c.Unlock()
 
-	b, found := world.BlockByRuntimeID(rid)
-	if !found {
-		fmt.Println("BLOCK NOT FOUND, RETURN AIR")
-	}
+	b, _ := world.BlockByRuntimeID(rid)
 	return b
 }
 
@@ -85,7 +80,7 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	c.Unlock()
 }
 
-// GetNearbyBBoxes returns a list of block ounding boxes that are within the given bounding box - which is usually
+// GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box - which is usually
 // the player's bounding box.
 func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 	grown := aabb.Grow(1)
@@ -94,7 +89,7 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 
 	// A prediction of one BBox per block, plus an additional 2, in case
-	var blockBBoxs []cube.BBox
+	var bboxList []cube.BBox
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
@@ -103,13 +98,13 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 				for _, box := range boxes {
 					b := game.DFBoxToCubeBox(box)
 					if b.Translate(pos.Vec3()).IntersectsWith(aabb) {
-						blockBBoxs = append(blockBBoxs, b.Translate(pos.Vec3()))
+						bboxList = append(bboxList, b.Translate(pos.Vec3()))
 					}
 				}
 			}
 		}
 	}
-	return blockBBoxs
+	return bboxList
 }
 
 // GetNearbyBlocks returns a list of blocks that are within the given bounding box.
