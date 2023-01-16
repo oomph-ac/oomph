@@ -1,12 +1,11 @@
 package player
 
 import (
-	"fmt"
+	"github.com/df-mc/dragonfly/server/block"
+	"github.com/ethaniccc/float32-cube/cube"
 
 	"github.com/chewxy/math32"
-	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
@@ -29,7 +28,7 @@ func (p *Player) updateMovementState() bool {
 	} else {
 		p.mInfo.InUnsupportedRewindScenario = false
 		exempt = p.mInfo.CanExempt
-		p.calculateExpectedMovement()
+		p.aiStep()
 		p.mInfo.CanExempt = false
 	}
 
@@ -45,8 +44,6 @@ func (p *Player) validateMovement() {
 	}
 
 	diff := p.mInfo.ServerPosition.Sub(p.Position())
-	p.SendOomphDebug("diff="+fmt.Sprint(game.RoundVec32(diff, 5)), packet.TextTypeChat)
-
 	if diff.LenSqr() < 0.09 {
 		return
 	}
@@ -55,7 +52,7 @@ func (p *Player) validateMovement() {
 }
 
 // correctMovement sends a movement correction to the player. Exemptions can be made to prevent sending corrections, such as if
-// the player has not recieved a correction yet, if the player is teleporting, or if the player is in an unsupported rewind scenario
+// the player has not received a correction yet, if the player is teleporting, or if the player is in an unsupported rewind scenario
 // (determined by the people that made the rewind system) - in which case movement corrections will not work properly.
 func (p *Player) correctMovement() {
 	// Do not correct player movement if the movement mode is not fully server authoritative because it can lead to issues.
@@ -76,7 +73,7 @@ func (p *Player) correctMovement() {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 				NewBlockRuntimeID: world.BlockRuntimeID(b),
-				Flags:             packet.BlockUpdatePriority,
+				Flags:             packet.BlockUpdateNeighbours,
 				Layer:             0,
 			})
 		}
@@ -106,110 +103,59 @@ func (p *Player) correctMovement() {
 	})
 }
 
-// processInput processes the input packet sent by the client to the server. This also updates some of the movement states such as
-// if the player is sprinting, jumping, or in a loaded chunk.
-func (p *Player) processInput(pk *packet.PlayerAuthInput) {
-	p.miMu.Lock()
-	defer p.miMu.Unlock()
-
-	p.inputMode = pk.InputMode
-	p.Move(pk)
-
-	if p.movementMode == utils.ModeClientAuthoritative {
-		p.mInfo.ServerPosition = p.Position()
-		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
-		return
-	}
-
-	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
-		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
-		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
-	})
-
-	if p.inLoadedChunk {
-		p.inLoadedChunkTicks++
-	} else {
-		p.inLoadedChunkTicks = 0
-	}
-
-	p.mInfo.MoveForward = pk.MoveVector.Y() * 0.98
-	p.mInfo.MoveStrafe = pk.MoveVector.X() * 0.98
-
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
-		p.mInfo.Sprinting = true
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
-		p.mInfo.Sprinting = false
-	}
-
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
-		p.mInfo.Sneaking = true
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-		p.mInfo.Sneaking = false
-	}
-
-	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
-	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
-	p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
-	p.mInfo.InVoid = p.Position().Y() < -128
-
-	p.mInfo.JumpVelocity = game.DefaultJumpMotion
-	p.mInfo.Gravity = game.NormalGravity
-
-	p.tickEffects()
-
-	if utils.HasFlag(pk.InputData, packet.InputFlagPerformItemInteraction) && pk.ItemInteractionData.ActionType == protocol.UseItemActionBreakBlock {
-		b, _ := world.BlockByRuntimeID(air)
-		p.SetBlock(utils.BlockToCubePos(pk.ItemInteractionData.BlockPosition), b)
-	}
-
-	if p.updateMovementState() {
-		p.validateMovement()
-	}
-
-	if p.movementMode == utils.ModeFullAuthoritative {
-		pk.Position = p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
-	}
-
-	p.mInfo.Teleporting = false
-}
-
-// calculateExpectedMovement calculates the expected movement of the player for it's simulation frame.
-func (p *Player) calculateExpectedMovement() {
-	// If the player is immobile, then they should not be able to move at all. Instead of calculating all
-	// of the collisions that won't be nessesary anyway as the player will be "stuck", we can just assume that their
-	// position will be the same, and that their movement will be a zero vector.
+// aiStep starts the movement simulation of the player.
+func (p *Player) aiStep() {
 	if p.mInfo.Immobile {
-		p.mInfo.ServerMovement = mgl32.Vec3{0, 0, 0}
-		return
+		p.mInfo.ForwardImpulse = 0.0
+		p.mInfo.LeftImpulse = 0.0
+		p.mInfo.Jumping = false
+	}
+
+	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 0.003 {
+		p.mInfo.ServerMovement[0] = 0
+	}
+
+	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 0.003 {
+		p.mInfo.ServerMovement[1] = 0
+	}
+
+	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 0.003 {
+		p.mInfo.ServerMovement[2] = 0
+	}
+
+	p.mInfo.FlyingSpeed = 0.02
+	if p.mInfo.Sprinting {
+		p.mInfo.FlyingSpeed += 0.006
 	}
 
 	if p.mInfo.MotionTicks == 0 {
 		p.mInfo.ServerMovement = p.mInfo.ServerSentMovement
 	}
 
-	if p.mInfo.Jumping && p.mInfo.OnGround {
-		p.simulateJump()
+	if !p.mInfo.JumpDown {
+		p.mInfo.JumpCooldownTicks = 0
 	}
 
-	v1 := float32(0.91)
+	if p.mInfo.Jumping && p.mInfo.OnGround && p.mInfo.JumpCooldownTicks <= 0 {
+		p.simulateJump()
+		p.mInfo.JumpCooldownTicks = 10
+	}
+
+	p.travel()
+}
+
+// travel continues the player's movement simulation.
+func (p *Player) travel() {
+	blockFriction := float32(0.91)
 	if p.mInfo.OnGround {
 		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown)).(block.Frictional); ok {
-			v1 *= float32(b.Friction())
+			blockFriction *= float32(b.Friction())
 		} else {
-			v1 *= 0.6
+			blockFriction *= 0.6
 		}
 	}
 
-	var v3 float32
-	if p.mInfo.OnGround {
-		v3 = p.mInfo.Speed * math32.Pow((0.91*0.6)/v1, 3)
-	} else if p.mInfo.Sprinting {
-		v3 = 0.026 // 0.02 + (0.02 * 0.3)
-	} else {
-		v3 = 0.02
-	}
-
+	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction)
 	p.simulateAddedMovementForce(v3)
 
 	climb := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPosition)))
@@ -224,39 +170,28 @@ func (p *Player) calculateExpectedMovement() {
 		}
 	}
 
-	hc := p.mInfo.HorizontallyCollided
-	p.simulateCollisions()
+	p.maybeBackOffFromEdge()
+	oldMov := p.mInfo.ServerMovement
+	p.collide(p.mInfo.ServerMovement)
+	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
+	p.checkCollisions(oldMov)
 
 	if climb && (p.mInfo.HorizontallyCollided || p.mInfo.JumpDown) {
 		p.mInfo.ServerMovement[1] = 0.3
 	}
 
-	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 0.005 {
-		p.mInfo.ServerMovement[0] = 0
-	}
-	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 0.005 {
-		p.mInfo.ServerMovement[1] = 0
-	}
-	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 0.005 {
-		p.mInfo.ServerMovement[2] = 0
-	}
-
-	// After colliding with a block horizontally, the client stops sprinting. However, there seems to be a desync,
-	// where the client will collide with a block horizontally and not send it's status for itself to stop sprinting.
-	// This behavior is also noticable in a BDS server with movement corrections enabled.
-	if hc && !p.mInfo.SprintDown && p.mInfo.MoveForward <= 0 {
-		p.mInfo.Sprinting = false
-	}
-
+	p.checkUnsupportedMovementScenarios()
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
 
-	p.simulateGravity()
-	p.simulateHorizontalFriction(v1)
+	if !p.mInfo.InUnsupportedRewindScenario {
+		p.simulateGravity()
+		p.simulateHorizontalFriction(blockFriction)
+	}
 }
 
 // simulateAddedMovementForce simulates the additional movement force created by the player's mf/ms and rotation values
 func (p *Player) simulateAddedMovementForce(f float32) {
-	v := math32.Pow(p.mInfo.MoveForward, 2) + math32.Pow(p.mInfo.MoveStrafe, 2)
+	v := math32.Pow(p.mInfo.ForwardImpulse, 2) + math32.Pow(p.mInfo.LeftImpulse, 2)
 	if v < 1e-4 {
 		return
 	}
@@ -266,185 +201,128 @@ func (p *Player) simulateAddedMovementForce(f float32) {
 		v = 1
 	}
 	v = f / v
-	mf, ms := p.mInfo.MoveForward*v, p.mInfo.MoveStrafe*v
+	mf, ms := p.mInfo.ForwardImpulse*v, p.mInfo.LeftImpulse*v
 	v2, v3 := game.MCSin(p.entity.Rotation().Z()*math32.Pi/180), game.MCCos(p.entity.Rotation().Z()*math32.Pi/180)
 	p.mInfo.ServerMovement[0] += ms*v3 - mf*v2
 	p.mInfo.ServerMovement[2] += ms*v2 + mf*v3
 }
 
-// simulateCollisions simulates the player's collisions with blocks
-func (p *Player) simulateCollisions() {
-	p.mInfo.StepLenience *= 0.4
-	if p.mInfo.StepLenience <= 1e-4 {
-		p.mInfo.StepLenience = 0
+// maybeBackOffFromEdge simulates the movement scenarios where a player is at the edge of a block.
+// The weird function name comes from MCP, but what else would it be named I guess lol
+func (p *Player) maybeBackOffFromEdge() {
+	if !p.mInfo.Sneaking || p.mInfo.ServerMovement[1] > 0 {
+		return
 	}
 
-	vel := p.mInfo.ServerMovement
-	deltaX, deltaY, deltaZ := vel[0], vel[1], vel[2]
-
-	moveBB := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-5e-4)
-	cloneBB := moveBB
-	boxes := p.GetNearbyBBoxes(cloneBB.Extend(vel))
-
-	if p.mInfo.OnGround && p.mInfo.Sneaking {
-		mov := float32(0.05)
-
-		for ; deltaX != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl32.Vec3{deltaX, -1, 0}))) == 0; vel[0] = deltaX {
-			if deltaX < mov && deltaX >= -mov {
-				deltaX = 0
-			} else if deltaX > 0 {
-				deltaX -= mov
-			} else {
-				deltaX += mov
-			}
-		}
-
-		for ; deltaZ != 0.0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl32.Vec3{0, -1, deltaZ}))) == 0; vel[2] = deltaZ {
-			if deltaZ < mov && deltaZ >= -mov {
-				deltaZ = 0
-			} else if deltaZ > 0 {
-				deltaZ -= mov
-			} else {
-				deltaZ += mov
-			}
-		}
-
-		for ; deltaX != 0 && deltaZ != 0 && len(p.GetNearbyBBoxes(moveBB.Translate(mgl32.Vec3{deltaX, -1, deltaZ}))) == 0; vel[2] = deltaZ {
-			if deltaX < mov && deltaX >= -mov {
-				deltaX = 0
-			} else if deltaX > 0 {
-				deltaX -= mov
-			} else {
-				deltaX += mov
-			}
-			vel[0] = deltaX
-
-			if deltaZ < mov && deltaZ >= -mov {
-				deltaZ = 0
-			} else if deltaZ > 0 {
-				deltaZ -= mov
-			} else {
-				deltaZ += mov
-			}
-		}
+	v := p.mInfo.ServerMovement
+	if v[1] > 0 {
+		return
 	}
 
-	// Check collisions on the Y axis first
-	for _, blockBBox := range boxes {
-		deltaY = moveBB.YOffset(blockBBox, deltaY)
-	}
-	moveBB = moveBB.Translate(mgl32.Vec3{0, deltaY})
+	bb := p.AABB().Translate(p.mInfo.ServerPosition)
+	d0, d1, d2 := v[0], v[2], float32(0.05)
 
-	flag := p.mInfo.OnGround || (vel[1] != deltaY && vel[1] < 0)
-
-	// Afterward, check for collisions on the X and Z axis
-	for _, blockBBox := range boxes {
-		deltaX = moveBB.XOffset(blockBBox, deltaX)
-	}
-	moveBB = moveBB.Translate(mgl32.Vec3{deltaX})
-	for _, blockBBox := range boxes {
-		deltaZ = moveBB.ZOffset(blockBBox, deltaZ)
-	}
-	moveBB = moveBB.Translate(mgl32.Vec3{0, 0, deltaZ})
-
-	if flag && ((vel[0] != deltaX) || (vel[2] != deltaZ)) {
-		cx, cy, cz := deltaX, deltaY, deltaZ
-		deltaX, deltaY, deltaZ = vel[0], game.StepHeight, vel[2]
-
-		stepBB := p.AABB().Translate(p.mInfo.ServerPosition)
-		cloneBB = stepBB
-		boxes = p.GetNearbyBBoxes(cloneBB.Extend(mgl32.Vec3{deltaX, deltaY, deltaZ}))
-
-		for _, blockBBox := range boxes {
-			deltaY = stepBB.YOffset(blockBBox, deltaY)
-		}
-		stepBB = stepBB.Translate(mgl32.Vec3{0, deltaY})
-
-		for _, blockBBox := range boxes {
-			deltaX = stepBB.XOffset(blockBBox, deltaX)
-		}
-		stepBB = stepBB.Translate(mgl32.Vec3{deltaX})
-		for _, blockBBox := range boxes {
-			deltaZ = stepBB.ZOffset(blockBBox, deltaZ)
-		}
-		stepBB = stepBB.Translate(mgl32.Vec3{0, 0, deltaZ})
-
-		reverseDeltaY := -deltaY
-		for _, blockBBox := range boxes {
-			reverseDeltaY = stepBB.YOffset(blockBBox, reverseDeltaY)
-		}
-		deltaY += reverseDeltaY
-
-		if (math32.Pow(cx, 2)+math32.Pow(cz, 2)) >= (math32.Pow(deltaX, 2)+math32.Pow(deltaZ, 2)) || mgl32.FloatEqual(deltaY, 0) {
-			deltaX, deltaY, deltaZ = cx, cy, cz
+	for d0 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{d0, -game.StepHeight, 0}))) == 0 {
+		if d0 < d2 && d0 >= -d2 {
+			d0 = 0
+		} else if d0 > 0 {
+			d0 -= d2
 		} else {
-			p.mInfo.StepLenience += deltaY
-			moveBB = stepBB
+			d0 += d2
 		}
 	}
 
-	p.mInfo.OnGround = false
-	p.mInfo.VerticallyCollided = !mgl32.FloatEqual(vel[1], deltaY)
-	if p.mInfo.VerticallyCollided {
-		p.mInfo.OnGround = vel[1] < 0
-		vel[1] = 0
-	}
-
-	p.mInfo.XCollision = !mgl32.FloatEqual(vel[0], deltaX)
-	if p.mInfo.XCollision {
-		vel[0] = 0
-	}
-
-	p.mInfo.ZCollision = !mgl32.FloatEqual(vel[2], deltaZ)
-	if p.mInfo.ZCollision {
-		vel[2] = 0
-	}
-
-	p.mInfo.HorizontallyCollided = p.mInfo.XCollision || p.mInfo.ZCollision
-	p.mInfo.ServerMovement = vel
-
-	min, max := moveBB.Min(), moveBB.Max()
-	p.mInfo.ServerPosition = mgl32.Vec3{
-		(min[0] + max[0]) / 2,
-		min[1] - p.mInfo.StepLenience,
-		(min[2] + max[2]) / 2,
-	}
-	if p.mInfo.StepLenience > 1e-4 {
-		p.mInfo.ServerPosition = p.Position() // TODO! __Proper__ step predictions
-	}
-
-	bb := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-1e-6)
-	//boxes = p.GetNearbyBBoxes(bb)
-	blocks := p.GetNearbyBlocks(bb)
-
-	/* The following checks below determine wether or not the player is in an unspported rewind scenario.
-	What this means is that the movement corrections on the client won't work properly and the player will
-	essentially be jerked around indefinently, and therefore, corrections should not be done if these conditions
-	are met. */
-
-	// This check determines if the player is inside any blocks
-	/* if cube.AnyIntersections(boxes, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
-		p.mInfo.InUnsupportedRewindScenario = true
-	} */
-
-	// This check determines if the player is near liquids
-	for _, bl := range blocks {
-		_, ok := bl.(world.Liquid)
-		if ok {
-			p.mInfo.InUnsupportedRewindScenario = true
-			break
+	for d1 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight, d1}))) == 0 {
+		if d1 < d2 && d1 >= -d2 {
+			d1 = 0
+		} else if d1 > 0 {
+			d1 -= d2
+		} else {
+			d1 += d2
 		}
 	}
 
-	if p.mInfo.InUnsupportedRewindScenario {
-		p.mInfo.ServerPosition = p.Position()
-		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
+	for d0 != 0 && d1 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{d0, -game.StepHeight, d1}))) == 0 {
+		if d0 < d2 && d0 >= -d2 {
+			d0 = 0
+		} else if d0 > 0 {
+			d0 -= d2
+		} else {
+			d0 += d2
+		}
+
+		if d1 < d2 && d1 >= -d2 {
+			d1 = 0
+		} else if d1 > 0 {
+			d1 -= d2
+		} else {
+			d1 += d2
+		}
 	}
 
-	/* diff := p.Position().Sub(p.mInfo.ServerPosition)
-	p.mInfo.ServerPosition[0] += game.ClampFloat(diff[0], -0.01, 0.01)
-	p.mInfo.ServerPosition[1] += game.ClampFloat(diff[1], -0.01, 0.01)
-	p.mInfo.ServerPosition[2] += game.ClampFloat(diff[2], -0.01, 0.01) */
+	p.mInfo.ServerMovement = mgl32.Vec3{d0, v[1], d1}
+}
+
+// collide simulates the player's collisions with blocks
+func (p *Player) collide(v mgl32.Vec3) {
+	bb := p.AABB().Translate(p.mInfo.ServerPosition)
+	l := p.GetNearbyBBoxes(bb.Extend(v))
+
+	v2 := v
+	if p.mInfo.ServerMovement.LenSqr() > 0.0 {
+		v2 = p.collideWithBlocks(v, bb, l)
+	}
+
+	f := v[0] != v2[0]                         // Checks if the old X velocity differs from the new X velocity.
+	f1 := v[1] != v2[1]                        // Checks if the old Y velocity differs from the new Y velocity.
+	f2 := v[2] != v2[2]                        // Checks if the old Z velocity differs from the new Z velocity.
+	f3 := p.mInfo.OnGround || f1 && v[1] < 0.0 // Checks if the player is currently in an on-ground state.
+	if f3 && (f || f2) {
+		// MCP 1.19 shit here we go!
+		v31 := p.collideWithBlocks(mgl32.Vec3{v[0], game.StepHeight, v[2]}, bb, l)
+		v32 := p.collideWithBlocks(mgl32.Vec3{0, v[1], 0}, bb.Extend(mgl32.Vec3{v[0], 0, v[2]}), l)
+
+		if v32[1] < game.StepHeight {
+			v33 := p.collideWithBlocks(mgl32.Vec3{v[0], 0, v[2]}, bb.Translate(v32), l).Add(v32)
+			if game.Vec3HzDistSqr(v33) > game.Vec3HzDistSqr(v31) {
+				v31 = v33
+			}
+		}
+
+		if game.Vec3HzDistSqr(v31) > game.Vec3HzDistSqr(v2) {
+			p.mInfo.ServerMovement = v31.Add(p.collideWithBlocks(mgl32.Vec3{0, -v31[1] + v[1], 0}, bb.Translate(v31), l))
+			return
+		}
+	}
+
+	p.mInfo.ServerMovement = v2
+}
+
+// collideWithBlocks simulates the player's collisions with blocks
+func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBox) mgl32.Vec3 {
+	if len(list) == 0 {
+		return vel
+	}
+
+	d0, d1, d2 := vel[0], vel[1], vel[2]
+	if d1 != 0 {
+		bb, d1 = utils.DoBoxCollision(utils.CollisionY, bb, list, d1)
+	}
+
+	flag := math32.Abs(d0) < math32.Abs(d2)
+	if flag && d2 != 0 {
+		bb, d2 = utils.DoBoxCollision(utils.CollisionZ, bb, list, d2)
+	}
+
+	if d0 != 0 {
+		bb, d0 = utils.DoBoxCollision(utils.CollisionX, bb, list, d0)
+	}
+
+	if !flag && d2 != 0 {
+		bb, d2 = utils.DoBoxCollision(utils.CollisionZ, bb, list, d2)
+	}
+
+	return mgl32.Vec3{d0, d1, d2}
 }
 
 // simulateGravity simulates the gravity of the player
@@ -471,9 +349,62 @@ func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[2] += game.MCCos(force) * 0.2
 }
 
-func (p *Player) setMovementToClient(d mgl32.Vec3) {
+// setMovementToClient sets the server's velocity and position to the client's
+func (p *Player) setMovementToClient() {
 	p.mInfo.ServerPosition = p.Position()
-	p.mInfo.ServerMovement = d
+	p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
+}
+
+// checkCollisions compares the old and new velocities to check if there were any collisions made in p.collide()
+func (p *Player) checkCollisions(old mgl32.Vec3) {
+	p.mInfo.XCollision = !mgl32.FloatEqualThreshold(old[0], p.mInfo.ServerMovement[0], 1e-5)
+	p.mInfo.ZCollision = !mgl32.FloatEqualThreshold(old[2], p.mInfo.ServerMovement[2], 1e-5)
+
+	p.mInfo.HorizontallyCollided = p.mInfo.XCollision || p.mInfo.ZCollision
+	p.mInfo.VerticallyCollided = old[1] != p.mInfo.ServerMovement[1]
+	p.mInfo.OnGround = p.mInfo.VerticallyCollided && old[1] < 0.0
+
+	if p.mInfo.VerticallyCollided {
+		p.mInfo.ServerMovement[1] = 0
+	}
+
+	if p.mInfo.XCollision {
+		p.mInfo.ServerMovement[0] = 0
+	}
+
+	if p.mInfo.ZCollision {
+		p.mInfo.ServerMovement[2] = 0
+	}
+}
+
+// checkUnsupportedMovementScenarios checks if the player is in an unsupported movement scenario
+func (p *Player) checkUnsupportedMovementScenarios() {
+	bb := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-1e-6)
+	//boxes = p.GetNearbyBBoxes(bb)
+	blocks := p.GetNearbyBlocks(bb)
+
+	/* The following checks below determine wether or not the player is in an unspported rewind scenario.
+	What this means is that the movement corrections on the client won't work properly and the player will
+	essentially be jerked around indefinently, and therefore, corrections should not be done if these conditions
+	are met. */
+
+	// This check determines if the player is inside any blocks
+	/* if cube.AnyIntersections(boxes, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
+		p.mInfo.InUnsupportedRewindScenario = true
+	} */
+
+	// This check determines if the player is near liquids
+	for _, bl := range blocks {
+		_, ok := bl.(world.Liquid)
+		if ok {
+			p.mInfo.InUnsupportedRewindScenario = true
+			break
+		}
+	}
+
+	if p.mInfo.InUnsupportedRewindScenario {
+		p.setMovementToClient()
+	}
 }
 
 type MovementInfo struct {
@@ -481,14 +412,15 @@ type MovementInfo struct {
 
 	InUnsupportedRewindScenario bool
 
-	MoveForward, MoveStrafe float32
-	JumpVelocity            float32
-	Gravity                 float32
-	Speed                   float32
-	StepLenience            float32
+	ForwardImpulse, LeftImpulse float32
+	JumpVelocity                float32
+	FlyingSpeed                 float32
+	Gravity                     float32
+	Speed                       float32
 
 	MotionTicks       uint32
 	RefreshBlockTicks uint32
+	JumpCooldownTicks int32
 
 	Sneaking, SneakDown   bool
 	Jumping, JumpDown     bool
@@ -517,4 +449,14 @@ func (m *MovementInfo) UpdateServerSentVelocity(velo mgl32.Vec3) {
 func (m *MovementInfo) UpdateTickStatus() {
 	m.MotionTicks++
 	m.RefreshBlockTicks++
+
+	m.JumpCooldownTicks--
+}
+
+func (m *MovementInfo) getFrictionInfluencedSpeed(f float32) float32 {
+	if m.OnGround {
+		return m.Speed * math32.Pow(0.546/f, 3)
+	}
+
+	return m.FlyingSpeed
 }

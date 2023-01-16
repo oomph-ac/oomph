@@ -29,6 +29,30 @@ func BoxesIntersect(bb cube.BBox, boxes []cube.BBox, bpos mgl32.Vec3) bool {
 	return true
 }
 
+func DoBoxCollision(c CollisionType, bb cube.BBox, boxes []cube.BBox, delta float32) (cube.BBox, float32) {
+	for _, box := range boxes {
+		switch c {
+		case CollisionX:
+			delta = bb.XOffset(box, delta)
+		case CollisionY:
+			delta = bb.YOffset(box, delta)
+		case CollisionZ:
+			delta = bb.ZOffset(box, delta)
+		}
+	}
+
+	switch c {
+	case CollisionX:
+		bb = bb.Translate(mgl32.Vec3{delta})
+	case CollisionY:
+		bb = bb.Translate(mgl32.Vec3{0, delta})
+	case CollisionZ:
+		bb = bb.Translate(mgl32.Vec3{0, 0, delta})
+	}
+
+	return bb, delta
+}
+
 // BlockToCubePos converts protocol.BlockPos into cube.Pos
 func BlockToCubePos(p [3]int32) cube.Pos {
 	return cube.Pos{int(p[0]), int(p[1]), int(p[2])}
