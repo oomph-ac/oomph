@@ -88,7 +88,8 @@ type Player struct {
 	clickDelay    uint64
 	cps           int
 
-	stackLatency int64
+	stackLatency      int64
+	needLatencyUpdate bool
 
 	lastAttackData     *packet.InventoryTransaction
 	lastEquipmentData  *packet.MobEquipment
@@ -143,7 +144,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		effects: make(map[int32]effect.Effect),
 
-		stackLatency: 0,
+		stackLatency:      0,
+		needLatencyUpdate: true,
 
 		gameMode: data.PlayerGameMode,
 
@@ -678,8 +680,15 @@ func (p *Player) updateEntityPositions(m map[uint64]utils.LocationData) {
 }
 
 func (p *Player) updateLatency() {
+	if !p.needLatencyUpdate {
+		return
+	}
+
+	p.needLatencyUpdate = false
 	curr := time.Now()
+
 	p.Acknowledgement(func() {
+		p.needLatencyUpdate = true
 		p.stackLatency = time.Since(curr).Milliseconds()
 		if !p.debugger.Latency {
 			return
