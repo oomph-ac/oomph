@@ -87,6 +87,6 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 // StartGameContext starts the game for the conn with a context to cancel it.
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-	data.PlayerMovementSettings.RewindHistorySize = 60
+	data.PlayerMovementSettings.RewindHistorySize = 40
 	return p.conn.StartGameContext(ctx, data)
 }
