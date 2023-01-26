@@ -194,7 +194,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		// If rewind is being applied with this packet, teleport the player instantly on the server
 		// instead of waiting for the client to acknowledge the packet.
-		if p.movementMode == utils.ModeFullAuthoritative {
+		if p.movementMode == utils.ModeFullAuthoritative || pk.Tick != 0 {
 			pk.Tick = p.ClientFrame()
 			p.Teleport(pk.Position)
 			return false
@@ -208,12 +208,6 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 
 		if pk.EntityRuntimeID == p.rid {
 			p.lastSentActorData = pk
-		}
-
-		if p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= NetworkLatencyCutoff {
-			pk.Tick = p.ClientFrame()
-			p.handleSetActorData(pk)
-			return false
 		}
 
 		p.Acknowledgement(func() {
@@ -258,7 +252,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		// If the player is behind by more than 6 ticks (300ms), then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if p.movementMode == utils.ModeFullAuthoritative && (p.TickLatency() >= NetworkLatencyCutoff || p.debugger.ServerKnockback) {
+		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= NetworkLatencyCutoff) || p.debugger.ServerKnockback {
 			p.UpdateServerVelocity(pk.Velocity)
 			return false
 		}

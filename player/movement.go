@@ -83,14 +83,14 @@ func (p *Player) correctMovement() {
 	// This will send the most recent actor data to the client to ensure that all
 	// actor data is the same on the client and server (sprinting, sneaking, swimming, etc.)
 	if p.lastSentActorData != nil {
-		p.lastSentActorData.Tick = p.ClientFrame()
+		p.lastSentActorData.Tick = 0
 		p.conn.WritePacket(p.lastSentActorData)
 	}
 
 	// This will send the most recent player attributes to the client to ensure
 	// all attributes are the same on the client and server (health, speed, etc.)
 	if p.lastSentAttributes != nil {
-		p.lastSentAttributes.Tick = p.ClientFrame()
+		p.lastSentAttributes.Tick = 0
 		p.conn.WritePacket(p.lastSentAttributes)
 	}
 
