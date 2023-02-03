@@ -1,5 +1,5 @@
 # Oomph
-An interception based anti-cheat proxy.
+Oomph is a military-grade interception based anti-cheat proxy.
 
 ## How does oomph work?
 Oomph is a middle-man between your server and any minecraft clients that want to join. Oomph processes all client packets
