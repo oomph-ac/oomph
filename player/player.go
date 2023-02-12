@@ -2,7 +2,6 @@ package player
 
 import (
 	"fmt"
-
 	"strings"
 	"sync"
 	"time"
@@ -43,8 +42,12 @@ type Player struct {
 
 	acks *Acknowledgements
 
-	clientPks, svrPks   []packet.Packet
-	clientPkMu, svrPkMu sync.Mutex
+	packetBuffer                                    *PacketBuffer
+	bufferQueue                                     []*PacketBuffer
+	expectedFrame, queueCredits                     uint64
+	isBufferReady, isBufferStarted, usePacketBuffer bool
+	excessBufferScore, depletedBufferScore          float64
+	buffListMu                                      sync.Mutex
 
 	clientTick, clientFrame, serverTick atomic.Uint64
 	lastServerTicked                    time.Time
@@ -96,9 +99,10 @@ type Player struct {
 	lastSentAttributes *packet.UpdateAttributes
 	lastSentActorData  *packet.SetActorData
 
-	chunks      map[protocol.ChunkPos]*chunk.Chunk
-	chunkRadius int
-	chkMu       sync.Mutex
+	subscribedChunks []protocol.ChunkPos
+	chunks           map[protocol.ChunkPos]*chunk.Chunk
+	chunkRadius      int
+	chkMu            sync.Mutex
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -117,6 +121,10 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	data := conn.GameData()
 	p := &Player{
 		log: log,
+
+		packetBuffer: NewPacketBuffer(),
+		bufferQueue:  make([]*PacketBuffer, 0),
+		queueCredits: 0,
 
 		debugger: &Debugger{},
 
@@ -232,19 +240,6 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 	p.mInfo.CanExempt = true
 	p.mInfo.ServerPosition = pos
 	p.miMu.Unlock()
-}
-
-func (p *Player) QueuePacket(pk packet.Packet, client bool) {
-	if client {
-		p.clientPkMu.Lock()
-		p.clientPks = append(p.clientPks, pk)
-		p.clientPkMu.Unlock()
-		return
-	}
-
-	p.svrPkMu.Lock()
-	p.svrPks = append(p.svrPks, pk)
-	p.svrPkMu.Unlock()
 }
 
 // MoveEntity moves an entity to the given position.
@@ -591,9 +586,7 @@ func (p *Player) Close() error {
 		p.checks = nil
 		p.checkMu.Unlock()
 
-		p.chkMu.Lock()
-		p.chunks = nil
-		p.chkMu.Unlock()
+		p.clearAllChunks()
 
 		p.entityMu.Lock()
 		p.entities = nil
@@ -606,6 +599,7 @@ func (p *Player) Close() error {
 			_ = p.serverConn.Close()
 		}
 	})
+
 	return nil
 }
 
@@ -623,19 +617,6 @@ func (p *Player) flushConns() {
 	if p.serverConn != nil {
 		p.serverConn.Flush()
 	}
-}
-
-// sendPacketToServer sends a packet to the server
-func (p *Player) sendPacketToServer(pk packet.Packet) {
-	if p.serverConn == nil {
-		p.tMu.Lock()
-		p.toSend = append(p.toSend, pk)
-		p.tMu.Unlock()
-
-		return
-	}
-
-	p.serverConn.WritePacket(pk)
 }
 
 // tickEntitiesPos ticks the position of all entities
@@ -679,8 +660,9 @@ func (p *Player) updateEntityPositions(m map[uint64]utils.LocationData) {
 	}
 }
 
+// updateLatency updates the stack latency of the player.
 func (p *Player) updateLatency() {
-	if !p.needLatencyUpdate {
+	if !p.needLatencyUpdate || (p.usePacketBuffer && !p.isBufferStarted) {
 		return
 	}
 
@@ -690,6 +672,7 @@ func (p *Player) updateLatency() {
 	p.Acknowledgement(func() {
 		p.needLatencyUpdate = true
 		p.stackLatency = time.Since(curr).Milliseconds()
+
 		if !p.debugger.Latency {
 			return
 		}
@@ -736,6 +719,13 @@ func (p *Player) startTicking() {
 			} else {
 				p.serverTick.Inc()
 			}
+
+			if p.ServerTick()%40 == 0 {
+				p.tryToCacheChunks()
+			}
+
+			// This will handle all the client packets if packet buffering is enabled.
+			p.handlePacketQueue()
 
 			// This will prepare the entity positions to be acknowledged.
 			p.ackEntitiesPos()

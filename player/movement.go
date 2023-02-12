@@ -105,10 +105,12 @@ func (p *Player) correctMovement() {
 
 // aiStep starts the movement simulation of the player.
 func (p *Player) aiStep() {
-	if p.mInfo.Immobile {
+	if p.mInfo.Immobile || !p.inLoadedChunk {
 		p.mInfo.ForwardImpulse = 0.0
 		p.mInfo.LeftImpulse = 0.0
 		p.mInfo.Jumping = false
+
+		p.mInfo.ServerMovement = mgl32.Vec3{}
 	}
 
 	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 0.003 {
@@ -142,6 +144,7 @@ func (p *Player) aiStep() {
 	}
 
 	p.travel()
+	p.checkUnsupportedMovementScenarios()
 }
 
 // travel continues the player's movement simulation.
@@ -439,6 +442,8 @@ type MovementInfo struct {
 	ServerSentMovement                      mgl32.Vec3
 	ServerMovement, OldServerMovement       mgl32.Vec3
 	ServerPosition                          mgl32.Vec3
+
+	LastUsedInput *packet.PlayerAuthInput
 }
 
 func (m *MovementInfo) UpdateServerSentVelocity(velo mgl32.Vec3) {

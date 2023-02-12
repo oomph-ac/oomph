@@ -77,6 +77,8 @@ type Processor interface {
 	Clicking() bool
 	// TakingKnockback returns true if the processor is currently taking knockback.
 	TakingKnockback() bool
+	// UsesPacketBuffer returns true if the processor uses a packet buffer.
+	UsesPacketBuffer() bool
 
 	// Debug debugs the given parameters to the processor.
 	Debug(check Check, params map[string]any)

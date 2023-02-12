@@ -52,7 +52,7 @@ func (a *Acknowledgements) GetMap(t int64) ([]func(), bool) {
 func (a *Acknowledgements) Handle(i int64, tryOther bool) bool {
 	ok := a.tryHandle(i)
 	if !ok && tryOther {
-		ok = a.tryHandle(i)
+		ok = a.tryHandle(i / 1000)
 	}
 
 	return ok
