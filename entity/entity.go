@@ -108,6 +108,7 @@ func (e *Entity) LastPosition() mgl32.Vec3 {
 func (e *Entity) Move(pos mgl32.Vec3, offset bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
 	e.lastPosition = e.position
 	e.position = pos
 	if offset {

@@ -56,6 +56,7 @@ func (p *Player) WritePacket(pk packet.Packet) error {
 		return nil
 	}
 	if err := p.conn.WritePacket(pk); err != nil {
+		p.Close()
 		return err
 	}
 	return nil
@@ -74,7 +75,16 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 	p.tMu.Unlock()
 
 	if pk, err = p.conn.ReadPacket(); err != nil {
+		p.Close()
 		return nil, err
+	}
+
+	if p.usePacketBuffer {
+		if p.QueuePacket(pk) {
+			return pk, err
+		}
+
+		return p.ReadPacket()
 	}
 
 	if p.ClientProcess(pk) {
