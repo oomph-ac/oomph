@@ -3,6 +3,7 @@ package player
 import (
 	"bytes"
 	"github.com/chewxy/math32"
+	"strconv"
 	"strings"
 	"time"
 	_ "unsafe"
@@ -41,6 +42,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	}
 
 	switch pk := pk.(type) {
+	case *packet.Disconnect:
+		p.Close()
+		return false
 	case *packet.TickSync:
 		// The tick sync packet is sent once by the client on join and the server responds with another.
 		// From what I can tell, the client frame is supposed to be rewound to `ServerReceptionTime` in the
@@ -53,6 +57,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
+			p.Acknowledgement(func() {
+				p.ready = true
+			})
 		})
 		p.rid = p.conn.GameData().EntityRuntimeID
 	case *packet.NetworkStackLatency:
@@ -109,12 +116,32 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.debugger.Latency = b
 			case "server_combat":
 				p.debugger.ServerCombat = b
-			case "server_kb":
 			case "server_knockback":
 				p.debugger.ServerKnockback = b
+			case "buffer_info":
+				p.debugger.PacketBuffer = b
+			case "packet_buffer":
+				p.EnablePacketQueue(b)
+			case "game_speed":
+				// convert to float32 using strconv.ParseFloat
+				f, err := strconv.ParseFloat(cmd[2], 32)
+				if err != nil {
+					p.SendOomphDebug("Invalid value: "+cmd[2], packet.TextTypeChat)
+					return true
+				}
+
+				pk := &packet.LevelEvent{
+					EventType: packet.LevelEventSimTimeScale,
+					Position:  mgl32.Vec3{1},
+				}
+
+				p.conn.WritePacket(pk)
+				pk.Position = mgl32.Vec3{float32(f)}
+				p.conn.WritePacket(pk)
 			default:
 				p.SendOomphDebug("Unknown debug mode: "+cmd[1], packet.TextTypeChat)
 			}
+			p.SendOomphDebug("OK.", packet.TextTypeChat)
 			return true
 		}
 
@@ -188,16 +215,14 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
-		if pk.Mode != packet.MoveModeTeleport {
-			return false
-		}
-
 		// If rewind is being applied with this packet, teleport the player instantly on the server
 		// instead of waiting for the client to acknowledge the packet.
-		if p.movementMode == utils.ModeFullAuthoritative || pk.Tick != 0 {
+		if p.movementMode == utils.ModeFullAuthoritative {
 			pk.Tick = p.ClientFrame()
 			p.Teleport(pk.Position)
 			return false
+		} else {
+			pk.Tick = 0
 		}
 
 		p.Acknowledgement(func() {
@@ -231,16 +256,29 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
+		for _, a := range pk.Attributes {
+			if a.Name == "minecraft:health" && a.Value <= 0 {
+				p.isSyncedWithServer = false
+				p.dead = true
+
+				p.chkMu.Lock()
+				p.chunks = make(map[protocol.ChunkPos]*chunk.Chunk)
+				p.inLoadedChunk = false
+				p.inLoadedChunkTicks = 0
+				p.chkMu.Unlock()
+
+				break
+			}
+		}
+
 		p.lastSentAttributes = pk
 		p.Acknowledgement(func() {
 			for _, a := range pk.Attributes {
-				if a.Name == "minecraft:health" && a.Value <= 0 {
-					p.isSyncedWithServer = false
-					p.dead = true
-				} else if a.Name == "minecraft:movement" {
+				if a.Name == "minecraft:movement" {
 					p.miMu.Lock()
 					p.mInfo.Speed = a.Value
 					p.miMu.Unlock()
+					break
 				}
 			}
 		})
@@ -287,6 +325,9 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			return false
 		}
 
+		chunkPos := GetChunkPos(pk.Position[0], pk.Position[2])
+		p.LoadChunkFromCache(chunkPos)
+
 		if p.movementMode == utils.ModeFullAuthoritative {
 			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
 			return false
@@ -318,9 +359,12 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 
 		p.Acknowledgement(func() {
+			p.mInfo.ServerPosition = pk.Position.Add(mgl32.Vec3{0, 1.62})
 			p.dead = false
 			p.respawned = true
 		})
+	case *packet.Disconnect:
+		p.Close()
 	}
 	return false
 }
@@ -338,6 +382,10 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		p.setMovementToClient()
 		return
 	}
+
+	defer func() {
+		p.mInfo.LastUsedInput = pk
+	}()
 
 	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
 		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
@@ -400,25 +448,33 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 }
 
 func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
-	p.ready = true
+	if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
+		return
+	}
+
 	c, err := chunk.NetworkDecode(air, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
 	if err != nil {
 		c = chunk.New(air, world.Overworld.Range())
 	}
 	c.Compact()
 
+	if equal, _ := CompareFromChunkCache(pk.Position, c); equal {
+		return
+	}
+
 	switch p.movementMode {
 	case utils.ModeSemiAuthoritative:
 		p.Acknowledgement(func() {
-			p.LoadChunk(pk.Position, c)
+			TryAddChunkToCache(p, pk.Position, c)
 		})
 	case utils.ModeFullAuthoritative:
-		p.LoadChunk(pk.Position, c)
+		TryAddChunkToCache(p, pk.Position, c)
+
 	}
+	return
 }
 
 func (p *Player) handleSubChunk(pk *packet.SubChunk) {
-	p.ready = true
 	for _, entry := range pk.SubChunkEntries {
 		if entry.Result != protocol.SubChunkResultSuccess {
 			continue
@@ -429,15 +485,8 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 			pk.Position[2] + int32(entry.Offset[2]),
 		}
 
-		c, ok := p.Chunk(chunkPos)
-		if !ok {
-			p.chkMu.Lock()
-			c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
-			p.chunks[chunkPos] = c
-			p.chkMu.Unlock()
-		} else {
-			c.Unlock()
-		}
+		c := chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
+		c.Lock()
 
 		var index byte
 		sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
@@ -446,6 +495,17 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 		}
 
 		c.Sub()[index] = sub
+		c.Unlock()
+
+		equal, exists := CompareFromChunkCache(chunkPos, c)
+		if !exists {
+			TryAddChunkToCache(p, chunkPos, c)
+			continue
+		}
+
+		if equal {
+			p.LoadChunk(chunkPos, c)
+		}
 	}
 }
 
