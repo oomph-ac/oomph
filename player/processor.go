@@ -121,7 +121,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			case "buffer_info":
 				p.debugger.PacketBuffer = b
 			case "packet_buffer":
-				p.EnablePacketQueue(b)
+				p.UsePacketBuffering(b)
 			case "game_speed":
 				// convert to float32 using strconv.ParseFloat
 				f, err := strconv.ParseFloat(cmd[2], 32)

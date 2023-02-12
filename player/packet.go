@@ -24,6 +24,8 @@ func (b *PacketBuffer) Add(pk packet.Packet) {
 	b.Packets = append(b.Packets, pk)
 }
 
+// handlePacketQueue handles the packet queue for the player. This is a function that is called every tick, and
+// will use the next available (valid) buffer, or fill for movement with the player's last sent input.
 func (p *Player) handlePacketQueue() {
 	var doDouble bool
 
@@ -225,7 +227,7 @@ func (p *Player) UsesPacketBuffer() bool {
 	return p.usePacketBuffer
 }
 
-func (p *Player) EnablePacketQueue(b bool) {
+func (p *Player) UsePacketBuffering(b bool) {
 	if p.movementMode != utils.ModeFullAuthoritative {
 		b = false
 	}
