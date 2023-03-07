@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/chewxy/math32"
 	"strconv"
 	"strings"
@@ -82,6 +83,19 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 		p.needsCombatValidation = false
 
+		if p.debugger.Chunks && p.ClientTick()%20 == 0 {
+			c, loaded, cached := p.Chunk(protocol.ChunkPos{
+				int32(p.Position().X()) >> 4,
+				int32(p.Position().Z()) >> 4,
+			})
+
+			if loaded {
+				c.Unlock()
+			}
+
+			p.SendOomphDebug(fmt.Sprint("pos=", game.RoundVec32(p.Position(), 2), " cached=", cached, " loaded=", loaded), packet.TextTypeChat)
+		}
+
 		defer p.SetRespawned(false)
 		if p.movementMode == utils.ModeSemiAuthoritative {
 			defer p.setMovementToClient()
@@ -138,6 +152,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.conn.WritePacket(pk)
 				pk.Position = mgl32.Vec3{float32(f)}
 				p.conn.WritePacket(pk)
+			case "movement":
+				p.debugger.Movement = b
+			case "chunks":
+				p.debugger.Chunks = b
 			default:
 				p.SendOomphDebug("Unknown debug mode: "+cmd[1], packet.TextTypeChat)
 			}
@@ -312,9 +330,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 			p.handleSubChunk(pk)
 		}
 	case *packet.ChunkRadiusUpdated:
-		p.Acknowledgement(func() {
-			p.chunkRadius = int(pk.ChunkRadius) + 4
-		})
+		p.chunkRadius = pk.ChunkRadius + 4
 	case *packet.UpdateBlock:
 		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
@@ -458,10 +474,6 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 	}
 	c.Compact()
 
-	if equal, _ := CompareFromChunkCache(pk.Position, c); equal {
-		return
-	}
-
 	switch p.movementMode {
 	case utils.ModeSemiAuthoritative:
 		p.Acknowledgement(func() {
@@ -469,7 +481,6 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 		})
 	case utils.ModeFullAuthoritative:
 		TryAddChunkToCache(p, pk.Position, c)
-
 	}
 	return
 }

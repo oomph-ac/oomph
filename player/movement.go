@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/ethaniccc/float32-cube/cube"
 
@@ -44,6 +45,13 @@ func (p *Player) validateMovement() {
 	}
 
 	diff := p.mInfo.ServerPosition.Sub(p.Position())
+
+	if p.debugger.Movement {
+		p.SendOomphDebug(fmt.Sprint("want=", game.RoundVec32(p.mInfo.ServerPosition, 2),
+			" got=", game.RoundVec32(p.Position(), 2), " diff=", game.RoundVec32(diff, 2), " fI=", p.mInfo.ForwardImpulse,
+			" lI=", p.mInfo.LeftImpulse), packet.TextTypeChat)
+	}
+
 	if diff.LenSqr() < 0.09 {
 		return
 	}
@@ -138,7 +146,7 @@ func (p *Player) aiStep() {
 		p.mInfo.JumpCooldownTicks = 0
 	}
 
-	if p.mInfo.Jumping && p.mInfo.OnGround && p.mInfo.JumpCooldownTicks <= 0 {
+	if p.mInfo.JumpDown && p.mInfo.OnGround && p.mInfo.JumpCooldownTicks <= 0 {
 		p.simulateJump()
 		p.mInfo.JumpCooldownTicks = 10
 	}
