@@ -720,7 +720,7 @@ func (p *Player) startTicking() {
 				p.serverTick.Inc()
 			}
 
-			if p.ServerTick()%40 == 0 {
+			if p.ServerTick()%100 == 0 {
 				p.tryToCacheChunks()
 			}
 
