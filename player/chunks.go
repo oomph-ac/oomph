@@ -146,7 +146,8 @@ func (p *Player) LoadChunkFromCache(pos protocol.ChunkPos) {
 	defer chunkCacheMu.Unlock()
 
 	if c, ok := chunkCache[pos]; ok {
-		p.LoadChunk(pos, c.Chunk)
+		chunkToCopy := *c.Chunk // We make a copy of the chunk so that we don't shit on the chunk cache!!
+		p.LoadChunk(pos, &chunkToCopy)
 	}
 }
 
