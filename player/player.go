@@ -101,7 +101,7 @@ type Player struct {
 
 	subscribedChunks []protocol.ChunkPos
 	chunks           map[protocol.ChunkPos]*chunk.Chunk
-	chunkRadius      int
+	chunkRadius      int32
 	chkMu            sync.Mutex
 
 	checkMu sync.Mutex
@@ -198,7 +198,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	}
 
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
-	p.chunkRadius = p.conn.ChunkRadius() + 4
+	p.chunkRadius = int32(p.conn.ChunkRadius()) + 4
 	p.Acknowledgements().Refresh()
 
 	go p.startTicking()

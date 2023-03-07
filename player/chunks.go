@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -9,13 +10,14 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"sync"
 	"time"
 )
 
 type CachedChunk struct {
 	Chunk       *chunk.Chunk
-	Subscribers uint
+	Subscribers int32
 }
 
 var chunkCache map[protocol.ChunkPos]*CachedChunk
@@ -31,10 +33,14 @@ func init() {
 			select {
 			case <-t.C:
 				chunkCacheMu.Lock()
+				deleted := 0
 				for pos, c := range chunkCache {
-					if c.Subscribers == 0 {
-						delete(chunkCache, pos)
+					if c.Subscribers > 0 {
+						continue
 					}
+
+					deleted++
+					delete(chunkCache, pos)
 				}
 				chunkCacheMu.Unlock()
 			}
@@ -43,8 +49,9 @@ func init() {
 }
 
 // TryAddChunkToCache will try to add a chunk to the chunk cache. If the chunk is already in the cache, it will
-// put it in the player's chunk map.
-func TryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) {
+// put it in the player's chunk map. This function will return true if the player is using a cached chunk, and
+// false if otherwise.
+func TryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) bool {
 	chunkCacheMu.Lock()
 	defer chunkCacheMu.Unlock()
 
@@ -52,15 +59,30 @@ func TryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) {
 	if !ok {
 		chunkCache[pos] = &CachedChunk{Chunk: c}
 		p.subscribeToChunk(pos)
-		return
+
+		if p.debugger.Chunks {
+			p.SendOomphDebug(fmt.Sprint("chunk ", pos, " added to cache and used"), packet.TextTypeChat)
+		}
+
+		return true
 	}
 
 	if chk.Chunk == c {
 		p.subscribeToChunk(pos)
-		return
+
+		if p.debugger.Chunks {
+			p.SendOomphDebug(fmt.Sprint("chunk ", pos, " already in cache and used"), packet.TextTypeChat)
+		}
+
+		return true
+	}
+
+	if p.debugger.Chunks {
+		p.SendOomphDebug(fmt.Sprint("chunk ", pos, " NOT using cache"), packet.TextTypeChat)
 	}
 
 	p.LoadChunk(pos, c)
+	return false
 }
 
 // GetChunkFromCache returns a chunk from the chunk cache. If the chunk was found in the cache, it will return
@@ -146,7 +168,7 @@ func (p *Player) UnloadChunk(pos protocol.ChunkPos) {
 
 // ChunkExists returns true if the given chunk position was found in the map of chunks
 func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
-	c, ok := p.Chunk(pos)
+	c, _, ok := p.Chunk(pos)
 	if ok {
 		c.Unlock()
 	}
@@ -156,7 +178,7 @@ func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
 
 // Chunk returns a chunk from the given chunk position. If the chunk was found in the map, it will
 // return the chunk and true.
-func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
+func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool, bool) {
 	// First, we will check if the player has a different version of the chunk
 	// loaded in their own chunk map.
 	p.chkMu.Lock()
@@ -165,16 +187,16 @@ func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
 
 	if ok {
 		c.Lock()
-		return c, ok
+		return c, false, ok
 	}
 
 	// If there is no chunk detected, we will see if the chunk is in the cache.
-	if c, ok := GetChunkFromCache(pos); ok {
-		return c, ok
+	if cc, valid := GetChunkFromCache(pos); valid {
+		return cc, true, valid
 	}
 
 	// No chunk detected - very sad :(
-	return nil, ok
+	return nil, false, ok
 }
 
 // tryToCacheChunks will try to remove chunks from the player's chunk map, and use the chunk cache instead.
@@ -199,7 +221,7 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
-	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
+	c, _, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if !ok {
 		return block.Air{}
 	}
@@ -217,7 +239,7 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	}
 
 	rid := world.BlockRuntimeID(b)
-	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
+	c, _, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if !ok {
 		return
 	}
@@ -285,7 +307,7 @@ func (p *Player) cleanChunks() {
 	for pos := range p.chunks {
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
 		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
-		if int(dist) > p.chunkRadius {
+		if int32(dist) > p.chunkRadius {
 			delete(p.chunks, pos)
 		}
 	}
@@ -294,7 +316,7 @@ func (p *Player) cleanChunks() {
 	for _, pos := range p.subscribedChunks {
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
 		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
-		if int(dist) > p.chunkRadius {
+		if int32(dist) > p.chunkRadius {
 			removeChunkSubscriber(pos)
 			continue
 		}

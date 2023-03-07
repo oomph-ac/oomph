@@ -5,4 +5,6 @@ type Debugger struct {
 	ServerCombat    bool
 	ServerKnockback bool
 	PacketBuffer    bool
+	Movement        bool
+	Chunks          bool
 }
