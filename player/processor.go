@@ -84,16 +84,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.needsCombatValidation = false
 
 		if p.debugger.Chunks && p.ClientTick()%20 == 0 {
-			c, loaded, cached := p.Chunk(protocol.ChunkPos{
-				int32(p.Position().X()) >> 4,
-				int32(p.Position().Z()) >> 4,
-			})
-
-			if loaded {
-				c.Unlock()
-			}
-
-			p.SendOomphDebug(fmt.Sprint("pos=", game.RoundVec32(p.Position(), 2), " cached=", cached, " loaded=", loaded), packet.TextTypeChat)
+			p.SendOomphDebug(fmt.Sprint("pos=", game.RoundVec32(p.mInfo.ServerPosition, 2), " cached=", p.UsingCachedChunk(), " loaded=", p.inLoadedChunk), packet.TextTypeChat)
 		}
 
 		defer p.SetRespawned(false)
@@ -465,6 +456,10 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 
 func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 	if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
+		return
+	}
+
+	if p.movementMode == utils.ModeClientAuthoritative {
 		return
 	}
 
