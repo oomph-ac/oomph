@@ -33,13 +33,11 @@ func init() {
 			select {
 			case <-t.C:
 				chunkCacheMu.Lock()
-				deleted := 0
 				for pos, c := range chunkCache {
 					if c.Subscribers > 0 {
 						continue
 					}
 
-					deleted++
 					delete(chunkCache, pos)
 				}
 				chunkCacheMu.Unlock()
@@ -164,6 +162,16 @@ func (p *Player) UnloadChunk(pos protocol.ChunkPos) {
 	p.chkMu.Lock()
 	delete(p.chunks, pos)
 	p.chkMu.Unlock()
+}
+
+// UsingCachedChunk returns true if the player is using a chunk from the chunk cache.
+func (p *Player) UsingCachedChunk() bool {
+	p.chkMu.Lock()
+	defer p.chkMu.Unlock()
+
+	loc := protocol.ChunkPos{int32(p.mInfo.ServerPosition[0]) >> 4, int32(p.mInfo.ServerPosition[2]) >> 4}
+	_, ok := p.chunks[loc]
+	return ok
 }
 
 // ChunkExists returns true if the given chunk position was found in the map of chunks
