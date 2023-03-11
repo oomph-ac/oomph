@@ -11,108 +11,226 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"reflect"
+	"runtime"
 	"sync"
 	"time"
 )
 
+// CachedChunk contains a pointer to the chunk, and the "subscriber" count.
+// As long as
 type CachedChunk struct {
 	Chunk       *chunk.Chunk
-	Subscribers int32
+	Subscribers uint32
 }
 
-var chunkCache map[protocol.ChunkPos]*CachedChunk
+type ChunkSubscriptionInfo struct {
+	ChunkPos protocol.ChunkPos
+	ID       int64
+}
+
+var chunkCache map[protocol.ChunkPos]map[int64]*CachedChunk
+var chunkSubscriptions map[int64]*ChunkSubscriptionInfo
 var chunkCacheMu sync.Mutex
+var currentChunkNum int64 = 0
 
 func init() {
-	chunkCache = make(map[protocol.ChunkPos]*CachedChunk)
+	chunkCache = make(map[protocol.ChunkPos]map[int64]*CachedChunk)
+	chunkSubscriptions = make(map[int64]*ChunkSubscriptionInfo)
 
 	// Every 5 seconds, review the chunk cache, and remove any chunks that do not have any subscribers.
 	go func() {
-		t := time.NewTicker(time.Second * 5)
+		t := time.NewTicker(time.Second * 2)
 		for {
 			select {
 			case <-t.C:
 				chunkCacheMu.Lock()
-				for pos, c := range chunkCache {
-					if c.Subscribers > 0 {
+				deleted := 0
+				for pos, subMap := range chunkCache {
+					deleted += removeUnsubscribedChunks(subMap)
+
+					// Remove duplicated chunks that have different IDs in a sub-map.
+					if !removeDuplicateCachedChunks(subMap) {
 						continue
 					}
 
+					// removeDuplicateCachedChunks returns true if the map
+					// is empty, so we can delete it here.
 					delete(chunkCache, pos)
 				}
+
+				// We run the garbage collector here to get rid of all the stupid
+				// lurking chunks that are still in memory but are not used.
+				runtime.GC()
+
 				chunkCacheMu.Unlock()
 			}
 		}
 	}()
 }
 
-// TryAddChunkToCache will try to add a chunk to the chunk cache. If the chunk is already in the cache, it will
-// put it in the player's chunk map. This function will return true if the player is using a cached chunk, and
-// false if otherwise.
-func TryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) bool {
-	chunkCacheMu.Lock()
-	defer chunkCacheMu.Unlock()
-
-	chk, ok := chunkCache[pos]
-	if !ok {
-		chunkCache[pos] = &CachedChunk{Chunk: c}
-		p.subscribeToChunk(pos)
-
-		if p.debugger.Chunks {
-			p.SendOomphDebug(fmt.Sprint("chunk ", pos, " added to cache and used"), packet.TextTypeChat)
+// compareChunkToMap compares a chunk to all chunks in a map. If the
+// chunk is found in the map, it will return the ID and true.
+func compareChunkToMap(c *chunk.Chunk, m map[int64]*CachedChunk) (int64, bool) {
+	for id, chk := range m {
+		if doChunkCompare(c, chk.Chunk) {
+			return id, true
 		}
-
-		return true
 	}
 
-	if chk.Chunk == c {
-		p.subscribeToChunk(pos)
-
-		if p.debugger.Chunks {
-			p.SendOomphDebug(fmt.Sprint("chunk ", pos, " already in cache and used"), packet.TextTypeChat)
-		}
-
-		return true
-	}
-
-	if p.debugger.Chunks {
-		p.SendOomphDebug(fmt.Sprint("chunk ", pos, " NOT using cache"), packet.TextTypeChat)
-	}
-
-	p.LoadChunk(pos, c)
-	return false
+	return -1, false
 }
 
-// GetChunkFromCache returns a chunk from the chunk cache. If the chunk was found in the cache, it will return
+// removeUnsubscribedChunks removes any chunks that have 0 subscribers
+func removeUnsubscribedChunks(subMap map[int64]*CachedChunk) (d int) {
+	for id, chk := range subMap {
+		if chk.Subscribers > 0 {
+			continue
+		}
+
+		d++
+		delete(subMap, id)
+		delete(chunkSubscriptions, id)
+	}
+
+	return
+}
+
+// removeDuplicateCachedChunks removes duplicate chunks from the chunk cache.
+// The function will return true if the map should be deleted.
+func removeDuplicateCachedChunks(subMap map[int64]*CachedChunk) bool {
+	// Make a buffer of the ids of the chunks that have already been compared.
+	// This is to prevent comparing two same chunks twice.
+	compared := make(map[int64]bool, 0)
+
+	for id1, chk := range subMap {
+		for id2, chk2 := range subMap {
+			if id1 == id2 {
+				continue
+			}
+
+			if _, ok := compared[id2]; ok {
+				continue
+			}
+
+			if !doChunkCompare(chk.Chunk, chk2.Chunk) {
+				continue
+			}
+
+			if i, ok := chunkSubscriptions[id2]; ok {
+				i.ID = id1
+			}
+			delete(subMap, id2)
+		}
+
+		compared[id1] = true
+	}
+
+	compared = nil
+	return len(subMap) == 0
+}
+
+// tryAddChunkToCache will try to add a chunk to the chunk cache. If the chunk is already exists
+// in the cache, the function will return false.
+func tryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) bool {
+	if p == nil {
+		panic("Did not expect null player when calling tryAddChunkToCache")
+	}
+
+	subMap, ok := chunkCache[pos]
+	if !ok {
+		// In this scenario, the map has not been created for this position yet, so we will create one.
+		addChunkToCache(pos, c)
+		p.subscribeToChunk(pos, currentChunkNum)
+
+		if p.debugger.Chunks {
+			p.SendOomphDebug(fmt.Sprint("chunk ", pos, " had a sub-map created"), packet.TextTypeChat)
+		}
+
+		return true
+	}
+
+	// If the map exists, and the current chunk is found in the map, we will
+	// have the player subscribe to that chunk.
+	id, ok := compareChunkToMap(c, subMap)
+	if ok {
+		p.subscribeToChunk(pos, id)
+
+		if p.debugger.Chunks {
+			p.SendOomphDebug(fmt.Sprint("chunk ", pos, " was found in sub-map with id ", id), packet.TextTypeChat)
+		}
+
+		return false
+	}
+
+	// If the chunk is not found in the map, we will add it to the map.
+	addChunkToCache(pos, c)
+	p.subscribeToChunk(pos, currentChunkNum)
+
+	if p.debugger.Chunks {
+		p.SendOomphDebug(fmt.Sprint("chunk ", pos, " added to cache in new sub-map"), packet.TextTypeChat)
+	}
+
+	return true
+}
+
+// getChunkFromCache returns a chunk from the chunk cache. If the chunk was found in the cache, it will return
 // the chunk and true.
-func GetChunkFromCache(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
+func getChunkFromCache(pos protocol.ChunkPos, id int64) (*chunk.Chunk, bool) {
 	chunkCacheMu.Lock()
 	defer chunkCacheMu.Unlock()
 
-	c, ok := chunkCache[pos]
-	if ok {
-		c.Chunk.Lock()
-		return c.Chunk, ok
+	// Check if there is a sub map for the chunk position.
+	subMap, ok := chunkCache[pos]
+	if !ok {
+		// There is not a sub map for the chunk position, so we can return false.
+		return nil, ok
 	}
 
+	chk, ok := subMap[id]
+	if ok {
+		// Lock the chunk before returning it - this is to ensure that once returned, we
+		// can modify or read the chunk without any race conditions.
+		chk.Chunk.Lock()
+		return chk.Chunk, ok
+	}
+
+	// There was no chunk found in the sub map with the following ID, so we can return false.
 	return nil, ok
 }
 
-// CompareFromChunkCache returns true if the chunk in the chunk cache is the same as the chunk given.
-func CompareFromChunkCache(pos protocol.ChunkPos, c *chunk.Chunk) (equal bool, exists bool) {
+// addChunkToCache adds a chunk to the chunk cache.
+func addChunkToCache(pos protocol.ChunkPos, c *chunk.Chunk) {
 	chunkCacheMu.Lock()
 	defer chunkCacheMu.Unlock()
 
-	chk, ok := chunkCache[pos]
-	if !ok {
-		return false, false
+	if _, ok := chunkCache[pos]; !ok {
+		chunkCache[pos] = make(map[int64]*CachedChunk)
 	}
 
-	return chk.Chunk == c, true
+	currentChunkNum++
+
+	chunkCache[pos][currentChunkNum] = &CachedChunk{Chunk: c, Subscribers: 0}
+	chunkSubscriptions[currentChunkNum] = &ChunkSubscriptionInfo{ID: currentChunkNum, ChunkPos: pos}
 }
 
-func addChunkSubscriber(pos protocol.ChunkPos) {
-	chk, ok := chunkCache[pos]
+// doChunkCompare compares two chunks with each other. It will return true if
+// the two given chunks are equal.
+func doChunkCompare(c1 *chunk.Chunk, c2 *chunk.Chunk) bool {
+	return reflect.DeepEqual(c1, c2)
+}
+
+// addChunkSubscribe will add a subscriber to a chunk in the chunk cache.
+func addChunkSubscriber(pos protocol.ChunkPos, id int64) {
+	chunkCacheMu.Lock()
+	defer chunkCacheMu.Unlock()
+
+	sub, ok := chunkCache[pos]
+	if !ok {
+		return
+	}
+
+	chk, ok := sub[id]
 	if !ok {
 		return
 	}
@@ -120,64 +238,61 @@ func addChunkSubscriber(pos protocol.ChunkPos) {
 	chk.Subscribers++
 }
 
-func removeChunkSubscriber(pos protocol.ChunkPos) {
-	chk, ok := chunkCache[pos]
+// getChunkSubscriptionInfo returns the chunk subscription info for the given chunk ID.
+// This is done so that if we detect two identical chunks with different IDs, we can
+// just edit the subscription info the chunk to auto-subscribe the player.
+func getChunkSubscriptionInfo(id int64) *ChunkSubscriptionInfo {
+	chunkCacheMu.Lock()
+	defer chunkCacheMu.Unlock()
+
+	i, ok := chunkSubscriptions[id]
+	if !ok {
+		panic("Did not expect getting nil chunk subscription info")
+	}
+
+	return i
+}
+
+// removeChunkSubscriber will remove a subscriber from a chunk in the chunk cache.
+func removeChunkSubscriber(pos protocol.ChunkPos, id int64) {
+	chunkCacheMu.Lock()
+	defer chunkCacheMu.Unlock()
+
+	sub, ok := chunkCache[pos]
+	if !ok {
+		return
+	}
+
+	chk, ok := sub[id]
 	if !ok {
 		return
 	}
 
 	chk.Subscribers--
+	if chk.Subscribers > 0 {
+		return
+	}
+
+	fmt.Println("deleted chunk with id", id)
+	delete(sub, id)
 }
 
+// GetChunkPos returns the chunk position from the given x and z coordinates.
 func GetChunkPos(x, z int32) protocol.ChunkPos {
 	return protocol.ChunkPos{x >> 4, z >> 4}
 }
 
-func (p *Player) subscribeToChunk(pos protocol.ChunkPos) {
-	p.chkMu.Lock()
-	p.subscribedChunks = append(p.subscribedChunks, pos)
-	p.chkMu.Unlock()
-
-	addChunkSubscriber(pos)
-}
-
-func (p *Player) LoadChunkFromCache(pos protocol.ChunkPos) {
-	chunkCacheMu.Lock()
-	defer chunkCacheMu.Unlock()
-
-	if c, ok := chunkCache[pos]; ok {
-		chunkToCopy := *c.Chunk // We make a copy of the chunk so that we don't shit on the chunk cache!!
-		p.LoadChunk(pos, &chunkToCopy)
-	}
-}
-
-// LoadChunk adds a chunk to the map of chunks
-func (p *Player) LoadChunk(pos protocol.ChunkPos, c *chunk.Chunk) {
-	p.chkMu.Lock()
-	p.chunks[pos] = c
-	p.chkMu.Unlock()
-}
-
-// UnloadChunk removes a chunk from the map of chunks
-func (p *Player) UnloadChunk(pos protocol.ChunkPos) {
-	p.chkMu.Lock()
-	delete(p.chunks, pos)
-	p.chkMu.Unlock()
-}
-
-// UsingCachedChunk returns true if the player is using a chunk from the chunk cache.
-func (p *Player) UsingCachedChunk() bool {
+func (p *Player) subscribeToChunk(pos protocol.ChunkPos, id int64) {
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()
 
-	loc := protocol.ChunkPos{int32(p.mInfo.ServerPosition[0]) >> 4, int32(p.mInfo.ServerPosition[2]) >> 4}
-	_, ok := p.chunks[loc]
-	return ok
+	p.chunks[pos] = getChunkSubscriptionInfo(id)
+	addChunkSubscriber(pos, id)
 }
 
 // ChunkExists returns true if the given chunk position was found in the map of chunks
 func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
-	c, _, ok := p.Chunk(pos)
+	c, ok := p.Chunk(pos)
 	if ok {
 		c.Unlock()
 	}
@@ -187,42 +302,18 @@ func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
 
 // Chunk returns a chunk from the given chunk position. If the chunk was found in the map, it will
 // return the chunk and true.
-func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool, bool) {
-	// First, we will check if the player has a different version of the chunk
-	// loaded in their own chunk map.
-	p.chkMu.Lock()
-	c, ok := p.chunks[pos]
-	p.chkMu.Unlock()
-
-	if ok {
-		c.Lock()
-		return c, false, ok
-	}
-
-	// If there is no chunk detected, we will see if the chunk is in the cache.
-	if cc, valid := GetChunkFromCache(pos); valid {
-		return cc, true, valid
-	}
-
-	// No chunk detected - very sad :(
-	return nil, false, ok
-}
-
-// tryToCacheChunks will try to remove chunks from the player's chunk map, and use the chunk cache instead.
-// Chunks will only be removed if the chunk in the player's chunk map is the same as the chunk in the cache.
-func (p *Player) tryToCacheChunks() {
+func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
+	// Figure out of the player has a subscription to the chunk
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()
+	sc, ok := p.chunks[pos]
 
-	for pos, c := range p.chunks {
-		// If the chunks differ from each other, we will not use the chunk cache for this chunk.
-		if equal, _ := CompareFromChunkCache(pos, c); !equal {
-			continue
-		}
-
-		// If the chunks are the same, we will remove the chunk from the player's chunk map, and use the cache.
-		delete(p.chunks, pos)
+	if !ok {
+		return nil, false
 	}
+
+	// Check if the chunk is in the cache
+	return getChunkFromCache(sc.ChunkPos, sc.ID)
 }
 
 // Block returns the block found at the given position
@@ -230,7 +321,7 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
-	c, _, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
+	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if !ok {
 		return block.Air{}
 	}
@@ -248,7 +339,7 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	}
 
 	rid := world.BlockRuntimeID(b)
-	c, _, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
+	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if !ok {
 		return
 	}
@@ -305,6 +396,36 @@ func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
 	return blocks
 }
 
+// makeChunkCopy makes a copy of the chunk at the given position, and
+// adds it to the cache with a new ID.
+func (p *Player) makeChunkCopy(pos protocol.ChunkPos) {
+	p.chkMu.Lock()
+	sc, ok := p.chunks[pos] // Check if the player has subscription info to the chunk at the given position.
+	p.chkMu.Unlock()
+
+	if !ok {
+		// This function shouldn't be called anyway if the player doesn't have a
+		// subscription to the chunk.
+		return
+	}
+
+	c, ok := getChunkFromCache(sc.ChunkPos, sc.ID)
+	if !ok {
+		// There should be a chunk here... am I missing something?
+		return
+	}
+
+	// Remove the player from the unwanted original chunk.
+	removeChunkSubscriber(sc.ChunkPos, sc.ID)
+
+	c.Unlock()
+	chk := *c
+
+	// Add the chunk to the cache with a new ID. This function also subscribes
+	// the player to the copied chunk.
+	tryAddChunkToCache(p, sc.ChunkPos, &chk)
+}
+
 // cleanChunks filters out any chunks that are out of the player's view, and returns a value of
 // how many chunks were cleaned
 func (p *Player) cleanChunks() {
@@ -313,26 +434,21 @@ func (p *Player) cleanChunks() {
 
 	loc := p.mInfo.ServerPosition
 	activePos := world.ChunkPos{int32(math32.Floor(loc[0])) >> 4, int32(math32.Floor(loc[2])) >> 4}
-	for pos := range p.chunks {
-		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
-		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
-		if int32(dist) > p.chunkRadius {
-			delete(p.chunks, pos)
-		}
-	}
 
-	subscribed := make([]protocol.ChunkPos, 0)
-	for _, pos := range p.subscribedChunks {
-		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
+	// Unsubscribe from any chunks that are out of the player's view.
+	for _, sc := range p.chunks {
+		diffX, diffZ := sc.ChunkPos[0]-activePos[0], sc.ChunkPos[1]-activePos[1]
 		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
-		if int32(dist) > p.chunkRadius {
-			removeChunkSubscriber(pos)
+
+		// If the distance is within the player's chunk view, leave it alone.
+		if int32(dist) <= p.chunkRadius {
 			continue
 		}
 
-		subscribed = append(subscribed, pos)
+		// The chunks are out of the player's view, so unsubscribe from them.
+		removeChunkSubscriber(sc.ChunkPos, sc.ID)
+		delete(p.chunks, sc.ChunkPos)
 	}
-	p.subscribedChunks = subscribed
 }
 
 // clearAllChunks clears all chunks from the player's chunk map and unsubscribes from any cached chunks.
@@ -340,9 +456,8 @@ func (p *Player) clearAllChunks() {
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()
 
-	for _, pos := range p.subscribedChunks {
-		removeChunkSubscriber(pos)
+	for _, sc := range p.chunks {
+		removeChunkSubscriber(sc.ChunkPos, sc.ID)
 	}
-	p.subscribedChunks = nil
 	p.chunks = nil
 }
