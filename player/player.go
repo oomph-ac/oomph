@@ -10,7 +10,6 @@ import (
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/check"
@@ -99,10 +98,9 @@ type Player struct {
 	lastSentAttributes *packet.UpdateAttributes
 	lastSentActorData  *packet.SetActorData
 
-	subscribedChunks []protocol.ChunkPos
-	chunks           map[protocol.ChunkPos]*chunk.Chunk
-	chunkRadius      int32
-	chkMu            sync.Mutex
+	chunks      map[protocol.ChunkPos]*ChunkSubscriptionInfo
+	chunkRadius int32
+	chkMu       sync.Mutex
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -194,7 +192,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		movementMode: utils.ModeFullAuthoritative,
 		combatMode:   utils.ModeFullAuthoritative,
 
-		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
+		chunks: make(map[protocol.ChunkPos]*ChunkSubscriptionInfo),
 	}
 
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
@@ -718,10 +716,6 @@ func (p *Player) startTicking() {
 				p.serverTick.Add(uint64(delta / 50))
 			} else {
 				p.serverTick.Inc()
-			}
-
-			if p.ServerTick()%100 == 0 {
-				p.tryToCacheChunks()
 			}
 
 			// This will handle all the client packets if packet buffering is enabled.

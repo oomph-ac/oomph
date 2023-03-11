@@ -84,7 +84,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.needsCombatValidation = false
 
 		if p.debugger.Chunks && p.ClientTick()%20 == 0 {
-			p.SendOomphDebug(fmt.Sprint("pos=", game.RoundVec32(p.mInfo.ServerPosition, 2), " cached=", p.UsingCachedChunk(), " loaded=", p.inLoadedChunk), packet.TextTypeChat)
+			p.SendOomphDebug(fmt.Sprint("pos=", game.RoundVec32(p.mInfo.ServerPosition, 2), " loaded=", p.inLoadedChunk), packet.TextTypeChat)
 		}
 
 		defer p.SetRespawned(false)
@@ -271,7 +271,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 				p.dead = true
 
 				p.chkMu.Lock()
-				p.chunks = make(map[protocol.ChunkPos]*chunk.Chunk)
+				p.chunks = make(map[protocol.ChunkPos]*ChunkSubscriptionInfo)
 				p.inLoadedChunk = false
 				p.inLoadedChunkTicks = 0
 				p.chkMu.Unlock()
@@ -333,7 +333,7 @@ func (p *Player) ServerProcess(pk packet.Packet) bool {
 		}
 
 		chunkPos := GetChunkPos(pk.Position[0], pk.Position[2])
-		p.LoadChunkFromCache(chunkPos)
+		p.makeChunkCopy(chunkPos)
 
 		if p.movementMode == utils.ModeFullAuthoritative {
 			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
@@ -438,6 +438,8 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 			}
 
 			pos := utils.BlockToCubePos(action.BlockPos).Side(cube.Face(action.Face))
+			p.makeChunkCopy(GetChunkPos(int32(pos[0]), int32(pos[2])))
+
 			b, _ := world.BlockByRuntimeID(air)
 			p.SetBlock(pos, b)
 		}
@@ -472,10 +474,10 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 	switch p.movementMode {
 	case utils.ModeSemiAuthoritative:
 		p.Acknowledgement(func() {
-			TryAddChunkToCache(p, pk.Position, c)
+			tryAddChunkToCache(p, pk.Position, c)
 		})
 	case utils.ModeFullAuthoritative:
-		TryAddChunkToCache(p, pk.Position, c)
+		tryAddChunkToCache(p, pk.Position, c)
 	}
 	return
 }
@@ -492,7 +494,6 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 		}
 
 		c := chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
-		c.Lock()
 
 		var index byte
 		sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
@@ -501,17 +502,7 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 		}
 
 		c.Sub()[index] = sub
-		c.Unlock()
-
-		equal, exists := CompareFromChunkCache(chunkPos, c)
-		if !exists {
-			TryAddChunkToCache(p, chunkPos, c)
-			continue
-		}
-
-		if equal {
-			p.LoadChunk(chunkPos, c)
-		}
+		tryAddChunkToCache(p, chunkPos, c)
 	}
 }
 
@@ -543,6 +534,8 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
 		return false
 	}
+
+	p.makeChunkCopy(GetChunkPos(int32(replacePos[0]), int32(replacePos[2])))
 
 	// Set the block in the world
 	p.SetBlock(replacePos, b)
