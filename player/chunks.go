@@ -18,12 +18,14 @@ import (
 )
 
 // CachedChunk contains a pointer to the chunk, and the "subscriber" count.
-// As long as
+// The subscriber count is the amount of players that are using the chunk.
 type CachedChunk struct {
 	Chunk       *chunk.Chunk
 	Subscribers uint32
 }
 
+// ChunkSubscriptionInfo contains the chunk position and the ID of the chunk.
+// This is used to keep track of which chunks a player is subscribed to.
 type ChunkSubscriptionInfo struct {
 	ChunkPos protocol.ChunkPos
 	ID       int64
@@ -32,7 +34,7 @@ type ChunkSubscriptionInfo struct {
 var chunkCache map[protocol.ChunkPos]map[int64]*CachedChunk
 var chunkSubscriptions map[int64]*ChunkSubscriptionInfo
 var chunkCacheMu sync.Mutex
-var currentChunkNum int64 = 0
+var currentChunkID int64 = 0
 
 func init() {
 	chunkCache = make(map[protocol.ChunkPos]map[int64]*CachedChunk)
@@ -50,11 +52,11 @@ func init() {
 					deleted += removeUnsubscribedChunks(subMap)
 
 					// Remove duplicated chunks that have different IDs in a sub-map.
-					if !removeDuplicateCachedChunks(subMap) {
+					if !removeDuplicateChunks(subMap) {
 						continue
 					}
 
-					// removeDuplicateCachedChunks returns true if the map
+					// removeDuplicateChunks returns true if the map
 					// is empty, so we can delete it here.
 					delete(chunkCache, pos)
 				}
@@ -96,33 +98,41 @@ func removeUnsubscribedChunks(subMap map[int64]*CachedChunk) (d int) {
 	return
 }
 
-// removeDuplicateCachedChunks removes duplicate chunks from the chunk cache.
-// The function will return true if the map should be deleted.
-func removeDuplicateCachedChunks(subMap map[int64]*CachedChunk) bool {
+// removeDuplicateChunks removes duplicate chunks from the chunk cache.
+// The function will return true if the map is empty.
+func removeDuplicateChunks(subMap map[int64]*CachedChunk) bool {
 	// Make a buffer of the ids of the chunks that have already been compared.
 	// This is to prevent comparing two same chunks twice.
 	compared := make(map[int64]bool, 0)
 
 	for id1, chk := range subMap {
 		for id2, chk2 := range subMap {
+			// Don't compare the same chunk.
 			if id1 == id2 {
 				continue
 			}
 
+			// If the chunk has already been compared, skip it.
 			if _, ok := compared[id2]; ok {
 				continue
 			}
 
+			// Compare the chunks - if they are not the same, then they are not "duplicates".
 			if !doChunkCompare(chk.Chunk, chk2.Chunk) {
 				continue
 			}
 
+			// Edit the subscription info so that players using the duplicate chunk
+			// that's going to get deleted will be subscribed to the chunk that's
+			// going to stay.
 			if i, ok := chunkSubscriptions[id2]; ok {
 				i.ID = id1
 			}
+
 			delete(subMap, id2)
 		}
 
+		// Add the current chunk to the compared buffer.
 		compared[id1] = true
 	}
 
@@ -141,7 +151,7 @@ func tryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) bool {
 	if !ok {
 		// In this scenario, the map has not been created for this position yet, so we will create one.
 		addChunkToCache(pos, c)
-		p.subscribeToChunk(pos, currentChunkNum)
+		p.subscribeToChunk(pos, currentChunkID)
 
 		if p.debugger.Chunks {
 			p.SendOomphDebug(fmt.Sprint("chunk ", pos, " had a sub-map created"), packet.TextTypeChat)
@@ -165,7 +175,7 @@ func tryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) bool {
 
 	// If the chunk is not found in the map, we will add it to the map.
 	addChunkToCache(pos, c)
-	p.subscribeToChunk(pos, currentChunkNum)
+	p.subscribeToChunk(pos, currentChunkID)
 
 	if p.debugger.Chunks {
 		p.SendOomphDebug(fmt.Sprint("chunk ", pos, " added to cache in new sub-map"), packet.TextTypeChat)
@@ -204,14 +214,15 @@ func addChunkToCache(pos protocol.ChunkPos, c *chunk.Chunk) {
 	chunkCacheMu.Lock()
 	defer chunkCacheMu.Unlock()
 
+	// If the sub-map for the chunk position does not exist, we will create one.
 	if _, ok := chunkCache[pos]; !ok {
 		chunkCache[pos] = make(map[int64]*CachedChunk)
 	}
 
-	currentChunkNum++
+	currentChunkID++
 
-	chunkCache[pos][currentChunkNum] = &CachedChunk{Chunk: c, Subscribers: 0}
-	chunkSubscriptions[currentChunkNum] = &ChunkSubscriptionInfo{ID: currentChunkNum, ChunkPos: pos}
+	chunkCache[pos][currentChunkID] = &CachedChunk{Chunk: c, Subscribers: 0}
+	chunkSubscriptions[currentChunkID] = &ChunkSubscriptionInfo{ID: currentChunkID, ChunkPos: pos}
 }
 
 // doChunkCompare compares two chunks with each other. It will return true if
