@@ -284,7 +284,6 @@ func removeChunkSubscriber(pos protocol.ChunkPos, id int64) {
 		return
 	}
 
-	fmt.Println("deleted chunk with id", id)
 	delete(sub, id)
 }
 
