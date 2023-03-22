@@ -213,7 +213,7 @@ func (p *Player) Conn() *minecraft.Conn {
 	return p.conn
 }
 
-// Log returns the logger of the player.
+// Log returns the log of the player.
 func (p *Player) Log() *logrus.Logger {
 	return p.log
 }
@@ -500,7 +500,7 @@ func (p *Player) SetRespawned(v bool) {
 	p.respawned = v
 }
 
-// InLoadedChunk returns true if the player is in a chunk loaded by it's world
+// InLoadedChunk returns true if the player is in a chunk loaded by its world
 func (p *Player) InLoadedChunk() bool {
 	return p.inLoadedChunk
 }
@@ -717,6 +717,9 @@ func (p *Player) startTicking() {
 			} else {
 				p.serverTick.Inc()
 			}
+
+			// This will tick the chunk subscriptions.
+			p.tickChunkSubscriptions()
 
 			// This will handle all the client packets if packet buffering is enabled.
 			p.handlePacketQueue()

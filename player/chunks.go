@@ -27,8 +27,9 @@ type CachedChunk struct {
 // ChunkSubscriptionInfo contains the chunk position and the ID of the chunk.
 // This is used to keep track of which chunks a player is subscribed to.
 type ChunkSubscriptionInfo struct {
-	ChunkPos protocol.ChunkPos
-	ID       int64
+	ChunkPos       protocol.ChunkPos
+	ID             int64
+	GuaranteeTicks int64
 }
 
 var (
@@ -408,6 +409,20 @@ func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
 	return blocks
 }
 
+// tickChunkSubscriptions lowers the guarantee ticks of all chunks that the player has a subscription to.
+func (p *Player) tickChunkSubscriptions() {
+	p.chkMu.Lock()
+	defer p.chkMu.Unlock()
+
+	for _, sc := range p.chunks {
+		if sc.GuaranteeTicks <= 0 {
+			continue
+		}
+
+		sc.GuaranteeTicks--
+	}
+}
+
 // makeChunkCopy makes a copy of the chunk at the given position, and
 // adds it to the cache with a new ID.
 func (p *Player) makeChunkCopy(pos protocol.ChunkPos) {
@@ -418,6 +433,11 @@ func (p *Player) makeChunkCopy(pos protocol.ChunkPos) {
 	if !ok {
 		// This function shouldn't be called anyway if the player doesn't have a
 		// subscription to the chunk.
+		return
+	}
+
+	// We can't make a copy right now - too fast! We can't just have the memory go brrrt...
+	if sc.GuaranteeTicks > 0 {
 		return
 	}
 
@@ -436,6 +456,9 @@ func (p *Player) makeChunkCopy(pos protocol.ChunkPos) {
 	// Add the chunk to the cache with a new ID. This function also subscribes
 	// the player to the copied chunk.
 	tryAddChunkToCache(p, sc.ChunkPos, &chk)
+	if nsc, ok := p.chunks[sc.ChunkPos]; ok {
+		nsc.GuaranteeTicks = 40
+	}
 }
 
 // cleanChunks filters out any chunks that are out of the player's view, and returns a value of
