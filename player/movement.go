@@ -45,6 +45,15 @@ func (p *Player) validateMovement() {
 	}
 
 	diff := p.mInfo.ServerPosition.Sub(p.Position())
+	acceptableDrift := diff
+
+	// We will adjust the server position to the client's position by a maximum of 0.0025 blocks on the X, Y, and Z axis
+	// to account for player drift. This will work perfectly for legitimate players, and should not benefit cheaters in any way.
+	// Of course, unless they appreciate moving 0.0025 blocks extra every tick (1 block after 20 seconds).
+	acceptableDrift[0] = game.ClampFloat(acceptableDrift[0], -0.0025, 0.0025)
+	acceptableDrift[1] = 0
+	acceptableDrift[2] = game.ClampFloat(acceptableDrift[2], -0.0025, 0.0025)
+	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Sub(acceptableDrift)
 
 	if p.debugger.Movement {
 		p.SendOomphDebug(fmt.Sprint("want=", game.RoundVec32(p.mInfo.ServerPosition, 2),

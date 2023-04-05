@@ -410,8 +410,10 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
 		p.mInfo.Sprinting = true
+		p.mInfo.Speed *= 1.3 // The client will predict the speed it will have before receiving attribute updates from the server. Sprint multiplies current movement speed by 1.3
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
 		p.mInfo.Sprinting = false
+		p.mInfo.Speed /= 1.3 // The client will predict the speed it will have before receiving attribute updates from the server. Stop sprint divides current movement speed by 1.3
 	}
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
