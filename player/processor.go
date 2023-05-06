@@ -459,7 +459,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 }
 
 func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
-	if pk.SubChunkRequestMode != protocol.SubChunkRequestModeLegacy {
+	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
 		return
 	}
 
