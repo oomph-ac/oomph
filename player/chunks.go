@@ -12,7 +12,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"reflect"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -20,6 +19,7 @@ import (
 // CachedChunk contains a pointer to the chunk, and the "subscriber" count.
 // The subscriber count is the amount of players that are using the chunk.
 type CachedChunk struct {
+	sync.Mutex
 	Chunk       *chunk.Chunk
 	Subscribers uint32
 }
@@ -31,10 +31,12 @@ type ChunkSubscriptionInfo struct {
 	ID       int64
 }
 
-var chunkCache map[protocol.ChunkPos]map[int64]*CachedChunk
-var chunkSubscriptions map[int64]*ChunkSubscriptionInfo
-var chunkCacheMu sync.Mutex
-var currentChunkID int64 = 0
+var (
+	chunkCacheMu       sync.Mutex
+	chunkCache         map[protocol.ChunkPos]map[int64]*CachedChunk
+	chunkSubscriptions map[int64]*ChunkSubscriptionInfo
+	currentChunkID     int64 = 0
+)
 
 func init() {
 	chunkCache = make(map[protocol.ChunkPos]map[int64]*CachedChunk)
@@ -63,7 +65,7 @@ func init() {
 
 				// We run the garbage collector here to get rid of all the stupid
 				// lurking chunks that are still in memory but are not used.
-				runtime.GC()
+				// runtime.GC()
 
 				chunkCacheMu.Unlock()
 			}
@@ -186,7 +188,7 @@ func tryAddChunkToCache(p *Player, pos protocol.ChunkPos, c *chunk.Chunk) bool {
 
 // getChunkFromCache returns a chunk from the chunk cache. If the chunk was found in the cache, it will return
 // the chunk and true.
-func getChunkFromCache(pos protocol.ChunkPos, id int64) (*chunk.Chunk, bool) {
+func getChunkFromCache(pos protocol.ChunkPos, id int64) (*CachedChunk, bool) {
 	chunkCacheMu.Lock()
 	defer chunkCacheMu.Unlock()
 
@@ -201,8 +203,8 @@ func getChunkFromCache(pos protocol.ChunkPos, id int64) (*chunk.Chunk, bool) {
 	if ok {
 		// Lock the chunk before returning it - this is to ensure that once returned, we
 		// can modify or read the chunk without any race conditions.
-		chk.Chunk.Lock()
-		return chk.Chunk, ok
+		chk.Lock()
+		return chk, ok
 	}
 
 	// There was no chunk found in the sub map with the following ID, so we can return false.
@@ -312,7 +314,7 @@ func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
 
 // Chunk returns a chunk from the given chunk position. If the chunk was found in the map, it will
 // return the chunk and true.
-func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
+func (p *Player) Chunk(pos protocol.ChunkPos) (*CachedChunk, bool) {
 	// Figure out of the player has a subscription to the chunk
 	p.chkMu.Lock()
 	defer p.chkMu.Unlock()
@@ -335,7 +337,7 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	if !ok {
 		return block.Air{}
 	}
-	rid := c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
+	rid := c.Chunk.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
 	c.Unlock()
 
 	b, _ := world.BlockByRuntimeID(rid)
@@ -354,7 +356,7 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 		return
 	}
 
-	c.SetBlock(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0, rid)
+	c.Chunk.SetBlock(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0, rid)
 	c.Unlock()
 }
 
@@ -429,7 +431,7 @@ func (p *Player) makeChunkCopy(pos protocol.ChunkPos) {
 	removeChunkSubscriber(sc.ChunkPos, sc.ID)
 
 	c.Unlock()
-	chk := *c
+	chk := *c.Chunk
 
 	// Add the chunk to the cache with a new ID. This function also subscribes
 	// the player to the copied chunk.

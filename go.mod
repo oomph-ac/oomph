@@ -5,12 +5,11 @@ go 1.18
 require (
 	github.com/chewxy/math32 v1.10.1
 	github.com/df-mc/atomic v1.10.0
-	github.com/df-mc/dragonfly v0.9.4
+	github.com/df-mc/dragonfly v0.9.5
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/go-gl/mathgl v1.0.0
-	github.com/mkevac/debugcharts v0.0.0-20191222103121-ae1c48aa8615
 	github.com/pelletier/go-toml v1.9.5
-	github.com/sandertv/gophertunnel v1.28.1
+	github.com/sandertv/gophertunnel v1.29.0
 	github.com/sirupsen/logrus v1.9.0
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 	golang.org/x/text v0.8.0
@@ -20,20 +19,14 @@ require (
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
-	github.com/df-mc/worldupgrader v1.0.4 // indirect
-	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/df-mc/worldupgrader v1.0.6 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/klauspost/compress v1.16.3 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/sandertv/go-raknet v1.12.0 // indirect
-	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/tklauser/go-sysconf v0.3.11 // indirect
-	github.com/tklauser/numcpus v0.6.0 // indirect
-	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/image v0.6.0 // indirect
