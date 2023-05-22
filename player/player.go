@@ -575,6 +575,11 @@ func (p *Player) Disconnect(reason string) {
 	p.Close()
 }
 
+// Closed returns if the player is closed.
+func (p *Player) Closed() bool {
+	return p.closed
+}
+
 // Close closes the player.
 func (p *Player) Close() error {
 	p.once.Do(func() {
