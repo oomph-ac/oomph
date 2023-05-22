@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/chewxy/math32"
+	"github.com/df-mc/dragonfly/server/event"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,16 @@ func init() {
 func (p *Player) ClientProcess(pk packet.Packet) bool {
 	cancel := false
 	p.clicking = false
+
+	defer func() {
+		if cancel {
+			return
+		}
+
+		ctx := event.C()
+		p.handler().HandleClientPacket(ctx, pk)
+		cancel = ctx.Cancelled()
+	}()
 
 	if p.closed {
 		return false
@@ -171,10 +182,20 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 }
 
 // ServerProcess processes a given packet from the server.
-func (p *Player) ServerProcess(pk packet.Packet) bool {
+func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	if p.closed {
 		return false
 	}
+
+	defer func() {
+		if cancel {
+			return
+		}
+
+		ctx := event.C()
+		p.handler().HandleClientPacket(ctx, pk)
+		cancel = ctx.Cancelled()
+	}()
 
 	switch pk := pk.(type) {
 	case *packet.AddPlayer:
