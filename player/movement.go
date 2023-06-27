@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/ethaniccc/float32-cube/cube"
 
@@ -166,7 +167,7 @@ func (p *Player) aiStep() {
 
 // travel continues the player's movement simulation.
 func (p *Player) travel() {
-	blockFriction := float32(0.91)
+	blockFriction := game.DefaultAirFriction
 	if p.mInfo.OnGround {
 		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown)).(block.Frictional); ok {
 			blockFriction *= float32(b.Friction())
@@ -348,7 +349,7 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 // simulateGravity simulates the gravity of the player
 func (p *Player) simulateGravity() {
 	p.mInfo.ServerMovement[1] -= p.mInfo.Gravity
-	p.mInfo.ServerMovement[1] *= 0.98
+	p.mInfo.ServerMovement[1] *= game.GravityMultiplier
 }
 
 // simulateHorizontalFriction simulates the horizontal friction of the player
