@@ -293,7 +293,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 				p.dead = true
 
 				p.chkMu.Lock()
-				p.chunks = make(map[protocol.ChunkPos]*ChunkSubscriptionInfo)
+				p.chunks = make(map[protocol.ChunkPos]*chunk.Chunk)
 				p.inLoadedChunk = false
 				p.inLoadedChunkTicks = 0
 				p.chkMu.Unlock()
@@ -353,9 +353,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		if !ok {
 			return false
 		}
-
-		chunkPos := GetChunkPos(pk.Position[0], pk.Position[2])
-		p.makeChunkCopy(chunkPos)
 
 		if p.movementMode == utils.ModeFullAuthoritative {
 			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
@@ -420,6 +417,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
+	fmt.Println(p.inLoadedChunk)
 
 	if p.inLoadedChunk {
 		p.inLoadedChunkTicks++
@@ -442,6 +440,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		p.mInfo.Sneaking = false
 	}
 
+	// Update movement states for the player, depending on what inputs the client has in it's input packet.
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
 	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
@@ -451,18 +450,23 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	p.mInfo.JumpVelocity = game.DefaultJumpMotion
 	p.mInfo.Gravity = game.NormalGravity
 
+	// Update the effects of the player
 	p.tickEffects()
 
+	// The client is doing a block action on it's side, so we want to replicate this to
+	// make the copy of the server and client world identical.
 	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) {
 		for _, action := range pk.BlockActions {
+			// If the action isn't destroying a block, then we don't handle it.
 			if action.Action != protocol.PlayerActionPredictDestroyBlock {
 				continue
 			}
 
+			// Get the position of the block the client is breaking
 			pos := utils.BlockToCubePos(action.BlockPos).Side(cube.Face(action.Face))
-			p.makeChunkCopy(GetChunkPos(int32(pos[0]), int32(pos[2])))
-
 			b, _ := world.BlockByRuntimeID(air)
+
+			// Set the block broken to air - because that's what happens when you break a block.
 			p.SetBlock(pos, b)
 		}
 	}
@@ -493,20 +497,23 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 	}
 	c.Compact()
 
+	// If we are in the semi-authorative mode, we want to account for latency between the client and server
+	// and replicate what the client sees. If we want full-authorative movement, the server dictates what movement
+	// is considered right, and we don't compensate for client-side latency, so we add the chunk instantly to the map.
 	switch p.movementMode {
 	case utils.ModeSemiAuthoritative:
 		p.Acknowledgement(func() {
-			tryAddChunkToCache(p, pk.Position, c)
+			p.AddChunk(c, pk.Position)
 		})
 	case utils.ModeFullAuthoritative:
-		tryAddChunkToCache(p, pk.Position, c)
+		p.AddChunk(c, pk.Position)
 	}
-	return
 }
 
 func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 	for _, entry := range pk.SubChunkEntries {
-		if entry.Result != protocol.SubChunkResultSuccess && entry.Result != protocol.SubChunkResultSuccessAllAir {
+		// Do not handle sub-chunk responses that returned an error.
+		if entry.Result != protocol.SubChunkResultSuccess {
 			continue
 		}
 
@@ -515,24 +522,30 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 			pk.Position[2] + int32(entry.Offset[2]),
 		}
 
-		c := chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
+		var c *chunk.Chunk
+		c, ok := p.Chunk(chunkPos)
 
-		if entry.Result == protocol.SubChunkResultSuccessAllAir {
-			var index byte
-			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
-			if err != nil {
-				panic(err)
-			}
-
-			c.Sub()[index] = sub
+		// If the chunk doesn't already exist in the player map, it is being sent to the client
+		// for the first time, so we create a new one.
+		if !ok {
+			c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
 		}
 
-		if !tryAddChunkToCache(p, chunkPos, c) {
-			panic("unable to add wtf???")
+		var index byte
+		sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+		if err != nil {
+			panic(err)
 		}
+
+		c.Sub()[index] = sub
+
+		p.AddChunk(c, chunkPos)
 	}
 }
 
+// handleBlockPlace handles when a player sends a block placement to the server. This function
+// will place a block on the specified position to account for the temporary client-server desync
+// between worlds when blocks are placed.
 func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	i, ok := world.ItemByRuntimeID(t.HeldItem.Stack.NetworkID, int16(t.HeldItem.Stack.MetadataValue))
 	if !ok {
@@ -561,8 +574,6 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
 		return false
 	}
-
-	p.makeChunkCopy(GetChunkPos(int32(replacePos[0]), int32(replacePos[2])))
 
 	// Set the block in the world
 	p.SetBlock(replacePos, b)
