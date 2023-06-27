@@ -340,7 +340,7 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 	}
 
 	if !flag && d2 != 0 {
-		bb, d2 = utils.DoBoxCollision(utils.CollisionZ, bb, list, d2)
+		_, d2 = utils.DoBoxCollision(utils.CollisionZ, bb, list, d2)
 	}
 
 	return mgl32.Vec3{d0, d1, d2}
