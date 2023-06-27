@@ -2,9 +2,10 @@ package player
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"math"
 )
 
 type PacketBuffer struct {
@@ -197,11 +198,7 @@ func (p *Player) getNextBuffer() (buffer *PacketBuffer, canContinue bool) {
 
 func (p *Player) QueuePacket(pk packet.Packet) (send bool) {
 	if !p.ready || p.dead {
-		if p.ClientProcess(pk) {
-			return false
-		}
-
-		return true
+		return !p.ClientProcess(pk)
 	}
 
 	p.packetBuffer.Add(pk)
