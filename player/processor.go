@@ -417,7 +417,6 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
-	fmt.Println(p.inLoadedChunk)
 
 	if p.inLoadedChunk {
 		p.inLoadedChunkTicks++
