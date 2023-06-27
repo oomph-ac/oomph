@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -196,7 +197,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	}
 
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
-	p.chunkRadius = int32(p.conn.ChunkRadius()) + 4
+	p.chunkRadius = math.MaxInt16
 	p.Acknowledgements().Refresh()
 
 	go p.startTicking()

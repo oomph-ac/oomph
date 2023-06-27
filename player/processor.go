@@ -3,12 +3,13 @@ package player
 import (
 	"bytes"
 	"fmt"
-	"github.com/chewxy/math32"
-	"github.com/df-mc/dragonfly/server/event"
 	"strconv"
 	"strings"
 	"time"
 	_ "unsafe"
+
+	"github.com/chewxy/math32"
+	"github.com/df-mc/dragonfly/server/event"
 
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -431,10 +432,8 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
 		p.mInfo.Sprinting = true
-		p.mInfo.Speed *= 1.3 // The client will predict the speed it will have before receiving attribute updates from the server. Sprint multiplies current movement speed by 1.3
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
 		p.mInfo.Sprinting = false
-		p.mInfo.Speed /= 1.3 // The client will predict the speed it will have before receiving attribute updates from the server. Stop sprint divides current movement speed by 1.3
 	}
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
@@ -507,7 +506,7 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 
 func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 	for _, entry := range pk.SubChunkEntries {
-		if entry.Result != protocol.SubChunkResultSuccess {
+		if entry.Result != protocol.SubChunkResultSuccess && entry.Result != protocol.SubChunkResultSuccessAllAir {
 			continue
 		}
 
@@ -518,14 +517,19 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 
 		c := chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
 
-		var index byte
-		sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
-		if err != nil {
-			panic(err)
+		if entry.Result == protocol.SubChunkResultSuccessAllAir {
+			var index byte
+			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+			if err != nil {
+				panic(err)
+			}
+
+			c.Sub()[index] = sub
 		}
 
-		c.Sub()[index] = sub
-		tryAddChunkToCache(p, chunkPos, c)
+		if !tryAddChunkToCache(p, chunkPos, c) {
+			panic("unable to add wtf???")
+		}
 	}
 }
 

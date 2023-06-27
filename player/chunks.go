@@ -2,6 +2,10 @@ package player
 
 import (
 	"fmt"
+	"reflect"
+	"sync"
+	"time"
+
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -11,9 +15,6 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"reflect"
-	"sync"
-	"time"
 )
 
 // CachedChunk contains a pointer to the chunk, and the "subscriber" count.
@@ -46,30 +47,28 @@ func init() {
 	// Every 5 seconds, review the chunk cache, and remove any chunks that do not have any subscribers.
 	go func() {
 		t := time.NewTicker(time.Second * 2)
-		for {
-			select {
-			case <-t.C:
-				chunkCacheMu.Lock()
-				deleted := 0
-				for pos, subMap := range chunkCache {
-					deleted += removeUnsubscribedChunks(subMap)
+		select {
+		case <-t.C:
+			chunkCacheMu.Lock()
+			deleted := 0
+			for pos, subMap := range chunkCache {
+				deleted += removeUnsubscribedChunks(subMap)
 
-					// Remove duplicated chunks that have different IDs in a sub-map.
-					if !removeDuplicateChunks(subMap) {
-						continue
-					}
-
-					// removeDuplicateChunks returns true if the map
-					// is empty, so we can delete it here.
-					delete(chunkCache, pos)
+				// Remove duplicated chunks that have different IDs in a sub-map.
+				if !removeDuplicateChunks(subMap) {
+					continue
 				}
 
-				// We run the garbage collector here to get rid of all the stupid
-				// lurking chunks that are still in memory but are not used.
-				// runtime.GC()
-
-				chunkCacheMu.Unlock()
+				// removeDuplicateChunks returns true if the map
+				// is empty, so we can delete it here.
+				delete(chunkCache, pos)
 			}
+
+			// We run the garbage collector here to get rid of all the stupid
+			// lurking chunks that are still in memory but are not used.
+			// runtime.GC()
+
+			chunkCacheMu.Unlock()
 		}
 	}()
 }
