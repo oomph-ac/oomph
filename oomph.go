@@ -56,6 +56,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 		if err != nil {
 			panic(err)
 		}
+
 		go o.handleConn(c.(*minecraft.Conn), l, remoteAddr)
 	}
 }
@@ -96,7 +97,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 
-	o.players <- p
+	go func() {
+		o.players <- p
+	}()
 
 	g.Add(2)
 	go func() {
@@ -108,8 +111,10 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		for {
 			pk, err := conn.ReadPacket()
 			if err != nil || p == nil {
+				o.log.Error(err)
 				return
 			}
+
 			if p.ClientProcess(pk) {
 				continue
 			}
