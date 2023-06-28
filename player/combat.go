@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
@@ -40,7 +41,7 @@ func (p *Player) validateCombat() {
 	// Lag compensation is limited to 300ms in this case, so we want two things:
 	// 1) The tick we should rewind to should be no more than 6 ticks (300ms) in the past.
 	// 2) The tick we should rewind to should not be higher than the current server rewTick
-	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(NetworkLatencyCutoff)
+	rewTick, sTick, cut := p.clientTick.Load(), p.serverTick.Load(), uint64(NetworkLatencyCutoff)
 
 	if rewTick+cut < sTick {
 		if p.debugger.ServerCombat {
@@ -79,9 +80,7 @@ func (p *Player) validateCombat() {
 			}
 
 			rew := e.RewindPosition(rewTick)
-			// The rewind should never be null here because we have validated the rewind tick.
 			if rew == nil {
-				p.SendOomphDebug("§4ERR 001: combat validation - contact admin.", packet.TextTypeChat)
 				continue
 			}
 
@@ -107,7 +106,7 @@ func (p *Player) validateCombat() {
 
 		if valid {
 			if p.debugger.ServerCombat {
-				p.SendOomphDebug("detected client misprediction - an attack for entity "+fmt.Sprint(eid)+" sent to server w/ dist="+fmt.Sprint(min), packet.TextTypeChat)
+				p.SendOomphDebug("detected client misprediction - an attack for entity "+fmt.Sprint(eid)+" sent to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
 			}
 
 			p.sendPacketToServer(&packet.InventoryTransaction{
@@ -134,7 +133,6 @@ func (p *Player) validateCombat() {
 		// The rewind should never be null here because we have validated the rewind tick.
 		rew := t.RewindPosition(rewTick)
 		if rew == nil {
-			p.SendOomphDebug("§4ERR 002: combat validation - contact admin.", packet.TextTypeChat)
 			return
 		}
 
@@ -147,7 +145,7 @@ func (p *Player) validateCombat() {
 		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 		// which would allow the player to attack another entity without actually looking at them.
 		if p.inputMode != packet.InputModeTouch {
-			targetAABB := t.AABB().Grow(0.125).Translate(rew.Position)
+			targetAABB := t.AABB().Grow(0.103).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
 
