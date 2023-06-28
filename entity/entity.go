@@ -125,7 +125,7 @@ func (e *Entity) TickPosition(tick uint64) {
 	}
 
 	e.positionBuffer = append(e.positionBuffer, utils.LocationData{Tick: tick, Position: e.position})
-	if len(e.positionBuffer) > 6 {
+	if len(e.positionBuffer) > 6 { // 6 = player.NetworkLatenctyCutoff
 		e.positionBuffer = e.positionBuffer[1:]
 	}
 }
@@ -157,6 +157,8 @@ func (e *Entity) HasUpdated(tick uint64) bool {
 	return e.updatedTick == tick
 }
 
+// RewindPosition rewinds the position of the entity to the provided tick. This is mainly
+// used for server authoritative combat.
 func (e *Entity) RewindPosition(tick uint64) *utils.LocationData {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -168,6 +170,14 @@ func (e *Entity) RewindPosition(tick uint64) *utils.LocationData {
 	}
 
 	return nil
+}
+
+// PositionBuffer returns the position buffer of the entity.
+func (e *Entity) PositionBuffer() []utils.LocationData {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.positionBuffer
 }
 
 // Rotation returns the rotation of the entity.

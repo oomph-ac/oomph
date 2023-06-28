@@ -10,6 +10,9 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+const maxCrosshairAttackDist float32 = 3.005
+const maxOtherAttackDist float32 = 3.1
+
 func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
 	p.lastAttackData = pk
 	p.needsCombatValidation = true
@@ -36,13 +39,23 @@ func (p *Player) validateCombat() {
 	// This determines what tick we should rewind to get an entity position for lag compensation.
 	// Lag compensation is limited to 300ms in this case, so we want two things:
 	// 1) The tick we should rewind to should be no more than 6 ticks (300ms) in the past.
-	// 2) The tick we should rewind to should not be higher than the current server tick
-	tick, stick, cut := p.clientTick.Load(), p.serverTick.Load(), uint64(NetworkLatencyCutoff)
-	if tick < stick-cut {
-		tick = stick - cut
+	// 2) The tick we should rewind to should not be higher than the current server rewTick
+	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(NetworkLatencyCutoff)
+
+	if rewTick+cut < sTick {
+		if p.debugger.ServerCombat {
+			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", NetworkLatencyCutoff, ")"), packet.TextTypeChat)
+		}
+
+		rewTick = sTick - cut + 1
 	}
-	if tick > stick {
-		tick = stick
+
+	if rewTick > sTick {
+		if p.debugger.ServerCombat {
+			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - most present is ", sTick), packet.TextTypeChat)
+		}
+
+		rewTick = sTick
 	}
 
 	attackPos := p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
@@ -65,8 +78,10 @@ func (p *Player) validateCombat() {
 				continue
 			}
 
-			rew := e.RewindPosition(tick)
+			rew := e.RewindPosition(rewTick)
+			// The rewind should never be null here because we have validated the rewind tick.
 			if rew == nil {
+				p.SendOomphDebug("§4ERR 001: combat validation - contact admin.", packet.TextTypeChat)
 				continue
 			}
 
@@ -76,7 +91,7 @@ func (p *Player) validateCombat() {
 
 			targetAABB := e.AABB().Grow(0.125).Translate(rew.Position)
 
-			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3)))
+			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
 			if !ok {
 				continue
 			}
@@ -91,6 +106,10 @@ func (p *Player) validateCombat() {
 		p.entityMu.Unlock()
 
 		if valid {
+			if p.debugger.ServerCombat {
+				p.SendOomphDebug("detected client misprediction - an attack for entity "+fmt.Sprint(eid)+" sent to server w/ dist="+fmt.Sprint(min), packet.TextTypeChat)
+			}
+
 			p.sendPacketToServer(&packet.InventoryTransaction{
 				TransactionData: &protocol.UseItemOnEntityTransactionData{
 					TargetEntityRuntimeID: eid,
@@ -112,13 +131,15 @@ func (p *Player) validateCombat() {
 	}
 
 	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
-		rew := t.RewindPosition(tick)
+		// The rewind should never be null here because we have validated the rewind tick.
+		rew := t.RewindPosition(rewTick)
 		if rew == nil {
+			p.SendOomphDebug("§4ERR 002: combat validation - contact admin.", packet.TextTypeChat)
 			return
 		}
 
 		dist := game.AABBVectorDistance(t.AABB().Translate(rew.Position), attackPos)
-		if dist > 3.1 {
+		if dist > maxOtherAttackDist {
 			return
 		}
 
@@ -128,7 +149,7 @@ func (p *Player) validateCombat() {
 		if p.inputMode != packet.InputModeTouch {
 			targetAABB := t.AABB().Grow(0.125).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
-			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(3)))
+			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
 
 			if ok {
 				p.sendPacketToServer(p.lastAttackData)
