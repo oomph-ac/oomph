@@ -202,12 +202,14 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		p.Acknowledgement(func() {
-			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
+			e := entity.NewEntity(
 				pk.Position,
 				pk.Velocity,
 				mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw},
 				true,
-			))
+			)
+			e.SetPositionBufferSize(uint64(p.combatNetworkCutoff))
+			p.AddEntity(pk.EntityRuntimeID, e)
 		})
 	case *packet.AddActor:
 		if pk.EntityRuntimeID == p.rid {
@@ -216,12 +218,14 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		p.Acknowledgement(func() {
-			p.AddEntity(pk.EntityRuntimeID, entity.NewEntity(
+			e := entity.NewEntity(
 				pk.Position,
 				pk.Velocity,
 				mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw},
 				false,
-			))
+			)
+			e.SetPositionBufferSize(uint64(p.combatNetworkCutoff))
+			p.AddEntity(pk.EntityRuntimeID, e)
 		})
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.rid {
@@ -314,10 +318,10 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			return false
 		}
 
-		// If the player is behind by more than 6 ticks (300ms), then instantly set the KB
+		// If the player is behind by more than the knockback network cutoff, then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= NetworkLatencyCutoff) || p.debugger.ServerKnockback {
+		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff) || p.debugger.ServerKnockback {
 			p.UpdateServerVelocity(pk.Velocity)
 			return false
 		}

@@ -41,11 +41,11 @@ func (p *Player) validateCombat() {
 	// Lag compensation is limited to 300ms in this case, so we want two things:
 	// 1) The tick we should rewind to should be no more than 6 ticks (300ms) in the past.
 	// 2) The tick we should rewind to should not be higher than the current server rewTick
-	rewTick, sTick, cut := p.clientTick.Load(), p.serverTick.Load(), uint64(NetworkLatencyCutoff)
+	rewTick, sTick, cut := p.clientTick.Load(), p.serverTick.Load(), uint64(DefaultNetworkLatencyCutoff)
 
 	if rewTick+cut < sTick {
 		if p.debugger.ServerCombat {
-			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", NetworkLatencyCutoff, ")"), packet.TextTypeChat)
+			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", DefaultNetworkLatencyCutoff, ")"), packet.TextTypeChat)
 		}
 
 		rewTick = sTick - cut + 1
