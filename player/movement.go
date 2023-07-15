@@ -56,7 +56,7 @@ func (p *Player) validateMovement() {
 	acceptableDrift[2] = game.ClampFloat(acceptableDrift[2], -0.0025, 0.0025)
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Sub(acceptableDrift)
 
-	if p.debugger.Movement {
+	if p.debugger.Movement && p.mInfo.ClientMovement.Len() > 1e-4 {
 		p.SendOomphDebug(fmt.Sprint("want=", game.RoundVec32(p.mInfo.ServerPosition, 2),
 			" got=", game.RoundVec32(p.Position(), 2), " diff=", game.RoundVec32(diff, 2), " fI=", p.mInfo.ForwardImpulse,
 			" lI=", p.mInfo.LeftImpulse), packet.TextTypeChat)
