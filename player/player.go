@@ -24,7 +24,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-var NetworkLatencyCutoff int64 = 6
+const DefaultNetworkLatencyCutoff int64 = 6
 
 // Player contains information about a player, such as its virtual world or AABB.
 type Player struct {
@@ -94,6 +94,9 @@ type Player struct {
 
 	stackLatency      int64
 	needLatencyUpdate bool
+
+	knockbackNetworkCutoff int64
+	combatNetworkCutoff    int64
 
 	lastAttackData     *packet.InventoryTransaction
 	lastEquipmentData  *packet.MobEquipment
@@ -193,6 +196,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		movementMode: utils.ModeFullAuthoritative,
 		combatMode:   utils.ModeFullAuthoritative,
+
+		knockbackNetworkCutoff: DefaultNetworkLatencyCutoff,
+		combatNetworkCutoff:    DefaultNetworkLatencyCutoff,
 
 		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
 	}
@@ -363,12 +369,26 @@ func (p *Player) CombatMode() utils.AuthorityType {
 	return p.combatMode
 }
 
+// SetMovementMode sets the movement authority for the player.
 func (p *Player) SetMovementMode(mode utils.AuthorityType) {
 	p.movementMode = mode
 }
 
+// SetCombatMode sets the combat authority for the player.
 func (p *Player) SetCombatMode(mode utils.AuthorityType) {
 	p.combatMode = mode
+}
+
+// SetKnockbackCutoff sets the amount of ticks of latency allowed before using server-authoritative knockback.
+// This will only have an affect on server-authoritative movement.
+func (p *Player) SetKnockbackCutoff(i int64) {
+	p.knockbackNetworkCutoff = i
+}
+
+// SetCombatCutoff sets the max amount of ticks allowed of rewind used for server-authoritative combat. This will not affect client
+// authoritative combat and semi-authoritative combat.
+func (p *Player) SetCombatCutoff(i int64) {
+	p.combatNetworkCutoff = i
 }
 
 // Acknowledgement runs a function after an acknowledgement from the client.

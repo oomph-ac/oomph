@@ -33,6 +33,8 @@ type Entity struct {
 	lastRotation mgl32.Vec3
 	// teleportTicks is the amount of client ticks that have passed since the entity has teleported.
 	teleportTicks uint32
+	// positionBufferSize is the size of the position buffer.
+	positionBufferSize uint64
 	// aabb represents the bounding box of the entity.
 	aabb cube.BBox
 	// player is true if the entity is a player.
@@ -59,7 +61,16 @@ func NewEntity(position, velocity, rotation mgl32.Vec3, player bool) *Entity {
 		player:                   player,
 		onGround:                 true,
 		newPosRotationIncrements: 3,
+		positionBufferSize:       6,
 	}
+}
+
+// SetPositionBufferSize sets the size of the position buffer.
+func (e *Entity) SetPositionBufferSize(size uint64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.positionBufferSize = size
 }
 
 // SetServerPosition sets the position of the entity on the server-side.
@@ -125,7 +136,7 @@ func (e *Entity) TickPosition(tick uint64) {
 	}
 
 	e.positionBuffer = append(e.positionBuffer, utils.LocationData{Tick: tick, Position: e.position})
-	if len(e.positionBuffer) > 6 { // 6 = player.NetworkLatenctyCutoff
+	if uint64(len(e.positionBuffer)) > e.positionBufferSize {
 		e.positionBuffer = e.positionBuffer[1:]
 	}
 }
