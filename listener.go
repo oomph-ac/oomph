@@ -17,15 +17,16 @@ type listener struct {
 }
 
 // Listen adds the oomph listener in the server config, this should be used instead of Start() for dragonfly servers.
-func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.Protocol, requirePacks bool) {
+func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.Protocol, requirePacks bool, authDisabled bool) {
 	conf.Listeners = nil
 	conf.Listeners = append(conf.Listeners, func(_ server.Config) (server.Listener, error) {
 		l, err := minecraft.ListenConfig{
-			StatusProvider:       minecraft.NewStatusProvider(name),
-			ResourcePacks:        conf.Resources,
-			TexturePacksRequired: requirePacks,
-			AcceptedProtocols:    protocols,
-			FlushRate:            -1,
+			StatusProvider:         minecraft.NewStatusProvider(name),
+			AuthenticationDisabled: authDisabled,
+			ResourcePacks:          conf.Resources,
+			TexturePacksRequired:   requirePacks,
+			AcceptedProtocols:      protocols,
+			FlushRate:              -1,
 		}.Listen("raknet", o.addr)
 		if err != nil {
 			return nil, err
