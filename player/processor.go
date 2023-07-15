@@ -103,11 +103,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if p.movementMode == utils.ModeSemiAuthoritative {
 			defer p.setMovementToClient()
 		}
-	case *packet.LevelSoundEvent:
-		if pk.SoundType == packet.SoundEventAttackNoDamage {
-			p.Click()
-			p.updateCombatData(nil)
-		}
 	case *packet.MobEquipment:
 		p.lastEquipmentData = pk
 	case *packet.InventoryTransaction:
@@ -458,6 +453,12 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
 	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
 	p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+
+	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
+	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+		p.Click()
+		p.updateCombatData(nil)
+	}
 
 	// TODO: Make a better way to check if the player is in the void.
 	p.mInfo.InVoid = p.Position().Y() < -128
