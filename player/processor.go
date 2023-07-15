@@ -161,6 +161,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.debugger.Chunks = b
 			default:
 				p.SendOomphDebug("Unknown debug mode: "+cmd[1], packet.TextTypeChat)
+				return true
 			}
 			p.SendOomphDebug("OK.", packet.TextTypeChat)
 			return true
@@ -401,51 +402,67 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 
+	// Update the input mode of the player. This is mainly used for combat detections.
+	// Note while this can be abused, techincally, there are still combat checks in place for touch players.
 	p.inputMode = pk.InputMode
+
+	// Call p.Move() to update some movement states, such as the client predicted movement.
 	p.Move(pk)
 
+	// If the movement mode is set to client authoritative, then we do not need to do any processing
+	// of movement, other than sending it to the server.
 	if p.movementMode == utils.ModeClientAuthoritative {
 		p.setMovementToClient()
 		return
 	}
 
+	// Set the last used input of the player to the current input. This will execute at the end of the function.
 	defer func() {
 		p.mInfo.LastUsedInput = pk
 	}()
 
+	// Determine wether the player's current position has a chunk.
 	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
 		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
 
+	// Check if the player is in a loaded chunk, and if so, increment the tick counter.
 	if p.inLoadedChunk {
 		p.inLoadedChunkTicks++
 	} else {
 		p.inLoadedChunkTicks = 0
 	}
 
+	// Update the forward and left impulses of the player. This value is determined by the WASD combo the player
+	// is holding. If on controller, this will be variable, depending on the joystick position.
 	p.mInfo.ForwardImpulse = pk.MoveVector.Y() * 0.98
 	p.mInfo.LeftImpulse = pk.MoveVector.X() * 0.98
 
+	// Update the sprinting state of the player.
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
 		p.mInfo.Sprinting = true
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
 		p.mInfo.Sprinting = false
 	}
 
+	// Update the sneaking state of the player.
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
 		p.mInfo.Sneaking = true
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
 		p.mInfo.Sneaking = false
 	}
 
-	// Update movement states for the player, depending on what inputs the client has in it's input packet.
+	// Update movement key pressed states for the player, depending on what inputs the client has in it's input packet.
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
 	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
 	p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+
+	// TODO: Make a better way to check if the player is in the void.
 	p.mInfo.InVoid = p.Position().Y() < -128
 
+	// Reset the jump velocity and gravity values in the players movement info, it will be updated later on.
 	p.mInfo.JumpVelocity = game.DefaultJumpMotion
 	p.mInfo.Gravity = game.NormalGravity
 
@@ -470,26 +487,37 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		}
 	}
 
+	// Update the movement state of the player. If it returns true, then we are in a scenario where we are able to
+	// predict and validate the movement of the player.
 	if p.updateMovementState() {
+		// Validate the movement of the player - this will not be done, if the movement mode is set to client authoritative.
 		p.validateMovement()
 	}
 
+	// If the movement mode is set to be full server authoritative, then we want to set the position of the player
+	// to the server predicted position.
 	if p.movementMode == utils.ModeFullAuthoritative {
 		pk.Position = p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
 	}
 
+	// Reset the teleporting state in the player's movement info.
 	p.mInfo.Teleporting = false
 }
 
+// handleLevelChunk handles all LevelChunk packets sent by the server. This is used to create a copy
+// of the client world on our end.
 func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
+	// Check if this LevelChunk packet is compatiable with oomph's handling.
 	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
 		return
 	}
 
+	// If the movement mode is client authoritative, we will not be needing a copy of the client's world.
 	if p.movementMode == utils.ModeClientAuthoritative {
 		return
 	}
 
+	// Decode the chunk data, and remove any uneccessary data via. Compact().
 	c, err := chunk.NetworkDecode(air, pk.RawPayload, int(pk.SubChunkCount), world.Overworld.Range())
 	if err != nil {
 		c = chunk.New(air, world.Overworld.Range())
@@ -509,6 +537,8 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 	}
 }
 
+// handleSubChunk handles all SubChunk packets sent by the server. This is used to create a copy
+// of the client world on our end.
 func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 	for _, entry := range pk.SubChunkEntries {
 		// Do not handle sub-chunk responses that returned an error.
@@ -551,24 +581,31 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		return false
 	}
 
+	// Determine if the item can be placed as a block.
 	b, ok := i.(world.Block)
 	if !ok {
 		return false
 	}
 
+	// Find the replace position of the block. This will be used if the block at the current position
+	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(t.BlockPosition)
 	fb := p.Block(replacePos)
 
+	// If the block at the position is not replacable, we want to place the block on the side of the block.
 	if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
 		replacePos = replacePos.Side(cube.Face(t.BlockFace))
 	}
 
+	// Make a list of BBoxes the block will occupy.
 	bx := b.Model().BBox(df_cube.Pos(replacePos), nil)
 	boxes := make([]cube.BBox, 0)
 	for _, b := range bx {
 		boxes = append(boxes, game.DFBoxToCubeBox(b))
 	}
 
+	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
+	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
 	bb := p.AABB().Translate(t.Position)
 	if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
 		return false
@@ -579,6 +616,8 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	return false
 }
 
+// handleMobEffect handles the MobEffect packet sent by the server. This is used to apply effects
+// to the player.
 func (p *Player) handleMobEffect(pk *packet.MobEffect) {
 	switch pk.Operation {
 	case packet.MobEffectAdd, packet.MobEffectModify:
@@ -599,6 +638,8 @@ func (p *Player) handleMobEffect(pk *packet.MobEffect) {
 	}
 }
 
+// handleSetActorData handles the SetActorData packet sent by the server. This is used to update
+// some of the player's metadata.
 func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 	isPlayer := pk.EntityRuntimeID == p.rid
 	width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]

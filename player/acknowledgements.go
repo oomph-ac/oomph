@@ -4,8 +4,15 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+)
+
+// @whoever.the.fuck.touching.networkstacklatency.packet how about instead
+// of touching my packet, you touch the issue I sent that's almost a year old on the bug tracker.
+// https://bugs.mojang.com/browse/MCPE-158716
+// pls :(((
+const (
+	NetworkStackLatencyDivider = 1000000
 )
 
 type Acknowledgements struct {
@@ -50,7 +57,10 @@ func (a *Acknowledgements) GetMap(t int64) ([]func(), bool) {
 // found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
 // "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
 func (a *Acknowledgements) Handle(i int64, tryOther bool) bool {
-	ok := a.tryHandle(i)
+	ok := a.tryHandle(i / NetworkStackLatencyDivider)
+
+	// FUCK. What the fuck have they done to the PlayStation NSL? Is the behavior the
+	// same on all platforms now? Is there a different divider...? TODO!
 	if !ok && tryOther {
 		ok = a.tryHandle(i / 1000)
 	}
@@ -58,6 +68,8 @@ func (a *Acknowledgements) Handle(i int64, tryOther bool) bool {
 	return ok
 }
 
+// tryHandle checks if an acknowledgement ID has a map of functions, and if so, executes them.
+// If tryHandle() ends up finding a map, it returns true, and if not, returns false.
 func (a *Acknowledgements) tryHandle(i int64) bool {
 	a.mu.Lock()
 	calls, ok := a.AcknowledgeMap[i]
@@ -87,8 +99,9 @@ func (a *Acknowledgements) Refresh() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	// Create a random timestamp, and ensure that it is not already being used.
 	for {
-		a.CurrentTimestamp = int64(rand.Uint32()) * 1000
+		a.CurrentTimestamp = int64(rand.Uint32())
 		if _, ok := a.AcknowledgeMap[a.CurrentTimestamp]; !ok {
 			break
 		}
@@ -132,21 +145,23 @@ func (a *Acknowledgements) Validate() bool {
 	return a.awaitResTicks < 200
 }
 
+// sendAck sends an acknowledgement packet to the client.
 func (p *Player) sendAck() {
 	acks := p.Acknowledgements()
 	if pk := acks.Create(); pk != nil {
-		m, ok := acks.GetMap(acks.CurrentTimestamp)
+		_, ok := acks.GetMap(acks.CurrentTimestamp)
 		if !ok {
 			return
 		}
+
 		p.conn.WritePacket(pk)
 
 		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
 		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
-		// TODO: Figure out wtf is going on and get rid of this hack (aka never!)
-		if p.ClientData().DeviceOS == protocol.DeviceOrbis {
-			acks.AddMap(m, acks.CurrentTimestamp/1000)
-		}
+		// TODO: Figure out if this is still needed.
+		//if p.ClientData().DeviceOS == protocol.DeviceOrbis {
+		//	acks.AddMap(m, acks.CurrentTimestamp/1000)
+		//}
 
 		acks.Refresh()
 	}

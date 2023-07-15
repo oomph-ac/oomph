@@ -716,41 +716,46 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
-			// This code calculates how much the server tick should be incremented by. This is done by checking the
-			// difference between the last time the server ticked and the current time.
-			delta := time.Since(p.lastServerTicked).Milliseconds()
-			if delta > 50 {
-				p.serverTick.Add(uint64(delta / 50))
-			} else {
-				p.serverTick.Inc()
-			}
-
-			// This will handle all the client packets if packet buffering is enabled.
-			p.handlePacketQueue()
-
-			// This will prepare the entity positions to be acknowledged.
-			p.ackEntitiesPos()
-
-			// This code ticks positions for entities on server tick, this is used for the rewind combat system, so that we
-			// can rewind back in time to what the client sees. Of course, this is not 100% accurate to what the client sees due
-			// to extra interpolation code in the client, but it should be close enough.
-			if p.combatMode == utils.ModeFullAuthoritative {
-				p.tickEntitiesPos()
-			}
-
-			// If the player is not responding to acknowledgements, we have to kick them to prevent
-			// abusive behavior (bypasses).
-			if !p.Acknowledgements().Validate() {
-				p.Disconnect("Error: Client was unable to respond to acknowledgements sent by the server.")
-			}
-
-			p.tryDoSync()
-			p.updateLatency()
-			p.flushConns()
-
-			p.lastServerTicked = time.Now()
+			p.doTick()
 		}
 	}
+}
+
+// doTick ticks the player.
+func (p *Player) doTick() {
+	// This code calculates how much the server tick should be incremented by. This is done by checking the
+	// difference between the last time the server ticked and the current time.
+	delta := time.Since(p.lastServerTicked).Milliseconds()
+	if delta > 50 {
+		p.serverTick.Add(uint64(delta / 50))
+	} else {
+		p.serverTick.Inc()
+	}
+
+	// This will handle all the client packets if packet buffering is enabled.
+	p.handlePacketQueue()
+
+	// This will prepare the entity positions to be acknowledged.
+	p.ackEntitiesPos()
+
+	// This code ticks positions for entities on server tick, this is used for the rewind combat system, so that we
+	// can rewind back in time to what the client sees. Of course, this is not 100% accurate to what the client sees due
+	// to extra interpolation code in the client, but it should be close enough.
+	if p.combatMode == utils.ModeFullAuthoritative {
+		p.tickEntitiesPos()
+	}
+
+	// If the player is not responding to acknowledgements, we have to kick them to prevent
+	// abusive behavior (bypasses).
+	if !p.Acknowledgements().Validate() {
+		p.Disconnect("Error: Client was unable to respond to acknowledgements sent by the server.")
+	}
+
+	p.tryDoSync()
+	p.updateLatency()
+	p.flushConns()
+
+	p.lastServerTicked = time.Now()
 }
 
 // handler returns the handler of the player.
