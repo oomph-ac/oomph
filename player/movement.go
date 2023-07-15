@@ -77,6 +77,7 @@ func (p *Player) correctMovement() {
 		return
 	}
 
+	// Do not correct player movement if the player is in a scenario we cannot correct reliably.
 	if p.mInfo.CanExempt || p.mInfo.Teleporting || p.mInfo.InUnsupportedRewindScenario {
 		return
 	}
