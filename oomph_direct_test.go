@@ -29,7 +29,7 @@ func TestOomphDirect(t *testing.T) {
 	}
 
 	oomph := New(log, ":19132")
-	oomph.Listen(&cfg, cfg.Name, []minecraft.Protocol{}, false)
+	oomph.Listen(&cfg, cfg.Name, []minecraft.Protocol{}, false, false)
 
 	srv := cfg.New()
 	srv.CloseOnProgramEnd()

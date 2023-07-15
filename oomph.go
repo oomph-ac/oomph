@@ -34,17 +34,18 @@ func New(log *logrus.Logger, localAddr string) *Oomph {
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
 // Addresses should be formatted in the following format: "ip:port" (ex: "127.0.0.1:19132").
 // If you're using dragonfly, use Listen instead of Start.
-func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []minecraft.Protocol, requirePacks bool) error {
+func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []minecraft.Protocol, requirePacks bool, authDisabled bool) error {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
 		panic(err)
 	}
 	l, err := minecraft.ListenConfig{
-		StatusProvider:       p,
-		ResourcePacks:        utils.ResourcePacks(resourcePackPath),
-		TexturePacksRequired: requirePacks,
-		AcceptedProtocols:    protocols,
-		FlushRate:            -1,
+		StatusProvider:         p,
+		AuthenticationDisabled: authDisabled,
+		ResourcePacks:          utils.ResourcePacks(resourcePackPath),
+		TexturePacksRequired:   requirePacks,
+		AcceptedProtocols:      protocols,
+		FlushRate:              -1,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
