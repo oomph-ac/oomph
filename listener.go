@@ -2,9 +2,11 @@ package oomph
 
 import (
 	"errors"
+	"time"
 
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/session"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
@@ -58,8 +60,17 @@ func (l listener) Accept() (session.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	p := player.NewPlayer(logrus.New(), c.(*minecraft.Conn), nil)
 	p.SetRuntimeID(1)
+
+	time.AfterFunc(time.Second, func() {
+		data := (c.(*minecraft.Conn)).GameData()
+		p.Entity().Move(data.PlayerPosition, true)
+		p.MovementInfo().ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
+		p.MovementInfo().ServerMovement = mgl32.Vec3{0, -0.0784, 0}
+	})
+
 	l.o.players <- p
 	return p, err
 }
