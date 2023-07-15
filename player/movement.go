@@ -58,8 +58,7 @@ func (p *Player) validateMovement() {
 
 	if p.debugger.Movement && p.mInfo.ClientMovement.Len() > 1e-4 {
 		p.SendOomphDebug(fmt.Sprint("want=", game.RoundVec32(p.mInfo.ServerPosition, 2),
-			" got=", game.RoundVec32(p.Position(), 2), " diff=", game.RoundVec32(diff, 2), " fI=", p.mInfo.ForwardImpulse,
-			" lI=", p.mInfo.LeftImpulse), packet.TextTypeChat)
+			" got=", game.RoundVec32(p.Position(), 4), " diff=", game.RoundVec32(diff, 4)), packet.TextTypeChat)
 	}
 
 	if diff.LenSqr() < 0.09 {
@@ -229,9 +228,8 @@ func (p *Player) simulateAddedMovementForce(f float32) {
 }
 
 // maybeBackOffFromEdge simulates the movement scenarios where a player is at the edge of a block.
-// The weird function name comes from MCP, but what else would it be named I guess lol
 func (p *Player) maybeBackOffFromEdge() {
-	if !p.mInfo.Sneaking || p.mInfo.ServerMovement[1] > 0 {
+	if !p.mInfo.Sneaking || !p.mInfo.OnGround || p.mInfo.ServerMovement[1] > 0 {
 		return
 	}
 
@@ -361,6 +359,7 @@ func (p *Player) simulateHorizontalFriction(friction float32) {
 // simulateJump simulates the jump movement of the player
 func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
+
 	if !p.mInfo.Sprinting {
 		return
 	}
