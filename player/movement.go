@@ -25,6 +25,7 @@ func (p *Player) updateMovementState() bool {
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
+		p.entity.SetAABB(p.AABB().Translate(p.mInfo.ClientMovement))
 		p.mInfo.CanExempt = true
 		exempt = true
 	} else {
@@ -45,24 +46,17 @@ func (p *Player) validateMovement() {
 		return
 	}
 
-	diff := p.mInfo.ServerPosition.Sub(p.Position())
-	acceptableDrift := diff
+	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
 
-	// We will adjust the server position to the client's position by a maximum of 0.0025 blocks on the X, Y, and Z axis
-	// to account for player drift. This will work perfectly for legitimate players, and should not benefit cheaters in any way.
-	// Of course, unless they appreciate moving 0.0025 blocks extra every tick (1 block after 20 seconds).
-	acceptableDrift[0] = game.ClampFloat(acceptableDrift[0], -0.0025, 0.0025)
-	acceptableDrift[1] = 0
-	acceptableDrift[2] = game.ClampFloat(acceptableDrift[2], -0.0025, 0.0025)
-	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Sub(acceptableDrift)
-
-	if p.debugger.Movement && p.mInfo.ClientMovement.Len() > 1e-4 {
-		p.SendOomphDebug(fmt.Sprint("want=", game.RoundVec32(p.mInfo.ServerPosition, 2),
-			" got=", game.RoundVec32(p.Position(), 4), " diff=", game.RoundVec32(diff, 4)), packet.TextTypeChat)
+	// TODO: Properly account for the client clipping into steps - as of now however,
+	// this hack will suffice and will not trigger if a malicious client is stepping over
+	// heights a vanilla client would not.
+	if posDiff.LenSqr() <= (0.09 + math32.Pow(p.mInfo.StepClipOffset, 2)) {
+		return
 	}
 
-	if diff.LenSqr() < 0.09 {
-		return
+	if p.debugger.Movement {
+		p.SendOomphDebug(fmt.Sprint("got->", fmt.Sprint(game.RoundVec32(p.Position(), 3)), " want->", fmt.Sprint(game.RoundVec32(p.mInfo.ServerPosition, 3)), " diff->", game.RoundVec32(posDiff, 3)), packet.TextTypeChat)
 	}
 
 	p.correctMovement()
@@ -87,7 +81,7 @@ func (p *Player) correctMovement() {
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
 	if p.mInfo.RefreshBlockTicks >= 30 {
-		for bpos, b := range p.GetNearbyBlocks(p.AABB().Translate(p.mInfo.ServerPosition)) {
+		for bpos, b := range p.GetNearbyBlocks(p.AABB()) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 				NewBlockRuntimeID: world.BlockRuntimeID(b),
@@ -152,11 +146,11 @@ func (p *Player) aiStep() {
 		p.mInfo.ServerMovement = p.mInfo.ServerSentMovement
 	}
 
-	if !p.mInfo.JumpDown {
+	if !p.mInfo.JumpBindPressed {
 		p.mInfo.JumpCooldownTicks = 0
 	}
 
-	if p.mInfo.JumpDown && p.mInfo.OnGround && p.mInfo.JumpCooldownTicks <= 0 {
+	if p.mInfo.JumpBindPressed && p.mInfo.OnGround && p.mInfo.JumpCooldownTicks <= 0 {
 		p.simulateJump()
 		p.mInfo.JumpCooldownTicks = 10
 	}
@@ -167,6 +161,10 @@ func (p *Player) aiStep() {
 
 // travel continues the player's movement simulation.
 func (p *Player) travel() {
+	if p.mInfo.StepClipOffset > 0 {
+		p.mInfo.StepClipOffset *= game.StepClipMultiplier
+	}
+
 	blockFriction := game.DefaultAirFriction
 	if p.mInfo.OnGround {
 		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown)).(block.Frictional); ok {
@@ -193,12 +191,13 @@ func (p *Player) travel() {
 
 	p.maybeBackOffFromEdge()
 	oldMov := p.mInfo.ServerMovement
-	p.collide(p.mInfo.ServerMovement)
-	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
+	p.collide()
+
+	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement.Sub(mgl32.Vec3{0, 0, 0}))
 	p.checkCollisions(oldMov)
 
-	if climb && (p.mInfo.HorizontallyCollided || p.mInfo.JumpDown) {
-		p.mInfo.ServerMovement[1] = 0.3
+	if climb && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
+		p.mInfo.ServerMovement[1] = 0.2
 	}
 
 	p.checkUnsupportedMovementScenarios()
@@ -234,13 +233,13 @@ func (p *Player) maybeBackOffFromEdge() {
 		return
 	}
 
-	v := p.mInfo.ServerMovement
-	if v[1] > 0 {
+	currentVel := p.mInfo.ServerMovement
+	if currentVel[1] > 0 {
 		return
 	}
 
-	bb := p.AABB().Translate(p.mInfo.ServerPosition)
-	d0, d1, d2 := v[0], v[2], float32(0.05)
+	bb := p.AABB()
+	d0, d1, d2 := currentVel[0], currentVel[2], float32(0.05)
 
 	for d0 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{d0, -game.StepHeight, 0}))) == 0 {
 		if d0 < d2 && d0 >= -d2 {
@@ -280,42 +279,43 @@ func (p *Player) maybeBackOffFromEdge() {
 		}
 	}
 
-	p.mInfo.ServerMovement = mgl32.Vec3{d0, v[1], d1}
+	p.mInfo.ServerMovement = mgl32.Vec3{d0, currentVel[1], d1}
 }
 
 // collide simulates the player's collisions with blocks
-func (p *Player) collide(v mgl32.Vec3) {
-	bb := p.AABB().Translate(p.mInfo.ServerPosition)
-	l := p.GetNearbyBBoxes(bb.Extend(v))
+func (p *Player) collide() {
+	currVel := p.mInfo.ServerMovement
+	bbList := p.GetNearbyBBoxes(p.AABB().Extend(currVel))
+	newVel := currVel
 
-	v2 := v
-	if p.mInfo.ServerMovement.LenSqr() > 0.0 {
-		v2 = p.collideWithBlocks(v, bb, l)
+	if currVel.LenSqr() > 0.0 {
+		newVel = p.collideWithBlocks(currVel, p.AABB(), bbList)
 	}
 
-	f := v[0] != v2[0]                         // Checks if the old X velocity differs from the new X velocity.
-	f1 := v[1] != v2[1]                        // Checks if the old Y velocity differs from the new Y velocity.
-	f2 := v[2] != v2[2]                        // Checks if the old Z velocity differs from the new Z velocity.
-	f3 := p.mInfo.OnGround || f1 && v[1] < 0.0 // Checks if the player is currently in an on-ground state.
-	if f3 && (f || f2) {
-		// MCP 1.19 shit here we go!
-		v31 := p.collideWithBlocks(mgl32.Vec3{v[0], game.StepHeight, v[2]}, bb, l)
-		v32 := p.collideWithBlocks(mgl32.Vec3{0, v[1], 0}, bb.Extend(mgl32.Vec3{v[0], 0, v[2]}), l)
+	xCollision := currVel[0] != newVel[0]
+	yCollision := currVel[1] != newVel[1]
+	zCollision := currVel[2] != newVel[2]
+	hasGroundState := p.mInfo.OnGround || (yCollision && currVel[1] < 0.0)
 
-		if v32[1] < game.StepHeight {
-			v33 := p.collideWithBlocks(mgl32.Vec3{v[0], 0, v[2]}, bb.Translate(v32), l).Add(v32)
-			if game.Vec3HzDistSqr(v33) > game.Vec3HzDistSqr(v31) {
-				v31 = v33
-			}
-		}
+	if hasGroundState && (xCollision || zCollision) {
+		stepVel := mgl32.Vec3{currVel.X(), game.StepHeight, currVel.Z()}
+		list := p.GetNearbyBBoxes(p.AABB().Extend(stepVel))
 
-		if game.Vec3HzDistSqr(v31) > game.Vec3HzDistSqr(v2) {
-			p.mInfo.ServerMovement = v31.Add(p.collideWithBlocks(mgl32.Vec3{0, -v31[1] + v[1], 0}, bb.Translate(v31), l))
-			return
+		bb := p.AABB()
+		bb, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, bb, list, stepVel.Y())
+		bb, stepVel[0] = utils.DoBoxCollision(utils.CollisionX, bb, list, stepVel.X())
+		bb, stepVel[2] = utils.DoBoxCollision(utils.CollisionZ, bb, list, stepVel.Z())
+		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, list, -(stepVel.Y()))
+		stepVel[1] += rDy
+
+		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
+			p.mInfo.StepClipOffset += stepVel.Y()
+			newVel = stepVel
 		}
 	}
 
-	p.mInfo.ServerMovement = v2
+	p.mInfo.ServerMovement = newVel
+	p.entity.SetAABB(p.AABB().Translate(newVel))
 }
 
 // collideWithBlocks simulates the player's collisions with blocks
@@ -324,25 +324,25 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 		return vel
 	}
 
-	d0, d1, d2 := vel[0], vel[1], vel[2]
-	if d1 != 0 {
-		bb, d1 = utils.DoBoxCollision(utils.CollisionY, bb, list, d1)
+	xMov, yMov, zMov := vel[0], vel[1], vel[2]
+	if yMov != 0 {
+		bb, yMov = utils.DoBoxCollision(utils.CollisionY, bb, list, yMov)
 	}
 
-	flag := math32.Abs(d0) < math32.Abs(d2)
-	if flag && d2 != 0 {
-		bb, d2 = utils.DoBoxCollision(utils.CollisionZ, bb, list, d2)
+	flag := math32.Abs(xMov) < math32.Abs(zMov)
+	if flag && zMov != 0 {
+		bb, zMov = utils.DoBoxCollision(utils.CollisionZ, bb, list, zMov)
 	}
 
-	if d0 != 0 {
-		bb, d0 = utils.DoBoxCollision(utils.CollisionX, bb, list, d0)
+	if xMov != 0 {
+		bb, xMov = utils.DoBoxCollision(utils.CollisionX, bb, list, xMov)
 	}
 
-	if !flag && d2 != 0 {
-		_, d2 = utils.DoBoxCollision(utils.CollisionZ, bb, list, d2)
+	if !flag && zMov != 0 {
+		_, zMov = utils.DoBoxCollision(utils.CollisionZ, bb, list, zMov)
 	}
 
-	return mgl32.Vec3{d0, d1, d2}
+	return mgl32.Vec3{xMov, yMov, zMov}
 }
 
 // simulateGravity simulates the gravity of the player
@@ -400,7 +400,7 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 
 // checkUnsupportedMovementScenarios checks if the player is in an unsupported movement scenario
 func (p *Player) checkUnsupportedMovementScenarios() {
-	bb := p.AABB().Translate(p.mInfo.ServerPosition).Grow(-1e-6)
+	bb := p.AABB()
 	//boxes = p.GetNearbyBBoxes(bb)
 	blocks := p.GetNearbyBlocks(bb)
 
@@ -438,18 +438,19 @@ type MovementInfo struct {
 	FlyingSpeed                 float32
 	Gravity                     float32
 	Speed                       float32
+	StepClipOffset              float32
 
 	MotionTicks       uint32
 	RefreshBlockTicks uint32
 	JumpCooldownTicks int32
 
-	Sneaking, SneakDown   bool
-	Jumping, JumpDown     bool
-	Sprinting, SprintDown bool
-	Teleporting           bool
-	Immobile              bool
-	CanFly, Flying        bool
-	NoClip                bool
+	Sneaking, SneakBindPressed   bool
+	Jumping, JumpBindPressed     bool
+	Sprinting, SprintBindPressed bool
+	Teleporting                  bool
+	Immobile                     bool
+	CanFly, Flying               bool
+	NoClip                       bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool
