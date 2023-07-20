@@ -115,9 +115,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 	case *packet.Text:
 		cmd := strings.Split(pk.Message, " ")
-		if cmd[0] == ".oomph_debug" {
+		if cmd[0] == "!oomph_debug" {
 			if len(cmd) != 3 {
-				p.SendOomphDebug("Usage: .oomph_debug <mode> <value>", packet.TextTypeChat)
+				p.SendOomphDebug("Usage: oomph_debug <mode> <value>", packet.TextTypeChat)
 				return true
 			}
 
@@ -452,11 +452,13 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		p.mInfo.Sneaking = false
 	}
 
-	// Update movement key pressed states for the player, depending on what inputs the client has in it's input packet.
+	// Update the jumping state of the player.
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-	p.mInfo.SprintDown = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
-	p.mInfo.SneakDown = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
-	p.mInfo.JumpDown = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+
+	// Update movement key pressed states for the player, depending on what inputs the client has in it's input packet.
+	p.mInfo.JumpBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+	p.mInfo.SprintBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
+	p.mInfo.SneakBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
 
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
 	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
@@ -476,7 +478,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 
 	// The client is doing a block action on it's side, so we want to replicate this to
 	// make the copy of the server and client world identical.
-	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) {
+	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) && p.movementMode != utils.ModeClientAuthoritative {
 		for _, action := range pk.BlockActions {
 			// If the action isn't destroying a block, then we don't handle it.
 			if action.Action != protocol.PlayerActionPredictDestroyBlock {
@@ -611,7 +613,7 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-	bb := p.AABB().Translate(t.Position)
+	bb := p.AABB()
 	if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
 		return false
 	}
@@ -661,10 +663,16 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 	}
 
 	if widthExists {
-		e.SetAABB(game.AABBFromDimensions(width.(float32), e.AABB().Height()))
+		if isPlayer {
+			e.SetAABB(game.AABBFromDimensions(width.(float32), e.AABB().Height()))
+		}
 	}
 	if heightExists {
 		e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height.(float32)))
+	}
+
+	if isPlayer {
+		e.SetAABB(e.AABB().Translate(p.mInfo.ServerPosition))
 	}
 
 	if !isPlayer {

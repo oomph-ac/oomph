@@ -12,7 +12,6 @@ import (
 )
 
 const maxCrosshairAttackDist float32 = 3.005
-const maxOtherAttackDist float32 = 3.1
 
 func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
 	p.lastAttackData = pk
@@ -41,7 +40,7 @@ func (p *Player) validateCombat() {
 	// Lag compensation is limited to 300ms in this case, so we want two things:
 	// 1) The tick we should rewind to should be no more than 6 ticks (300ms) in the past.
 	// 2) The tick we should rewind to should not be higher than the current server rewTick
-	rewTick, sTick, cut := p.clientTick.Load(), p.serverTick.Load(), uint64(DefaultNetworkLatencyCutoff)
+	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(DefaultNetworkLatencyCutoff)
 
 	if rewTick+cut < sTick {
 		if p.debugger.ServerCombat {
@@ -88,7 +87,7 @@ func (p *Player) validateCombat() {
 				continue
 			}
 
-			targetAABB := e.AABB().Grow(0.125).Translate(rew.Position)
+			targetAABB := e.AABB().Grow(0.103).Translate(rew.Position)
 
 			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
 			if !ok {
@@ -136,23 +135,33 @@ func (p *Player) validateCombat() {
 			return
 		}
 
-		dist := game.AABBVectorDistance(t.AABB().Translate(rew.Position), attackPos)
-		if dist > maxOtherAttackDist {
-			return
-		}
-
 		// If a player's input mode is touch, then a raycast will not be performed to validate combat.
 		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 		// which would allow the player to attack another entity without actually looking at them.
 		if p.inputMode != packet.InputModeTouch {
-			targetAABB := t.AABB().Grow(0.103).Translate(rew.Position)
+			targetAABB := t.AABB().Grow(0.1).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
-			_, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
+			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
 
 			if ok {
-				p.sendPacketToServer(p.lastAttackData)
+				dist := res.Position().Sub(attackPos).Len()
+				valid := dist <= maxCrosshairAttackDist
+
+				if p.debugger.ServerCombat {
+					color := "§c"
+					if valid {
+						color = "§a"
+					}
+
+					p.SendOomphDebug("dist="+fmt.Sprint(dist)+" && valid="+color+fmt.Sprint(valid), packet.TextTypeChat)
+				}
+
+				if valid {
+					p.sendPacketToServer(p.lastAttackData)
+					return
+				}
 			} else if p.debugger.ServerCombat {
-				p.SendOomphDebug(fmt.Sprint("hit invalidated! raycast failed && {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
+				p.SendOomphDebug(fmt.Sprint("hit invalidated! casted ray did not land. {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
 			}
 		}
 	}

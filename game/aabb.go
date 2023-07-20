@@ -45,3 +45,12 @@ func AABBVectorDistance(a cube.BBox, v mgl32.Vec3) float32 {
 
 	return dist
 }
+
+// AABBMiddlePosition gets the middle X/Z position of an AABB.
+func AABBMiddlePosition(bb cube.BBox) mgl32.Vec3 {
+	return mgl32.Vec3{
+		(bb.Min().X() + bb.Max().X()) / 2,
+		bb.Min().Y(),
+		(bb.Min().Z() + bb.Max().Z()) / 2,
+	}
+}

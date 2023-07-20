@@ -93,9 +93,9 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 				pos := cube.Pos{x, y, z}
 				boxes := p.Block(pos).Model().BBox(df_cube.Pos(pos), nil)
 				for _, box := range boxes {
-					b := game.DFBoxToCubeBox(box)
-					if b.Translate(pos.Vec3()).IntersectsWith(aabb) {
-						bboxList = append(bboxList, b.Translate(pos.Vec3()))
+					b := game.DFBoxToCubeBox(box).Translate(pos.Vec3())
+					if b.IntersectsWith(aabb) {
+						bboxList = append(bboxList, b)
 					}
 				}
 			}
