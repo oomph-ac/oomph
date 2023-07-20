@@ -13,4 +13,6 @@ const (
 	SlowFallingGravity = float32(0.01)
 	// StepHeight is the maximum height a player can step up.
 	StepHeight = float32(0.6)
+	// StepClipMultiplier is the multiplier for the step height of a player while they are clipping into a stair.
+	StepClipMultiplier = float32(0.4)
 )
