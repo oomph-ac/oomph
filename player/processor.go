@@ -82,10 +82,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		p.cleanChunks()
+		prevPos := p.mInfo.ServerPosition
 		p.handlePlayerAuthInput(pk)
 
 		if p.combatMode == utils.ModeFullAuthoritative {
-			p.validateCombat()
+			p.validateCombat(prevPos.Add(mgl32.Vec3{0, 1.62}))
 		} else {
 			p.tickEntitiesPos()
 		}
@@ -127,7 +128,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			case "latency":
 				p.debugger.Latency = b
 			case "server_combat":
-				p.debugger.ServerCombat = b
+				p.debugger.Combat = b
 			case "server_knockback":
 				p.debugger.ServerKnockback = b
 			case "buffer_info":
