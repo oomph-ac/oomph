@@ -177,8 +177,8 @@ func (p *Player) travel() {
 	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction)
 	p.simulateAddedMovementForce(v3)
 
-	climb := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPosition)))
-	if climb {
+	nearClimableBlock := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPosition)))
+	if nearClimableBlock {
 		p.mInfo.ServerMovement[0] = game.ClampFloat(p.mInfo.ServerMovement.X(), -0.2, 0.2)
 		p.mInfo.ServerMovement[2] = game.ClampFloat(p.mInfo.ServerMovement.Z(), -0.2, 0.2)
 		if p.mInfo.ServerMovement[1] < -0.2 {
@@ -191,14 +191,10 @@ func (p *Player) travel() {
 
 	p.maybeBackOffFromEdge()
 	oldMov := p.mInfo.ServerMovement
+
 	p.collide()
-
-	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement.Sub(mgl32.Vec3{0, 0, 0}))
+	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
 	p.checkCollisions(oldMov)
-
-	if climb && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
-		p.mInfo.ServerMovement[1] = 0.2
-	}
 
 	p.checkUnsupportedMovementScenarios()
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
@@ -206,6 +202,10 @@ func (p *Player) travel() {
 	if !p.mInfo.InUnsupportedRewindScenario {
 		p.simulateGravity()
 		p.simulateHorizontalFriction(blockFriction)
+	}
+
+	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
+		p.mInfo.ServerMovement[1] = 0.2
 	}
 }
 

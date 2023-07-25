@@ -2,7 +2,7 @@ package player
 
 type Debugger struct {
 	Latency         bool
-	ServerCombat    bool
+	Combat          bool
 	ServerKnockback bool
 	PacketBuffer    bool
 	Movement        bool

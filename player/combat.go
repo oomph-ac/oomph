@@ -21,7 +21,7 @@ func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
 // validateCombat checks if the player's attack was valid for the tick. If combat is found to be legitimate, this function
 // will return true. Note that if multiple attacks are recieved in a tick, this function will only validate the first
 // processed in the tick, and any other hits will be ignored until next tick.
-func (p *Player) validateCombat() {
+func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	defer func() {
 		p.needsCombatValidation = false
 	}()
@@ -43,7 +43,7 @@ func (p *Player) validateCombat() {
 	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(DefaultNetworkLatencyCutoff)
 
 	if rewTick+cut < sTick {
-		if p.debugger.ServerCombat {
+		if p.debugger.Combat {
 			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", DefaultNetworkLatencyCutoff, ")"), packet.TextTypeChat)
 		}
 
@@ -51,14 +51,12 @@ func (p *Player) validateCombat() {
 	}
 
 	if rewTick > sTick {
-		if p.debugger.ServerCombat {
+		if p.debugger.Combat {
 			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - most present is ", sTick), packet.TextTypeChat)
 		}
 
 		rewTick = sTick
 	}
-
-	attackPos := p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
 
 	if p.lastAttackData == nil {
 		if p.inputMode == packet.InputModeTouch {
@@ -104,7 +102,7 @@ func (p *Player) validateCombat() {
 		p.entityMu.Unlock()
 
 		if valid {
-			if p.debugger.ServerCombat {
+			if p.debugger.Combat {
 				p.SendOomphDebug("detected client misprediction - an attack for entity "+fmt.Sprint(eid)+" sent to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
 			}
 
@@ -139,7 +137,7 @@ func (p *Player) validateCombat() {
 		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 		// which would allow the player to attack another entity without actually looking at them.
 		if p.inputMode != packet.InputModeTouch {
-			targetAABB := t.AABB().Grow(0.1).Translate(rew.Position)
+			targetAABB := t.AABB().Grow(0.103).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
 
@@ -147,7 +145,7 @@ func (p *Player) validateCombat() {
 				dist := res.Position().Sub(attackPos).Len()
 				valid := dist <= maxCrosshairAttackDist
 
-				if p.debugger.ServerCombat {
+				if p.debugger.Combat {
 					color := "§c"
 					if valid {
 						color = "§a"
@@ -160,7 +158,7 @@ func (p *Player) validateCombat() {
 					p.sendPacketToServer(p.lastAttackData)
 					return
 				}
-			} else if p.debugger.ServerCombat {
+			} else if p.debugger.Combat {
 				p.SendOomphDebug(fmt.Sprint("hit invalidated! casted ray did not land. {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
 			}
 		}
