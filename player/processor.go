@@ -442,8 +442,11 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	// Update the sprinting state of the player.
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
 		p.mInfo.Sprinting = true
+		p.mInfo.Speed *= 1.3
+		p.SendOomphDebug("start sprint at "+fmt.Sprint(p.ClientTick()), 1)
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
 		p.mInfo.Sprinting = false
+		p.mInfo.Speed /= 1.3
 	}
 
 	// Update the sneaking state of the player.
@@ -688,8 +691,8 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 
 	p.miMu.Lock()
 	p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
-	p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
-	p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
+	//p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
+	//p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
 	p.miMu.Unlock()
 }
 

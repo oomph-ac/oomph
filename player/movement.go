@@ -56,7 +56,7 @@ func (p *Player) validateMovement() {
 	}
 
 	if p.debugger.Movement {
-		p.SendOomphDebug(fmt.Sprint("got->", fmt.Sprint(game.RoundVec32(p.Position(), 3)), " want->", fmt.Sprint(game.RoundVec32(p.mInfo.ServerPosition, 3)), " diff->", game.RoundVec32(posDiff, 3)), packet.TextTypeChat)
+		p.SendOomphDebug(fmt.Sprint("got->", fmt.Sprint(game.RoundVec32(p.Position(), 3)), " want->", fmt.Sprint(game.RoundVec32(p.mInfo.ServerPosition, 3))), packet.TextTypeChat)
 	}
 
 	p.correctMovement()
@@ -174,8 +174,8 @@ func (p *Player) travel() {
 		}
 	}
 
-	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction)
-	p.simulateAddedMovementForce(v3)
+	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction / game.DefaultAirFriction)
+	p.moveRelative(v3)
 
 	nearClimableBlock := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPosition)))
 	if nearClimableBlock {
@@ -209,22 +209,29 @@ func (p *Player) travel() {
 	}
 }
 
-// simulateAddedMovementForce simulates the additional movement force created by the player's mf/ms and rotation values
-func (p *Player) simulateAddedMovementForce(f float32) {
-	v := math32.Pow(p.mInfo.ForwardImpulse, 2) + math32.Pow(p.mInfo.LeftImpulse, 2)
-	if v < 1e-4 {
+// moveRelative simulates the additional movement force created by the player's mf/ms and rotation values
+func (p *Player) moveRelative(fSpeed float32) {
+	movVec := mgl32.Vec3{p.mInfo.LeftImpulse, 0, p.mInfo.ForwardImpulse}
+
+	d0 := movVec.LenSqr()
+	if d0 < 1e-7 {
 		return
 	}
 
-	v = math32.Sqrt(v)
-	if v < 1 {
-		v = 1
+	var newMovVec mgl32.Vec3
+	if d0 > 1 {
+		newMovVec = movVec.Normalize()
+	} else {
+		newMovVec = movVec
 	}
-	v = f / v
-	mf, ms := p.mInfo.ForwardImpulse*v, p.mInfo.LeftImpulse*v
-	v2, v3 := game.MCSin(p.entity.Rotation().Z()*math32.Pi/180), game.MCCos(p.entity.Rotation().Z()*math32.Pi/180)
-	p.mInfo.ServerMovement[0] += ms*v3 - mf*v2
-	p.mInfo.ServerMovement[2] += ms*v2 + mf*v3
+	newMovVec = newMovVec.Mul(fSpeed)
+
+	yaw := p.entity.Rotation().Z() * (math32.Pi / 180)
+	v := game.MCSin(yaw)
+	v1 := game.MCCos(yaw)
+
+	p.mInfo.ServerMovement[0] += newMovVec.X()*v1 - newMovVec.Z()*v
+	p.mInfo.ServerMovement[2] += newMovVec.Z()*v1 + newMovVec.X()*v
 }
 
 // maybeBackOffFromEdge simulates the movement scenarios where a player is at the edge of a block.
@@ -479,7 +486,7 @@ func (m *MovementInfo) UpdateTickStatus() {
 
 func (m *MovementInfo) getFrictionInfluencedSpeed(f float32) float32 {
 	if m.OnGround {
-		return m.Speed * math32.Pow(0.546/f, 3)
+		return m.Speed * (0.21600002 / (f * f * f))
 	}
 
 	return m.FlyingSpeed
