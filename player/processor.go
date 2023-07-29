@@ -261,12 +261,11 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.Teleport(pk.Position)
 		})
 	case *packet.SetActorData:
-		pk.Tick = 0 // prevent rewind from happening
-
 		if pk.EntityRuntimeID == p.rid {
 			p.lastSentActorData = pk
 		}
 
+		pk.Tick = 0
 		p.Acknowledgement(func() {
 			p.handleSetActorData(pk)
 		})
@@ -402,6 +401,13 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 
+	p.nextTickActionsMu.Lock()
+	for _, fn := range p.nextTickActions {
+		fn()
+	}
+	p.nextTickActions = make([]func(), 0)
+	p.nextTickActionsMu.Unlock()
+
 	// Update the input mode of the player. This is mainly used for combat detections.
 	// Note while this can be abused, techincally, there are still combat checks in place for touch players.
 	p.inputMode = pk.InputMode
@@ -440,11 +446,10 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	p.mInfo.LeftImpulse = pk.MoveVector.X() * 0.98
 
 	// Update the sprinting state of the player.
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) {
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) && !p.mInfo.Sprinting {
 		p.mInfo.Sprinting = true
 		p.mInfo.Speed *= 1.3
-		p.SendOomphDebug("start sprint at "+fmt.Sprint(p.ClientTick()), 1)
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) {
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) && p.mInfo.Sprinting {
 		p.mInfo.Sprinting = false
 		p.mInfo.Speed /= 1.3
 	}
@@ -490,7 +495,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 			}
 
 			// Get the position of the block the client is breaking
-			pos := utils.BlockToCubePos(action.BlockPos).Side(cube.Face(action.Face))
+			pos := utils.BlockToCubePos(action.BlockPos)
 			b, _ := world.BlockByRuntimeID(air)
 
 			// Set the block broken to air - because that's what happens when you break a block.
@@ -611,15 +616,25 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	// Make a list of BBoxes the block will occupy.
 	bx := b.Model().BBox(df_cube.Pos(replacePos), nil)
 	boxes := make([]cube.BBox, 0)
-	for _, b := range bx {
-		boxes = append(boxes, game.DFBoxToCubeBox(b))
+	for _, bxx := range bx {
+		boxes = append(boxes, game.DFBoxToCubeBox(bxx).Translate(mgl32.Vec3{
+			float32(replacePos.X()),
+			float32(replacePos.Y()),
+			float32(replacePos.Z()),
+		}))
 	}
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-	bb := p.AABB()
-	if utils.BoxesIntersect(bb, boxes, replacePos.Vec3()) {
+	if cube.AnyIntersections(boxes, p.AABB()) {
 		return false
+	}
+
+	for _, e := range p.entities {
+		ebb := e.AABB().Translate(e.Position())
+		if cube.AnyIntersections(boxes, ebb) {
+			return false
+		}
 	}
 
 	// Set the block in the world
@@ -675,10 +690,6 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 		e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height.(float32)))
 	}
 
-	if isPlayer {
-		e.SetAABB(e.AABB().Translate(p.mInfo.ServerPosition))
-	}
-
 	if !isPlayer {
 		return
 	}
@@ -691,8 +702,6 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 
 	p.miMu.Lock()
 	p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
-	//p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
-	//p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
 	p.miMu.Unlock()
 }
 
