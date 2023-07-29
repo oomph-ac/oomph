@@ -1,8 +1,6 @@
 package check
 
 import (
-	"math"
-
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -27,7 +25,7 @@ func (*InvalidA) Description() string {
 
 // MaxViolations ...
 func (*InvalidA) MaxViolations() float64 {
-	return math.MaxFloat64
+	return 1.0
 }
 
 func (a *InvalidA) Process(p Processor, pk packet.Packet) bool {
