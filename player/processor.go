@@ -86,7 +86,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.handlePlayerAuthInput(pk)
 
 		if p.combatMode == utils.ModeFullAuthoritative {
-			p.validateCombat(prevPos.Add(mgl32.Vec3{0, 1.62}))
+			p.validateCombat(prevPos.Add(mgl32.Vec3{0, p.eyeOffset, 0}))
 		} else {
 			p.tickEntitiesPos()
 		}
@@ -459,6 +459,13 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		p.mInfo.Sneaking = true
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
 		p.mInfo.Sneaking = false
+	}
+
+	// Update the eye offset of the player - this is used in the attack position for combat validation.
+	if p.mInfo.Sneaking {
+		p.eyeOffset = 1.54
+	} else {
+		p.eyeOffset = 1.62
 	}
 
 	// Update the jumping state of the player.

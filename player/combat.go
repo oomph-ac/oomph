@@ -81,11 +81,11 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 				continue
 			}
 
-			if rew.Position.Sub(p.mInfo.ServerPosition).LenSqr() > 20.25 { // 20.25 ^ 0.5 = 4.5 - entities that are used for raycasting are always 4.5 blocks away
+			if rew.Position.Sub(p.mInfo.ServerPosition).LenSqr() > 20.25 { // 20.25 ^ 0.5 = 4.5 - entities that are used for raycasting are 4.5 blocks away
 				continue
 			}
 
-			targetAABB := e.AABB().Grow(0.103).Translate(rew.Position)
+			targetAABB := e.AABB().Grow(0.13).Translate(rew.Position)
 
 			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
 			if !ok {
@@ -133,11 +133,16 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 			return
 		}
 
+		// Basic distance check, to make sure the player is within search range of the entity.
+		if attackPos.Sub(mgl32.Vec3{0, p.eyeOffset}).Sub(rew.Position).LenSqr() > 20.25 {
+			return
+		}
+
 		// If a player's input mode is touch, then a raycast will not be performed to validate combat.
 		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 		// which would allow the player to attack another entity without actually looking at them.
 		if p.inputMode != packet.InputModeTouch {
-			targetAABB := t.AABB().Grow(0.103).Translate(rew.Position)
+			targetAABB := t.AABB().Grow(0.13).Translate(rew.Position)
 			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
 

@@ -73,6 +73,8 @@ type Player struct {
 	gameMode  int32
 	inputMode uint32
 
+	eyeOffset float32
+
 	ready                 bool
 	respawned             bool
 	dead                  bool
