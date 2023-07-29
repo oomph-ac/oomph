@@ -103,6 +103,9 @@ type Player struct {
 	lastSentAttributes *packet.UpdateAttributes
 	lastSentActorData  *packet.SetActorData
 
+	nextTickActions   []func()
+	nextTickActionsMu sync.Mutex
+
 	chunks      map[protocol.ChunkPos]*chunk.Chunk
 	chunkRadius int32
 	chkMu       sync.Mutex
@@ -201,6 +204,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		combatNetworkCutoff:    DefaultNetworkLatencyCutoff,
 
 		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
+
+		nextTickActions: make([]func(), 0),
 	}
 
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
@@ -308,7 +313,13 @@ func (p *Player) Rotation() mgl32.Vec3 {
 
 // AABB returns the axis-aligned bounding box of the player.
 func (p *Player) AABB() cube.BBox {
-	return p.Entity().AABB()
+	bb := p.Entity().AABB()
+	pos := p.Position()
+	if p.movementMode != utils.ModeClientAuthoritative {
+		pos = p.mInfo.ServerPosition
+	}
+
+	return cube.Box(bb.Min().X(), bb.Min().Y(), bb.Min().Z(), bb.Max().X(), bb.Max().Y(), bb.Max().Z()).Translate(pos)
 }
 
 func (p *Player) Acknowledgements() *Acknowledgements {
@@ -400,6 +411,13 @@ func (p *Player) Acknowledgement(f func()) {
 	}
 
 	p.Acknowledgements().Add(f)
+}
+
+func (p *Player) OnNextClientTick(f func()) {
+	p.nextTickActionsMu.Lock()
+	defer p.nextTickActionsMu.Unlock()
+
+	p.nextTickActions = append(p.nextTickActions, f)
 }
 
 // Debug debugs the given check data to the console and other relevant sources.

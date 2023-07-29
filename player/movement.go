@@ -25,7 +25,6 @@ func (p *Player) updateMovementState() bool {
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
-		p.entity.SetAABB(p.AABB().Translate(p.mInfo.ClientMovement))
 		p.mInfo.CanExempt = true
 		exempt = true
 	} else {
@@ -56,7 +55,7 @@ func (p *Player) validateMovement() {
 	}
 
 	if p.debugger.Movement {
-		p.SendOomphDebug(fmt.Sprint("got->", fmt.Sprint(game.RoundVec32(p.Position(), 3)), " want->", fmt.Sprint(game.RoundVec32(p.mInfo.ServerPosition, 3))), packet.TextTypeChat)
+		p.SendOomphDebug(fmt.Sprint("got->", game.RoundVec32(p.Position(), 3), " want->", game.RoundVec32(p.mInfo.ServerPosition, 3), " clientMov->", game.RoundVec32(p.mInfo.ClientMovement, 4), " srvMov->", game.RoundVec32(p.mInfo.OldServerMovement, 4)), packet.TextTypeChat)
 	}
 
 	p.correctMovement()
@@ -155,12 +154,11 @@ func (p *Player) aiStep() {
 		p.mInfo.JumpCooldownTicks = 10
 	}
 
-	p.travel()
-	p.checkUnsupportedMovementScenarios()
+	p.doMove()
 }
 
-// travel continues the player's movement simulation.
-func (p *Player) travel() {
+// doMove continues the player's movement simulation.
+func (p *Player) doMove() {
 	if p.mInfo.StepClipOffset > 0 {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	}
@@ -199,10 +197,8 @@ func (p *Player) travel() {
 	p.checkUnsupportedMovementScenarios()
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
 
-	if !p.mInfo.InUnsupportedRewindScenario {
-		p.simulateGravity()
-		p.simulateHorizontalFriction(blockFriction)
-	}
+	p.simulateGravity()
+	p.simulateHorizontalFriction(blockFriction)
 
 	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
 		p.mInfo.ServerMovement[1] = 0.2
@@ -246,7 +242,7 @@ func (p *Player) maybeBackOffFromEdge() {
 	}
 
 	bb := p.AABB()
-	d0, d1, d2 := currentVel[0], currentVel[2], float32(0.05)
+	d0, d1, d2 := currentVel.X(), currentVel.Z(), float32(0.05)
 
 	for d0 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{d0, -game.StepHeight, 0}))) == 0 {
 		if d0 < d2 && d0 >= -d2 {
@@ -286,7 +282,7 @@ func (p *Player) maybeBackOffFromEdge() {
 		}
 	}
 
-	p.mInfo.ServerMovement = mgl32.Vec3{d0, currentVel[1], d1}
+	p.mInfo.ServerMovement = mgl32.Vec3{d0, currentVel.Y(), d1}
 }
 
 // collide simulates the player's collisions with blocks
@@ -322,7 +318,6 @@ func (p *Player) collide() {
 	}
 
 	p.mInfo.ServerMovement = newVel
-	p.entity.SetAABB(p.AABB().Translate(newVel))
 }
 
 // collideWithBlocks simulates the player's collisions with blocks
@@ -331,7 +326,7 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 		return vel
 	}
 
-	xMov, yMov, zMov := vel[0], vel[1], vel[2]
+	xMov, yMov, zMov := vel.X(), vel.Y(), vel.Z()
 	if yMov != 0 {
 		bb, yMov = utils.DoBoxCollision(utils.CollisionY, bb, list, yMov)
 	}

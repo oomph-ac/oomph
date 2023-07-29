@@ -80,7 +80,7 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box - which is usually
 // the player's bounding box.
 func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
-	grown := aabb.Grow(1)
+	grown := aabb.Grow(1e-4)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
@@ -94,9 +94,17 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 				boxes := p.Block(pos).Model().BBox(df_cube.Pos(pos), nil)
 				for _, box := range boxes {
 					b := game.DFBoxToCubeBox(box).Translate(pos.Vec3())
-					if b.IntersectsWith(aabb) {
-						bboxList = append(bboxList, b)
+
+					if !b.IntersectsWith(aabb) {
+						continue
 					}
+
+					// TODO: Why the fuck is the block using the wrong AABB after recently being set????
+					/*if p.isRecentAirBlock(cube.Pos{int(b.Min().X()), int(b.Max().Y()), int(b.Min().Z())}) {
+						continue
+					}*/
+
+					bboxList = append(bboxList, b)
 				}
 			}
 		}
