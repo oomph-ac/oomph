@@ -449,7 +449,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) && !p.mInfo.Sprinting {
 		p.mInfo.Sprinting = true
 		p.mInfo.Speed *= 1.3
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) && p.mInfo.Sprinting {
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || (p.mInfo.Sprinting && p.mInfo.ForwardImpulse <= 0) {
 		p.mInfo.Sprinting = false
 		p.mInfo.Speed /= 1.3
 	}
