@@ -266,6 +266,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		pk.Tick = 0
+
+		if p.movementMode == utils.ModeFullAuthoritative {
+			p.handleSetActorData(pk)
+			return false
+		}
+
 		p.Acknowledgement(func() {
 			p.handleSetActorData(pk)
 		})
@@ -299,10 +305,22 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 				p.chkMu.Unlock()
 
 				break
+			} else if p.movementMode == utils.ModeFullAuthoritative && a.Name == "minecraft:movement" {
+				p.miMu.Lock()
+				p.mInfo.Speed = a.Value
+				if !p.mInfo.Sprinting {
+					p.mInfo.PreSprintSpeed = p.mInfo.Speed
+				}
+				p.miMu.Unlock()
 			}
 		}
 
 		p.lastSentAttributes = pk
+
+		if p.movementMode == utils.ModeFullAuthoritative {
+			return false
+		}
+
 		p.Acknowledgement(func() {
 			for _, a := range pk.Attributes {
 				if a.Name == "minecraft:movement" {
@@ -433,61 +451,13 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
 
-	// Check if the player is in a loaded chunk, and if so, increment the tick counter.
-	if p.inLoadedChunk {
-		p.inLoadedChunkTicks++
-	} else {
-		p.inLoadedChunkTicks = 0
-	}
-
-	// Update the forward and left impulses of the player. This value is determined by the WASD combo the player
-	// is holding. If on controller, this will be variable, depending on the joystick position.
-	p.mInfo.ForwardImpulse = pk.MoveVector.Y() * 0.98
-	p.mInfo.LeftImpulse = pk.MoveVector.X() * 0.98
-
-	// Update the sprinting state of the player.
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) && !p.mInfo.Sprinting {
-		p.mInfo.Sprinting = true
-		p.mInfo.Speed *= 1.3
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || (p.mInfo.Sprinting && p.mInfo.ForwardImpulse <= 0) {
-		p.mInfo.Sprinting = false
-		p.mInfo.Speed /= 1.3
-	}
-
-	// Update the sneaking state of the player.
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
-		p.mInfo.Sneaking = true
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-		p.mInfo.Sneaking = false
-	}
-
-	// Update the eye offset of the player - this is used in the attack position for combat validation.
-	if p.mInfo.Sneaking {
-		p.eyeOffset = 1.54
-	} else {
-		p.eyeOffset = 1.62
-	}
-
-	// Update the jumping state of the player.
-	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-
-	// Update movement key pressed states for the player, depending on what inputs the client has in it's input packet.
-	p.mInfo.JumpBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
-	p.mInfo.SprintBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
-	p.mInfo.SneakBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
+	p.updateMovementStates(pk)
 
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
 	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 		p.Click()
 		p.updateCombatData(nil)
 	}
-
-	// TODO: Make a better way to check if the player is in the void.
-	p.mInfo.InVoid = p.Position().Y() < -128
-
-	// Reset the jump velocity and gravity values in the players movement info, it will be updated later on.
-	p.mInfo.JumpVelocity = game.DefaultJumpMotion
-	p.mInfo.Gravity = game.NormalGravity
 
 	// Update the effects of the player
 	p.tickEffects()
@@ -510,12 +480,8 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		}
 	}
 
-	// Update the movement state of the player. If it returns true, then we are in a scenario where we are able to
-	// predict and validate the movement of the player.
-	if p.updateMovementState() {
-		// Validate the movement of the player - this will not be done, if the movement mode is set to client authoritative.
-		p.validateMovement()
-	}
+	// Run the movement simulation of the player.
+	p.doMovementSimulation()
 
 	// If the movement mode is set to be full server authoritative, then we want to set the position of the player
 	// to the server predicted position.
@@ -708,6 +674,8 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 	flags := f.(int64)
 
 	p.miMu.Lock()
+	p.mInfo.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
+	p.mInfo.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
 	p.mInfo.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
 	p.miMu.Unlock()
 }

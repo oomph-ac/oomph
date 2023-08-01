@@ -15,9 +15,10 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// updateMovementState updates the movement state of the player - this function will check if any exemptions need to be made.
+// doMovementSimulation starts running the movement simulation of the player - this function will check if any exemptions need to be made.
 // If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
-func (p *Player) updateMovementState() bool {
+// If a difference between the client calculated movement and server calculated are found, a correction will be sent.
+func (p *Player) doMovementSimulation() {
 	var exempt bool
 	if p.inLoadedChunkTicks < 100 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
 		p.mInfo.OnGround = true
@@ -35,7 +36,63 @@ func (p *Player) updateMovementState() bool {
 	}
 
 	p.mInfo.UpdateTickStatus()
-	return !exempt
+	if exempt {
+		return
+	}
+
+	p.validateMovement()
+}
+
+func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
+	// Check if the player is in a loaded chunk, and if so, increment the tick counter.
+	if p.inLoadedChunk {
+		p.inLoadedChunkTicks++
+	} else {
+		p.inLoadedChunkTicks = 0
+	}
+
+	// Update the forward and left impulses of the player. This value is determined by the WASD combo the player
+	// is holding. If on controller, this will be variable, depending on the joystick position.
+	p.mInfo.ForwardImpulse = pk.MoveVector.Y() * 0.98
+	p.mInfo.LeftImpulse = pk.MoveVector.X() * 0.98
+
+	// Update the sprinting state of the player.
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) && !p.mInfo.Sprinting {
+		p.mInfo.Sprinting = true
+		p.mInfo.Speed = p.mInfo.PreSprintSpeed * 1.3
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) && p.mInfo.Sprinting {
+		p.mInfo.Sprinting = false
+		p.mInfo.Speed = p.mInfo.PreSprintSpeed
+	}
+
+	// Update the sneaking state of the player.
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+		p.mInfo.Sneaking = true
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+		p.mInfo.Sneaking = false
+	}
+
+	// Update the eye offset of the player - this is used in the attack position for combat validation.
+	if p.mInfo.Sneaking {
+		p.eyeOffset = 1.54
+	} else {
+		p.eyeOffset = 1.62
+	}
+
+	// Update the jumping state of the player.
+	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+
+	// Update movement key pressed states for the player, depending on what inputs the client has in it's input packet.
+	p.mInfo.JumpBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
+	p.mInfo.SprintBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
+	p.mInfo.SneakBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagSneakDown) || utils.HasFlag(pk.InputData, packet.InputFlagSneakToggleDown)
+
+	// TODO: Make a better way to check if the player is in the void.
+	p.mInfo.InVoid = p.Position().Y() < -128
+
+	// Reset the jump velocity and gravity values in the players movement info, it will be updated later on.
+	p.mInfo.JumpVelocity = game.DefaultJumpMotion
+	p.mInfo.Gravity = game.NormalGravity
 }
 
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
@@ -50,7 +107,7 @@ func (p *Player) validateMovement() {
 	// TODO: Properly account for the client clipping into steps - as of now however,
 	// this hack will suffice and will not trigger if a malicious client is stepping over
 	// heights a vanilla client would not.
-	if posDiff.LenSqr() <= (0.09 + math32.Pow(p.mInfo.StepClipOffset, 2)) {
+	if posDiff.LenSqr() <= (0.000001 + math32.Pow(p.mInfo.StepClipOffset, 2)) {
 		return
 	}
 
@@ -124,15 +181,15 @@ func (p *Player) aiStep() {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 	}
 
-	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 0.003 {
+	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-10 {
 		p.mInfo.ServerMovement[0] = 0
 	}
 
-	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 0.003 {
+	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 1e-10 {
 		p.mInfo.ServerMovement[1] = 0
 	}
 
-	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 0.003 {
+	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 1e-10 {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
@@ -403,7 +460,6 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 // checkUnsupportedMovementScenarios checks if the player is in an unsupported movement scenario
 func (p *Player) checkUnsupportedMovementScenarios() {
 	bb := p.AABB()
-	//boxes = p.GetNearbyBBoxes(bb)
 	blocks := p.GetNearbyBlocks(bb)
 
 	/* The following checks below determine wether or not the player is in an unspported rewind scenario.
@@ -441,6 +497,7 @@ type MovementInfo struct {
 	Gravity                     float32
 	Speed                       float32
 	StepClipOffset              float32
+	PreSprintSpeed              float32
 
 	MotionTicks       uint32
 	RefreshBlockTicks uint32
