@@ -8,6 +8,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
@@ -99,11 +100,6 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 						continue
 					}
 
-					// TODO: Why the fuck is the block using the wrong AABB after recently being set????
-					/*if p.isRecentAirBlock(cube.Pos{int(b.Min().X()), int(b.Max().Y()), int(b.Min().Z())}) {
-						continue
-					}*/
-
 					bboxList = append(bboxList, b)
 				}
 			}
@@ -131,6 +127,16 @@ func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
 	}
 
 	return blocks
+}
+
+// networkClientBreaksBlock is called when the client has data in PlayerAuthInput
+// that is has broken a block.
+func (p *Player) networkClientBreaksBlock(pos protocol.BlockPos) {
+	// Get the position of the block the client is breaking
+	spos := utils.BlockToCubePos(pos)
+	b, _ := world.BlockByRuntimeID(air)
+
+	p.SetBlock(spos, b)
 }
 
 // cleanChunks filters out any chunks that are out of the player's view, and returns a value of

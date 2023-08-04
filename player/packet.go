@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -113,7 +114,7 @@ func (p *Player) handlePacketQueue() {
 
 		if p.mInfo.LastUsedInput == nil {
 			// This should never happen anyway, but I don't need a whole server to crash in the case it does.
-			p.Disconnect("ERROR: No previous input available to fill - disconnecting.")
+			p.Disconnect(game.ErrorNoInput)
 			return
 		}
 		input := *p.mInfo.LastUsedInput
@@ -164,7 +165,7 @@ func (p *Player) validateBufferSize() {
 	p.depletedBufferScore = 0
 
 	if size >= 20 {
-		p.Disconnect("Too many packets are being received - try restarting your game?")
+		p.Disconnect(game.ErrorExcessBuffer)
 	}
 }
 
