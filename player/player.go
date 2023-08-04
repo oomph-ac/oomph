@@ -16,6 +16,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/check"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -106,9 +107,10 @@ type Player struct {
 	nextTickActions   []func()
 	nextTickActionsMu sync.Mutex
 
-	chunks      map[protocol.ChunkPos]*chunk.Chunk
-	chunkRadius int32
-	chkMu       sync.Mutex
+	chunks           map[protocol.ChunkPos]*chunk.Chunk
+	chunkRadius      int32
+	chkMu            sync.Mutex
+	breakingBlockPos *protocol.BlockPos
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -738,7 +740,7 @@ func (p *Player) updateLatency() {
 			return
 		}
 
-		p.SendOomphDebug(fmt.Sprint("RTT + Processing Delays: ", p.stackLatency, "ms"), packet.TextTypePopup)
+		p.SendOomphDebug(fmt.Sprint("RTT + Processing Delays: ", p.stackLatency, "ms\nTick Delta: ", p.TickLatency()), packet.TextTypePopup)
 	})
 }
 
@@ -804,7 +806,7 @@ func (p *Player) doTick() {
 	// If the player is not responding to acknowledgements, we have to kick them to prevent
 	// abusive behavior (bypasses).
 	if !p.Acknowledgements().Validate() {
-		p.Disconnect("Error: Client was unable to respond to acknowledgements sent by the server.")
+		p.Disconnect(game.ErrorNoAcks)
 	}
 
 	// Attempt to sync the client tick and server tick - if the client is running smoothly the difference between
