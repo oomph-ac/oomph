@@ -20,7 +20,8 @@ import (
 // If a difference between the client calculated movement and server calculated are found, a correction will be sent.
 func (p *Player) doMovementSimulation() {
 	var exempt bool
-	if p.inLoadedChunkTicks < 100 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
+
+	if p.inLoadedChunkTicks < 30 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
@@ -35,7 +36,7 @@ func (p *Player) doMovementSimulation() {
 		p.mInfo.CanExempt = false
 	}
 
-	p.mInfo.UpdateTickStatus()
+	p.mInfo.Tick()
 	if exempt {
 		return
 	}
@@ -56,31 +57,12 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	p.mInfo.ForwardImpulse = pk.MoveVector.Y() * 0.98
 	p.mInfo.LeftImpulse = pk.MoveVector.X() * 0.98
 
-	// Update the sprinting state of the player.
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) && !p.mInfo.Sprinting {
-		p.mInfo.Sprinting = true
-		p.mInfo.Speed = p.mInfo.PreSprintSpeed * 1.3
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) && p.mInfo.Sprinting {
-		p.mInfo.Sprinting = false
-		p.mInfo.Speed = p.mInfo.PreSprintSpeed
-	}
-
-	// Update the sneaking state of the player.
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
-		p.mInfo.Sneaking = true
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
-		p.mInfo.Sneaking = false
-	}
-
 	// Update the eye offset of the player - this is used in the attack position for combat validation.
 	if p.mInfo.Sneaking {
 		p.eyeOffset = 1.54
 	} else {
 		p.eyeOffset = 1.62
 	}
-
-	// Update the jumping state of the player.
-	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 
 	// Update movement key pressed states for the player, depending on what inputs the client has in it's input packet.
 	p.mInfo.JumpBindPressed = utils.HasFlag(pk.InputData, packet.InputFlagJumpDown)
@@ -93,6 +75,95 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	// Reset the jump velocity and gravity values in the players movement info, it will be updated later on.
 	p.mInfo.JumpVelocity = game.DefaultJumpMotion
 	p.mInfo.Gravity = game.NormalGravity
+
+	// Update the effects of the player - this is ran after movement states are updated as some effects can
+	// affect certain movement aspects, such as gravity.
+	p.tickEffects()
+
+	// Update the sneaking state of the player.
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+		p.mInfo.Sneaking = true
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+		p.mInfo.Sneaking = false
+	}
+
+	// Update the sprinting state of the player.
+	var needsSpeedAdjustment bool
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) && !p.mInfo.Sprinting {
+		p.mInfo.Sprinting = true
+		needsSpeedAdjustment = true
+	} else if (utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || p.mInfo.ForwardImpulse <= 0 || p.mInfo.Sneaking) && p.mInfo.Sprinting {
+		p.mInfo.Sprinting = false
+	}
+
+	// Estimate the client calculated speed of the player.
+	p.calculateClientSpeed()
+
+	// If the player has switched sprinting state from false to true, adjust the movement speed
+	// of the player to match the client calculated speed. It appears the client likes to do a
+	// client-sided prediction of it's speed when enabling sprint, but not when stopping sprint.
+	if needsSpeedAdjustment {
+		p.mInfo.MovementSpeed = p.mInfo.ClientCalculatedSpeed
+	}
+
+	// Update the jumping state of the player.
+	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+
+	// Update the flying speed of the player.
+	p.mInfo.FlyingSpeed = 0.02
+	if p.mInfo.Sprinting {
+		p.mInfo.FlyingSpeed += 0.006
+	}
+
+	// Apply knockback if neccessary.
+	if p.mInfo.TicksSinceKnockback == 0 {
+		p.mInfo.ServerMovement = p.mInfo.Knockback
+	}
+
+	// If the player is not holding the jump key, reset the ticks until next jump.
+	if !p.mInfo.JumpBindPressed {
+		p.mInfo.TicksUntilNextJump = 0
+	}
+
+	// If the player's X movement is below 1e-7, set it to 0.
+	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-7 {
+		p.mInfo.ServerMovement[0] = 0
+	}
+
+	// If the player's Y movement is below 1e-7, set it to 0.
+	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 1e-7 {
+		p.mInfo.ServerMovement[1] = 0
+	}
+
+	// If the player's Z movement is below 1e-7, set it to 0.
+	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 1e-7 {
+		p.mInfo.ServerMovement[2] = 0
+	}
+}
+
+func (p *Player) calculateClientSpeed() {
+	// The base client calculated speed (no effects) is 0.1.
+	p.mInfo.ClientCalculatedSpeed = 0.1
+
+	// Check if the slowness effect is present, and if so, adjust
+	// the client calculated speed.
+	if slwE, ok := p.effects[packet.EffectSlowness]; ok {
+		p.mInfo.ClientCalculatedSpeed -= 0.015 * float32(slwE.Level())
+	}
+
+	// Check if the speed effect is present, and if so, adjust
+	// the client calculated speed.
+	if spdE, ok := p.effects[packet.EffectSpeed]; ok {
+		p.mInfo.ClientCalculatedSpeed += 0.02 * float32(spdE.Level())
+	}
+
+	// If the player is not sprinting, we don't need to multiply the
+	// client calculated speed by 1.3.
+	if !p.mInfo.Sprinting {
+		return
+	}
+
+	p.mInfo.ClientCalculatedSpeed *= 1.3
 }
 
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
@@ -107,7 +178,7 @@ func (p *Player) validateMovement() {
 	// TODO: Properly account for the client clipping into steps - as of now however,
 	// this hack will suffice and will not trigger if a malicious client is stepping over
 	// heights a vanilla client would not.
-	if posDiff.LenSqr() <= (0.000001 + math32.Pow(p.mInfo.StepClipOffset, 2)) {
+	if posDiff.LenSqr() <= (p.mInfo.AcceptablePositionOffset + math32.Pow(p.mInfo.StepClipOffset, 2)) {
 		return
 	}
 
@@ -136,7 +207,7 @@ func (p *Player) correctMovement() {
 
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
-	if p.mInfo.RefreshBlockTicks >= 30 {
+	if p.mInfo.TicksSinceBlockRefresh >= 60 {
 		for bpos, b := range p.GetNearbyBlocks(p.AABB()) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
@@ -145,21 +216,7 @@ func (p *Player) correctMovement() {
 				Layer:             0,
 			})
 		}
-		p.mInfo.RefreshBlockTicks = 0
-	}
-
-	// This will send the most recent actor data to the client to ensure that all
-	// actor data is the same on the client and server (sprinting, sneaking, swimming, etc.)
-	if p.lastSentActorData != nil {
-		p.lastSentActorData.Tick = 0
-		p.conn.WritePacket(p.lastSentActorData)
-	}
-
-	// This will send the most recent player attributes to the client to ensure
-	// all attributes are the same on the client and server (health, speed, etc.)
-	if p.lastSentAttributes != nil {
-		p.lastSentAttributes.Tick = 0
-		p.conn.WritePacket(p.lastSentAttributes)
+		p.mInfo.TicksSinceBlockRefresh = 0
 	}
 
 	// This packet will correct the player to the server's predicted position.
@@ -181,41 +238,16 @@ func (p *Player) aiStep() {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 	}
 
-	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-10 {
-		p.mInfo.ServerMovement[0] = 0
-	}
-
-	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 1e-10 {
-		p.mInfo.ServerMovement[1] = 0
-	}
-
-	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 1e-10 {
-		p.mInfo.ServerMovement[2] = 0
-	}
-
-	p.mInfo.FlyingSpeed = 0.02
-	if p.mInfo.Sprinting {
-		p.mInfo.FlyingSpeed += 0.006
-	}
-
-	if p.mInfo.MotionTicks == 0 {
-		p.mInfo.ServerMovement = p.mInfo.ServerSentMovement
-	}
-
-	if !p.mInfo.JumpBindPressed {
-		p.mInfo.JumpCooldownTicks = 0
-	}
-
-	if p.mInfo.JumpBindPressed && p.mInfo.OnGround && p.mInfo.JumpCooldownTicks <= 0 {
+	if p.mInfo.JumpBindPressed && p.mInfo.OnGround && p.mInfo.TicksUntilNextJump <= 0 {
 		p.simulateJump()
-		p.mInfo.JumpCooldownTicks = 10
+		p.mInfo.TicksUntilNextJump = 10
 	}
 
-	p.doMove()
+	p.doGroundMove()
 }
 
-// doMove continues the player's movement simulation.
-func (p *Player) doMove() {
+// doGroundMove continues the player's movement simulation.
+func (p *Player) doGroundMove() {
 	if p.mInfo.StepClipOffset > 0 {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	}
@@ -487,21 +519,25 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 }
 
 type MovementInfo struct {
-	CanExempt bool
-
+	CanExempt                   bool
 	InUnsupportedRewindScenario bool
 
-	ForwardImpulse, LeftImpulse float32
-	JumpVelocity                float32
-	FlyingSpeed                 float32
-	Gravity                     float32
-	Speed                       float32
-	StepClipOffset              float32
-	PreSprintSpeed              float32
+	ForwardImpulse float32
+	LeftImpulse    float32
 
-	MotionTicks       uint32
-	RefreshBlockTicks uint32
-	JumpCooldownTicks int32
+	JumpVelocity          float32
+	FlyingSpeed           float32
+	MovementSpeed         float32
+	ClientCalculatedSpeed float32
+
+	Gravity float32
+
+	StepClipOffset           float32
+	AcceptablePositionOffset float32
+
+	TicksSinceKnockback    uint32
+	TicksSinceBlockRefresh uint32
+	TicksUntilNextJump     int32
 
 	Sneaking, SneakBindPressed   bool
 	Jumping, JumpBindPressed     bool
@@ -517,28 +553,37 @@ type MovementInfo struct {
 	InVoid                                               bool
 
 	ClientPredictedMovement, ClientMovement mgl32.Vec3
-	ServerSentMovement                      mgl32.Vec3
+	Knockback                               mgl32.Vec3
 	ServerMovement, OldServerMovement       mgl32.Vec3
 	ServerPosition                          mgl32.Vec3
 
 	LastUsedInput *packet.PlayerAuthInput
 }
 
-func (m *MovementInfo) UpdateServerSentVelocity(velo mgl32.Vec3) {
-	m.ServerSentMovement = velo
-	m.MotionTicks = 0
+// SetAcceptablePositionOffset sets the acceptable position offset, and if the client exceeds this,
+// the client will be sent a correction packet to correct it's movement.
+func (m *MovementInfo) SetAcceptablePositionOffset(o float32) {
+	m.AcceptablePositionOffset = o * o
 }
 
-func (m *MovementInfo) UpdateTickStatus() {
-	m.MotionTicks++
-	m.RefreshBlockTicks++
-
-	m.JumpCooldownTicks--
+// SetKnockback sets the knockback of the player.
+func (m *MovementInfo) SetKnockback(k mgl32.Vec3) {
+	m.Knockback = k
+	m.TicksSinceKnockback = 0
 }
 
+// Tick ticks the movement info.
+func (m *MovementInfo) Tick() {
+	m.TicksSinceKnockback++
+	m.TicksSinceBlockRefresh++
+
+	m.TicksUntilNextJump--
+}
+
+// getFrictionInfluencedSpeed returns the friction influenced speed of the player.
 func (m *MovementInfo) getFrictionInfluencedSpeed(f float32) float32 {
 	if m.OnGround {
-		return m.Speed * (0.21600002 / (f * f * f))
+		return m.MovementSpeed * (0.21600002 / (f * f * f))
 	}
 
 	return m.FlyingSpeed
