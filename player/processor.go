@@ -440,17 +440,27 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	// make the copy of the server and client world identical.
 	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) && p.movementMode != utils.ModeClientAuthoritative {
 		for _, action := range pk.BlockActions {
-			// If the action isn't destroying a block, then we don't handle it.
-			if action.Action != protocol.PlayerActionPredictDestroyBlock {
+			// If we are in direct mode using dragonfly, server authoritative block breaking is enabled.
+			if p.serverConn == nil || p.serverConn.GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
+				if action.Action != protocol.PlayerActionPredictDestroyBlock {
+					continue
+				}
+
+				p.networkClientBreaksBlock(action.BlockPos)
 				continue
 			}
 
-			// Get the position of the block the client is breaking
-			pos := utils.BlockToCubePos(action.BlockPos)
-			b, _ := world.BlockByRuntimeID(air)
-
-			// Set the block broken to air - because that's what happens when you break a block.
-			p.SetBlock(pos, b)
+			// If server authoritaitve block breaking is disabled, the behavior in PlayerAuthInput for breaking blocks is different.
+			if action.Action == protocol.PlayerActionStartBreak && p.breakingBlockPos == nil {
+				p.breakingBlockPos = &action.BlockPos
+			} else if action.Action == protocol.PlayerActionCrackBreak && p.breakingBlockPos != nil && *p.breakingBlockPos != action.BlockPos {
+				p.Disconnect(game.ErrorInvalidBlockBreak)
+			} else if action.Action == protocol.PlayerActionAbortBreak {
+				p.breakingBlockPos = nil
+			} else if action.Action == protocol.PlayerActionStopBreak {
+				p.networkClientBreaksBlock(*p.breakingBlockPos)
+				p.breakingBlockPos = nil
+			}
 		}
 	}
 
