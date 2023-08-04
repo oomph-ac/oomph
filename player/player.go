@@ -100,10 +100,8 @@ type Player struct {
 	knockbackNetworkCutoff int64
 	combatNetworkCutoff    int64
 
-	lastAttackData     *packet.InventoryTransaction
-	lastEquipmentData  *packet.MobEquipment
-	lastSentAttributes *packet.UpdateAttributes
-	lastSentActorData  *packet.SetActorData
+	lastAttackData    *packet.InventoryTransaction
+	lastEquipmentData *packet.MobEquipment
 
 	nextTickActions   []func()
 	nextTickActionsMu sync.Mutex
@@ -196,7 +194,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		},
 
 		mInfo: &MovementInfo{
-			Speed: 0.1,
+			MovementSpeed: 0.1,
 		},
 
 		movementMode: utils.ModeFullAuthoritative,
@@ -213,6 +211,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
 	p.chunkRadius = math.MaxInt16
 	p.Acknowledgements().Refresh()
+	p.mInfo.SetAcceptablePositionOffset(0.3)
 
 	go p.startTicking()
 	return p
@@ -303,6 +302,20 @@ func (p *Player) ClientFrame() uint64 {
 	return p.clientFrame.Load()
 }
 
+// ClientFrameSynced returns the client's simulation frame after all movement simulations
+// are no longer running.
+func (p *Player) ClientFrameSynced() uint64 {
+	c := p.clientFrame.Load()
+	if p.miMu.TryLock() {
+		defer p.miMu.Unlock()
+		return c
+	}
+
+	// Since a movement simulation is running, we want to apply whaever we need to
+	// on the next movement simulation, and not this one.
+	return c + 1
+}
+
 // Position returns the position of the player.
 func (p *Player) Position() mgl32.Vec3 {
 	return p.Entity().Position()
@@ -332,6 +345,7 @@ func (p *Player) Acknowledgements() *Acknowledgements {
 func (p *Player) MovementInfo() *MovementInfo {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
+
 	return p.mInfo
 }
 
@@ -339,14 +353,16 @@ func (p *Player) MovementInfo() *MovementInfo {
 func (p *Player) TakingKnockback() bool {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
-	return p.mInfo.MotionTicks <= 1
+
+	return p.mInfo.TicksSinceKnockback <= 1
 }
 
-// UpdateServerVelocity updates the server velocity of the player.
-func (p *Player) UpdateServerVelocity(v mgl32.Vec3) {
+// SetKnockback updates the knockback of the player. The knockback is always sent by the server.
+func (p *Player) SetKnockback(v mgl32.Vec3) {
 	p.miMu.Lock()
-	p.mInfo.UpdateServerSentVelocity(v)
-	p.miMu.Unlock()
+	defer p.miMu.Unlock()
+
+	p.mInfo.SetKnockback(v)
 }
 
 // ClientMovement returns the client's movement as a Vec3
@@ -791,8 +807,12 @@ func (p *Player) doTick() {
 		p.Disconnect("Error: Client was unable to respond to acknowledgements sent by the server.")
 	}
 
+	// Attempt to sync the client tick and server tick - if the client is running smoothly the difference between
+	// the client and server tick shoudld remain the same.
 	p.tryDoSync()
+	// Update the numerical millisecond latency of the player.
 	p.updateLatency()
+	// Flush the client and server connections. If used in direct mode, there is no server connection to flush.
 	p.flushConns()
 
 	p.lastServerTicked = time.Now()

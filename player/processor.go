@@ -250,7 +250,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// If rewind is being applied with this packet, teleport the player instantly on the server
 		// instead of waiting for the client to acknowledge the packet.
 		if p.movementMode == utils.ModeFullAuthoritative {
-			pk.Tick = p.ClientFrame()
+			pk.Tick = p.ClientFrameSynced()
 			p.Teleport(pk.Position)
 			return false
 		} else {
@@ -261,16 +261,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.Teleport(pk.Position)
 		})
 	case *packet.SetActorData:
-		if pk.EntityRuntimeID == p.rid {
-			p.lastSentActorData = pk
-		}
-
-		pk.Tick = 0
-
-		if p.movementMode == utils.ModeFullAuthoritative {
-			p.handleSetActorData(pk)
-			return false
-		}
+		pk.Tick = 0 // prevent any rewind from being done
 
 		p.Acknowledgement(func() {
 			p.handleSetActorData(pk)
@@ -305,28 +296,16 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 				p.chkMu.Unlock()
 
 				break
-			} else if p.movementMode == utils.ModeFullAuthoritative && a.Name == "minecraft:movement" {
-				p.miMu.Lock()
-				p.mInfo.Speed = a.Value
-				if !p.mInfo.Sprinting {
-					p.mInfo.PreSprintSpeed = p.mInfo.Speed
-				}
-				p.miMu.Unlock()
 			}
-		}
-
-		p.lastSentAttributes = pk
-
-		if p.movementMode == utils.ModeFullAuthoritative {
-			return false
 		}
 
 		p.Acknowledgement(func() {
 			for _, a := range pk.Attributes {
 				if a.Name == "minecraft:movement" {
 					p.miMu.Lock()
-					p.mInfo.Speed = a.Value
+					p.mInfo.MovementSpeed = a.Value
 					p.miMu.Unlock()
+
 					break
 				}
 			}
@@ -340,14 +319,14 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
 		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff) || p.debugger.ServerKnockback {
-			p.UpdateServerVelocity(pk.Velocity)
+			p.SetKnockback(pk.Velocity)
 			return false
 		}
 
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 		// does take knockback when it recieves it.
 		p.Acknowledgement(func() {
-			p.UpdateServerVelocity(pk.Velocity)
+			p.SetKnockback(pk.Velocity)
 		})
 	case *packet.LevelChunk:
 		p.handleLevelChunk(pk)
@@ -451,16 +430,11 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	})
 
-	p.updateMovementStates(pk)
-
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
 	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 		p.Click()
 		p.updateCombatData(nil)
 	}
-
-	// Update the effects of the player
-	p.tickEffects()
 
 	// The client is doing a block action on it's side, so we want to replicate this to
 	// make the copy of the server and client world identical.
@@ -480,6 +454,8 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		}
 	}
 
+	// UpdateMovementStates updates the movement states of the player.
+	p.updateMovementStates(pk)
 	// Run the movement simulation of the player.
 	p.doMovementSimulation()
 
