@@ -126,7 +126,7 @@ func (p *Player) handlePacketQueue() {
 		p.clientFrame.Store(p.expectedFrame)
 
 		p.handlePlayerAuthInput(&input)
-		p.sendPacketToServer(&input)
+		p.SendPacketToServer(&input)
 
 		return
 	}
@@ -143,7 +143,7 @@ func (p *Player) flushBuffer(b *PacketBuffer, input bool) {
 			continue
 		}
 
-		p.sendPacketToServer(pk)
+		p.SendPacketToServer(pk)
 	}
 
 	if !input {
@@ -151,7 +151,7 @@ func (p *Player) flushBuffer(b *PacketBuffer, input bool) {
 	}
 
 	p.ClientProcess(b.Input)
-	p.sendPacketToServer(b.Input)
+	p.SendPacketToServer(b.Input)
 }
 
 func (p *Player) validateBufferSize() {
@@ -238,17 +238,17 @@ func (p *Player) UsePacketBuffering(b bool) {
 	p.usePacketBuffer = b
 }
 
-// sendPacketToServer sends a packet to the server
-func (p *Player) sendPacketToServer(pk packet.Packet) {
+// SendPacketToServer sends a packet to the server
+func (p *Player) SendPacketToServer(pk packet.Packet) error {
 	if p.serverConn == nil {
 		p.tMu.Lock()
 		p.toSend = append(p.toSend, pk)
 		p.tMu.Unlock()
 
-		return
+		return nil
 	}
 
-	p.serverConn.WritePacket(pk)
+	return p.serverConn.WritePacket(pk)
 }
 
 func NewPacketBuffer() *PacketBuffer {
