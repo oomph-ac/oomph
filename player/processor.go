@@ -2,7 +2,6 @@ package player
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -96,10 +95,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 		p.needsCombatValidation = false
 
-		if p.debugger.Chunks && p.ClientTick()%20 == 0 {
-			p.SendOomphDebug(fmt.Sprint("pos=", game.RoundVec32(p.mInfo.ServerPosition, 2), " loaded=", p.inLoadedChunk), packet.TextTypeChat)
-		}
-
 		defer p.SetRespawned(false)
 		if p.movementMode == utils.ModeSemiAuthoritative {
 			defer p.setMovementToClient()
@@ -126,13 +121,13 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			switch cmd[1] {
 			case "latency":
-				p.debugger.Latency = b
+				p.debugger.LogLatency = b
 			case "server_combat":
-				p.debugger.Combat = b
+				p.debugger.LogCombatData = b
 			case "server_knockback":
-				p.debugger.ServerKnockback = b
+				p.debugger.UseServerKnockback = b
 			case "buffer_info":
-				p.debugger.PacketBuffer = b
+				p.debugger.UsePacketBuffer = b
 			case "packet_buffer":
 				p.UsePacketBuffering(b)
 			case "game_speed":
@@ -152,9 +147,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				pk.Position = mgl32.Vec3{float32(f)}
 				p.conn.WritePacket(pk)
 			case "movement":
-				p.debugger.Movement = b
-			case "chunks":
-				p.debugger.Chunks = b
+				p.debugger.LogMovementPredictions = b
 			default:
 				p.SendOomphDebug("Unknown debug mode: "+cmd[1], packet.TextTypeChat)
 				return true
@@ -318,7 +311,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// If the player is behind by more than the knockback network cutoff, then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff) || p.debugger.ServerKnockback {
+		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff) || p.debugger.UseServerKnockback {
 			p.SetKnockback(pk.Velocity)
 			return false
 		}
