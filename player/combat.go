@@ -106,7 +106,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 				p.SendOomphDebug("detected client misprediction - an attack for entity "+fmt.Sprint(eid)+" sent to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
 			}
 
-			p.sendPacketToServer(&packet.InventoryTransaction{
+			p.SendPacketToServer(&packet.InventoryTransaction{
 				TransactionData: &protocol.UseItemOnEntityTransactionData{
 					TargetEntityRuntimeID: eid,
 					ActionType:            protocol.UseItemOnEntityActionAttack,
@@ -160,7 +160,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 				}
 
 				if valid {
-					p.sendPacketToServer(p.lastAttackData)
+					p.SendPacketToServer(p.lastAttackData)
 					return
 				}
 			} else if p.debugger.Combat {
