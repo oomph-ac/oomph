@@ -119,9 +119,25 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
+			if p.UsesPacketBuffer() {
+				if !p.QueuePacket(pk) {
+					continue
+				}
+
+				err = p.SendPacketToServer(pk)
+				if err == nil {
+					continue
+				}
+
+				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+					_ = listener.Disconnect(conn, disconnect.Error())
+				}
+			}
+
 			if p.ClientProcess(pk) {
 				continue
 			}
+
 			if err := serverConn.WritePacket(pk); err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					_ = listener.Disconnect(conn, disconnect.Error())
