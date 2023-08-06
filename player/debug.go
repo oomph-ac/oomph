@@ -1,10 +1,9 @@
 package player
 
 type Debugger struct {
-	Latency         bool
-	Combat          bool
-	ServerKnockback bool
-	PacketBuffer    bool
-	Movement        bool
-	Chunks          bool
+	LogLatency             bool
+	LogCombatData          bool
+	UseServerKnockback     bool
+	UsePacketBuffer        bool
+	LogMovementPredictions bool
 }
