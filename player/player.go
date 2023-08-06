@@ -736,7 +736,7 @@ func (p *Player) updateLatency() {
 		p.needLatencyUpdate = true
 		p.stackLatency = time.Since(curr).Milliseconds()
 
-		if !p.debugger.Latency {
+		if !p.debugger.LogLatency {
 			return
 		}
 

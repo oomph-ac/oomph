@@ -182,7 +182,7 @@ func (p *Player) validateMovement() {
 		return
 	}
 
-	if p.debugger.Movement {
+	if p.debugger.LogMovementPredictions {
 		p.SendOomphDebug(fmt.Sprint("got->", game.RoundVec32(p.Position(), 3), " want->", game.RoundVec32(p.mInfo.ServerPosition, 3), " clientMov->", game.RoundVec32(p.mInfo.ClientMovement, 4), " srvMov->", game.RoundVec32(p.mInfo.OldServerMovement, 4)), packet.TextTypeChat)
 	}
 

@@ -43,7 +43,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(DefaultNetworkLatencyCutoff)
 
 	if rewTick+cut < sTick {
-		if p.debugger.Combat {
+		if p.debugger.LogCombatData {
 			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", DefaultNetworkLatencyCutoff, ")"), packet.TextTypeChat)
 		}
 
@@ -51,7 +51,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	}
 
 	if rewTick > sTick {
-		if p.debugger.Combat {
+		if p.debugger.LogCombatData {
 			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - most present is ", sTick), packet.TextTypeChat)
 		}
 
@@ -102,7 +102,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		p.entityMu.Unlock()
 
 		if valid {
-			if p.debugger.Combat {
+			if p.debugger.LogCombatData {
 				p.SendOomphDebug("detected client misprediction - an attack for entity "+fmt.Sprint(eid)+" sent to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
 			}
 
@@ -150,7 +150,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 				dist := res.Position().Sub(attackPos).Len()
 				valid := dist <= maxCrosshairAttackDist
 
-				if p.debugger.Combat {
+				if p.debugger.LogCombatData {
 					color := "§c"
 					if valid {
 						color = "§a"
@@ -163,7 +163,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 					p.SendPacketToServer(p.lastAttackData)
 					return
 				}
-			} else if p.debugger.Combat {
+			} else if p.debugger.LogCombatData {
 				p.SendOomphDebug(fmt.Sprint("hit invalidated! casted ray did not land. {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
 			}
 		}
