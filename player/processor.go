@@ -448,13 +448,26 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 			}
 
 			// If server authoritaitve block breaking is disabled, the behavior in PlayerAuthInput for breaking blocks is different.
-			if action.Action == protocol.PlayerActionStartBreak && p.breakingBlockPos == nil {
+			switch action.Action {
+			case protocol.PlayerActionStartBreak:
+				if p.breakingBlockPos != nil {
+					continue
+				}
+
 				p.breakingBlockPos = &action.BlockPos
-			} else if action.Action == protocol.PlayerActionCrackBreak && p.breakingBlockPos != nil && *p.breakingBlockPos != action.BlockPos {
+			case protocol.PlayerActionCrackBreak:
+				if p.breakingBlockPos == nil {
+					continue
+				}
+
+				if *p.breakingBlockPos == action.BlockPos {
+					continue
+				}
+
 				p.Disconnect(game.ErrorInvalidBlockBreak)
-			} else if action.Action == protocol.PlayerActionAbortBreak {
+			case protocol.PlayerActionAbortBreak:
 				p.breakingBlockPos = nil
-			} else if action.Action == protocol.PlayerActionStopBreak {
+			case protocol.PlayerActionStopBreak:
 				p.networkClientBreaksBlock(*p.breakingBlockPos)
 				p.breakingBlockPos = nil
 			}
