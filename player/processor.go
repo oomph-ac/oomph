@@ -80,6 +80,15 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
 
+		defer func() {
+			p.mInfo.Teleporting = false
+			p.SetRespawned(false)
+
+			if p.movementMode == utils.ModeSemiAuthoritative {
+				p.setMovementToClient()
+			}
+		}()
+
 		p.cleanChunks()
 		prevPos := p.mInfo.ServerPosition
 		p.handlePlayerAuthInput(pk)
@@ -94,11 +103,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			acks.HasTicked = true
 		}
 		p.needsCombatValidation = false
-
-		defer p.SetRespawned(false)
-		if p.movementMode == utils.ModeSemiAuthoritative {
-			defer p.setMovementToClient()
-		}
 	case *packet.MobEquipment:
 		p.lastEquipmentData = pk
 	case *packet.InventoryTransaction:
@@ -467,9 +471,6 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	if p.movementMode == utils.ModeFullAuthoritative {
 		pk.Position = p.mInfo.ServerPosition.Add(mgl32.Vec3{0, 1.62})
 	}
-
-	// Reset the teleporting state in the player's movement info.
-	p.mInfo.Teleporting = false
 }
 
 // handleLevelChunk handles all LevelChunk packets sent by the server. This is used to create a copy
