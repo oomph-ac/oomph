@@ -328,14 +328,9 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	case *packet.LevelChunk:
 		p.handleLevelChunk(pk)
 	case *packet.SubChunk:
-		switch p.movementMode {
-		case utils.ModeSemiAuthoritative:
-			p.Acknowledgement(func() {
-				p.handleSubChunk(pk)
-			})
-		case utils.ModeFullAuthoritative:
+		p.Acknowledgement(func() {
 			p.handleSubChunk(pk)
-		}
+		})
 	case *packet.ChunkRadiusUpdated:
 		p.chunkRadius = pk.ChunkRadius + 4
 	case *packet.UpdateBlock:
@@ -506,17 +501,9 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 	}
 	c.Compact()
 
-	// If we are in the semi-authorative mode, we want to account for latency between the client and server
-	// and replicate what the client sees. If we want full-authorative movement, the server dictates what movement
-	// is considered right, and we don't compensate for client-side latency, so we add the chunk instantly to the map.
-	switch p.movementMode {
-	case utils.ModeSemiAuthoritative:
-		p.Acknowledgement(func() {
-			p.AddChunk(c, pk.Position)
-		})
-	case utils.ModeFullAuthoritative:
+	p.Acknowledgement(func() {
 		p.AddChunk(c, pk.Position)
-	}
+	})
 }
 
 // handleSubChunk handles all SubChunk packets sent by the server. This is used to create a copy
