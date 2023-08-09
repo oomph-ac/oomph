@@ -244,16 +244,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			return false
 		}
 
-		// If rewind is being applied with this packet, teleport the player instantly on the server
-		// instead of waiting for the client to acknowledge the packet.
-		if p.movementMode == utils.ModeFullAuthoritative {
-			pk.Tick = p.ClientFrameSynced()
-			p.Teleport(pk.Position)
-			return false
-		} else {
-			pk.Tick = 0
-		}
-
+		pk.Tick = 0 // prevent any rewind from being done
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position)
 		})
