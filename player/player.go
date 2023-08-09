@@ -184,6 +184,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 			check.NewMovementA(),
 			check.NewMovementB(),
+			check.NewMovementC(),
 
 			check.NewVelocityA(),
 			check.NewVelocityB(),
@@ -247,13 +248,14 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
 func (p *Player) Teleport(pos mgl32.Vec3) {
-	pos = pos.Sub(mgl32.Vec3{0, 1.62})
+	pos = pos.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, 5e-3})
 
 	p.miMu.Lock()
+	defer p.miMu.Unlock()
+
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
 	p.mInfo.ServerPosition = pos
-	p.miMu.Unlock()
 }
 
 // MoveEntity moves an entity to the given position.
