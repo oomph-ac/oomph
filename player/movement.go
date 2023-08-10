@@ -98,6 +98,7 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	}
 
 	// Estimate the client calculated speed of the player.
+	// IMPORTANT: The client-side does not account for speed/slow effects in it's predicted speed.
 	p.calculateClientSpeed()
 
 	// If the player has switched sprinting state from false to true, adjust the movement speed
@@ -145,18 +146,6 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 func (p *Player) calculateClientSpeed() {
 	// The base client calculated speed (no effects) is 0.1.
 	p.mInfo.ClientCalculatedSpeed = 0.1
-
-	// Check if the slowness effect is present, and if so, adjust
-	// the client calculated speed.
-	if slwE, ok := p.effects[packet.EffectSlowness]; ok {
-		p.mInfo.ClientCalculatedSpeed -= 0.015 * float32(slwE.Level())
-	}
-
-	// Check if the speed effect is present, and if so, adjust
-	// the client calculated speed.
-	if spdE, ok := p.effects[packet.EffectSpeed]; ok {
-		p.mInfo.ClientCalculatedSpeed += 0.02 * float32(spdE.Level())
-	}
 
 	// If the player is not sprinting, we don't need to multiply the
 	// client calculated speed by 1.3.
@@ -239,7 +228,7 @@ func (p *Player) aiStep() {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 	}
 
-	if p.mInfo.JumpBindPressed && p.mInfo.OnGround && p.mInfo.TicksUntilNextJump <= 0 {
+	if (p.mInfo.Jumping || p.mInfo.JumpBindPressed) && p.mInfo.OnGround && p.mInfo.TicksUntilNextJump <= 0 {
 		p.simulateJump()
 		p.mInfo.TicksUntilNextJump = 10
 	}
@@ -262,7 +251,7 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
-	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction / game.DefaultAirFriction)
+	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction)
 	p.moveRelative(v3)
 
 	nearClimableBlock := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPosition)))
@@ -299,27 +288,21 @@ func (p *Player) doGroundMove() {
 
 // moveRelative simulates the additional movement force created by the player's mf/ms and rotation values
 func (p *Player) moveRelative(fSpeed float32) {
-	movVec := mgl32.Vec3{p.mInfo.LeftImpulse, 0, p.mInfo.ForwardImpulse}
-
-	d0 := movVec.LenSqr()
-	if d0 < 1e-7 {
+	v := math32.Pow(p.mInfo.ForwardImpulse, 2) + math32.Pow(p.mInfo.LeftImpulse, 2)
+	if v < 1e-4 {
 		return
 	}
 
-	var newMovVec mgl32.Vec3
-	if d0 > 1 {
-		newMovVec = movVec.Normalize()
-	} else {
-		newMovVec = movVec
+	v = math32.Sqrt(v)
+	if v < 1 {
+		v = 1
 	}
-	newMovVec = newMovVec.Mul(fSpeed)
 
-	yaw := p.entity.Rotation().Z() * (math32.Pi / 180)
-	v := game.MCSin(yaw)
-	v1 := game.MCCos(yaw)
-
-	p.mInfo.ServerMovement[0] += newMovVec.X()*v1 - newMovVec.Z()*v
-	p.mInfo.ServerMovement[2] += newMovVec.Z()*v1 + newMovVec.X()*v
+	v = fSpeed / v
+	mf, ms := p.mInfo.ForwardImpulse*v, p.mInfo.LeftImpulse*v
+	v2, v3 := game.MCSin(p.entity.Rotation().Z()*(math32.Pi/180)), game.MCCos(p.entity.Rotation().Z()*(math32.Pi/180))
+	p.mInfo.ServerMovement[0] += ms*v3 - mf*v2
+	p.mInfo.ServerMovement[2] += ms*v2 + mf*v3
 }
 
 // maybeBackOffFromEdge simulates the movement scenarios where a player is at the edge of a block.
@@ -621,7 +604,7 @@ func (m *MovementInfo) Tick() {
 // getFrictionInfluencedSpeed returns the friction influenced speed of the player.
 func (m *MovementInfo) getFrictionInfluencedSpeed(f float32) float32 {
 	if m.OnGround {
-		return m.MovementSpeed * (0.21600002 / (f * f * f))
+		return m.MovementSpeed * (0.162771336 / (f * f * f))
 	}
 
 	return m.FlyingSpeed
