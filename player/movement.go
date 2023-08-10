@@ -381,7 +381,7 @@ func (p *Player) handleInsideBlockMovement() {
 
 // isInsideBlock returns true if the player is inside a block.
 func (p *Player) isInsideBlock() bool {
-	bb := p.AABB().Grow(-1e-4)
+	bb := p.AABB().Grow(-0.015)
 	blockPos := cube.PosFromVec3(p.mInfo.ServerPosition)
 	b := p.Block(blockPos)
 
