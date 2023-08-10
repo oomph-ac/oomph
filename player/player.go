@@ -634,6 +634,7 @@ func (p *Player) SendOomphDebug(message string, t byte) {
 // Disconnect disconnects the player for the reason provided.
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
+	p.conn.Flush()
 	p.Close()
 }
 
