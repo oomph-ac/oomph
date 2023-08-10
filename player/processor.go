@@ -370,7 +370,8 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.respawned = true
 		})
 	case *packet.Disconnect:
-		p.Close()
+		p.Disconnect(pk.Message)
+		return true
 	}
 	return false
 }
