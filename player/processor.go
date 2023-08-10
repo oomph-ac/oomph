@@ -453,10 +453,8 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 
 				p.Disconnect(game.ErrorInvalidBlockBreak)
 			case protocol.PlayerActionAbortBreak:
-				if p.breakingBlockPos == nil {
-					continue
-				}
-
+				p.breakingBlockPos = nil
+			case protocol.PlayerActionStopBreak:
 				p.networkClientBreaksBlock(*p.breakingBlockPos)
 				p.breakingBlockPos = nil
 			}
