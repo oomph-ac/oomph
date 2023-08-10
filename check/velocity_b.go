@@ -50,6 +50,9 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 	}
 
 	pct := (math32.Hypot(p.ClientMovement()[0], p.ClientMovement()[2]) / math32.Hypot(xKb, zKb)) * 100
+	if pct > 100 {
+		return false
+	}
 
 	if math32.Abs(100.0-pct) <= 0.1 {
 		v.violations = math.Max(0, v.violations-0.2)
