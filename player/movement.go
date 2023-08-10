@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/df-mc/dragonfly/server/block"
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/ethaniccc/float32-cube/cube"
 
 	"github.com/chewxy/math32"
@@ -278,8 +279,10 @@ func (p *Player) doGroundMove() {
 
 	p.maybeBackOffFromEdge()
 	oldMov := p.mInfo.ServerMovement
-
 	p.collide()
+
+	p.handleInsideBlockMovement()
+
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
 	p.checkCollisions(oldMov)
 
@@ -372,6 +375,40 @@ func (p *Player) maybeBackOffFromEdge() {
 	}
 
 	p.mInfo.ServerMovement = mgl32.Vec3{d0, currentVel.Y(), d1}
+}
+
+func (p *Player) handleInsideBlockMovement() {
+	inside := p.isInsideBlock()
+	defer func() {
+		p.mInfo.KnownInsideBlock = inside
+	}()
+
+	if !inside {
+		return
+	}
+
+	if p.mInfo.KnownInsideBlock {
+		return
+	}
+
+	p.mInfo.ServerMovement[0] *= -1.5
+	p.mInfo.ServerMovement[1] *= -1
+	p.mInfo.ServerMovement[2] *= -1.5
+}
+
+// isInsideBlock returns true if the player is inside a block.
+func (p *Player) isInsideBlock() bool {
+	bb := p.AABB().Grow(-1e-4)
+	blockPos := cube.PosFromVec3(p.mInfo.ServerPosition)
+	b := p.Block(blockPos)
+
+	for _, box := range b.Model().BBox(df_cube.Pos{int(blockPos.X()), int(blockPos.Y()), int(blockPos.Z())}, nil) {
+		if bb.IntersectsWith(game.DFBoxToCubeBox(box).Translate(blockPos.Vec3())) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // collide simulates the player's collisions with blocks
@@ -546,6 +583,7 @@ type MovementInfo struct {
 	Immobile                     bool
 	CanFly, Flying               bool
 	NoClip                       bool
+	KnownInsideBlock             bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool
