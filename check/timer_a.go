@@ -4,7 +4,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -64,7 +63,10 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) bool {
 	// The time difference should be one tick (50ms), so we subtract 50ms from the time difference and then add it to the balance.
 	t.balance += timeDiff - 50
 	if t.balance <= -150 {
-		p.Flag(t, 1, map[string]any{"Balance": game.Round64(t.balance, 2)})
+		p.Flag(t, 1, map[string]any{
+			"client": p.ClientTick(),
+			"server": p.ServerTick(),
+		})
 		t.balance = 0
 	}
 
