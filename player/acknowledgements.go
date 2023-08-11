@@ -17,11 +17,20 @@ const (
 
 type Acknowledgements struct {
 	AcknowledgeMap   map[int64][]func()
-	HasTicked        bool
 	CurrentTimestamp int64
+
+	HasTicked  bool
+	LegacyMode bool
 
 	awaitResTicks uint64
 	mu            sync.Mutex
+}
+
+func (a *Acknowledgements) UseLegacy(b bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.LegacyMode = b
 }
 
 // Add adds an acknowledgement to run in the future to the map of acknowledgements.
@@ -57,6 +66,19 @@ func (a *Acknowledgements) GetMap(t int64) ([]func(), bool) {
 // found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
 // "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
 func (a *Acknowledgements) Handle(i int64, tryOther bool) bool {
+	if a.LegacyMode {
+		ok := a.tryHandle(i)
+		if ok {
+			return true
+		}
+
+		if !tryOther {
+			return false
+		}
+
+		return a.tryHandle(i / 1000)
+	}
+
 	ok := a.tryHandle(i / NetworkStackLatencyDivider)
 
 	// FUCK. What the fuck have they done to the PlayStation NSL? Is the behavior the
@@ -102,6 +124,12 @@ func (a *Acknowledgements) Refresh() {
 	// Create a random timestamp, and ensure that it is not already being used.
 	for {
 		a.CurrentTimestamp = int64(rand.Uint32())
+
+		// On clients supposedly <1.20, the timestamp is rounded to the thousands.
+		if a.LegacyMode {
+			a.CurrentTimestamp *= 1000
+		}
+
 		if _, ok := a.AcknowledgeMap[a.CurrentTimestamp]; !ok {
 			break
 		}
