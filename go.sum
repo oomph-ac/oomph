@@ -11,8 +11,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/df-mc/atomic v1.10.0 h1:0ZuxBKwR/hxcFGorKiHIp+hY7hgY+XBTzhCYD2NqSEg=
 github.com/df-mc/atomic v1.10.0/go.mod h1:Gw9rf+rPIbydMjA329Jn4yjd/O2c/qusw3iNp4tFGSc=
-github.com/df-mc/dragonfly v0.9.8 h1:mTVYU05qpYAuKMgNJGB9D7MdTNjfQSW2RFd55r0/QL8=
-github.com/df-mc/dragonfly v0.9.8/go.mod h1:Ee4LEtS6k1j6O+U7rkM4r8/RoA8qe+iSb0crOZ9gbgE=
+github.com/df-mc/dragonfly v0.9.9-0.20230714144543-281943e6efc4 h1:hmDEzY3sF+/mfQsVuJuC+ryt+RWsnoYul9nv/icQPsA=
+github.com/df-mc/dragonfly v0.9.9-0.20230714144543-281943e6efc4/go.mod h1:Ee4LEtS6k1j6O+U7rkM4r8/RoA8qe+iSb0crOZ9gbgE=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
 github.com/df-mc/worldupgrader v1.0.8 h1:T9p7d6o9Yx65qsnK20VYXUNOl9ZY9/5D/fbJBXKsi3o=
