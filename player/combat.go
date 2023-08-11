@@ -37,10 +37,10 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	}
 
 	// This determines what tick we should rewind to get an entity position for lag compensation.
-	// Lag compensation is limited to 300ms in this case, so we want two things:
-	// 1) The tick we should rewind to should be no more than 6 ticks (300ms) in the past.
+	// Lag compensation is limited to 300ms by default in this case, so we want two things:
+	// 1) The tick we should rewind to should be no more than the latency cutoff in the past.
 	// 2) The tick we should rewind to should not be higher than the current server rewTick
-	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(DefaultNetworkLatencyCutoff)
+	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(p.combatNetworkCutoff)
 
 	if rewTick+cut < sTick {
 		if p.debugger.LogCombatData {
