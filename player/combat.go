@@ -44,7 +44,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 
 	if rewTick+cut < sTick {
 		if p.debugger.LogCombatData {
-			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", DefaultNetworkLatencyCutoff, ")"), packet.TextTypeChat)
+			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", p.combatNetworkCutoff, ")"), packet.TextTypeChat)
 		}
 
 		rewTick = sTick - cut + 1
