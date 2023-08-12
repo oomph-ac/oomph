@@ -59,6 +59,8 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	}
 
 	if p.lastAttackData == nil {
+		// We can't assume the touch client has mispredicted a hit because they can pretty
+		// much touch anywhere on their screen and hit an entity.
 		if p.inputMode == packet.InputModeTouch {
 			return
 		}
@@ -103,7 +105,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 
 		if valid {
 			if p.debugger.LogCombatData {
-				p.SendOomphDebug("detected client misprediction - an attack for entity "+fmt.Sprint(eid)+" sent to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
+				p.SendOomphDebug("client misprediction - sent attack to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
 			}
 
 			p.SendPacketToServer(&packet.InventoryTransaction{
@@ -126,46 +128,55 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		return
 	}
 
-	if t, ok := p.SearchEntity(hit.TargetEntityRuntimeID); ok {
-		// The rewind should never be null here because we have validated the rewind tick.
-		rew := t.RewindPosition(rewTick)
-		if rew == nil {
-			return
+	t, ok := p.SearchEntity(hit.TargetEntityRuntimeID)
+	if !ok {
+		return
+	}
+
+	// The rewind should never be null here because we have validated the rewind tick.
+	rew := t.RewindPosition(rewTick)
+	if rew == nil {
+		if p.debugger.LogCombatData {
+			p.SendOomphDebug("rewind to tick"+fmt.Sprint(rewTick)+" failed for entity "+fmt.Sprint(hit.TargetEntityRuntimeID), packet.TextTypeChat)
 		}
 
-		// Basic distance check, to make sure the player is within search range of the entity.
-		if attackPos.Sub(mgl32.Vec3{0, p.eyeOffset}).Sub(rew.Position).LenSqr() > 20.25 {
-			return
-		}
+		return
+	}
 
-		// If a player's input mode is touch, then a raycast will not be performed to validate combat.
-		// This is because touchscreen players have the ability to use touch controls (instead of split controls),
-		// which would allow the player to attack another entity without actually looking at them.
-		if p.inputMode != packet.InputModeTouch {
-			targetAABB := t.AABB().Grow(0.13).Translate(rew.Position)
-			dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
-			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
+	// Basic distance check, to make sure the player is within search range of the entity.
+	if attackPos.Sub(mgl32.Vec3{0, p.eyeOffset}).Sub(rew.Position).LenSqr() > 20.25 {
+		return
+	}
 
-			if ok {
-				dist := res.Position().Sub(attackPos).Len()
-				valid := dist <= maxCrosshairAttackDist
+	// If a player's input mode is touch, then a raycast will not be performed to validate combat.
+	// This is because touchscreen players have the ability to use touch controls (instead of split controls),
+	// which would allow the player to attack another entity without actually looking at them.
+	if p.inputMode == packet.InputModeTouch {
+		return
+	}
 
-				if p.debugger.LogCombatData {
-					color := "§c"
-					if valid {
-						color = "§a"
-					}
+	targetAABB := t.AABB().Grow(0.13).Translate(rew.Position)
+	dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
+	res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
 
-					p.SendOomphDebug("dist="+fmt.Sprint(dist)+" && valid="+color+fmt.Sprint(valid), packet.TextTypeChat)
-				}
+	if ok {
+		dist := res.Position().Sub(attackPos).Len()
+		valid := dist <= maxCrosshairAttackDist
 
-				if valid {
-					p.SendPacketToServer(p.lastAttackData)
-					return
-				}
-			} else if p.debugger.LogCombatData {
-				p.SendOomphDebug(fmt.Sprint("hit invalidated! casted ray did not land. {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
+		if p.debugger.LogCombatData {
+			color := "§c"
+			if valid {
+				color = "§a"
 			}
+
+			p.SendOomphDebug("dist="+fmt.Sprint(dist)+" && valid="+color+fmt.Sprint(valid), packet.TextTypeChat)
 		}
+
+		if valid {
+			p.SendPacketToServer(p.lastAttackData)
+			return
+		}
+	} else if p.debugger.LogCombatData {
+		p.SendOomphDebug(fmt.Sprint("hit invalidated! casted ray did not land. {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
 	}
 }
