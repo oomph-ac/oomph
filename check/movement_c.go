@@ -37,6 +37,10 @@ func (m *MovementC) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
+	if p.CanExemptMovementValidation() {
+		return false
+	}
+
 	defer func() {
 		if p.OnGround() {
 			m.offGroundTicks = 0
@@ -47,8 +51,7 @@ func (m *MovementC) Process(p Processor, pk packet.Packet) bool {
 	}()
 
 	// If the player is not jumping, we don't need to run this check.
-	isJumping := utils.HasFlag(i.InputData, packet.InputFlagStartJumping)
-	if !isJumping {
+	if !utils.HasFlag(i.InputData, packet.InputFlagStartJumping) {
 		return false
 	}
 
@@ -59,6 +62,11 @@ func (m *MovementC) Process(p Processor, pk packet.Packet) bool {
 
 	// If the player has been off ground for less than 10 ticks, don't check.
 	if m.offGroundTicks <= 10 {
+		m.Buff(-m.buffer, 2)
+		return false
+	}
+
+	if m.Buff(1, 2) < 2 {
 		return false
 	}
 

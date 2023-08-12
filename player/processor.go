@@ -126,7 +126,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			switch cmd[1] {
 			case "latency":
 				p.debugger.LogLatency = b
-			case "server_combat":
+			case "combat_data":
 				p.debugger.LogCombatData = b
 			case "server_knockback":
 				p.debugger.UseServerKnockback = b
