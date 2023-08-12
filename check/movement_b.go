@@ -38,6 +38,10 @@ func (m *MovementB) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
+	if p.CanExemptMovementValidation() {
+		return false
+	}
+
 	diffX, diffZ := i.Delta[0]-float32(p.ServerMovement()[0]), i.Delta[2]-float32(p.ServerMovement()[2])
 	if math32.Abs(diffX) < 0.02 || math32.Abs(diffZ) < 0.02 {
 		m.Buff(-1, 6)

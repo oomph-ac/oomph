@@ -41,6 +41,8 @@ type Processor interface {
 	OldServerMovement() mgl32.Vec3
 	// ClientMovement returns the client's movement as a Vec3
 	ClientMovement() mgl32.Vec3
+	// CanExemptMovementValidation returns true if the player can exempt movement validation.
+	CanExemptMovementValidation() bool
 
 	// ClickDelay returns the delay between the current click and the last one.
 	ClickDelay() uint64
