@@ -390,6 +390,14 @@ func (p *Player) OldServerMovement() mgl32.Vec3 {
 	return p.mInfo.OldServerMovement
 }
 
+// CanExemptMovementValidation returns true if the player can exempt movement validation.
+func (p *Player) CanExemptMovementValidation() bool {
+	p.miMu.Lock()
+	defer p.miMu.Unlock()
+
+	return p.mInfo.CanExempt || p.mInfo.InUnsupportedRewindScenario || p.mInfo.StepClipOffset > 0
+}
+
 // MovementMode returns the movement mode of the player. The player's movement mode will determine how
 // much authority over movement oomph has.
 func (p *Player) MovementMode() utils.AuthorityType {
