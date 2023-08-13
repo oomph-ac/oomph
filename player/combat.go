@@ -24,6 +24,7 @@ func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
 func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	defer func() {
 		p.needsCombatValidation = false
+		p.lastAttackData = nil
 	}()
 
 	// There is no combat that needs to be validated as of now.
@@ -51,10 +52,6 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	}
 
 	if rewTick > sTick {
-		if p.debugger.LogCombatData {
-			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - most present is ", sTick), packet.TextTypeChat)
-		}
-
 		rewTick = sTick
 	}
 
@@ -128,6 +125,10 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		return
 	}
 
+	if hit.ActionType != protocol.UseItemOnEntityActionAttack {
+		return
+	}
+
 	t, ok := p.SearchEntity(hit.TargetEntityRuntimeID)
 	if !ok {
 		return
@@ -137,7 +138,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	rew := t.RewindPosition(rewTick)
 	if rew == nil {
 		if p.debugger.LogCombatData {
-			p.SendOomphDebug("rewind to tick"+fmt.Sprint(rewTick)+" failed for entity "+fmt.Sprint(hit.TargetEntityRuntimeID), packet.TextTypeChat)
+			p.SendOomphDebug("rewind to tick "+fmt.Sprint(rewTick)+" failed for entity "+fmt.Sprint(hit.TargetEntityRuntimeID), packet.TextTypeChat)
 		}
 
 		return
