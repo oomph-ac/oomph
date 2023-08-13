@@ -769,7 +769,7 @@ func (p *Player) tryDoSync() {
 			p.clientTick.Store(sTick)
 			p.isSyncedWithServer = true
 			p.awaitingSync = false
-			p.nextSyncTick = p.ServerTick() + uint64(p.TickLatency()) + 1
+			p.nextSyncTick = p.ServerTick() + uint64(p.TickLatency()) + 20
 		})
 	}
 }
