@@ -153,6 +153,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 	// which would allow the player to attack another entity without actually looking at them.
 	if p.inputMode == packet.InputModeTouch {
+		p.SendPacketToServer(p.lastAttackData)
 		return
 	}
 
