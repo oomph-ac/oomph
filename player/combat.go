@@ -12,7 +12,10 @@ import (
 )
 
 const maxCrosshairAttackDist float32 = 3.005
+const maxTouchAttackDist float32 = 3.1
 
+// updateCombatData updates the player's current combat data, and sets the needsCombatValidation flag to true. The combat data will be
+// nil if the player swung in the air (check for possible client misprediction).
 func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
 	p.lastAttackData = pk
 	p.needsCombatValidation = true
@@ -43,14 +46,16 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	// 2) The tick we should rewind to should not be higher than the current server rewTick
 	rewTick, sTick, cut := p.clientTick.Load()-1, p.serverTick.Load(), uint64(p.combatNetworkCutoff)
 
+	// If the current tick we want to rewind to is lower than the latency cutoff, we need to cut it off.
 	if rewTick+cut < sTick {
-		if p.debugger.LogCombatData {
-			p.SendOomphDebug(fmt.Sprint("unable to rewind to tick ", rewTick, " - least available is ", sTick-cut, " (max rewind is ", p.combatNetworkCutoff, ")"), packet.TextTypeChat)
-		}
-
 		rewTick = sTick - cut + 1
+
+		if p.debugger.LogCombatData {
+			p.SendOomphDebug(fmt.Sprint("cutoff reached - least available tick is ", rewTick, " (max rewind is ", p.combatNetworkCutoff, ")"), packet.TextTypeChat)
+		}
 	}
 
+	// The rewind cannot exceed the current server tick. If it does, set the rewind tick to the server tick.
 	if rewTick > sTick {
 		rewTick = sTick
 	}
@@ -137,15 +142,21 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	// The rewind should never be null here because we have validated the rewind tick.
 	rew := t.RewindPosition(rewTick)
 	if rew == nil {
-		if p.debugger.LogCombatData {
-			p.SendOomphDebug("rewind to tick "+fmt.Sprint(rewTick)+" failed for entity "+fmt.Sprint(hit.TargetEntityRuntimeID), packet.TextTypeChat)
-		}
+		p.SendOomphDebug("§cERROR: §7Combat system failed to rewind, please report this to an admin. (buffSize="+fmt.Sprint(len(t.PositionBuffer()))+" currTick="+
+			fmt.Sprint(p.ServerTick())+" rewTick="+fmt.Sprint(rewTick)+")", packet.TextTypeChat)
 
 		return
 	}
 
-	// Basic distance check, to make sure the player is within search range of the entity.
-	if attackPos.Sub(mgl32.Vec3{0, p.eyeOffset}).Sub(rew.Position).LenSqr() > 20.25 {
+	targetAABB := t.AABB().Grow(0.13).Translate(rew.Position)
+
+	// AABB distance check, to make sure the player is within search range of the entity.
+	touchDist := game.AABBVectorDistance(targetAABB, attackPos)
+	if touchDist > maxTouchAttackDist {
+		if p.debugger.LogCombatData {
+			p.SendOomphDebug("hit invalid: aabb dist check failed w/ dist="+fmt.Sprint(touchDist), packet.TextTypeChat)
+		}
+
 		return
 	}
 
@@ -157,7 +168,6 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		return
 	}
 
-	targetAABB := t.AABB().Grow(0.13).Translate(rew.Position)
 	dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 	res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
 
@@ -179,6 +189,6 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 			return
 		}
 	} else if p.debugger.LogCombatData {
-		p.SendOomphDebug(fmt.Sprint("hit invalidated! casted ray did not land. {pos: ", game.RoundVec32(rew.Position, 4), " yaw: ", game.Round32(p.Rotation()[2], 2)), packet.TextTypeChat)
+		p.SendOomphDebug("hit invalid: casted ray did not land. rewTick:"+fmt.Sprint(rewTick), packet.TextTypeChat)
 	}
 }
