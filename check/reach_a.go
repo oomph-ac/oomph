@@ -11,11 +11,11 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolatedFrames float32 = 7
+const interpolatedFrames float32 = 10
 
 type ReachA struct {
-	eid             uint64
-	run, cancelNext bool
+	eid uint64
+	run bool
 	basic
 }
 
@@ -50,13 +50,10 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		if r.cancelNext {
-			r.cancelNext = false
-			return true
-		}
-
 		r.eid = d.TargetEntityRuntimeID
 		r.run = true
+
+		return false
 	}
 
 	if i, ok := pk.(*packet.PlayerAuthInput); ok && r.run {
@@ -76,46 +73,36 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		bb := e.AABB().Translate(e.LastPosition()).Grow(0.1)
 		pe := p.Entity()
 
+		atkPos := pe.LastPosition().Add(mgl32.Vec3{0, 1.62})
 		cDv, lDv := game.DirectionVector(pe.Rotation()[2], pe.Rotation()[0]),
 			game.DirectionVector(pe.LastRotation()[2], pe.LastRotation()[0])
-		cAtkPos, lAtkPos := pe.Position().Add(mgl32.Vec3{0, 1.62}), pe.LastPosition().Add(mgl32.Vec3{0, 1.62})
-		dvDelta, atkPosDelta := cDv.Sub(lDv).Mul(1/interpolatedFrames),
-			cAtkPos.Sub(lAtkPos).Mul(1/interpolatedFrames)
-		uAtkPos, uDv := lAtkPos, lDv
+		dvDelta := cDv.Sub(lDv).Mul(1 / interpolatedFrames)
+		uDv := lDv
 
 		minDist, valid := float32(6900.0), false
 
-		// This will require for (interpolatedFrame ^ 2) raycasts to be performed.
-		// We need to interpolate the attack position and the direction vector.
-		for x := float32(0.0); x < interpolatedFrames; x++ {
-			if x != 0 {
-				uAtkPos = uAtkPos.Add(atkPosDelta)
+		for y := float32(0.0); y < interpolatedFrames; y++ {
+			if y != 0 {
+				uDv = uDv.Add(dvDelta)
 			}
 
-			for y := float32(0.0); y < interpolatedFrames; y++ {
-				if y != 0 {
-					uDv = uDv.Add(dvDelta)
-				}
+			result, ok := trace.BBoxIntercept(bb, atkPos, atkPos.Add(uDv.Mul(14.0)))
+			if !ok {
+				continue
+			}
 
-				result, ok := trace.BBoxIntercept(bb, uAtkPos, uAtkPos.Add(uDv.Mul(7.0)))
-				if !ok {
-					continue
-				}
+			dist := result.Position().Sub(atkPos).Len()
+			if dist > 14 { // This is impossible as we only traversed 14 blocks.
+				continue
+			}
 
-				dist := result.Position().Sub(uAtkPos).Len()
-				if dist > 7 { // This is impossible as we only traversed 7 blocks.
-					continue
-				}
-
-				valid = true
-				if dist < minDist {
-					minDist = dist
-				}
+			valid = true
+			if dist < minDist {
+				minDist = dist
 			}
 		}
 
 		if !valid {
-			r.cancelNext = true
 			return false
 		}
 
@@ -132,7 +119,6 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		p.Flag(r, 1, map[string]any{
 			"dist": game.Round32(minDist, 2),
 		})
-		r.cancelNext = true
 	}
 
 	return false
