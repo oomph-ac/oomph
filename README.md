@@ -27,7 +27,6 @@ go func() {
 			return
 		}
 
-        // Setting these values here are optional, additional information on what each setting does will be covered below the README.
 		p.UsePacketBuffering(false)
 		p.SetCombatMode(2)
 		p.SetMovementMode(2)
@@ -38,7 +37,6 @@ go func() {
 
 		p.Handle(newOomphHandler(p))
 
-        // Set the logger for the player (optional)
 		f, err := os.OpenFile("./logs/"+p.Conn().ClientData().ThirdPartyName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatal(err)
@@ -64,7 +62,6 @@ go func() {
 			panic(err)
 		}
 
-		// Setting these values here are optional, additional information on what each setting does will be covered below the README.
 		p.UsePacketBuffering(false)
 		p.SetCombatMode(2)
 		p.SetMovementMode(2)
@@ -75,7 +72,6 @@ go func() {
 
 		p.Handle(newOomphHandler(p))
 
-        // Set the logger for the player (optional)
 		f, err := os.OpenFile("./logs/"+p.Conn().ClientData().ThirdPartyName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatal(err)
