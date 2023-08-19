@@ -206,7 +206,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 				mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw},
 				true,
 			)
-			e.SetPositionBufferSize(uint64(p.combatNetworkCutoff))
+			e.SetPositionBufferSize(uint64(p.combatNetworkCutoff) + 1)
 			p.AddEntity(pk.EntityRuntimeID, e)
 		})
 	case *packet.AddActor:
@@ -222,7 +222,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 				mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw},
 				false,
 			)
-			e.SetPositionBufferSize(uint64(p.combatNetworkCutoff))
+			e.SetPositionBufferSize(uint64(p.combatNetworkCutoff) + 1)
 			p.AddEntity(pk.EntityRuntimeID, e)
 		})
 	case *packet.MoveActorAbsolute:
