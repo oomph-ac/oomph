@@ -70,5 +70,5 @@ func (r *ReachB) Process(p Processor, pk packet.Packet) bool {
 		"dist": game.Round32(dist, 2),
 	})
 
-	return true
+	return false
 }
