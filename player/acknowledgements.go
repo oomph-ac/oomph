@@ -76,7 +76,7 @@ func (a *Acknowledgements) Handle(i int64, tryOther bool) bool {
 			return false
 		}
 
-		return a.tryHandle(i)
+		return a.tryHandle(i / 1000)
 	}
 
 	ok := a.tryHandle(i / NetworkStackLatencyDivider)
