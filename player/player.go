@@ -11,7 +11,6 @@ import (
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/check"
@@ -107,9 +106,8 @@ type Player struct {
 	nextTickActions   []func()
 	nextTickActionsMu sync.Mutex
 
-	chunks           map[protocol.ChunkPos]*chunk.Chunk
+	chunks           sync.Map
 	chunkRadius      int32
-	chkMu            sync.Mutex
 	breakingBlockPos *protocol.BlockPos
 
 	checkMu sync.Mutex
@@ -205,8 +203,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		knockbackNetworkCutoff: DefaultNetworkLatencyCutoff,
 		combatNetworkCutoff:    DefaultNetworkLatencyCutoff,
-
-		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
 
 		nextTickActions: make([]func(), 0),
 	}

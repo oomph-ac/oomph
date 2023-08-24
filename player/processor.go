@@ -277,11 +277,9 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 				p.isSyncedWithServer = false
 				p.dead = true
 
-				p.chkMu.Lock()
-				p.chunks = make(map[protocol.ChunkPos]*chunk.Chunk)
+				p.clearAllChunks()
 				p.inLoadedChunk = false
 				p.inLoadedChunkTicks = 0
-				p.chkMu.Unlock()
 
 				break
 			}

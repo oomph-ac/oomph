@@ -25,26 +25,18 @@ func (p *Player) ChunkExists(pos protocol.ChunkPos) bool {
 
 // AddChunk adds a chunk to the chunk map of the player. This function can also be used to replace existing chunks
 func (p *Player) AddChunk(c *chunk.Chunk, pos protocol.ChunkPos) {
-	p.chkMu.Lock()
-	defer p.chkMu.Unlock()
-
-	p.chunks[pos] = c
+	p.chunks.Store(pos, c)
 }
 
 // Chunk returns a chunk from the given chunk position. If the chunk was found in the map, it will
 // return the chunk and true.
 func (p *Player) Chunk(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
-	// Figure out of the player has a subscription to the chunk
-	p.chkMu.Lock()
-	defer p.chkMu.Unlock()
-
-	c, ok := p.chunks[pos]
-
+	v, ok := p.chunks.Load(pos)
 	if !ok {
 		return nil, false
 	}
 
-	return c, true
+	return v.(*chunk.Chunk), true
 }
 
 // Block returns the block found at the given position
@@ -142,31 +134,31 @@ func (p *Player) networkClientBreaksBlock(pos protocol.BlockPos) {
 // cleanChunks filters out any chunks that are out of the player's view, and returns a value of
 // how many chunks were cleaned
 func (p *Player) cleanChunks() {
-	p.chkMu.Lock()
-	defer p.chkMu.Unlock()
-
 	loc := p.mInfo.ServerPosition
-	activePos := world.ChunkPos{int32(math32.Floor(loc[0])) >> 4, int32(math32.Floor(loc[2])) >> 4}
+	activePos := protocol.ChunkPos{int32(math32.Floor(loc[0])) >> 4, int32(math32.Floor(loc[2])) >> 4}
 
 	// Unsubscribe from any chunks that are out of the player's view.
-	for pos := range p.chunks {
+	p.chunks.Range(func(k, _ any) bool {
+		pos := k.(protocol.ChunkPos)
+
 		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
 		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
 
 		// If the distance is within the player's chunk view, leave it alone.
 		if int32(dist) <= p.chunkRadius {
-			continue
+			return true
 		}
 
 		// The chunks are out of the player's view, so unsubscribe from them.
-		delete(p.chunks, pos)
-	}
+		p.chunks.Delete(pos)
+		return true
+	})
 }
 
 // clearAllChunks clears all chunks from the player's chunk map and unsubscribes from any cached chunks.
 func (p *Player) clearAllChunks() {
-	p.chkMu.Lock()
-	defer p.chkMu.Unlock()
-
-	p.chunks = nil
+	p.chunks.Range(func(k, _ any) bool {
+		p.chunks.Delete(k)
+		return true
+	})
 }
