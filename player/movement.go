@@ -143,6 +143,7 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	}
 }
 
+// clientCalculatedSpeed calculates the speed the client will be using before it recieves an update for it's movement speed.
 func (p *Player) calculateClientSpeed() {
 	// The base client calculated speed (no effects) is 0.1.
 	p.mInfo.ClientCalculatedSpeed = 0.1
@@ -164,6 +165,7 @@ func (p *Player) validateMovement() {
 	}
 
 	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
+	movDiff := p.mInfo.OldServerMovement.Sub(p.mInfo.ClientMovement).Len()
 
 	// TODO: Properly account for the client clipping into steps - as of now however,
 	// this hack will suffice and will not trigger if a malicious client is stepping over
@@ -173,7 +175,7 @@ func (p *Player) validateMovement() {
 	}
 
 	if p.debugger.LogMovementPredictions {
-		p.SendOomphDebug(fmt.Sprint("got->", game.RoundVec32(p.Position(), 3), " want->", game.RoundVec32(p.mInfo.ServerPosition, 3), " clientMov->", game.RoundVec32(p.mInfo.ClientMovement, 4), " srvMov->", game.RoundVec32(p.mInfo.OldServerMovement, 4)), packet.TextTypeChat)
+		p.SendOomphDebug(fmt.Sprint("got->", game.RoundVec32(p.Position(), 3), " want->", game.RoundVec32(p.mInfo.ServerPosition, 3), " movDiff->", movDiff), packet.TextTypeChat)
 	}
 
 	p.correctMovement()
