@@ -577,11 +577,20 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		return false
 	}
 
-	for _, e := range p.entities {
+	hasIntersect := false
+	p.entities.Range(func(_, v any) bool {
+		e := v.(*entity.Entity)
 		ebb := e.AABB().Translate(e.Position())
 		if cube.AnyIntersections(boxes, ebb) {
+			hasIntersect = true
 			return false
 		}
+
+		return true
+	})
+
+	if hasIntersect {
+		return false
 	}
 
 	// Set the block in the world

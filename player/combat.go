@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -55,9 +56,9 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		}
 	}
 
-	// The rewind cannot exceed the current server tick. If it does, set the rewind tick to the server tick.
-	if rewTick > sTick {
-		rewTick = sTick
+	// The rewind cannot exceed the current (server tick - 1). If it does, set the rewind tick to the server tick.
+	if rewTick >= sTick {
+		rewTick = sTick - 1
 	}
 
 	if p.lastAttackData == nil {
@@ -72,28 +73,27 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 			return
 		}
 
-		p.entityMu.Lock()
 		min, valid, eid := float32(69000.0), false, uint64(0)
 		dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
-		for id, e := range p.entities {
-			if id == p.rid {
-				continue
-			}
+
+		p.entities.Range(func(k, v any) bool {
+			e := v.(*entity.Entity)
+			id := k.(uint64)
 
 			rew := e.RewindPosition(rewTick)
 			if rew == nil {
-				continue
+				return true
 			}
 
 			if rew.Position.Sub(p.mInfo.ServerPosition).LenSqr() > 20.25 { // 20.25 ^ 0.5 = 4.5 - entities that are used for raycasting are 4.5 blocks away
-				continue
+				return true
 			}
 
 			targetAABB := e.AABB().Grow(0.13).Translate(rew.Position)
 
 			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
 			if !ok {
-				continue
+				return true
 			}
 
 			dist := res.Position().Sub(attackPos).LenSqr()
@@ -102,8 +102,9 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 				eid = id
 				valid = true
 			}
-		}
-		p.entityMu.Unlock()
+
+			return true
+		})
 
 		if valid {
 			if p.debugger.LogCombatData {
