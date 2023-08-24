@@ -57,8 +57,7 @@ type Player struct {
 
 	entity *entity.Entity
 
-	entityMu sync.Mutex
-	entities map[uint64]*entity.Entity
+	entities sync.Map
 
 	effects sync.Map
 
@@ -151,7 +150,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			true,
 		),
 
-		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]utils.LocationData),
 
 		stackLatency:      0,
@@ -614,7 +612,12 @@ func (p *Player) StackLatency() int64 {
 
 // TickLatency returns the tick stack latency of the player in ticks.
 func (p *Player) TickLatency() int64 {
-	return int64(p.ServerTick()) - int64(p.ClientTick())
+	l := int64(p.ServerTick()) - int64(p.ClientTick())
+	if l < 0 {
+		l = 0
+	}
+
+	return l
 }
 
 // Name returns the player's display name.
@@ -654,9 +657,15 @@ func (p *Player) Close() error {
 
 		p.clearAllChunks()
 
-		p.entityMu.Lock()
-		p.entities = nil
-		p.entityMu.Unlock()
+		p.entities.Range(func(k, _ any) bool {
+			p.entities.Delete(k)
+			return true
+		})
+
+		p.effects.Range(func(k, _ any) bool {
+			p.effects.Delete(k)
+			return true
+		})
 
 		close(p.c)
 
@@ -687,11 +696,12 @@ func (p *Player) flushConns() {
 
 // tickEntitiesPos ticks the position of all entities
 func (p *Player) tickEntitiesPos() {
-	p.entityMu.Lock()
-	for _, e := range p.entities {
-		e.TickPosition(p.serverTick.Load())
-	}
-	p.entityMu.Unlock()
+	sT := p.serverTick.Load()
+
+	p.entities.Range(func(_, v any) bool {
+		(v.(*entity.Entity)).TickPosition(sT)
+		return true
+	})
 }
 
 // ackEntitiesPos prepares to acknowledge the position of all entities in the queue.

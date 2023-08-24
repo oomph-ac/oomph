@@ -11,22 +11,21 @@ func (p *Player) SearchEntity(rid uint64) (*entity.Entity, bool) {
 		// We got our own runtime ID, so we can return ourself.
 		return p.Entity(), true
 	}
-	p.entityMu.Lock()
-	e, ok := p.entities[rid]
-	p.entityMu.Unlock()
-	return e, ok
+
+	v, ok := p.entities.Load(rid)
+	if !ok {
+		return nil, false
+	}
+
+	return v.(*entity.Entity), ok
 }
 
 // AddEntity creates a new entity using the runtime ID and the provided data.
 func (p *Player) AddEntity(rid uint64, e *entity.Entity) {
-	p.entityMu.Lock()
-	defer p.entityMu.Unlock()
-	p.entities[rid] = e
+	p.entities.Store(rid, e)
 }
 
 // RemoveEntity removes an entity from the entity map using the runtime ID
 func (p *Player) RemoveEntity(rid uint64) {
-	p.entityMu.Lock()
-	delete(p.entities, rid)
-	p.entityMu.Unlock()
+	p.entities.Delete(rid)
 }
