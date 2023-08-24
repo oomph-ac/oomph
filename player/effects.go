@@ -7,36 +7,32 @@ import (
 
 // SetEffect sets an effect into the effect map
 func (p *Player) SetEffect(id int32, eff effect.Effect) {
-	p.effectMu.Lock()
-	p.effects[id] = eff
-	p.effectMu.Unlock()
+	p.effects.Store(id, eff)
 }
 
 // Effect gets the effect from the effect map
 func (p *Player) Effect(id int32) (effect.Effect, bool) {
-	p.effectMu.Lock()
-	eff, ok := p.effects[id]
-	p.effectMu.Unlock()
-	return eff, ok
+	v, ok := p.effects.Load(id)
+	if !ok {
+		return effect.Effect{}, false
+	}
+
+	return v.(effect.Effect), ok
 }
 
 // RemoveEffect removes an effect from the effect map
 func (p *Player) RemoveEffect(id int32) {
-	p.effectMu.Lock()
-	delete(p.effects, id)
-	p.effectMu.Unlock()
+	p.effects.Delete(id)
 }
 
 // tickEffects ticks the effects in the effect map. This will also remove any effects that have expired.
 func (p *Player) tickEffects() {
-	p.effectMu.Lock()
-	defer p.effectMu.Unlock()
-
-	for i, eff := range p.effects {
+	p.effects.Range(func(k, v any) bool {
+		eff := v.(effect.Effect)
 		eff = eff.TickDuration()
 		if eff.Duration() <= 0 {
-			delete(p.effects, i)
-			continue
+			p.effects.Delete(k)
+			return true
 		}
 
 		switch eff.Type().(type) {
@@ -46,6 +42,7 @@ func (p *Player) tickEffects() {
 			p.mInfo.Gravity = game.SlowFallingGravity
 		}
 
-		p.effects[i] = eff
-	}
+		p.effects.Store(k, eff)
+		return true
+	})
 }

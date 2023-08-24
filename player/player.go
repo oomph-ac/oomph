@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/df-mc/atomic"
-	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -61,8 +60,7 @@ type Player struct {
 	entityMu sync.Mutex
 	entities map[uint64]*entity.Entity
 
-	effects  map[int32]effect.Effect
-	effectMu sync.Mutex
+	effects sync.Map
 
 	mInfo *MovementInfo
 	miMu  sync.Mutex
@@ -155,8 +153,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		entities:              make(map[uint64]*entity.Entity),
 		queuedEntityLocations: make(map[uint64]utils.LocationData),
-
-		effects: make(map[int32]effect.Effect),
 
 		stackLatency:      0,
 		needLatencyUpdate: true,
