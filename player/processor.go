@@ -251,6 +251,11 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	case *packet.SetActorData:
 		pk.Tick = 0 // prevent any rewind from being done
 
+		if p.movementMode == utils.ModeFullAuthoritative {
+			p.handleSetActorData(pk)
+			return false
+		}
+
 		p.Acknowledgement(func() {
 			p.handleSetActorData(pk)
 		})
