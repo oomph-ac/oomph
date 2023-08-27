@@ -1,8 +1,6 @@
 package player
 
 import (
-	"fmt"
-
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -22,7 +20,12 @@ import (
 func (p *Player) doMovementSimulation() {
 	var exempt bool
 
-	if p.inLoadedChunkTicks < 30 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
+	if p.debugger.LogMovement {
+		p.Log().Debugf("started movement simulation for frame %d", p.ClientFrame())
+		defer p.Log().Debugf("finished movement simulation for frame %d", p.ClientFrame())
+	}
+
+	if (p.inLoadedChunkTicks < 30 && p.movementMode == utils.ModeFullAuthoritative) || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 		p.mInfo.ServerPosition = p.Position()
@@ -39,6 +42,7 @@ func (p *Player) doMovementSimulation() {
 
 	p.mInfo.Tick()
 	if exempt {
+		p.Log().Debugf("doMovementSimulation(): player exempted at frame %d", p.ClientFrame())
 		return
 	}
 
@@ -165,7 +169,7 @@ func (p *Player) validateMovement() {
 	}
 
 	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
-	movDiff := p.mInfo.OldServerMovement.Sub(p.mInfo.ClientMovement).Len()
+	movDiff := p.mInfo.OldServerMovement.Sub(p.mInfo.ClientMovement)
 
 	// TODO: Properly account for the client clipping into steps - as of now however,
 	// this hack will suffice and will not trigger if a malicious client is stepping over
@@ -174,8 +178,8 @@ func (p *Player) validateMovement() {
 		return
 	}
 
-	if p.debugger.LogMovementPredictions {
-		p.SendOomphDebug(fmt.Sprint("got->", game.RoundVec32(p.Position(), 3), " want->", game.RoundVec32(p.mInfo.ServerPosition, 3), " movDiff->", movDiff), packet.TextTypeChat)
+	if p.debugger.LogMovement {
+		p.Log().Debugf("validateMovement(): correction needed! posDiff=%f, movDiff=%f", posDiff, movDiff)
 	}
 
 	p.correctMovement()
@@ -228,11 +232,19 @@ func (p *Player) aiStep() {
 		p.mInfo.Jumping = false
 
 		p.mInfo.ServerMovement = mgl32.Vec3{}
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("aiStep(): movement set to 0 vector because player is immobile/not in loaded chunk")
+		}
 	}
 
 	if (p.mInfo.Jumping || p.mInfo.JumpBindPressed) && p.mInfo.OnGround && p.mInfo.TicksUntilNextJump <= 0 {
 		p.simulateJump()
 		p.mInfo.TicksUntilNextJump = 10
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("aiStep(): simulating jump for player")
+		}
 	}
 
 	p.doGroundMove()
@@ -251,6 +263,10 @@ func (p *Player) doGroundMove() {
 		} else {
 			blockFriction *= 0.6
 		}
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("doGroundMove(): block friction set to %f", blockFriction)
+		}
 	}
 
 	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction)
@@ -260,11 +276,17 @@ func (p *Player) doGroundMove() {
 	if nearClimableBlock {
 		p.mInfo.ServerMovement[0] = game.ClampFloat(p.mInfo.ServerMovement.X(), -0.2, 0.2)
 		p.mInfo.ServerMovement[2] = game.ClampFloat(p.mInfo.ServerMovement.Z(), -0.2, 0.2)
+
 		if p.mInfo.ServerMovement[1] < -0.2 {
 			p.mInfo.ServerMovement[1] = -0.2
 		}
+
 		if p.mInfo.Sneaking && p.mInfo.ServerMovement.Y() < 0 {
 			p.mInfo.ServerMovement[1] = 0
+		}
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("doGroundMove(): player near climbable, movement=%v", p.mInfo.ServerMovement)
 		}
 	}
 
@@ -277,19 +299,35 @@ func (p *Player) doGroundMove() {
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
 	p.checkCollisions(oldMov)
 
+	if p.debugger.LogMovement {
+		p.Log().Debugf("doGroundMove(): final position=%v", p.mInfo.ServerPosition)
+	}
+
 	p.checkUnsupportedMovementScenarios()
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
 
 	p.simulateGravity()
 	p.simulateHorizontalFriction(blockFriction)
 
+	if p.debugger.LogMovement {
+		p.Log().Debugf("doGroundMove(): friction and gravity applied, movement=%v", p.mInfo.ServerMovement)
+	}
+
 	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
 		p.mInfo.ServerMovement[1] = 0.2
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("doGroundMove(): climb detected at end frame")
+		}
 	}
 }
 
 // moveRelative simulates the additional movement force created by the player's mf/ms and rotation values
 func (p *Player) moveRelative(fSpeed float32) {
+	if p.debugger.LogMovement {
+		p.Log().Debugf("moveRelative(): fSpeed=%f", fSpeed)
+	}
+
 	v := math32.Pow(p.mInfo.ForwardImpulse, 2) + math32.Pow(p.mInfo.LeftImpulse, 2)
 	if v < 1e-4 {
 		return
@@ -310,6 +348,10 @@ func (p *Player) moveRelative(fSpeed float32) {
 // maybeBackOffFromEdge simulates the movement scenarios where a player is at the edge of a block.
 func (p *Player) maybeBackOffFromEdge() {
 	if !p.mInfo.Sneaking || !p.mInfo.OnGround || p.mInfo.ServerMovement[1] > 0 {
+		if p.debugger.LogMovement {
+			p.Log().Debug("maybeBackOffFromEdge(): conditions not met.")
+		}
+
 		return
 	}
 
@@ -360,8 +402,15 @@ func (p *Player) maybeBackOffFromEdge() {
 	}
 
 	p.mInfo.ServerMovement = mgl32.Vec3{d0, currentVel.Y(), d1}
+
+	if !p.debugger.LogMovement {
+		return
+	}
+
+	p.Log().Debugf("maybeBackOffFromEdge(): oldMov=%v, newMov=%v", currentVel, p.mInfo.ServerMovement)
 }
 
+// handleInsideBlockMovement handles movement that occurs when a player is first inside a block.
 func (p *Player) handleInsideBlockMovement() {
 	inside := p.isInsideBlock()
 	defer func() {
@@ -369,16 +418,30 @@ func (p *Player) handleInsideBlockMovement() {
 	}()
 
 	if !inside {
+		if p.debugger.LogMovement {
+			p.Log().Debug("handleInsideBlockMovement(): player not inside block")
+		}
+
 		return
 	}
 
 	if p.mInfo.KnownInsideBlock {
+		if p.debugger.LogMovement {
+			p.Log().Debug("handleInsideBlockMovement(): player known to be inside block")
+		}
+
 		return
 	}
 
 	p.mInfo.ServerMovement[0] *= -1.5
 	p.mInfo.ServerMovement[1] *= -1
 	p.mInfo.ServerMovement[2] *= -1.5
+
+	if !p.debugger.LogMovement {
+		return
+	}
+
+	p.Log().Debugf("handleInsideBlockMovement(): modified vel, movement=%v", p.mInfo.ServerMovement)
 }
 
 // isInsideBlock returns true if the player is inside a block.
@@ -404,12 +467,22 @@ func (p *Player) collide() {
 
 	if currVel.LenSqr() > 0.0 {
 		newVel = p.collideWithBlocks(currVel, p.AABB(), bbList)
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("collide(): collideWithBlocks() result w/ oldVel=%v, newVel=%v", currVel, newVel)
+		}
+	} else if p.debugger.LogMovement {
+		p.Log().Debug("collide(): currVel is 0 vector, collision not possible")
 	}
 
 	xCollision := currVel[0] != newVel[0]
 	yCollision := currVel[1] != newVel[1]
 	zCollision := currVel[2] != newVel[2]
 	hasGroundState := p.mInfo.OnGround || (yCollision && currVel[1] < 0.0)
+
+	if p.debugger.LogMovement {
+		p.Log().Debugf("collide(): xCollision=%v, yCollision=%v, zCollision=%v, hasGroundState=%v", xCollision, yCollision, zCollision, hasGroundState)
+	}
 
 	if hasGroundState && (xCollision || zCollision) {
 		stepVel := mgl32.Vec3{currVel.X(), game.StepHeight, currVel.Z()}
@@ -425,10 +498,20 @@ func (p *Player) collide() {
 		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
 			p.mInfo.StepClipOffset += stepVel.Y()
 			newVel = stepVel
+
+			if p.debugger.LogMovement {
+				p.Log().Debugf("collide(): conditions met to set movement to stepVel")
+			}
 		}
 	}
 
 	p.mInfo.ServerMovement = newVel
+
+	if !p.debugger.LogMovement {
+		return
+	}
+
+	p.Log().Debugf("collide(): movement=%v", newVel)
 }
 
 // collideWithBlocks simulates the player's collisions with blocks
@@ -440,19 +523,35 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 	xMov, yMov, zMov := vel.X(), vel.Y(), vel.Z()
 	if yMov != 0 {
 		bb, yMov = utils.DoBoxCollision(utils.CollisionY, bb, list, yMov)
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("collideWithBlocks(): oldYMov=%f, newYMov=%f", vel.Y(), yMov)
+		}
 	}
 
 	flag := math32.Abs(xMov) < math32.Abs(zMov)
 	if flag && zMov != 0 {
 		bb, zMov = utils.DoBoxCollision(utils.CollisionZ, bb, list, zMov)
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("collideWithBlocks(): oldZMov=%f, newZMov=%f", vel.Z(), zMov)
+		}
 	}
 
 	if xMov != 0 {
 		bb, xMov = utils.DoBoxCollision(utils.CollisionX, bb, list, xMov)
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("collideWithBlocks(): oldXMov=%f, newXMov=%f", vel.X(), xMov)
+		}
 	}
 
 	if !flag && zMov != 0 {
 		_, zMov = utils.DoBoxCollision(utils.CollisionZ, bb, list, zMov)
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("collideWithBlocks(): oldZMov=%f, newZMov=%f", vel.Z(), zMov)
+		}
 	}
 
 	return mgl32.Vec3{xMov, yMov, zMov}
@@ -500,14 +599,26 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 
 	if p.mInfo.VerticallyCollided {
 		p.mInfo.ServerMovement[1] = 0
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("checkCollisions(): collideY, onGround=%v", p.mInfo.OnGround)
+		}
 	}
 
 	if p.mInfo.XCollision {
 		p.mInfo.ServerMovement[0] = 0
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("checkCollisions(): collideX")
+		}
 	}
 
 	if p.mInfo.ZCollision {
 		p.mInfo.ServerMovement[2] = 0
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("checkCollisions(): collideZ")
+		}
 	}
 }
 
@@ -537,6 +648,10 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 
 	if p.mInfo.InUnsupportedRewindScenario {
 		p.setMovementToClient()
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("checkUnsupportedMovementScenarios(): player in unsupported rewind scenario")
+		}
 	}
 }
 
