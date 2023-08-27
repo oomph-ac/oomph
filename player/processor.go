@@ -9,6 +9,7 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/event"
+	"github.com/sirupsen/logrus"
 
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -126,8 +127,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			switch cmd[1] {
 			case "latency":
 				p.debugger.LogLatency = b
-			case "combat_data":
-				p.debugger.LogCombatData = b
+			case "combat":
+				p.debugger.LogCombat = b
 			case "server_knockback":
 				p.debugger.UseServerKnockback = b
 			case "buffer_info":
@@ -151,7 +152,13 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				pk.Position = mgl32.Vec3{float32(f)}
 				p.conn.WritePacket(pk)
 			case "movement":
-				p.debugger.LogMovementPredictions = b
+				p.debugger.LogMovement = b
+
+				if b {
+					p.Log().SetLevel(logrus.DebugLevel)
+				} else {
+					p.Log().SetLevel(logrus.InfoLevel)
+				}
 			default:
 				p.SendOomphDebug("Unknown debug mode: "+cmd[1], packet.TextTypeChat)
 				return true
