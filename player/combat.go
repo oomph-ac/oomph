@@ -51,7 +51,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	if rewTick+cut < sTick {
 		rewTick = sTick - cut + 1
 
-		if p.debugger.LogCombatData {
+		if p.debugger.LogCombat {
 			p.SendOomphDebug(fmt.Sprint("cutoff reached - least available tick is ", rewTick, " (max rewind is ", p.combatNetworkCutoff, ")"), packet.TextTypeChat)
 		}
 	}
@@ -107,7 +107,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		})
 
 		if valid {
-			if p.debugger.LogCombatData {
+			if p.debugger.LogCombat {
 				p.SendOomphDebug("client misprediction - sent attack to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
 			}
 
@@ -154,7 +154,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	// AABB distance check, to make sure the player is within search range of the entity.
 	touchDist := game.AABBVectorDistance(targetAABB, attackPos)
 	if touchDist > maxTouchAttackDist {
-		if p.debugger.LogCombatData {
+		if p.debugger.LogCombat {
 			p.SendOomphDebug("hit invalid: aabb dist check failed w/ dist="+fmt.Sprint(touchDist), packet.TextTypeChat)
 		}
 
@@ -176,7 +176,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		dist := res.Position().Sub(attackPos).Len()
 		valid := dist <= maxCrosshairAttackDist
 
-		if p.debugger.LogCombatData {
+		if p.debugger.LogCombat {
 			color := "§c"
 			if valid {
 				color = "§a"
@@ -189,7 +189,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 			p.SendPacketToServer(p.lastAttackData)
 			return
 		}
-	} else if p.debugger.LogCombatData {
+	} else if p.debugger.LogCombat {
 		p.SendOomphDebug("hit invalid: casted ray did not land. rewTick:"+fmt.Sprint(rewTick), packet.TextTypeChat)
 	}
 }
