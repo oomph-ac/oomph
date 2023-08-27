@@ -110,6 +110,10 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	// client-sided prediction of it's speed when enabling sprint, but not when stopping sprint.
 	if needsSpeedAdjustment {
 		p.mInfo.MovementSpeed = p.mInfo.ClientCalculatedSpeed
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("updateMovementStates(): speed set to client calc @ %f", p.mInfo.MovementSpeed)
+		}
 	}
 
 	// Update the jumping state of the player.
@@ -121,29 +125,9 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 		p.mInfo.FlyingSpeed += 0.006
 	}
 
-	// Apply knockback if neccessary.
-	if p.mInfo.TicksSinceKnockback == 0 {
-		p.mInfo.ServerMovement = p.mInfo.Knockback
-	}
-
 	// If the player is not holding the jump key, reset the ticks until next jump.
 	if !p.mInfo.JumpBindPressed {
 		p.mInfo.TicksUntilNextJump = 0
-	}
-
-	// If the player's X movement is below 1e-7, set it to 0.
-	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-7 {
-		p.mInfo.ServerMovement[0] = 0
-	}
-
-	// If the player's Y movement is below 1e-7, set it to 0.
-	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 1e-7 {
-		p.mInfo.ServerMovement[1] = 0
-	}
-
-	// If the player's Z movement is below 1e-7, set it to 0.
-	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 1e-7 {
-		p.mInfo.ServerMovement[2] = 0
 	}
 }
 
@@ -226,6 +210,21 @@ func (p *Player) correctMovement() {
 
 // aiStep starts the movement simulation of the player.
 func (p *Player) aiStep() {
+	// If the player's X movement is below 1e-7, set it to 0.
+	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-7 {
+		p.mInfo.ServerMovement[0] = 0
+	}
+
+	// If the player's Y movement is below 1e-7, set it to 0.
+	if mgl32.Abs(p.mInfo.ServerMovement[1]) < 1e-7 {
+		p.mInfo.ServerMovement[1] = 0
+	}
+
+	// If the player's Z movement is below 1e-7, set it to 0.
+	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 1e-7 {
+		p.mInfo.ServerMovement[2] = 0
+	}
+
 	if p.mInfo.Immobile || !p.inLoadedChunk {
 		p.mInfo.ForwardImpulse = 0.0
 		p.mInfo.LeftImpulse = 0.0
@@ -234,7 +233,16 @@ func (p *Player) aiStep() {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 
 		if p.debugger.LogMovement {
-			p.Log().Debug("aiStep(): movement set to 0 vector because player is immobile/not in loaded chunk")
+			p.Log().Debug("aiStep(): player immobile/not in loaded chunk")
+		}
+	}
+
+	// Apply knockback if the server has sent it.
+	if p.mInfo.TicksSinceKnockback == 0 {
+		p.mInfo.ServerMovement = p.mInfo.Knockback
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("aiStep(): knockback applied %v", p.mInfo.ServerMovement)
 		}
 	}
 
@@ -243,7 +251,7 @@ func (p *Player) aiStep() {
 		p.mInfo.TicksUntilNextJump = 10
 
 		if p.debugger.LogMovement {
-			p.Log().Debug("aiStep(): simulating jump for player")
+			p.Log().Debug("aiStep(): simulated jump")
 		}
 	}
 
@@ -433,6 +441,14 @@ func (p *Player) handleInsideBlockMovement() {
 		return
 	}
 
+	if p.mInfo.Teleporting {
+		if p.debugger.LogMovement {
+			p.Log().Debug("handleInsideBlockMovement(): ignored due to teleport")
+		}
+
+		return
+	}
+
 	p.mInfo.ServerMovement[0] *= -1.5
 	p.mInfo.ServerMovement[1] *= -1
 	p.mInfo.ServerMovement[2] *= -1.5
@@ -452,6 +468,11 @@ func (p *Player) isInsideBlock() bool {
 
 	for _, box := range b.Model().BBox(df_cube.Pos{int(blockPos.X()), int(blockPos.Y()), int(blockPos.Z())}, nil) {
 		if bb.IntersectsWith(game.DFBoxToCubeBox(box).Translate(blockPos.Vec3())) {
+			if p.debugger.LogMovement {
+				n, _ := b.EncodeBlock()
+				p.Log().Debugf("isInsideBlock(): player inside block, block=%v", n)
+			}
+
 			return true
 		}
 	}
