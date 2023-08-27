@@ -323,6 +323,11 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	case *packet.LevelChunk:
 		p.handleLevelChunk(pk)
 	case *packet.SubChunk:
+		if p.movementMode == utils.ModeFullAuthoritative {
+			p.handleSubChunk(pk)
+			return false
+		}
+
 		p.Acknowledgement(func() {
 			p.handleSubChunk(pk)
 		})
@@ -500,6 +505,11 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 		c = chunk.New(air, world.Overworld.Range())
 	}
 	c.Compact()
+
+	if p.movementMode == utils.ModeFullAuthoritative {
+		p.AddChunk(c, pk.Position)
+		return
+	}
 
 	p.Acknowledgement(func() {
 		p.AddChunk(c, pk.Position)
