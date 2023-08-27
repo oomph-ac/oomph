@@ -258,12 +258,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	case *packet.SetActorData:
 		pk.Tick = 0 // prevent any rewind from being done
 
-		if p.movementMode == utils.ModeFullAuthoritative {
-			pk.Tick = p.ClientFrameSynced()
-			p.handleSetActorData(pk)
-			return false
-		}
-
 		p.Acknowledgement(func() {
 			p.handleSetActorData(pk)
 		})
@@ -302,7 +296,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			for _, a := range pk.Attributes {
 				if a.Name == "minecraft:movement" {
 					p.miMu.Lock()
+
 					p.mInfo.MovementSpeed = a.Value
+					if p.debugger.LogMovement {
+						p.Log().Debugf("ack: movement speed updated to %f", a.Value)
+					}
+
 					p.miMu.Unlock()
 
 					break
