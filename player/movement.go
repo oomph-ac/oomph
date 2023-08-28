@@ -468,8 +468,16 @@ func (p *Player) isInsideBlock() bool {
 	bb := p.AABB().Grow(-0.015)
 	blockPos := cube.PosFromVec3(p.mInfo.ServerPosition)
 	b := p.Block(blockPos)
+	name, _ := b.EncodeBlock()
 
-	for _, box := range b.Model().BBox(df_cube.Pos{int(blockPos.X()), int(blockPos.Y()), int(blockPos.Z())}, nil) {
+	var boxes []df_cube.BBox
+	if list, ok := utils.ManualBBoxes(name); ok {
+		boxes = list
+	} else {
+		boxes = b.Model().BBox(df_cube.Pos{int(blockPos.X()), int(blockPos.Y()), int(blockPos.Z())}, nil)
+	}
+
+	for _, box := range boxes {
 		if bb.IntersectsWith(game.DFBoxToCubeBox(box).Translate(blockPos.Vec3())) {
 			if p.debugger.LogMovement {
 				n, _ := b.EncodeBlock()
