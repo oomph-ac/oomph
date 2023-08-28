@@ -138,12 +138,15 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				continue
 			}
 
-			if err := serverConn.WritePacket(pk); err != nil {
+			err = serverConn.WritePacket(pk)
+			if err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					_ = listener.Disconnect(conn, disconnect.Error())
 				}
 				return
 			}
+
+			serverConn.Flush()
 		}
 	}()
 	go func() {
