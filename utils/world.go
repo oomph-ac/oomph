@@ -9,17 +9,19 @@ import (
 )
 
 // ManualBBoxes returns the true bounding boxes of the given block based on it's name.
-func ManualBBoxes(n string) ([]df_cube.BBox, bool) {
+func ManualBBoxes(b world.Block, pos df_cube.Pos) []df_cube.BBox {
+	n, _ := b.EncodeBlock()
+
 	switch n {
 	case "minecraft:wooden_pressure_plate", "minecraft:spruce_pressure_plate", "minecraft:birch_pressure_plate",
 		"minecraft:jungle_pressure_plate", "minecraft:acacia_pressure_plate", "minecraft:dark_oak_pressure_plate",
 		"minecraft:mangrove_pressure_plate", "minecraft:cherry_pressure_plate", "minecraft:crimson_pressure_plate",
 		"minecraft:warped_pressure_plate", "minecraft:stone_pressure_plate", "minecraft:light_weighted_pressure_plate",
 		"minecraft:heavy_weighted_pressure_plate", "minecraft:polished_blackstone_pressure_plate":
-		return []df_cube.BBox{}, true
+		return []df_cube.BBox{}
 	}
 
-	return []df_cube.BBox{}, false
+	return b.Model().BBox(pos, nil)
 }
 
 // BlockClimbable returns whether the given block is climbable.

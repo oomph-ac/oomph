@@ -84,15 +84,7 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
-				block := p.Block(pos)
-				name, _ := p.Block(pos).EncodeBlock()
-				var boxes []df_cube.BBox
-
-				if list, ok := utils.ManualBBoxes(name); ok {
-					boxes = list
-				} else {
-					boxes = block.Model().BBox(df_cube.Pos(pos), nil)
-				}
+				boxes := utils.ManualBBoxes(p.Block(pos), df_cube.Pos(pos))
 
 				for _, box := range boxes {
 					b := game.DFBoxToCubeBox(box).Translate(pos.Vec3())
