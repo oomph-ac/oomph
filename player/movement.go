@@ -1,6 +1,8 @@
 package player
 
 import (
+	"fmt"
+
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -164,6 +166,7 @@ func (p *Player) validateMovement() {
 
 	if p.debugger.LogMovement {
 		p.Log().Debugf("validateMovement(): correction needed! posDiff=%f, movDiff=%f", posDiff, movDiff)
+		p.SendOomphDebug("validateMovement(): correction sent for frame "+fmt.Sprint(p.ClientFrame()), packet.TextTypeChat)
 	}
 
 	p.correctMovement()
