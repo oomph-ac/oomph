@@ -21,6 +21,10 @@ github.com/df-mc/worldupgrader v1.0.8 h1:T9p7d6o9Yx65qsnK20VYXUNOl9ZY9/5D/fbJBXK
 github.com/df-mc/worldupgrader v1.0.8/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
 github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8 h1:cdvxuwQ3kS23Hb2Zb7EoHeDM8IMs64C2B8ZpCkVRlp4=
 github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8/go.mod h1:xBh0GYHZ5yHg3YvvUGriGLSAlm7YW2S9SRULstdLZLk=
+github.com/ethaniccc/gophertunnel v0.0.0-20230829170542-04a8374773d6 h1:cmNe1LkGoC86EQ3JHfCCt6YMwRmNsgdqChjCy5FaxQw=
+github.com/ethaniccc/gophertunnel v0.0.0-20230829170542-04a8374773d6/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
+github.com/ethaniccc/gophertunnel v0.0.0-20230829174415-cc37aa643c47 h1:gDe+PISBYchTsH1HFiitb6bdfJEbQzDmOlGcJBXRIFw=
+github.com/ethaniccc/gophertunnel v0.0.0-20230829174415-cc37aa643c47/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/go-gl/mathgl v1.0.0 h1:t9DznWJlXxxjeeKLIdovCOVJQk/GzDEL7h/h+Ro2B68=
 github.com/go-gl/mathgl v1.0.0/go.mod h1:yhpkQzEiH9yPyxDUGzkmgScbaBVlhC06qodikEM0ZwQ=
@@ -66,6 +70,8 @@ github.com/sandertv/gophertunnel v1.31.0 h1:og9PmD8tXc0CgRJD2N/Yc3KQgYGU1XvAlOeM
 github.com/sandertv/gophertunnel v1.31.0/go.mod h1:ekREo7U9TPHh86kbuPMaWA93NMyWsfVvP/iNT3XhAb8=
 github.com/sandertv/gophertunnel v1.31.1-0.20230822231139-d4949d32a3ad h1:6RuPYCE0y+6nUe9h4AYJ1tVAcUwg9VFKdssqszxcCsA=
 github.com/sandertv/gophertunnel v1.31.1-0.20230822231139-d4949d32a3ad/go.mod h1:ekREo7U9TPHh86kbuPMaWA93NMyWsfVvP/iNT3XhAb8=
+github.com/sandertv/gophertunnel v1.31.1-0.20230826112839-46eecd90bd0f h1:vjyIwMWeVDKH1AvpLMuS/1EjAGr+J/91ALN1e1j8Cs4=
+github.com/sandertv/gophertunnel v1.31.1-0.20230826112839-46eecd90bd0f/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
