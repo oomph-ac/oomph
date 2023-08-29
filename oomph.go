@@ -2,6 +2,7 @@ package oomph
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/oomph-ac/oomph/utils"
@@ -121,6 +122,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
+			if len(pks) == 0 {
+				fmt.Println("killed")
+				return
+			}
+
 			for _, pk := range pks {
 				if p.UsesPacketBuffer() {
 					if !p.QueuePacket(pk) {
@@ -162,6 +168,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		for {
 			pks, err := serverConn.ReadBatch()
 
+			if len(pks) == 0 {
+				fmt.Println("killed")
+				return
+			}
+
 			for _, pk := range pks {
 				if err != nil {
 					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
@@ -178,6 +189,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				}
 			}
 
+			p.SendAck()
+			fmt.Println(len(pks), "in server batch for", p.ClientFrame())
 			conn.Flush()
 		}
 	}()
