@@ -2,6 +2,8 @@ module github.com/oomph-ac/oomph
 
 go 1.18
 
+replace github.com/sandertv/gophertunnel v1.31.1-0.20230826112839-46eecd90bd0f => github.com/ethaniccc/gophertunnel v0.0.0-20230829174415-cc37aa643c47
+
 require (
 	github.com/chewxy/math32 v1.10.1
 	github.com/df-mc/atomic v1.10.0
@@ -9,7 +11,7 @@ require (
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/go-gl/mathgl v1.1.0
 	github.com/pelletier/go-toml v1.9.5
-	github.com/sandertv/gophertunnel v1.31.1-0.20230822231139-d4949d32a3ad
+	github.com/sandertv/gophertunnel v1.31.1-0.20230826112839-46eecd90bd0f
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
 	golang.org/x/text v0.12.0
