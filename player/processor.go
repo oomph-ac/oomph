@@ -82,15 +82,25 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		defer func() {
+			// Update some basic information.
 			p.mInfo.Teleporting = false
 			p.SetRespawned(false)
 
+			// If the movement mode is only semi authoritative, we only want to validate the movement for this tick,
+			// and then set the movement mode back to the clients.
 			if p.movementMode == utils.ModeSemiAuthoritative {
 				p.setMovementToClient()
 			}
+
+			// Clear the cached block results.
+			p.cachedBlockResults.Range(func(k, _ any) bool {
+				p.cachedBlockResults.Delete(k)
+				return true
+			})
 		}()
 
 		p.cleanChunks()
+
 		prevPos := p.mInfo.ServerPosition
 		p.handlePlayerAuthInput(pk)
 

@@ -8,8 +8,10 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
+const fenceInset = 0.5 - (0.25 / 2)
+
 // ManualBBoxes returns the true bounding boxes of the given block based on it's name.
-func ManualBBoxes(b world.Block, pos df_cube.Pos) []df_cube.BBox {
+func ManualBBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Block) []df_cube.BBox {
 	n, _ := b.EncodeBlock()
 
 	switch n {
@@ -19,6 +21,57 @@ func ManualBBoxes(b world.Block, pos df_cube.Pos) []df_cube.BBox {
 		"minecraft:warped_pressure_plate", "minecraft:stone_pressure_plate", "minecraft:light_weighted_pressure_plate",
 		"minecraft:heavy_weighted_pressure_plate", "minecraft:polished_blackstone_pressure_plate":
 		return []df_cube.BBox{}
+	case "minecraft:oak_fence", "minecraft:spruce_fence", "minecraft:birch_fence", "minecraft:jungle_fence",
+		"minecraft:acacia_fence", "minecraft:dark_oak_fence", "minecraft:mangrove_fence", "minecraft:cherry_fence",
+		"minecraft:crimson_fence", "minecraft:warped_fence":
+		var bbs []df_cube.BBox
+
+		// Connections on the X-axis.
+		_, connectWest := sblocks[cube.FaceWest]
+		_, connectEast := sblocks[cube.FaceEast]
+
+		// Connections on the Z-axis.
+		_, connectNorth := sblocks[cube.FaceNorth]
+		_, connectSouth := sblocks[cube.FaceSouth]
+
+		if connectWest || connectEast {
+			bb := df_cube.Box(0, 0, 0, 1, 1.5, 1).
+				Stretch(df_cube.Z, -fenceInset)
+
+			if !connectWest {
+				bb = bb.ExtendTowards(df_cube.FaceWest, -fenceInset)
+			}
+
+			if !connectEast {
+				bb = bb.ExtendTowards(df_cube.FaceEast, -fenceInset)
+			}
+
+			bbs = append(bbs, bb)
+		}
+
+		if connectNorth || connectSouth {
+			bb := df_cube.Box(0, 0, 0, 1, 1.5, 1).
+				Stretch(df_cube.X, -fenceInset)
+
+			if !connectNorth {
+				bb = bb.ExtendTowards(df_cube.FaceNorth, -fenceInset)
+			}
+
+			if !connectSouth {
+				bb = bb.ExtendTowards(df_cube.FaceSouth, -fenceInset)
+			}
+
+			bbs = append(bbs, bb)
+		}
+
+		if len(bbs) == 0 {
+			return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1.5, 1).
+				Stretch(df_cube.X, -fenceInset).
+				Stretch(df_cube.Z, -fenceInset),
+			}
+		}
+
+		return bbs
 	}
 
 	return b.Model().BBox(pos, nil)
