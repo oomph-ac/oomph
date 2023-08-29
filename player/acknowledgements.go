@@ -173,16 +173,18 @@ func (a *Acknowledgements) Validate() bool {
 	return a.awaitResTicks < 200
 }
 
-// sendAck sends an acknowledgement packet to the client.
-func (p *Player) sendAck() {
+// SendAck sends an acknowledgement packet to the client.
+func (p *Player) SendAck() {
 	acks := p.Acknowledgements()
 	if pk := acks.Create(); pk != nil {
-		_, ok := acks.GetMap(acks.CurrentTimestamp)
+		buf, ok := acks.GetMap(acks.CurrentTimestamp)
 		if !ok {
 			return
 		}
 
-		p.conn.WritePacket(pk)
+		if len(buf) != 0 {
+			p.conn.WritePacket(pk)
+		}
 
 		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
 		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.

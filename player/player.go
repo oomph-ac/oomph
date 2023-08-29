@@ -686,15 +686,6 @@ func (p *Player) Handle(h Handler) {
 	p.h = h
 }
 
-func (p *Player) flushConns() {
-	p.sendAck()
-
-	p.conn.Flush()
-	if p.serverConn != nil {
-		p.serverConn.Flush()
-	}
-}
-
 // tickEntitiesPos ticks the position of all entities
 func (p *Player) tickEntitiesPos() {
 	sT := p.serverTick.Load()
@@ -828,8 +819,10 @@ func (p *Player) doTick() {
 	p.tryDoSync()
 	// Update the numerical millisecond latency of the player.
 	p.updateLatency()
-	// Flush the client and server connections. If used in direct mode, there is no server connection to flush.
-	p.flushConns()
+	// Send the acknowledgement packet to the client and then flush the client's connection so that they recieve packets
+	// from the server.
+	p.SendAck()
+	p.conn.Flush()
 
 	p.lastServerTicked = time.Now()
 }
