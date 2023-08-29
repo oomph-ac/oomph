@@ -103,9 +103,10 @@ type Player struct {
 	nextTickActions   []func()
 	nextTickActionsMu sync.Mutex
 
-	chunks           sync.Map
-	chunkRadius      int32
-	breakingBlockPos *protocol.BlockPos
+	chunks             sync.Map
+	cachedBlockResults sync.Map
+	chunkRadius        int32
+	breakingBlockPos   *protocol.BlockPos
 
 	checkMu sync.Mutex
 	checks  []check.Check

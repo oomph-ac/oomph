@@ -44,6 +44,12 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
+
+	// Check the block result cache to see if we already have this block.
+	if v, ok := p.cachedBlockResults.Load(pos); ok {
+		return v.(world.Block)
+	}
+
 	c, ok := p.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 
 	if !ok {
@@ -52,7 +58,26 @@ func (p *Player) Block(pos cube.Pos) world.Block {
 	rid := c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
 
 	b, _ := world.BlockByRuntimeID(rid)
+	p.cachedBlockResults.Store(pos, b)
+
 	return b
+}
+
+// SurroundingBlocks gets blocks that surround the given position, not including air.
+func (p *Player) SurroundingBlocks(pos cube.Pos) map[cube.Face]world.Block {
+	surrounds := make(map[cube.Face]world.Block)
+
+	for _, face := range cube.Faces() {
+		b := p.Block(pos.Side(face))
+		n, _ := b.EncodeBlock()
+		if n == "minecraft:air" {
+			continue
+		}
+
+		surrounds[face] = b
+	}
+
+	return surrounds
 }
 
 // SetBlock sets a block at the given position to the given block
@@ -73,7 +98,7 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box - which is usually
 // the player's bounding box.
 func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
-	grown := aabb.Grow(1e-4)
+	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
@@ -84,7 +109,7 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
-				boxes := utils.ManualBBoxes(p.Block(pos), df_cube.Pos(pos))
+				boxes := utils.ManualBBoxes(p.Block(pos), df_cube.Pos(pos), p.SurroundingBlocks(pos))
 
 				for _, box := range boxes {
 					b := game.DFBoxToCubeBox(box).Translate(pos.Vec3())
@@ -103,7 +128,7 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 
 // GetNearbyBlocks returns a list of blocks that are within the given bounding box.
 func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
-	grown := aabb.Grow(0.25)
+	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
@@ -152,6 +177,7 @@ func (p *Player) cleanChunks() {
 
 		// The chunks are out of the player's view, so unsubscribe from them.
 		p.chunks.Delete(pos)
+
 		return true
 	})
 }

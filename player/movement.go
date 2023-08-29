@@ -465,9 +465,13 @@ func (p *Player) handleInsideBlockMovement() {
 
 // isInsideBlock returns true if the player is inside a block.
 func (p *Player) isInsideBlock() bool {
+	if p.mInfo.StepClipOffset > 0 {
+		return false
+	}
+
 	bb := p.AABB().Grow(-0.015)
 	blockPos := cube.PosFromVec3(p.mInfo.ServerPosition)
-	boxes := utils.ManualBBoxes(p.Block(blockPos), df_cube.Pos(blockPos))
+	boxes := utils.ManualBBoxes(p.Block(blockPos), df_cube.Pos(blockPos), p.SurroundingBlocks(blockPos))
 
 	for _, box := range boxes {
 		if bb.IntersectsWith(game.DFBoxToCubeBox(box).Translate(blockPos.Vec3())) {
