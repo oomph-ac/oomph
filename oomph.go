@@ -46,6 +46,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 		TexturePacksRequired:   requirePacks,
 		AcceptedProtocols:      protocols,
 		FlushRate:              -1,
+		ReadBatches:            true,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
@@ -68,6 +69,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		IdentityData: conn.IdentityData(),
 		ClientData:   conn.ClientData(),
 		FlushRate:    -1,
+		ReadBatches:  true,
 	}.Dial("raknet", remoteAddr)
 	if err != nil {
 		return
@@ -113,37 +115,39 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			pk, err := conn.ReadPacket()
+			pks, err := conn.ReadBatch()
 			if err != nil || p == nil {
 				o.log.Error(err)
 				return
 			}
 
-			if p.UsesPacketBuffer() {
-				if !p.QueuePacket(pk) {
+			for _, pk := range pks {
+				if p.UsesPacketBuffer() {
+					if !p.QueuePacket(pk) {
+						continue
+					}
+
+					err = p.SendPacketToServer(pk)
+					if err == nil {
+						continue
+					}
+
+					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+						_ = listener.Disconnect(conn, disconnect.Error())
+					}
+				}
+
+				if p.ClientProcess(pk) {
 					continue
 				}
 
-				err = p.SendPacketToServer(pk)
-				if err == nil {
-					continue
+				err = serverConn.WritePacket(pk)
+				if err != nil {
+					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+						_ = listener.Disconnect(conn, disconnect.Error())
+					}
+					return
 				}
-
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-					_ = listener.Disconnect(conn, disconnect.Error())
-				}
-			}
-
-			if p.ClientProcess(pk) {
-				continue
-			}
-
-			err = serverConn.WritePacket(pk)
-			if err != nil {
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-					_ = listener.Disconnect(conn, disconnect.Error())
-				}
-				return
 			}
 
 			serverConn.Flush()
@@ -156,19 +160,25 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			pk, err := serverConn.ReadPacket()
-			if err != nil {
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-					_ = listener.Disconnect(conn, disconnect.Error())
+			pks, err := serverConn.ReadBatch()
+
+			for _, pk := range pks {
+				if err != nil {
+					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+						_ = listener.Disconnect(conn, disconnect.Error())
+					}
+					return
 				}
-				return
+
+				if p.ServerProcess(pk) {
+					continue
+				}
+				if err := conn.WritePacket(pk); err != nil {
+					return
+				}
 			}
-			if p.ServerProcess(pk) {
-				continue
-			}
-			if err := conn.WritePacket(pk); err != nil {
-				return
-			}
+
+			conn.Flush()
 		}
 	}()
 	g.Wait()
