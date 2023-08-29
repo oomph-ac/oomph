@@ -2,7 +2,6 @@ package oomph
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/oomph-ac/oomph/utils"
@@ -123,7 +122,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			}
 
 			if len(pks) == 0 {
-				fmt.Println("killed")
 				return
 			}
 
@@ -169,7 +167,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			pks, err := serverConn.ReadBatch()
 
 			if len(pks) == 0 {
-				fmt.Println("killed")
 				return
 			}
 
@@ -190,7 +187,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			}
 
 			p.SendAck()
-			fmt.Println(len(pks), "in server batch for", p.ClientFrame())
 			conn.Flush()
 		}
 	}()
