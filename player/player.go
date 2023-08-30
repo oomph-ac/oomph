@@ -386,7 +386,7 @@ func (p *Player) CanExemptMovementValidation() bool {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 
-	return p.mInfo.CanExempt || p.mInfo.InUnsupportedRewindScenario || p.mInfo.StepClipOffset > 0
+	return p.mInfo.CanExempt || p.mInfo.UnsupportedAcceptance > 0 || p.mInfo.StepClipOffset > 0
 }
 
 // MovementMode returns the movement mode of the player. The player's movement mode will determine how
