@@ -153,7 +153,7 @@ func (p *Player) validateMovement() {
 	}
 
 	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
-	movDiff := p.mInfo.OldServerMovement.Sub(p.mInfo.ClientMovement)
+	movDiff := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
 
 	//p.mInfo.ServerPosition[0] -= game.ClampFloat(posDiff.X(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
 	//p.mInfo.ServerPosition[1] -= game.ClampFloat(posDiff.Y(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
@@ -169,6 +169,8 @@ func (p *Player) validateMovement() {
 	if posDiff.LenSqr() <= (p.mInfo.AcceptablePositionOffset + p.mInfo.UnsupportedAcceptance + math32.Pow(p.mInfo.StepClipOffset, 2)) {
 		return
 	}
+
+	fmt.Println(movDiff, posDiff)
 
 	if p.debugger.LogMovement {
 		p.Log().Debugf("validateMovement(): correction needed! posDiff=%f, movDiff=%f", posDiff, movDiff)
@@ -273,8 +275,12 @@ func (p *Player) doGroundMove() {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	}
 
-	blockUnder := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown))
+	pos := p.mInfo.ServerPosition
+	pos[1] -= 0.5
+
+	blockUnder := p.Block(cube.PosFromVec3(pos))
 	blockFriction := game.DefaultAirFriction
+
 	if p.mInfo.OnGround {
 		blockFriction *= utils.BlockFriction(blockUnder)
 
@@ -359,7 +365,7 @@ func (p *Player) doGroundMove() {
 	}
 
 	if p.mInfo.OnGround && !oldGround {
-		p.fallOnBlock(oldMov, blockUnder)
+		p.simulateFallOnBlock(oldMov, blockUnder)
 	}
 
 	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
@@ -370,15 +376,17 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
-	if !p.mInfo.OnGround {
-		return
-	}
+	if p.mInfo.OnGround && !p.mInfo.Jumping {
+		p.simulateStepOnBlock(blockUnder)
 
-	p.stepOnBlock(blockUnder)
+		f := utils.BlockSpeedFactor(blockUnder)
+		p.mInfo.ServerMovement[0] *= f
+		p.mInfo.ServerMovement[2] *= f
+	}
 }
 
-// fallOnBlock simulates the player's movement when they fall and land on certain blocks.
-func (p *Player) fallOnBlock(oldMov mgl32.Vec3, b world.Block) {
+// simulateFallOnBlock simulates the player's movement when they fall and land on certain blocks.
+func (p *Player) simulateFallOnBlock(oldMov mgl32.Vec3, b world.Block) {
 	switch utils.BlockName(b) {
 	case "minecraft:slime":
 		if p.mInfo.SneakBindPressed {
@@ -395,7 +403,7 @@ func (p *Player) fallOnBlock(oldMov mgl32.Vec3, b world.Block) {
 		if !p.debugger.LogMovement {
 			return
 		}
-		p.Log().Debugf("fallOnBlock(): bounce on slime, new mov=%v", p.mInfo.ServerMovement)
+		p.Log().Debugf("simulateFallOnBlock(): bounce on slime, new mov=%v", p.mInfo.ServerMovement)
 	case "minecraft:bed":
 		if p.mInfo.SneakBindPressed {
 			return
@@ -410,12 +418,12 @@ func (p *Player) fallOnBlock(oldMov mgl32.Vec3, b world.Block) {
 		if !p.debugger.LogMovement {
 			return
 		}
-		p.Log().Debugf("fallOnBlock(): bounce on bed, new mov=%v", p.mInfo.ServerMovement)
+		p.Log().Debugf("simulateFallOnBlock(): bounce on bed, new mov=%v", p.mInfo.ServerMovement)
 	}
 }
 
-// stepOnBlock simulates the player's movement when they step on certain blocks.
-func (p *Player) stepOnBlock(b world.Block) {
+// simulateStepOnBlock simulates the player's movement when they step on certain blocks.
+func (p *Player) simulateStepOnBlock(b world.Block) {
 	switch utils.BlockName(b) {
 	case "minecraft:slime":
 		yMov := math32.Abs(p.mInfo.ServerMovement.Y())
@@ -424,6 +432,12 @@ func (p *Player) stepOnBlock(b world.Block) {
 			p.mInfo.ServerMovement[0] *= d1
 			p.mInfo.ServerMovement[2] *= d1
 		}
+
+		if !p.debugger.LogMovement {
+			return
+		}
+
+		p.Log().Debugf("simulateStepOnBlock(): walked on slime, new mov=%v", p.mInfo.ServerMovement)
 	}
 }
 
@@ -701,6 +715,7 @@ func (p *Player) simulateHorizontalFriction(friction float32) {
 // simulateJump simulates the jump movement of the player
 func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
+	p.mInfo.Jumping = true
 	if !p.mInfo.Sprinting {
 		return
 	}
