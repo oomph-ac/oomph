@@ -304,6 +304,8 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
+	p.maybeBackOffFromEdge()
+
 	// Check if the player is in a cobweb block.
 	b, in := p.isInsideBlock()
 	inCobweb := in && utils.BlockName(b) == "minecraft:web"
@@ -317,7 +319,6 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
-	p.maybeBackOffFromEdge()
 	oldMov := p.mInfo.ServerMovement
 	p.collide()
 	p.handleInsideBlockMovement()
@@ -331,6 +332,14 @@ func (p *Player) doGroundMove() {
 	oldGround := p.mInfo.OnGround
 	p.checkCollisions(oldMov)
 
+	if inCobweb {
+		p.mInfo.ServerMovement = mgl32.Vec3{}
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("doGroundMove(): in cobweb, mov set to 0 vec")
+		}
+	}
+
 	p.checkUnsupportedMovementScenarios()
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
 
@@ -343,14 +352,6 @@ func (p *Player) doGroundMove() {
 
 	if p.mInfo.OnGround && !oldGround {
 		p.fallOnBlock(oldMov, blockUnder)
-	}
-
-	if inCobweb {
-		p.mInfo.ServerMovement = mgl32.Vec3{}
-
-		if p.debugger.LogMovement {
-			p.Log().Debug("doGroundMove(): in cobweb, mov set to 0 vec")
-		}
 	}
 
 	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
@@ -380,16 +381,12 @@ func (p *Player) fallOnBlock(oldMov mgl32.Vec3, b world.Block) {
 			return
 		}
 
-		// ????? Mojang why the FUCK is this value not consistent also why are besd the same
-		// also HOW did slime behavior get mixed between BDS predictions and the client? do
-		// u not have source code access to ur own fucking client???????? -ethaniccc
-		p.mInfo.ServerMovement[1] = oldMov.Y() * p.mInfo.BounceMultiplier
-		p.mInfo.BounceMultiplier *= 0.6
+		// This is the closest we're probably going to get for now...
+		p.mInfo.ServerMovement[1] = ((oldMov.Y() / game.GravityMultiplier) + p.mInfo.Gravity) * -1
 
-		if p.mInfo.ServerMovement[1] < 0.005 {
-			p.mInfo.ServerMovement[1] = 0
+		if !p.debugger.LogMovement {
+			return
 		}
-
 		p.Log().Debugf("fallOnBlock(): bounce on slime, new mov=%v", p.mInfo.ServerMovement)
 	case "minecraft:bed":
 		if p.mInfo.SneakBindPressed {
@@ -400,9 +397,11 @@ func (p *Player) fallOnBlock(oldMov mgl32.Vec3, b world.Block) {
 			return
 		}
 
-		// ?????? same shit here with BEDS. FFS!!! -ethaniccc
 		p.mInfo.ServerMovement[1] = oldMov.Y() * -0.2
 
+		if !p.debugger.LogMovement {
+			return
+		}
 		p.Log().Debugf("fallOnBlock(): bounce on bed, new mov=%v", p.mInfo.ServerMovement)
 	}
 }
@@ -564,18 +563,17 @@ func (p *Player) isInsideBlock() (world.Block, bool) {
 		return nil, false
 	}
 
-	bb := p.AABB().Grow(0)
-	blockPos := cube.PosFromVec3(p.mInfo.ServerPosition)
-	boxes := utils.BlockBoxes(p.Block(blockPos), df_cube.Pos(blockPos), p.SurroundingBlocks(blockPos))
+	bb := p.AABB()
+	for pos, block := range p.GetNearbyBlocks(bb) {
+		boxes := utils.BlockBoxes(block, df_cube.Pos(pos), p.SurroundingBlocks(pos))
+		for _, box := range boxes {
+			if p.AABB().IntersectsWith(game.DFBoxToCubeBox(box).Translate(pos.Vec3())) {
+				if p.debugger.LogMovement {
+					p.Log().Debugf("isInsideBlock(): player inside block, block=%v", utils.BlockName(block))
+				}
 
-	for _, box := range boxes {
-		if bb.IntersectsWith(game.DFBoxToCubeBox(box).Translate(blockPos.Vec3())) {
-			block := p.Block(blockPos)
-			if p.debugger.LogMovement {
-				p.Log().Debugf("isInsideBlock(): player inside block, block=%v", utils.BlockName(block))
+				return block, true
 			}
-
-			return block, true
 		}
 	}
 
@@ -695,8 +693,6 @@ func (p *Player) simulateHorizontalFriction(friction float32) {
 // simulateJump simulates the jump movement of the player
 func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
-	p.mInfo.BounceMultiplier = -0.87
-
 	if !p.mInfo.Sprinting {
 		return
 	}
@@ -763,7 +759,7 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 
 	p.mInfo.UnsupportedAcceptance = 0.0
 
-	var hasLiquid, hasWeb, hasBounce bool
+	var hasLiquid, hasBounce bool
 
 	for _, bl := range blocks {
 		_, ok := bl.(world.Liquid)
@@ -773,8 +769,6 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 		}
 
 		switch utils.BlockName(bl) {
-		case "minecraft:web":
-			hasWeb = true
 		case "minecraft:slime", "minecraft:bed":
 			hasBounce = true
 		}
@@ -782,10 +776,6 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 
 	if hasLiquid {
 		p.setMovementToClient()
-	}
-
-	if hasWeb {
-		p.mInfo.UnsupportedAcceptance += 0.5
 	}
 
 	if hasBounce {
@@ -808,8 +798,7 @@ type MovementInfo struct {
 	MovementSpeed         float32
 	ClientCalculatedSpeed float32
 
-	Gravity          float32
-	BounceMultiplier float32
+	Gravity float32
 
 	StepClipOffset           float32
 	AcceptablePositionOffset float32
