@@ -22,8 +22,8 @@ func (p *Player) doMovementSimulation() {
 	var exempt bool
 
 	if p.debugger.LogMovement {
-		p.Log().Debugf("started movement simulation for frame %d", p.ClientFrame())
-		defer p.Log().Debugf("finished movement simulation for frame %d", p.ClientFrame())
+		p.Log().Debugf("%v started movement simulation for frame %d", p.Name(), p.ClientFrame())
+		defer p.Log().Debugf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame())
 	}
 
 	if (p.inLoadedChunkTicks < 30 && p.movementMode == utils.ModeFullAuthoritative) || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
