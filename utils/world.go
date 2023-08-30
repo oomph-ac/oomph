@@ -55,6 +55,8 @@ func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Bloc
 		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:bed":
 		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1.0-(7.0/16.0), 1)}
+	case "minecraft:waterlily":
+		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1.0/64.0, 1)}
 	case "minecraft:oak_fence", "minecraft:spruce_fence", "minecraft:birch_fence", "minecraft:jungle_fence",
 		"minecraft:acacia_fence", "minecraft:dark_oak_fence", "minecraft:mangrove_fence", "minecraft:cherry_fence",
 		"minecraft:crimson_fence", "minecraft:warped_fence":
