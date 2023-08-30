@@ -396,7 +396,7 @@ func (p *Player) simulateFallOnBlock(oldMov mgl32.Vec3, b world.Block) {
 		}
 
 		// This is the closest we're probably going to get for now...
-		p.mInfo.ServerMovement[1] = ((oldMov.Y() / game.GravityMultiplier) + p.mInfo.Gravity) * -1
+		p.mInfo.ServerMovement[1] = ((oldMov.Y() / game.GravityMultiplier) + p.mInfo.Gravity) * game.SlimeBounceMultiplier
 
 		if !p.debugger.LogMovement {
 			return
@@ -411,7 +411,7 @@ func (p *Player) simulateFallOnBlock(oldMov mgl32.Vec3, b world.Block) {
 			return
 		}
 
-		p.mInfo.ServerMovement[1] = oldMov.Y() * -0.2
+		p.mInfo.ServerMovement[1] = ((oldMov.Y() / game.GravityMultiplier) + p.mInfo.Gravity) * game.BedBounceMultiplier
 
 		if !p.debugger.LogMovement {
 			return
