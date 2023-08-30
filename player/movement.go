@@ -587,13 +587,15 @@ func (p *Player) isInsideBlock() (world.Block, bool) {
 	for pos, block := range p.GetNearbyBlocks(bb) {
 		boxes := utils.BlockBoxes(block, df_cube.Pos(pos), p.SurroundingBlocks(pos))
 		for _, box := range boxes {
-			if p.AABB().IntersectsWith(game.DFBoxToCubeBox(box).Translate(pos.Vec3())) {
-				if p.debugger.LogMovement {
-					p.Log().Debugf("isInsideBlock(): player inside block, block=%v", utils.BlockName(block))
-				}
-
-				return block, true
+			if !p.AABB().IntersectsWith(box.Translate(pos.Vec3())) {
+				continue
 			}
+
+			if p.debugger.LogMovement {
+				p.Log().Debugf("isInsideBlock(): player inside block, block=%v", utils.BlockName(block))
+			}
+
+			return block, true
 		}
 	}
 

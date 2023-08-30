@@ -7,7 +7,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
@@ -113,8 +112,7 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 				boxes := utils.BlockBoxes(p.Block(pos), df_cube.Pos(pos), p.SurroundingBlocks(pos))
 
 				for _, box := range boxes {
-					b := game.DFBoxToCubeBox(box).Translate(pos.Vec3())
-
+					b := box.Translate(pos.Vec3())
 					if !b.IntersectsWith(aabb) || utils.CanPassBlock(block) {
 						continue
 					}
