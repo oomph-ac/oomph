@@ -600,6 +600,10 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	if strings.Contains(blockName, "door") {
 		// FUCK NO.
 		return false
+	} else if blockName == "minecraft:bed" {
+		return false
+	} else if strings.Contains(blockName, "sign") {
+		return false
 	}
 
 	// Find the replace position of the block. This will be used if the block at the current position
