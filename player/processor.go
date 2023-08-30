@@ -582,6 +582,12 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		return false
 	}
 
+	blockName := utils.BlockName(b)
+	if strings.Contains(blockName, "door") {
+		// FUCK NO.
+		return false
+	}
+
 	// Find the replace position of the block. This will be used if the block at the current position
 	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(t.BlockPosition)
