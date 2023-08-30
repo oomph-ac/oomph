@@ -3,7 +3,6 @@ package player
 import (
 	"fmt"
 
-	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/ethaniccc/float32-cube/cube"
 
@@ -36,7 +35,6 @@ func (p *Player) doMovementSimulation() {
 		p.mInfo.CanExempt = true
 		exempt = true
 	} else {
-		p.mInfo.InUnsupportedRewindScenario = false
 		exempt = p.mInfo.CanExempt
 		p.aiStep()
 		p.mInfo.CanExempt = false
@@ -157,10 +155,18 @@ func (p *Player) validateMovement() {
 	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
 	movDiff := p.mInfo.OldServerMovement.Sub(p.mInfo.ClientMovement)
 
-	// TODO: Properly account for the client clipping into steps - as of now however,
-	// this hack will suffice and will not trigger if a malicious client is stepping over
-	// heights a vanilla client would not.
-	if posDiff.LenSqr() <= (p.mInfo.AcceptablePositionOffset + math32.Pow(p.mInfo.StepClipOffset, 2)) {
+	//p.mInfo.ServerPosition[0] -= game.ClampFloat(posDiff.X(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
+	//p.mInfo.ServerPosition[1] -= game.ClampFloat(posDiff.Y(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
+	//p.mInfo.ServerPosition[2] -= game.ClampFloat(posDiff.Z(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
+	//posDiff = p.mInfo.ServerPosition.Sub(p.Position())
+
+	if p.debugger.LogMovement {
+		p.Log().Debugf("validateMovement(): client pos:%v server pos:%v", p.Position(), p.mInfo.ServerPosition)
+		p.Log().Debugf("validateMovement(): client mov:%v server mov:%v", p.mInfo.ClientMovement, p.mInfo.OldServerMovement)
+	}
+
+	// TODO: Make Microjang fix shitty unsupported scenarios & fix my step code!!! -ethaniccc
+	if posDiff.LenSqr() <= (p.mInfo.AcceptablePositionOffset + p.mInfo.UnsupportedAcceptance + math32.Pow(p.mInfo.StepClipOffset, 2)) {
 		return
 	}
 
@@ -182,7 +188,7 @@ func (p *Player) correctMovement() {
 	}
 
 	// Do not correct player movement if the player is in a scenario we cannot correct reliably.
-	if p.mInfo.CanExempt || p.mInfo.Teleporting || p.mInfo.InUnsupportedRewindScenario {
+	if p.mInfo.CanExempt || p.mInfo.Teleporting {
 		return
 	}
 
@@ -267,13 +273,10 @@ func (p *Player) doGroundMove() {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	}
 
+	blockUnder := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown))
 	blockFriction := game.DefaultAirFriction
 	if p.mInfo.OnGround {
-		if b, ok := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown)).(block.Frictional); ok {
-			blockFriction *= float32(b.Friction())
-		} else {
-			blockFriction *= 0.6
-		}
+		blockFriction *= utils.BlockFriction(blockUnder)
 
 		if p.debugger.LogMovement {
 			p.Log().Debugf("doGroundMove(): block friction set to %f", blockFriction)
@@ -301,18 +304,32 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
+	// Check if the player is in a cobweb block.
+	b, in := p.isInsideBlock()
+	inCobweb := in && utils.BlockName(b) == "minecraft:web"
+	if inCobweb {
+		p.mInfo.ServerMovement[0] *= 0.25
+		p.mInfo.ServerMovement[1] *= 0.05
+		p.mInfo.ServerMovement[2] *= 0.25
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("doGroundMove(): in cobweb, new mov=%v", p.mInfo.ServerMovement)
+		}
+	}
+
 	p.maybeBackOffFromEdge()
 	oldMov := p.mInfo.ServerMovement
 	p.collide()
-
 	p.handleInsideBlockMovement()
 
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
-	p.checkCollisions(oldMov)
 
 	if p.debugger.LogMovement {
 		p.Log().Debugf("doGroundMove(): final position=%v", p.mInfo.ServerPosition)
 	}
+
+	oldGround := p.mInfo.OnGround
+	p.checkCollisions(oldMov)
 
 	p.checkUnsupportedMovementScenarios()
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
@@ -324,11 +341,81 @@ func (p *Player) doGroundMove() {
 		p.Log().Debugf("doGroundMove(): friction and gravity applied, movement=%v", p.mInfo.ServerMovement)
 	}
 
+	if p.mInfo.OnGround && !oldGround {
+		p.fallOnBlock(oldMov, blockUnder)
+	}
+
+	if inCobweb {
+		p.mInfo.ServerMovement = mgl32.Vec3{}
+
+		if p.debugger.LogMovement {
+			p.Log().Debug("doGroundMove(): in cobweb, mov set to 0 vec")
+		}
+	}
+
 	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
 		p.mInfo.ServerMovement[1] = 0.2
 
 		if p.debugger.LogMovement {
 			p.Log().Debug("doGroundMove(): climb detected at end frame")
+		}
+	}
+
+	if !p.mInfo.OnGround {
+		return
+	}
+
+	p.stepOnBlock(blockUnder)
+}
+
+// fallOnBlock simulates the player's movement when they fall and land on certain blocks.
+func (p *Player) fallOnBlock(oldMov mgl32.Vec3, b world.Block) {
+	switch utils.BlockName(b) {
+	case "minecraft:slime":
+		if p.mInfo.SneakBindPressed {
+			return
+		}
+
+		if oldMov.Y() >= 0 {
+			return
+		}
+
+		// ????? Mojang why the FUCK is this value not consistent also why are besd the same
+		// also HOW did slime behavior get mixed between BDS predictions and the client? do
+		// u not have source code access to ur own fucking client???????? -ethaniccc
+		p.mInfo.ServerMovement[1] = oldMov.Y() * p.mInfo.BounceMultiplier
+		p.mInfo.BounceMultiplier *= 0.6
+
+		if p.mInfo.ServerMovement[1] < 0.005 {
+			p.mInfo.ServerMovement[1] = 0
+		}
+
+		p.Log().Debugf("fallOnBlock(): bounce on slime, new mov=%v", p.mInfo.ServerMovement)
+	case "minecraft:bed":
+		if p.mInfo.SneakBindPressed {
+			return
+		}
+
+		if oldMov.Y() >= 0 {
+			return
+		}
+
+		// ?????? same shit here with BEDS. FFS!!! -ethaniccc
+		p.mInfo.ServerMovement[1] = oldMov.Y() * -0.2
+
+		p.Log().Debugf("fallOnBlock(): bounce on bed, new mov=%v", p.mInfo.ServerMovement)
+	}
+}
+
+// stepOnBlock simulates the player's movement when they step on certain blocks.
+func (p *Player) stepOnBlock(b world.Block) {
+	switch utils.BlockName(b) {
+	case "minecraft:slime":
+		yMov := math32.Abs(p.mInfo.ServerMovement.Y())
+		if yMov < 0.1 && !p.mInfo.SneakBindPressed {
+			d1 := 0.4 + yMov*0.2
+			p.mInfo.ServerMovement[0] *= d1
+			p.mInfo.ServerMovement[2] *= d1
 		}
 	}
 }
@@ -423,7 +510,7 @@ func (p *Player) maybeBackOffFromEdge() {
 
 // handleInsideBlockMovement handles movement that occurs when a player is first inside a block.
 func (p *Player) handleInsideBlockMovement() {
-	inside := p.isInsideBlock()
+	b, inside := p.isInsideBlock()
 	defer func() {
 		p.mInfo.KnownInsideBlock = inside
 	}()
@@ -439,6 +526,14 @@ func (p *Player) handleInsideBlockMovement() {
 	if p.mInfo.KnownInsideBlock {
 		if p.debugger.LogMovement {
 			p.Log().Debug("handleInsideBlockMovement(): player known to be inside block")
+		}
+
+		return
+	}
+
+	if utils.CanPassBlock(b) {
+		if p.debugger.LogMovement {
+			p.Log().Debugf("handleInsideBlockMovement(): block is passable (%v)", utils.BlockName(b))
 		}
 
 		return
@@ -464,27 +559,27 @@ func (p *Player) handleInsideBlockMovement() {
 }
 
 // isInsideBlock returns true if the player is inside a block.
-func (p *Player) isInsideBlock() bool {
+func (p *Player) isInsideBlock() (world.Block, bool) {
 	if p.mInfo.StepClipOffset > 0 {
-		return false
+		return nil, false
 	}
 
-	bb := p.AABB().Grow(-0.015)
+	bb := p.AABB().Grow(0)
 	blockPos := cube.PosFromVec3(p.mInfo.ServerPosition)
-	boxes := utils.ManualBBoxes(p.Block(blockPos), df_cube.Pos(blockPos), p.SurroundingBlocks(blockPos))
+	boxes := utils.BlockBoxes(p.Block(blockPos), df_cube.Pos(blockPos), p.SurroundingBlocks(blockPos))
 
 	for _, box := range boxes {
 		if bb.IntersectsWith(game.DFBoxToCubeBox(box).Translate(blockPos.Vec3())) {
+			block := p.Block(blockPos)
 			if p.debugger.LogMovement {
-				n, _ := p.Block(blockPos).EncodeBlock()
-				p.Log().Debugf("isInsideBlock(): player inside block, block=%v", n)
+				p.Log().Debugf("isInsideBlock(): player inside block, block=%v", utils.BlockName(block))
 			}
 
-			return true
+			return block, true
 		}
 	}
 
-	return false
+	return nil, false
 }
 
 // collide simulates the player's collisions with blocks
@@ -600,6 +695,7 @@ func (p *Player) simulateHorizontalFriction(friction float32) {
 // simulateJump simulates the jump movement of the player
 func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
+	p.mInfo.BounceMultiplier = -0.87
 
 	if !p.mInfo.Sprinting {
 		return
@@ -665,27 +761,44 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 		p.mInfo.InUnsupportedRewindScenario = true
 	} */
 
-	// This check determines if the player is near liquids
+	p.mInfo.UnsupportedAcceptance = 0.0
+
+	var hasLiquid, hasWeb, hasBounce bool
+
 	for _, bl := range blocks {
 		_, ok := bl.(world.Liquid)
 		if ok {
-			p.mInfo.InUnsupportedRewindScenario = true
-			break
+			hasLiquid = true
+			continue
+		}
+
+		switch utils.BlockName(bl) {
+		case "minecraft:web":
+			hasWeb = true
+		case "minecraft:slime", "minecraft:bed":
+			hasBounce = true
 		}
 	}
 
-	if p.mInfo.InUnsupportedRewindScenario {
+	if hasLiquid {
 		p.setMovementToClient()
+	}
 
-		if p.debugger.LogMovement {
-			p.Log().Debug("checkUnsupportedMovementScenarios(): player in unsupported rewind scenario")
-		}
+	if hasWeb {
+		p.mInfo.UnsupportedAcceptance += 0.5
+	}
+
+	if hasBounce {
+		p.mInfo.UnsupportedAcceptance += 1
+	}
+
+	if p.mInfo.UnsupportedAcceptance > 0 && p.debugger.LogMovement {
+		p.Log().Debug("checkUnsupportedMovementScenarios(): player in unsupported rewind scenario")
 	}
 }
 
 type MovementInfo struct {
-	CanExempt                   bool
-	InUnsupportedRewindScenario bool
+	CanExempt bool
 
 	ForwardImpulse float32
 	LeftImpulse    float32
@@ -695,10 +808,12 @@ type MovementInfo struct {
 	MovementSpeed         float32
 	ClientCalculatedSpeed float32
 
-	Gravity float32
+	Gravity          float32
+	BounceMultiplier float32
 
 	StepClipOffset           float32
 	AcceptablePositionOffset float32
+	UnsupportedAcceptance    float32
 
 	TicksSinceKnockback    uint32
 	TicksSinceBlockRefresh uint32
