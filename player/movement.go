@@ -340,7 +340,15 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
-	p.checkUnsupportedMovementScenarios()
+	unsupported := p.checkUnsupportedMovementScenarios()
+	defer func() {
+		if !unsupported {
+			return
+		}
+
+		p.setMovementToClient()
+	}()
+
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
 
 	p.simulateGravity()
@@ -742,8 +750,9 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 	}
 }
 
-// checkUnsupportedMovementScenarios checks if the player is in an unsupported movement scenario
-func (p *Player) checkUnsupportedMovementScenarios() {
+// checkUnsupportedMovementScenarios checks if the player is in an unsupported movement scenario.
+// Returns true if the player is in a scenario we cannot predict reliably.
+func (p *Player) checkUnsupportedMovementScenarios() bool {
 	bb := p.AABB()
 	blocks := p.GetNearbyBlocks(bb)
 
@@ -775,7 +784,11 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 	}
 
 	if hasLiquid {
-		p.setMovementToClient()
+		if p.debugger.LogMovement {
+			p.Log().Debug("checkUnsupportedMovementScenarios(): player in liquid")
+		}
+
+		return true
 	}
 
 	if hasBounce {
@@ -785,6 +798,8 @@ func (p *Player) checkUnsupportedMovementScenarios() {
 	if p.mInfo.UnsupportedAcceptance > 0 && p.debugger.LogMovement {
 		p.Log().Debug("checkUnsupportedMovementScenarios(): player in unsupported rewind scenario")
 	}
+
+	return false
 }
 
 type MovementInfo struct {
