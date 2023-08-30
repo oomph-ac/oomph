@@ -49,6 +49,11 @@ func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Bloc
 		"minecraft:warped_pressure_plate", "minecraft:stone_pressure_plate", "minecraft:light_weighted_pressure_plate",
 		"minecraft:heavy_weighted_pressure_plate", "minecraft:polished_blackstone_pressure_plate":
 		return []df_cube.BBox{}
+	case "minecraft:acacia_button", "minecraft:bamboo_button", "minecraft:birch_button", "minecraft:cherry_button",
+		"minecraft:crimson_button", "minecraft:dark_oak_button", "minecraft:jungle_button", "minecraft:mangrove_button",
+		"minecraft:polished_blackstone_button", "minecraft:spruce_button", "minecraft:stone_button", "minecraft:warped_button",
+		"minecraft:wooden_button":
+		return []df_cube.BBox{}
 	case "minecraft:trip_wire":
 		return []df_cube.BBox{}
 	case "minecraft:web":
