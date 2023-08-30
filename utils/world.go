@@ -10,17 +10,49 @@ import (
 
 const fenceInset = 0.5 - (0.25 / 2)
 
-// ManualBBoxes returns the true bounding boxes of the given block based on it's name.
-func ManualBBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Block) []df_cube.BBox {
+// BlockName returns the name of the block.
+func BlockName(b world.Block) string {
 	n, _ := b.EncodeBlock()
+	return n
+}
 
-	switch n {
+// BlockFriction returns the friction of the block.
+func BlockFriction(b world.Block) float32 {
+	if f, ok := b.(block.Frictional); ok {
+		return float32(f.Friction())
+	}
+
+	switch BlockName(b) {
+	case "minecraft:slime":
+		return 0.8
+	default:
+		return 0.6
+	}
+}
+
+// CanPassBlock returns true if an entity can pass through the given block.
+func CanPassBlock(b world.Block) bool {
+	switch BlockName(b) {
+	case "minecraft:web":
+		return true
+	default:
+		return false
+	}
+}
+
+// BlockBoxes returns the bounding boxes of the given block based on it's name.
+func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Block) []df_cube.BBox {
+	switch BlockName(b) {
 	case "minecraft:wooden_pressure_plate", "minecraft:spruce_pressure_plate", "minecraft:birch_pressure_plate",
 		"minecraft:jungle_pressure_plate", "minecraft:acacia_pressure_plate", "minecraft:dark_oak_pressure_plate",
 		"minecraft:mangrove_pressure_plate", "minecraft:cherry_pressure_plate", "minecraft:crimson_pressure_plate",
 		"minecraft:warped_pressure_plate", "minecraft:stone_pressure_plate", "minecraft:light_weighted_pressure_plate",
 		"minecraft:heavy_weighted_pressure_plate", "minecraft:polished_blackstone_pressure_plate":
 		return []df_cube.BBox{}
+	case "minecraft:trip_wire":
+		return []df_cube.BBox{}
+	case "minecraft:bed":
+		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1.0-(7.0/16.0), 1)}
 	case "minecraft:oak_fence", "minecraft:spruce_fence", "minecraft:birch_fence", "minecraft:jungle_fence",
 		"minecraft:acacia_fence", "minecraft:dark_oak_fence", "minecraft:mangrove_fence", "minecraft:cherry_fence",
 		"minecraft:crimson_fence", "minecraft:warped_fence":
