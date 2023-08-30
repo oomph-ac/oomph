@@ -843,9 +843,10 @@ type MovementInfo struct {
 	Sprinting, SprintBindPressed bool
 	Teleporting                  bool
 	Immobile                     bool
-	CanFly, Flying               bool
+	ToggleFly, Flying            bool
 	NoClip                       bool
 	KnownInsideBlock             bool
+	TrustFlyStatus               bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool

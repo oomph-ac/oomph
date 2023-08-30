@@ -124,6 +124,19 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
 			cancel = p.handleBlockPlace(t)
 		}
+	case *packet.RequestAbility:
+		if pk.Ability != packet.AbilityFlying {
+			return false
+		}
+
+		fly := pk.Value.(bool)
+		p.mInfo.ToggleFly = fly
+		// If we can't trust their flight status, we need to wait for the server to update the player's flying state.
+		if fly && !p.mInfo.TrustFlyStatus {
+			return false
+		}
+
+		p.mInfo.Flying = pk.Value.(bool)
 	case *packet.Text:
 		cmd := strings.Split(pk.Message, " ")
 		if cmd[0] == "!oomph_debug" {
@@ -378,10 +391,11 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	case *packet.UpdateAbilities:
 		p.Acknowledgement(func() {
 			for _, l := range pk.AbilityData.Layers {
-				p.miMu.Lock()
 				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
-				p.mInfo.CanFly = utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
-				p.miMu.Unlock()
+				if p.mInfo.ToggleFly {
+					p.mInfo.TrustFlyStatus = p.mInfo.Flying
+				}
+				p.mInfo.ToggleFly = false
 			}
 		})
 	case *packet.Respawn:
