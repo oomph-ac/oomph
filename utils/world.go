@@ -25,8 +25,22 @@ func BlockFriction(b world.Block) float32 {
 	switch BlockName(b) {
 	case "minecraft:slime":
 		return 0.8
+	case "minecraft:ice", "minecraft:packed_ice":
+		return 0.98
+	case "minecraft:blue_ice":
+		return 0.99
 	default:
 		return 0.6
+	}
+}
+
+// BlockSpeedFactor returns the speed factor of the block.
+func BlockSpeedFactor(b world.Block) float32 {
+	switch BlockName(b) {
+	case "minecraft:soul_sand":
+		return 0.3
+	default:
+		return 1
 	}
 }
 
@@ -59,38 +73,17 @@ func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Bloc
 	case "minecraft:web":
 		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:bed":
-		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1.0-(7.0/16.0), 1)}
+		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 9.0/16.0, 1)}
 	case "minecraft:waterlily":
 		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1.0/64.0, 1)}
+	case "minecraft:soul_sand":
+		return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 7.0/8.0, 1)}
 	case "minecraft:oak_fence", "minecraft:spruce_fence", "minecraft:birch_fence", "minecraft:jungle_fence",
 		"minecraft:acacia_fence", "minecraft:dark_oak_fence", "minecraft:mangrove_fence", "minecraft:cherry_fence",
 		"minecraft:crimson_fence", "minecraft:warped_fence":
 		var bbs []df_cube.BBox
 
-		// Connections on the X-axis.
-		wb, connectWest := sblocks[cube.FaceWest]
-		eb, connectEast := sblocks[cube.FaceEast]
-
-		// Check if the block can connect with the fence.
-		if connectWest && !FenceConnectionCompatiable(BlockName(wb)) {
-			connectWest = false
-		}
-		if connectEast && !FenceConnectionCompatiable(BlockName(eb)) {
-			connectEast = false
-		}
-
-		// Connections on the Z-axis.
-		nb, connectNorth := sblocks[cube.FaceNorth]
-		sb, connectSouth := sblocks[cube.FaceSouth]
-
-		// Check if the block can connect with the fence.
-		if connectNorth && !FenceConnectionCompatiable(BlockName(nb)) {
-			connectNorth = false
-		}
-		if connectSouth && !FenceConnectionCompatiable(BlockName(sb)) {
-			connectSouth = false
-		}
-
+		connectWest, connectEast, connectNorth, connectSouth := CheckFenceConnection(b, sblocks)
 		if connectWest || connectEast {
 			bb := df_cube.Box(0, 0, 0, 1, 1.5, 1).
 				Stretch(df_cube.Z, -fenceInset)
@@ -129,9 +122,74 @@ func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Bloc
 		}
 
 		return bbs
+	case "minecraft:iron_bars":
+		var bbs []df_cube.BBox
+		connectWest, connectEast, connectNorth, connectSouth := CheckFenceConnection(b, sblocks)
+		inset := 7.0 / 16.0
+
+		if connectWest || connectEast {
+			bb := df_cube.Box(0, 0, 0, 1, 1, 1).Stretch(df_cube.Z, -inset)
+			if !connectWest {
+				bb = bb.ExtendTowards(df_cube.FaceWest, -inset)
+			} else if !connectEast {
+				bb = bb.ExtendTowards(df_cube.FaceEast, -inset)
+			}
+
+			bbs = append(bbs, bb)
+		}
+
+		if connectNorth || connectSouth {
+			bb := df_cube.Box(0, 0, 0, 1, 1, 1).Stretch(df_cube.X, -inset)
+
+			if !connectNorth {
+				bb = bb.ExtendTowards(df_cube.FaceNorth, -inset)
+			} else if !connectSouth {
+				bb = bb.ExtendTowards(df_cube.FaceSouth, -inset)
+			}
+
+			bbs = append(bbs, bb)
+		}
+
+		if len(bbs) == 0 {
+			return []df_cube.BBox{df_cube.Box(0, 0, 0, 1, 1, 1).
+				Stretch(df_cube.X, -inset).
+				Stretch(df_cube.Z, -inset),
+			}
+		}
+
+		return bbs
 	}
 
 	return b.Model().BBox(pos, nil)
+}
+
+// Check fence connection checks for connections on the x and z axis the fence may have.
+func CheckFenceConnection(b world.Block, sblocks map[cube.Face]world.Block) (bool, bool, bool, bool) {
+	// Connections on the X-axis.
+	wb, connectWest := sblocks[cube.FaceWest]
+	eb, connectEast := sblocks[cube.FaceEast]
+
+	// Check if the block can connect with the fence.
+	if connectWest && !FenceConnectionCompatiable(BlockName(wb)) {
+		connectWest = false
+	}
+	if connectEast && !FenceConnectionCompatiable(BlockName(eb)) {
+		connectEast = false
+	}
+
+	// Connections on the Z-axis.
+	nb, connectNorth := sblocks[cube.FaceNorth]
+	sb, connectSouth := sblocks[cube.FaceSouth]
+
+	// Check if the block can connect with the fence.
+	if connectNorth && !FenceConnectionCompatiable(BlockName(nb)) {
+		connectNorth = false
+	}
+	if connectSouth && !FenceConnectionCompatiable(BlockName(sb)) {
+		connectSouth = false
+	}
+
+	return connectWest, connectEast, connectNorth, connectSouth
 }
 
 // FenceConnectionCompatiable returns true if the given block is compatiable to conenct to a fence.
