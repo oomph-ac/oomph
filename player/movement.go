@@ -170,8 +170,6 @@ func (p *Player) validateMovement() {
 		return
 	}
 
-	fmt.Println(movDiff, posDiff)
-
 	if p.debugger.LogMovement {
 		p.Log().Debugf("validateMovement(): correction needed! posDiff=%f, movDiff=%f", posDiff, movDiff)
 		p.SendOomphDebug("validateMovement(): correction sent for frame "+fmt.Sprint(p.ClientFrame()), packet.TextTypeChat)
