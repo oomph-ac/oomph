@@ -63,12 +63,28 @@ func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Bloc
 		var bbs []df_cube.BBox
 
 		// Connections on the X-axis.
-		_, connectWest := sblocks[cube.FaceWest]
-		_, connectEast := sblocks[cube.FaceEast]
+		wb, connectWest := sblocks[cube.FaceWest]
+		eb, connectEast := sblocks[cube.FaceEast]
+
+		// Check if the block can connect with the fence.
+		if connectWest && !FenceConnectionCompatiable(BlockName(wb)) {
+			connectWest = false
+		}
+		if connectEast && !FenceConnectionCompatiable(BlockName(eb)) {
+			connectEast = false
+		}
 
 		// Connections on the Z-axis.
-		_, connectNorth := sblocks[cube.FaceNorth]
-		_, connectSouth := sblocks[cube.FaceSouth]
+		nb, connectNorth := sblocks[cube.FaceNorth]
+		sb, connectSouth := sblocks[cube.FaceSouth]
+
+		// Check if the block can connect with the fence.
+		if connectNorth && !FenceConnectionCompatiable(BlockName(nb)) {
+			connectNorth = false
+		}
+		if connectSouth && !FenceConnectionCompatiable(BlockName(sb)) {
+			connectSouth = false
+		}
 
 		if connectWest || connectEast {
 			bb := df_cube.Box(0, 0, 0, 1, 1.5, 1).
@@ -111,6 +127,17 @@ func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Bloc
 	}
 
 	return b.Model().BBox(pos, nil)
+}
+
+// FenceConnectionCompatiable returns true if the given block is compatiable to conenct to a fence.
+func FenceConnectionCompatiable(n string) bool {
+	switch n {
+	case "minecraft:azalea_leaves", "minecraft:azalea_leaves_flowered", "minecraft:cherry_leaves", "minecraft:leaves",
+		"minecraft:leaves2", "minecraft:mangrove_leaves":
+		return false
+	default:
+		return true
+	}
 }
 
 // BlockClimbable returns whether the given block is climbable.
