@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -98,5 +99,9 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 40
+
+	p.mInfo.ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
+	p.mInfo.OnGround = true
+
 	return p.conn.StartGameContext(ctx, data)
 }
