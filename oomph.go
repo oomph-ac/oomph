@@ -71,7 +71,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		FlushRate:    -1,
 		ReadBatches:  true,
 	}.Dial("raknet", remoteAddr)
+
 	if err != nil {
+		o.log.Error(err)
 		return
 	}
 
@@ -81,7 +83,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	p := player.NewPlayer(logrus.New(), conn, serverConn)
 	p.MovementInfo().ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
-	p.MovementInfo().ServerMovement = mgl32.Vec3{0, -0.0784, 0}
+	p.MovementInfo().OnGround = true
 
 	var g sync.WaitGroup
 	g.Add(2)

@@ -26,9 +26,8 @@ func (p *Player) doMovementSimulation() {
 		defer p.Log().Debugf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame())
 	}
 
-	if (p.inLoadedChunkTicks < 30 && p.movementMode == utils.ModeFullAuthoritative) || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
-		p.mInfo.OnGround = true
-		p.mInfo.VerticallyCollided = true
+	if (p.inLoadedChunkTicks < 30 && p.movementMode != utils.ModeFullAuthoritative) || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
+		p.mInfo.OnGround = false
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
@@ -235,15 +234,13 @@ func (p *Player) aiStep() {
 	}
 
 	if p.mInfo.Immobile || !p.inLoadedChunk {
-		p.mInfo.ForwardImpulse = 0.0
-		p.mInfo.LeftImpulse = 0.0
-		p.mInfo.Jumping = false
-
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 
 		if p.debugger.LogMovement {
 			p.Log().Debug("aiStep(): player immobile/not in loaded chunk")
 		}
+
+		return
 	}
 
 	// Apply knockback if the server has sent it.
@@ -362,6 +359,7 @@ func (p *Player) doGroundMove() {
 		p.Log().Debugf("doGroundMove(): friction and gravity applied, movement=%v", p.mInfo.ServerMovement)
 	}
 
+	blockUnder = p.Block(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.5})))
 	if p.mInfo.OnGround && !oldGround {
 		p.simulateFallOnBlock(oldMov, blockUnder)
 	}
