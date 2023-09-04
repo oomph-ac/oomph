@@ -89,6 +89,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	g.Add(2)
 	go func() {
 		if err := conn.StartGame(data); err != nil {
+			o.log.Error("oomph conn.StartGame(): " + err.Error())
 			p.Close()
 			p = nil
 			return
@@ -97,6 +98,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	go func() {
 		if err := serverConn.DoSpawn(); err != nil {
+			o.log.Error("oomph serverConn.DoSpawn(): " + err.Error())
 			p.Close()
 			p = nil
 			return
