@@ -142,9 +142,11 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 
 	// The rewind should never be null here because we have validated the rewind tick.
 	rew := t.RewindPosition(rewTick)
-	if rew == nil && len(t.PositionBuffer()) >= int(p.combatNetworkCutoff) {
-		p.SendOomphDebug("§cERROR: §7Combat system failed to rewind, please report this to an admin. (buffSize="+fmt.Sprint(len(t.PositionBuffer()))+" currTick="+
-			fmt.Sprint(p.ServerTick())+" rewTick="+fmt.Sprint(rewTick)+")", packet.TextTypeChat)
+	if rew == nil {
+		if len(t.PositionBuffer()) >= int(p.combatNetworkCutoff) {
+			p.SendOomphDebug("§cERROR: §7Combat system failed to rewind, please report this to an admin. (buffSize="+fmt.Sprint(len(t.PositionBuffer()))+" currTick="+
+				fmt.Sprint(p.ServerTick())+" rewTick="+fmt.Sprint(rewTick)+")", packet.TextTypeChat)
+		}
 
 		return
 	}
