@@ -1,8 +1,6 @@
 module github.com/oomph-ac/oomph
 
-go 1.18
-
-replace github.com/sandertv/gophertunnel v1.31.1-0.20230826112839-46eecd90bd0f => github.com/ethaniccc/gophertunnel v0.0.0-20230905192954-8cb9372af1d5
+go 1.19
 
 require (
 	github.com/chewxy/math32 v1.10.1
@@ -11,9 +9,9 @@ require (
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/go-gl/mathgl v1.1.0
 	github.com/pelletier/go-toml v1.9.5
-	github.com/sandertv/gophertunnel v1.31.1-0.20230826112839-46eecd90bd0f
+	github.com/sandertv/gophertunnel v1.31.1
 	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/text v0.13.0
 )
 
@@ -35,7 +33,9 @@ require (
 	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/oauth2 v0.12.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
+
+replace github.com/sandertv/gophertunnel v1.31.1 => github.com/ethaniccc/gophertunnel v0.0.0-20230907154951-bb4a72356e48
