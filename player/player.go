@@ -10,6 +10,7 @@ import (
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/check"
@@ -103,7 +104,8 @@ type Player struct {
 	nextTickActions   []func()
 	nextTickActionsMu sync.Mutex
 
-	chunks             sync.Map
+	chunks             map[protocol.ChunkPos]*chunk.Chunk
+	chunkMu            sync.Mutex
 	cachedBlockResults sync.Map
 	chunkRadius        int32
 	breakingBlockPos   *protocol.BlockPos
@@ -158,6 +160,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		gameMode: data.PlayerGameMode,
 
+		chunks:        make(map[protocol.ChunkPos]*chunk.Chunk),
 		inLoadedChunk: false,
 
 		c: make(chan struct{}),
@@ -170,7 +173,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewAutoClickerC(),
 			check.NewAutoClickerD(),
 
-			check.NewKillAuraA(),
+			//check.NewKillAuraA(),
 
 			check.NewReachA(),
 			check.NewReachB(),

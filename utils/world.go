@@ -80,7 +80,7 @@ func IsFence(n string) bool {
 }
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
-func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Block) []cube.BBox {
+func BlockBoxes(b world.Block, pos cube.Pos, sblocks map[cube.Face]world.Block) []cube.BBox {
 	switch BlockName(b) {
 	case "minecraft:wooden_pressure_plate", "minecraft:spruce_pressure_plate", "minecraft:birch_pressure_plate",
 		"minecraft:jungle_pressure_plate", "minecraft:acacia_pressure_plate", "minecraft:dark_oak_pressure_plate",
@@ -212,7 +212,9 @@ func BlockBoxes(b world.Block, pos df_cube.Pos, sblocks map[cube.Face]world.Bloc
 		return []cube.BBox{bb}
 	}
 
-	dfBoxes := b.Model().BBox(pos, nil)
+	dfBoxes := b.Model().BBox(df_cube.Pos{
+		pos.X(), pos.Y(), pos.Z(),
+	}, nil)
 
 	var boxes []cube.BBox
 	for _, b := range dfBoxes {

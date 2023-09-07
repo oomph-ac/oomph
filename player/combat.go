@@ -8,6 +8,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -75,6 +76,16 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 
 		min, valid, eid := float32(69000.0), false, uint64(0)
 		dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
+
+		// Check if there is a block in the way of our raycast. If this is the case, then we cannot continue.
+		b, d := p.GetTargetBlock(dV, attackPos, maxCrosshairAttackDist)
+		if b != nil {
+			if p.debugger.LogCombat {
+				p.SendOomphDebug("client prediction correct: block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), packet.TextTypeChat)
+			}
+
+			return
+		}
 
 		p.entities.Range(func(k, v any) bool {
 			e := v.(*entity.Entity)
@@ -173,6 +184,15 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 
 	dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 	res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
+
+	b, d := p.GetTargetBlock(dV, attackPos, maxCrosshairAttackDist)
+	if b != nil {
+		if p.debugger.LogCombat {
+			p.SendOomphDebug("client-predicted hit INVALID: block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), packet.TextTypeChat)
+		}
+
+		return
+	}
 
 	if ok {
 		dist := res.Position().Sub(attackPos).Len()
