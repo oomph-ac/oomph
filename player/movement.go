@@ -3,7 +3,6 @@ package player
 import (
 	"fmt"
 
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/ethaniccc/float32-cube/cube"
 
 	"github.com/chewxy/math32"
@@ -583,7 +582,7 @@ func (p *Player) isInsideBlock() (world.Block, bool) {
 
 	bb := p.AABB()
 	for pos, block := range p.GetNearbyBlocks(bb) {
-		boxes := utils.BlockBoxes(block, df_cube.Pos(pos), p.SurroundingBlocks(pos))
+		boxes := utils.BlockBoxes(block, pos, p.SurroundingBlocks(pos))
 		for _, box := range boxes {
 			if !p.AABB().IntersectsWith(box.Translate(pos.Vec3())) {
 				continue

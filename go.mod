@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/chewxy/math32 v1.10.1
 	github.com/df-mc/atomic v1.10.0
-	github.com/df-mc/dragonfly v0.9.9-0.20230822233357-6a5c283387a4
+	github.com/df-mc/dragonfly v0.9.9-0.20230826102332-5303318f64a0
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/go-gl/mathgl v1.1.0
 	github.com/pelletier/go-toml v1.9.5
