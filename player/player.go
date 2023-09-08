@@ -173,7 +173,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewAutoClickerC(),
 			check.NewAutoClickerD(),
 
-			//check.NewKillAuraA(),
+			check.NewKillAuraA(),
 
 			check.NewReachA(),
 			check.NewReachB(),
