@@ -26,7 +26,7 @@ func (*KillAuraA) Description() string {
 
 // MaxViolations ...
 func (*KillAuraA) MaxViolations() float64 {
-	return 15
+	return 1
 }
 
 // Process ...
@@ -41,7 +41,7 @@ func (k *KillAuraA) Process(p Processor, pk packet.Packet) bool {
 			currentTick := p.ClientFrame()
 			tickDiff := currentTick - k.lastSwingTick
 			if tickDiff > 4 {
-				p.Flag(k, k.violationAfterTicks(currentTick, 600), map[string]any{
+				p.Flag(k, 1, map[string]any{
 					"Tick Difference": tickDiff,
 					"Current Tick":    currentTick,
 					"Last Tick":       k.lastSwingTick,
