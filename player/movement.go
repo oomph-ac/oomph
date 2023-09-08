@@ -232,6 +232,7 @@ func (p *Player) aiStep() {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
+	// If the player is not in a loaded chunk, or is immobile, set their movement to 0 vec.
 	if p.mInfo.Immobile || !p.inLoadedChunk {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 
@@ -258,6 +259,11 @@ func (p *Player) aiStep() {
 		if p.debugger.LogMovement {
 			p.Log().Debug("aiStep(): simulated jump")
 		}
+	}
+
+	// If the player is teleporting, set their motion to 0 vec.
+	if p.mInfo.Teleporting {
+		p.mInfo.ServerMovement = mgl32.Vec3{}
 	}
 
 	p.doGroundMove()
@@ -320,7 +326,7 @@ func (p *Player) doGroundMove() {
 	}
 
 	oldMov := p.mInfo.ServerMovement
-	p.collide()
+	p.simulateCollisions()
 	p.handleInsideBlockMovement()
 
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
@@ -599,8 +605,8 @@ func (p *Player) isInsideBlock() (world.Block, bool) {
 	return nil, false
 }
 
-// collide simulates the player's collisions with blocks
-func (p *Player) collide() {
+// simulateCollisions simulates the player's collisions with blocks
+func (p *Player) simulateCollisions() {
 	currVel := p.mInfo.ServerMovement
 	bbList := p.GetNearbyBBoxes(p.AABB().Extend(currVel))
 	newVel := currVel
