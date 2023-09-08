@@ -78,7 +78,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 
 		// Check if there is a block in the way of our raycast. If this is the case, then we cannot continue.
-		_, blockDist := p.GetTargetBlock(dV, attackPos, maxCrosshairAttackDist)
+		b, blockDist := p.GetTargetBlock(dV, attackPos, maxCrosshairAttackDist)
 		p.entities.Range(func(k, v any) bool {
 			e := v.(*entity.Entity)
 			id := k.(uint64)
@@ -102,7 +102,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 			dist := res.Position().Sub(attackPos).LenSqr()
 
 			// The player's ray intersects with the block first which means they shouldn't be able to attack the entity.
-			if blockDist < dist {
+			if b != nil && blockDist < dist {
 				return true
 			}
 
@@ -188,7 +188,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		dist := res.Position().Sub(attackPos).Len()
 		valid := dist <= maxCrosshairAttackDist
 
-		if d < dist {
+		if b != nil && d < dist {
 			if p.debugger.LogCombat {
 				p.SendOomphDebug("client-predicted hit INVALID: block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), packet.TextTypeChat)
 			}
