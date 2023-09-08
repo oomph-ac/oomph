@@ -40,6 +40,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	cancel := false
 	p.clicking = false
 
+	if p.inPunishmentAnimation {
+		return true
+	}
+
 	defer func() {
 		if cancel {
 			return
@@ -210,6 +214,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	if p.closed {
 		return false
+	}
+
+	if p.inPunishmentAnimation {
+		return true
 	}
 
 	defer func() {
