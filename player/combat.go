@@ -78,15 +78,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		dV := game.DirectionVector(p.Entity().Rotation().Z(), p.Entity().Rotation().X())
 
 		// Check if there is a block in the way of our raycast. If this is the case, then we cannot continue.
-		b, d := p.GetTargetBlock(dV, attackPos, maxCrosshairAttackDist)
-		if b != nil {
-			if p.debugger.LogCombat {
-				p.SendOomphDebug("client prediction correct: block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), packet.TextTypeChat)
-			}
-
-			return
-		}
-
+		_, blockDist := p.GetTargetBlock(dV, attackPos, maxCrosshairAttackDist)
 		p.entities.Range(func(k, v any) bool {
 			e := v.(*entity.Entity)
 			id := k.(uint64)
@@ -108,6 +100,12 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 			}
 
 			dist := res.Position().Sub(attackPos).LenSqr()
+
+			// The player's ray intersects with the block first which means they shouldn't be able to attack the entity.
+			if blockDist < dist {
+				return true
+			}
+
 			if dist <= min {
 				min = dist
 				eid = id
@@ -186,17 +184,17 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(14)))
 
 	b, d := p.GetTargetBlock(dV, attackPos, maxCrosshairAttackDist)
-	if b != nil {
-		if p.debugger.LogCombat {
-			p.SendOomphDebug("client-predicted hit INVALID: block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), packet.TextTypeChat)
-		}
-
-		return
-	}
-
 	if ok {
 		dist := res.Position().Sub(attackPos).Len()
 		valid := dist <= maxCrosshairAttackDist
+
+		if d < dist {
+			if p.debugger.LogCombat {
+				p.SendOomphDebug("client-predicted hit INVALID: block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), packet.TextTypeChat)
+			}
+
+			return
+		}
 
 		if p.debugger.LogCombat {
 			color := "§c"
@@ -207,10 +205,11 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 			p.SendOomphDebug("dist="+fmt.Sprint(dist)+" && valid="+color+fmt.Sprint(valid), packet.TextTypeChat)
 		}
 
-		if valid {
-			p.SendPacketToServer(p.lastAttackData)
+		if !valid {
 			return
 		}
+
+		p.SendPacketToServer(p.lastAttackData)
 	} else if p.debugger.LogCombat {
 		p.SendOomphDebug("hit invalid: casted ray did not land. rewTick:"+fmt.Sprint(rewTick), packet.TextTypeChat)
 	}
