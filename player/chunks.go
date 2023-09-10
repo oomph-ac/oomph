@@ -189,12 +189,14 @@ func (p *Player) networkClientBreaksBlock(pos protocol.BlockPos) {
 
 // cleanChunks filters out any chunks that are out of the player's view, and returns a value of
 // how many chunks were cleaned
-func (p *Player) cleanChunks() {
+func (p *Player) cleanChunks(chunkRadius int32) {
 	p.chunkMu.Lock()
 	defer p.chunkMu.Unlock()
 
-	loc := p.mInfo.ServerPosition
-	activePos := protocol.ChunkPos{int32(math32.Floor(loc[0])) >> 4, int32(math32.Floor(loc[2])) >> 4}
+	activePos := protocol.ChunkPos{
+		int32(p.mInfo.ServerPosition.X()) >> 4,
+		int32(p.mInfo.ServerPosition.Z()) >> 4,
+	}
 
 	// Delete from any chunks that are out of the player's view.
 	for pos := range p.chunks {
@@ -202,7 +204,7 @@ func (p *Player) cleanChunks() {
 		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
 
 		// If the distance is within the player's chunk view, leave it alone.
-		if int32(dist) <= p.chunkRadius {
+		if int32(dist) <= chunkRadius {
 			continue
 		}
 

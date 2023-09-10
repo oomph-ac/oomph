@@ -103,8 +103,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			})
 		}()
 
-		p.cleanChunks()
-
 		prevPos := p.mInfo.ServerPosition
 		p.handlePlayerAuthInput(pk)
 
@@ -231,6 +229,8 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	}()
 
 	switch pk := pk.(type) {
+	case *packet.NetworkChunkPublisherUpdate:
+		p.cleanChunks(int32(pk.Radius) / 16)
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.rid {
 			// We are the player.

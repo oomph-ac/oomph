@@ -2,10 +2,12 @@ package player
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ethaniccc/float32-cube/cube"
 
 	"github.com/chewxy/math32"
+	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -92,7 +94,14 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 
 	// Update the sprinting state of the player.
 	var needsSpeedAdjustment bool
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting) && !p.mInfo.Sprinting {
+	startFlag, stopFlag := utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting), utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting)
+	if startFlag && stopFlag {
+		// When both the start and stop flags are found in the same tick, this usually indicates the player is horizontally collided as the client will
+		// first check if the player is holding the sprint key (isn't sneaking, other conditions, etc.), and call setSprinting(true), but then see the player
+		// is horizontally collided and call setSprinting(false) on the same call in onLivingUpdate()
+		p.mInfo.Sprinting = false
+		needsSpeedAdjustment = true
+	} else if startFlag && !p.mInfo.Sprinting {
 		p.mInfo.Sprinting = true
 		needsSpeedAdjustment = true
 	} else if (utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || p.mInfo.ForwardImpulse <= 0 || p.mInfo.Sneaking) && p.mInfo.Sprinting {
@@ -275,10 +284,7 @@ func (p *Player) doGroundMove() {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	}
 
-	pos := p.mInfo.ServerPosition
-	pos[1] -= 0.5
-
-	blockUnder := p.Block(cube.PosFromVec3(pos))
+	blockUnder := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.5})))
 	blockFriction := game.DefaultAirFriction
 
 	if p.mInfo.OnGround {
@@ -335,9 +341,10 @@ func (p *Player) doGroundMove() {
 		p.Log().Debugf("doGroundMove(): final position=%v", p.mInfo.ServerPosition)
 	}
 
-	oldGround := p.mInfo.OnGround
+	// Check if there any collisions vertically/horizontally and then update the states in MovementInfo
 	p.checkCollisions(oldMov)
 
+	// If the player is in cobweb, we have to reset their movement to zero.
 	if inCobweb {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 
@@ -346,14 +353,20 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
-	unsupported := p.checkUnsupportedMovementScenarios()
-	defer func() {
-		if !unsupported {
-			return
+	// Update `blockUnder` after collisions have been applied and the new position has been determined.
+	blockUnder = p.Block(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.2})))
+	if _, ok := blockUnder.(block.Air); ok {
+		blockUnder2 := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown))
+		n := utils.BlockName(blockUnder2)
+		if utils.IsFence(n) || utils.IsWall(n) || strings.Contains(n, "fence_gate") { // ask MCP
+			blockUnder = blockUnder2
 		}
+	}
 
-		p.setMovementToClient()
-	}()
+	unsupported := p.checkUnsupportedMovementScenarios()
+	if unsupported {
+		defer p.setMovementToClient()
+	}
 
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
 
@@ -364,9 +377,8 @@ func (p *Player) doGroundMove() {
 		p.Log().Debugf("doGroundMove(): friction and gravity applied, movement=%v", p.mInfo.ServerMovement)
 	}
 
-	blockUnder = p.Block(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.5})))
-	if p.mInfo.OnGround && !oldGround {
-		p.simulateFallOnBlock(oldMov, blockUnder)
+	if p.mInfo.OnGround {
+		p.checkFallState(oldMov, blockUnder)
 	}
 
 	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
@@ -377,7 +389,7 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
-	if p.mInfo.OnGround && !p.mInfo.Jumping {
+	if p.mInfo.OnGround && !p.mInfo.Sneaking {
 		p.simulateStepOnBlock(blockUnder)
 
 		f := utils.BlockSpeedFactor(blockUnder)
@@ -386,8 +398,9 @@ func (p *Player) doGroundMove() {
 	}
 }
 
-// simulateFallOnBlock simulates the player's movement when they fall and land on certain blocks.
-func (p *Player) simulateFallOnBlock(oldMov mgl32.Vec3, b world.Block) {
+// checkFallState checks the falling state of the player and simulates the
+// player's movement when they fall and land on certain blocks.
+func (p *Player) checkFallState(oldMov mgl32.Vec3, b world.Block) {
 	switch utils.BlockName(b) {
 	case "minecraft:slime":
 		if p.mInfo.SneakBindPressed {
@@ -467,7 +480,7 @@ func (p *Player) moveRelative(fSpeed float32) {
 
 // maybeBackOffFromEdge simulates the movement scenarios where a player is at the edge of a block.
 func (p *Player) maybeBackOffFromEdge() {
-	if !p.mInfo.Sneaking || !p.mInfo.OnGround || p.mInfo.ServerMovement[1] > 0 {
+	if !p.mInfo.Sneaking || !p.mInfo.OnGround || p.mInfo.ServerMovement.Y() > 0 {
 		if p.debugger.LogMovement {
 			p.Log().Debug("maybeBackOffFromEdge(): conditions not met.")
 		}
@@ -476,10 +489,6 @@ func (p *Player) maybeBackOffFromEdge() {
 	}
 
 	currentVel := p.mInfo.ServerMovement
-	if currentVel[1] > 0 {
-		return
-	}
-
 	bb := p.AABB()
 	d0, d1, d2 := currentVel.X(), currentVel.Z(), float32(0.05)
 
