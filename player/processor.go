@@ -222,7 +222,11 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 	switch pk := pk.(type) {
 	case *packet.NetworkChunkPublisherUpdate:
-		p.cleanChunks(int32(pk.Radius) / 16)
+		if p.serverConn != nil && pk.Position.X()>>4 == 0 && pk.Position.Z()>>4 == 0 {
+			return false
+		}
+
+		p.cleanChunks(p.chunkRadius)
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.rid {
 			// We are the player.
