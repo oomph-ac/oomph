@@ -98,7 +98,7 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	if startFlag && stopFlag {
 		// When both the start and stop flags are found in the same tick, this usually indicates the player is horizontally collided as the client will
 		// first check if the player is holding the sprint key (isn't sneaking, other conditions, etc.), and call setSprinting(true), but then see the player
-		// is horizontally collided and call setSprinting(false) on the same call in onLivingUpdate()
+		// is horizontally collided and call setSprinting(false) on the same call of onLivingUpdate()
 		p.mInfo.Sprinting = false
 		needsSpeedAdjustment = true
 	} else if startFlag && !p.mInfo.Sprinting {
@@ -316,20 +316,8 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
+	inCobweb := p.tryCobwebMovement()
 	p.maybeBackOffFromEdge()
-
-	// Check if the player is in a cobweb block.
-	b, in := p.isInsideBlock()
-	inCobweb := in && utils.BlockName(b) == "minecraft:web"
-	if inCobweb {
-		p.mInfo.ServerMovement[0] *= 0.25
-		p.mInfo.ServerMovement[1] *= 0.05
-		p.mInfo.ServerMovement[2] *= 0.25
-
-		if p.debugger.LogMovement {
-			p.Log().Debugf("doGroundMove(): in cobweb, new mov=%v", p.mInfo.ServerMovement)
-		}
-	}
 
 	oldMov := p.mInfo.ServerMovement
 	p.simulateCollisions()
@@ -396,6 +384,23 @@ func (p *Player) doGroundMove() {
 		p.mInfo.ServerMovement[0] *= f
 		p.mInfo.ServerMovement[2] *= f
 	}
+}
+
+func (p *Player) tryCobwebMovement() bool {
+	// Check if the player is in a cobweb block.
+	b, in := p.isInsideBlock()
+	inCobweb := in && utils.BlockName(b) == "minecraft:web"
+	if inCobweb {
+		p.mInfo.ServerMovement[0] *= 0.25
+		p.mInfo.ServerMovement[1] *= 0.05
+		p.mInfo.ServerMovement[2] *= 0.25
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("doGroundMove(): in cobweb, new mov=%v", p.mInfo.ServerMovement)
+		}
+	}
+
+	return inCobweb
 }
 
 // checkFallState checks the falling state of the player and simulates the
@@ -489,48 +494,49 @@ func (p *Player) maybeBackOffFromEdge() {
 	}
 
 	currentVel := p.mInfo.ServerMovement
-	bb := p.AABB()
-	d0, d1, d2 := currentVel.X(), currentVel.Z(), float32(0.05)
+	bb := p.AABB().GrowVec3(mgl32.Vec3{-0.025, 0, -0.025})
+	xMov, zMov, offset := currentVel.X(), currentVel.Z(), float32(0.05)
 
-	for d0 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{d0, -game.StepHeight, 0}))) == 0 {
-		if d0 < d2 && d0 >= -d2 {
-			d0 = 0
-		} else if d0 > 0 {
-			d0 -= d2
+	for xMov != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -1.0, 0}))) == 0 {
+		if xMov < offset && xMov >= -offset {
+			xMov = 0
+		} else if xMov > 0 {
+			xMov -= offset
 		} else {
-			d0 += d2
+			xMov += offset
 		}
 	}
 
-	for d1 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight, d1}))) == 0 {
-		if d1 < d2 && d1 >= -d2 {
-			d1 = 0
-		} else if d1 > 0 {
-			d1 -= d2
+	for zMov != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -1.0, zMov}))) == 0 {
+		if zMov < offset && zMov >= -offset {
+			zMov = 0
+		} else if zMov > 0 {
+			zMov -= offset
 		} else {
-			d1 += d2
+			zMov += offset
 		}
 	}
 
-	for d0 != 0 && d1 != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{d0, -game.StepHeight, d1}))) == 0 {
-		if d0 < d2 && d0 >= -d2 {
-			d0 = 0
-		} else if d0 > 0 {
-			d0 -= d2
+	for xMov != 0 && zMov != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -1.0, zMov}))) == 0 {
+		if xMov < offset && xMov >= -offset {
+			xMov = 0
+		} else if xMov > 0 {
+			xMov -= offset
 		} else {
-			d0 += d2
+			xMov += offset
 		}
 
-		if d1 < d2 && d1 >= -d2 {
-			d1 = 0
-		} else if d1 > 0 {
-			d1 -= d2
+		if zMov < offset && zMov >= -offset {
+			zMov = 0
+		} else if zMov > 0 {
+			zMov -= offset
 		} else {
-			d1 += d2
+			zMov += offset
 		}
 	}
 
-	p.mInfo.ServerMovement = mgl32.Vec3{d0, currentVel.Y(), d1}
+	p.mInfo.ServerMovement[0] = xMov
+	p.mInfo.ServerMovement[2] = zMov
 
 	if !p.debugger.LogMovement {
 		return
