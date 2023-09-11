@@ -120,8 +120,6 @@ type Player struct {
 	c    chan struct{}
 	once sync.Once
 
-	inPunishmentAnimation bool
-
 	world.NopViewer
 }
 
@@ -216,33 +214,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 	go p.startTicking()
 	return p
-}
-
-// startPunishmentAnimation starts an animation that shows the cheater they got detected (L)!!
-func (p *Player) startPunishmentAnimation(msg string) {
-	p.inPunishmentAnimation = true
-	p.conn.WritePacket(&packet.LevelEvent{
-		EventType: packet.LevelEventSimTimeScale,
-		Position:  mgl32.Vec3{0.5},
-	})
-	p.conn.WritePacket(&packet.Text{
-		TextType: packet.TextTypeJukeboxPopup,
-		Message:  "§lThird-party modification detected.",
-	})
-
-	time.AfterFunc(time.Millisecond*2000, func() {
-		// Guess they really didn't want to see the ban animation :(
-		if p.Closed() {
-			return
-		}
-
-		p.inPunishmentAnimation = false
-		p.conn.WritePacket(&packet.LevelEvent{
-			EventType: packet.LevelEventSimTimeScale,
-			Position:  mgl32.Vec3{1},
-		})
-		p.Disconnect(msg)
-	})
 }
 
 // SetRuntimeID sets the runtime ID of the player.
@@ -514,14 +485,13 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	}
 
 	go func() {
-		message := text.Colourf("<bold><red>You are banned for the use of third-party software.</red></bold>")
+		message := text.Colourf("<bold><red>You were disconnected for the use of third-party software.</red></bold>")
 
 		ctx = event.C()
 		p.handler().HandlePunishment(ctx, check, &message)
 		if !ctx.Cancelled() {
 			p.log.Infof("%s was detected and punished for using %s%s.", p.Name(), name, variant)
-			//p.Disconnect(message)
-			p.startPunishmentAnimation(message)
+			p.Disconnect(message)
 		}
 	}()
 }
