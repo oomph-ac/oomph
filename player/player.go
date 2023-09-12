@@ -191,6 +191,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewTimerA(),
 
 			check.NewInvalidA(),
+			check.NewInvalidB(),
 		},
 
 		mInfo: &MovementInfo{
@@ -485,7 +486,7 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	}
 
 	go func() {
-		message := text.Colourf("<bold><red>You were disconnected for the use of third-party software.</red></bold>")
+		message := text.Colourf("<bold><red>Oomph detected the use of third-party software.</red></bold>")
 
 		ctx = event.C()
 		p.handler().HandlePunishment(ctx, check, &message)
