@@ -47,6 +47,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 		AcceptedProtocols:      protocols,
 		FlushRate:              -1,
 		ReadBatches:            true,
+		AllowInvalidPackets:    true,
 	}.Listen("raknet", o.addr)
 	if err != nil {
 		return err
