@@ -216,7 +216,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		ctx := event.C()
-		p.handler().HandleClientPacket(ctx, pk)
+		p.handler().HandleServerPacket(ctx, pk)
 		cancel = ctx.Cancelled()
 	}()
 
