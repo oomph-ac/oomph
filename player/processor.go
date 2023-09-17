@@ -40,19 +40,14 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	cancel := false
 	p.clicking = false
 
-	defer func() {
-		if cancel {
-			return
-		}
-
-		ctx := event.C()
-		p.handler().HandleClientPacket(ctx, pk)
-		cancel = ctx.Cancelled()
-	}()
-
 	if p.closed {
 		return false
 	}
+
+	defer func() {
+		ctx := event.C()
+		p.handler().HandleClientPacket(ctx, pk)
+	}()
 
 	switch pk := pk.(type) {
 	case *packet.Disconnect:
@@ -211,13 +206,8 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	}
 
 	defer func() {
-		if cancel {
-			return
-		}
-
 		ctx := event.C()
 		p.handler().HandleServerPacket(ctx, pk)
-		cancel = ctx.Cancelled()
 	}()
 
 	switch pk := pk.(type) {
