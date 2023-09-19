@@ -248,7 +248,7 @@ func (p *Player) SendPacketToServer(pk packet.Packet) error {
 		return nil
 	}
 
-	return p.serverConn.WritePacket(pk)
+	return p.ServerConn().WritePacket(pk)
 }
 
 func NewPacketBuffer() *PacketBuffer {

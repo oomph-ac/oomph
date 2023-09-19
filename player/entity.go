@@ -7,7 +7,7 @@ import (
 // SearchEntity queries the player for an entity, using the runtime ID specified. The second return value is false if
 // the entity is not loaded inside the player memory.
 func (p *Player) SearchEntity(rid uint64) (*entity.Entity, bool) {
-	if rid == p.rid {
+	if rid == p.runtimeID {
 		// We got our own runtime ID, so we can return ourself.
 		return p.Entity(), true
 	}
