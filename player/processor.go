@@ -2,6 +2,8 @@ package player
 
 import (
 	"bytes"
+	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +25,7 @@ import (
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
 var air uint32
@@ -69,7 +72,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.ready = true
 			})
 		})
-		p.rid = p.conn.GameData().EntityRuntimeID
+		p.SetRuntimeID(p.Conn().GameData().EntityRuntimeID)
+		p.SetUniqueID(p.Conn().GameData().EntityUniqueID)
 	case *packet.NetworkStackLatency:
 		cancel = p.Acknowledgements().Handle(pk.Timestamp, p.ClientData().DeviceOS == protocol.DeviceOrbis)
 	case *packet.PlayerAuthInput:
@@ -109,10 +113,16 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.needsCombatValidation = false
 	case *packet.MobEquipment:
 		p.lastEquipmentData = pk
+		pk.EntityRuntimeID = p.runtimeID
 	case *packet.InventoryTransaction:
-		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+		if t, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			cancel = p.combatMode == utils.ModeFullAuthoritative
 			p.updateCombatData(pk)
+
+			if t.TargetEntityRuntimeID == math.MaxInt64 {
+				t.TargetEntityRuntimeID = p.clientRuntimeID
+			}
+
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
 			cancel = p.handleBlockPlace(t)
@@ -187,6 +197,18 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
+	case *packet.Respawn:
+		pk.EntityRuntimeID = p.runtimeID
+	case *packet.Animate:
+		pk.EntityRuntimeID = p.runtimeID
+	case *packet.MovePlayer:
+		pk.EntityRuntimeID = p.runtimeID
+	case *packet.Interact:
+		if pk.TargetEntityRuntimeID == math.MaxInt64 {
+			pk.TargetEntityRuntimeID = p.clientRuntimeID
+		}
+	case *packet.PlayerAction:
+		pk.EntityRuntimeID = p.runtimeID
 	}
 
 	// Run all registered checks.
@@ -211,6 +233,34 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	}()
 
 	switch pk := pk.(type) {
+	case *packet.Animate:
+		if pk.EntityRuntimeID != p.runtimeID {
+			return false
+		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
+	case *packet.ActorEvent:
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+			return false
+		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
+	case *packet.Transfer:
+		if p.ServerConn() == nil {
+			return false
+		}
+
+		err := p.tryTransfer(pk.Address + ":" + fmt.Sprint(pk.Port))
+		if err != nil {
+			p.SendOomphDebug(text.Colourf("<red>Failed to transfer to remote server: %v</red>", err.Error()), packet.TextTypeChat)
+			return true
+		}
+
+		p.SendOomphDebug(text.Colourf("<green>Completed transfer to remote server!</green>"), packet.TextTypeChat)
+		return true
 	case *packet.NetworkChunkPublisherUpdate:
 		if p.serverConn != nil && pk.Position.X()>>4 == 0 && pk.Position.Z()>>4 == 0 {
 			return false
@@ -218,9 +268,13 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		p.cleanChunks(p.chunkRadius)
 	case *packet.AddPlayer:
-		if pk.EntityRuntimeID == p.rid {
+		if pk.EntityRuntimeID == p.runtimeID {
 			// We are the player.
 			return false
+		}
+
+		if pk.EntityRuntimeID == p.clientRuntimeID {
+			pk.EntityRuntimeID = math.MaxInt64
 		}
 
 		p.Acknowledgement(func() {
@@ -234,9 +288,13 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.AddEntity(pk.EntityRuntimeID, e)
 		})
 	case *packet.AddActor:
-		if pk.EntityRuntimeID == p.rid {
+		if pk.EntityRuntimeID == p.runtimeID {
 			// We are the player.
 			return false
+		}
+
+		if pk.EntityRuntimeID == p.clientRuntimeID {
+			pk.EntityRuntimeID = math.MaxInt64
 		}
 
 		p.Acknowledgement(func() {
@@ -250,10 +308,16 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.AddEntity(pk.EntityRuntimeID, e)
 		})
 	case *packet.MoveActorAbsolute:
-		if pk.EntityRuntimeID != p.rid {
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
 			p.MoveEntity(pk.EntityRuntimeID, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport), utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 			return false
 		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
 
 		if !utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
 			return false
@@ -263,17 +327,30 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.Teleport(pk.Position)
 		})
 	case *packet.MovePlayer:
-		if pk.EntityRuntimeID != p.rid {
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
 			p.MoveEntity(pk.EntityRuntimeID, pk.Position, pk.Mode == packet.MoveModeTeleport, pk.OnGround)
 			return false
 		}
 
+		pk.EntityRuntimeID = p.clientRuntimeID
 		pk.Tick = 0 // prevent any rewind from being done
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position)
 		})
 	case *packet.SetActorData:
 		pk.Tick = 0 // prevent any rewind from being done
+
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
+			return false
+		}
 
 		p.Acknowledgement(func() {
 			p.handleSetActorData(pk)
@@ -283,8 +360,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.gameMode = pk.GameType
 		})
 	case *packet.RemoveActor:
-		if pk.EntityUniqueID == p.uid {
+		if pk.EntityUniqueID == p.uniqueID {
 			return false
+		}
+
+		if pk.EntityUniqueID == p.clientUniqueID {
+			pk.EntityUniqueID = math.MaxInt64
 		}
 
 		p.Acknowledgement(func() {
@@ -292,9 +373,15 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		})
 	case *packet.UpdateAttributes:
 		pk.Tick = 0 // prevent any rewind from being done
-		if pk.EntityRuntimeID != p.rid {
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
 			return false
 		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
 
 		for _, a := range pk.Attributes {
 			if a.Name == "minecraft:health" && a.Value <= 0 {
@@ -326,9 +413,15 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			}
 		})
 	case *packet.SetActorMotion:
-		if pk.EntityRuntimeID != p.rid {
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
 			return false
 		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
 
 		// If the player is behind by more than the knockback network cutoff, then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
@@ -375,9 +468,15 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
 		})
 	case *packet.MobEffect:
-		if pk.EntityRuntimeID != p.rid {
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
 			return false
 		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
 
 		p.Acknowledgement(func() {
 			p.handleMobEffect(pk)
@@ -393,15 +492,41 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			}
 		})
 	case *packet.Respawn:
-		if pk.EntityRuntimeID != p.rid || pk.State != packet.RespawnStateReadyToSpawn {
+		if pk.EntityRuntimeID != p.runtimeID || pk.State != packet.RespawnStateReadyToSpawn {
 			return false
 		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
 
 		p.Acknowledgement(func() {
 			p.mInfo.ServerPosition = pk.Position.Add(mgl32.Vec3{0, 1.62})
 			p.dead = false
 			p.respawned = true
 		})
+	case *packet.AddItemActor:
+		if pk.EntityRuntimeID == p.clientRuntimeID && pk.EntityRuntimeID != p.runtimeID {
+			pk.EntityRuntimeID = math.MaxInt64
+		}
+	case *packet.MobEquipment:
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
+			return false
+		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
+	case *packet.MobArmourEquipment:
+		if pk.EntityRuntimeID != p.runtimeID {
+			if pk.EntityRuntimeID == p.clientRuntimeID {
+				pk.EntityRuntimeID = math.MaxInt64
+			}
+
+			return false
+		}
+
+		pk.EntityRuntimeID = p.clientRuntimeID
 	case *packet.Disconnect:
 		p.Disconnect(pk.Message)
 		return true
@@ -673,13 +798,14 @@ func (p *Player) handleMobEffect(pk *packet.MobEffect) {
 // handleSetActorData handles the SetActorData packet sent by the server. This is used to update
 // some of the player's metadata.
 func (p *Player) handleSetActorData(pk *packet.SetActorData) {
-	isPlayer := pk.EntityRuntimeID == p.rid
+	isPlayer := pk.EntityRuntimeID == p.runtimeID
 	width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 	height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
 
 	e, ok := p.SearchEntity(pk.EntityRuntimeID)
 	if isPlayer {
 		e = p.Entity()
+		pk.EntityRuntimeID = p.clientRuntimeID
 		ok = true
 	}
 

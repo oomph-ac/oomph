@@ -31,11 +31,14 @@ const DefaultNetworkLatencyCutoff int64 = 6
 type Player struct {
 	log              *logrus.Logger
 	conn, serverConn *minecraft.Conn
+	ccMu, scMu       sync.Mutex
 
 	debugger *Debugger
 
-	rid uint64
-	uid int64
+	runtimeID, clientRuntimeID uint64
+	uniqueID, clientUniqueID   int64
+
+	hasClientRid, hasClientUid bool
 
 	movementMode utils.AuthorityType
 	combatMode   utils.AuthorityType
@@ -138,8 +141,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		conn:       conn,
 		serverConn: serverConn,
 
-		rid: data.EntityRuntimeID,
-		uid: data.EntityUniqueID,
+		runtimeID: data.EntityRuntimeID,
+		uniqueID:  data.EntityUniqueID,
 
 		h: NopHandler{},
 
@@ -219,12 +222,39 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 // SetRuntimeID sets the runtime ID of the player.
 func (p *Player) SetRuntimeID(id uint64) {
-	p.rid = id
+	p.runtimeID = id
+	if p.hasClientRid {
+		return
+	}
+
+	p.hasClientRid = true
+	p.clientRuntimeID = id
+}
+
+func (p *Player) SetUniqueID(id int64) {
+	p.uniqueID = id
+	if p.hasClientUid {
+		return
+	}
+
+	p.hasClientUid = true
+	p.clientUniqueID = id
 }
 
 // Conn returns the connection of the player.
 func (p *Player) Conn() *minecraft.Conn {
+	p.ccMu.Lock()
+	defer p.ccMu.Unlock()
+
 	return p.conn
+}
+
+// ServerConn returns the server connection of the player.
+func (p *Player) ServerConn() *minecraft.Conn {
+	p.scMu.Lock()
+	defer p.scMu.Unlock()
+
+	return p.serverConn
 }
 
 // Log returns the log of the player.
@@ -754,6 +784,110 @@ func (p *Player) updateLatency() {
 
 		p.SendOomphDebug(fmt.Sprint("RTT + Processing Delays: ", p.stackLatency, "ms\nTick Delta: ", p.TickLatency()), packet.TextTypePopup)
 	})
+}
+
+// tryTransfer attempts to transfer the player to the given address w/o disconnecting them from oomph.
+func (p *Player) tryTransfer(address string) error {
+	p.scMu.Lock()
+	p.ccMu.Lock()
+	defer p.scMu.Unlock()
+	defer p.ccMu.Unlock()
+
+	serverConn, err := minecraft.Dialer{
+		IdentityData: p.conn.IdentityData(),
+		ClientData:   p.conn.ClientData(),
+		FlushRate:    -1,
+		ReadBatches:  true,
+	}.DialTimeout("raknet", address, time.Second)
+
+	if err != nil {
+		return err
+	}
+
+	oldRID := p.runtimeID
+	oldUID := p.uniqueID
+
+	data := serverConn.GameData()
+	p.SetRuntimeID(data.EntityRuntimeID)
+	p.SetUniqueID(data.EntityUniqueID)
+
+	if err := serverConn.DoSpawn(); err != nil {
+		p.SetRuntimeID(oldRID)
+		p.SetUniqueID(oldUID)
+		return err
+	}
+
+	p.clearAllChunks()
+
+	p.serverConn.Close()
+	p.serverConn = serverConn
+
+	// Get all entities and remove them
+	p.entities.Range(func(k, _ any) bool {
+		p.conn.WritePacket(&packet.RemoveEntity{
+			EntityNetworkID: k.(uint64),
+		})
+		p.entities.Delete(k)
+		return true
+	})
+
+	// Get all effects and remove them
+	p.effects.Range(func(k, _ any) bool {
+		p.conn.WritePacket(&packet.MobEffect{
+			EntityRuntimeID: p.clientRuntimeID,
+			Operation:       packet.MobEffectRemove,
+			EffectType:      k.(int32),
+		})
+		p.effects.Delete(k)
+		return true
+	})
+
+	// Remove any weather effects
+	p.conn.WritePacket(&packet.LevelEvent{
+		EventType: packet.LevelEventStopThunderstorm,
+		EventData: 0,
+	})
+	p.conn.WritePacket(&packet.LevelEvent{
+		EventType: packet.LevelEventStopRaining,
+		EventData: 10000,
+	})
+
+	// Set the player's gamemode
+	p.conn.WritePacket(&packet.SetPlayerGameType{
+		GameType: data.PlayerGameMode,
+	})
+	p.gameMode = data.PlayerGameMode
+
+	// Send the player the current server's gamerules
+	p.conn.WritePacket(&packet.GameRulesChanged{
+		GameRules: data.GameRules,
+	})
+	p.conn.Flush()
+
+	p.MovementInfo().ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
+	p.MovementInfo().OnGround = true
+	p.MovementInfo().Immobile = true
+	p.Acknowledgement(func() {
+		p.MovementInfo().Immobile = false
+	})
+
+	p.conn.WritePacket(&packet.MovePlayer{
+		EntityRuntimeID: p.clientRuntimeID,
+		Position:        p.mInfo.ServerPosition,
+		Mode:            packet.MoveModeReset,
+	})
+	p.conn.WritePacket(&packet.NetworkChunkPublisherUpdate{
+		Position: protocol.BlockPos{int32(p.mInfo.ServerPosition.X()) >> 4, int32(p.mInfo.ServerPosition.Z()) >> 4},
+		Radius:   uint32(p.chunkRadius * 16),
+	})
+	p.serverConn.WritePacket(&packet.RequestChunkRadius{
+		ChunkRadius:    p.chunkRadius,
+		MaxChunkRadius: p.chunkRadius,
+	})
+
+	p.conn.Flush()
+	p.serverConn.Flush()
+	return nil
 }
 
 func (p *Player) tryDoSync() {

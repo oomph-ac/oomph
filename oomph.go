@@ -90,7 +90,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
-		if err := conn.StartGame(data); err != nil {
+		if err := p.Conn().StartGame(data); err != nil {
 			o.log.Error("oomph conn.StartGame(): " + err.Error())
 			p.Close()
 			p = nil
@@ -99,7 +99,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		g.Done()
 	}()
 	go func() {
-		if err := serverConn.DoSpawn(); err != nil {
+		if err := p.ServerConn().DoSpawn(); err != nil {
 			o.log.Error("oomph serverConn.DoSpawn(): " + err.Error())
 			p.Close()
 			p = nil
@@ -116,12 +116,12 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	g.Add(2)
 	go func() {
 		defer func() {
-			_ = listener.Disconnect(conn, "connection lost")
-			_ = serverConn.Close()
+			_ = listener.Disconnect(p.Conn(), "client connection lost")
+			_ = p.ServerConn().Close()
 			g.Done()
 		}()
 		for {
-			pks, err := conn.ReadBatch()
+			pks, err := p.Conn().ReadBatch()
 			if err != nil || p == nil {
 				o.log.Error(err)
 				return
@@ -143,7 +143,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 					}
 
 					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-						_ = listener.Disconnect(conn, disconnect.Error())
+						_ = listener.Disconnect(p.Conn(), disconnect.Error())
 					}
 				}
 
@@ -151,49 +151,53 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 					continue
 				}
 
-				err = serverConn.WritePacket(pk)
+				err = p.ServerConn().WritePacket(pk)
 				if err != nil {
+					p.Log().Error("serverConn.WritePacket() error: " + err.Error())
 					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-						_ = listener.Disconnect(conn, disconnect.Error())
+						_ = listener.Disconnect(p.Conn(), disconnect.Error())
 					}
 					return
 				}
 			}
 
-			serverConn.Flush()
+			p.ServerConn().Flush()
 		}
 	}()
 	go func() {
 		defer func() {
-			_ = serverConn.Close()
-			_ = listener.Disconnect(conn, "connection lost")
+			_ = p.ServerConn().Close()
+			_ = listener.Disconnect(p.Conn(), "server connection lost")
 			g.Done()
 		}()
 		for {
-			pks, err := serverConn.ReadBatch()
+			pks, err := p.ServerConn().ReadBatch()
 
 			if len(pks) == 0 {
 				return
 			}
 
-			for _, pk := range pks {
-				if err != nil {
-					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-						_ = listener.Disconnect(conn, disconnect.Error())
-					}
-					return
+			if err != nil {
+				p.Log().Error("serverConn.ReadBatch() error: " + err.Error())
+				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+					_ = listener.Disconnect(p.Conn(), disconnect.Error())
 				}
+				return
+			}
 
+			for _, pk := range pks {
 				if p.ServerProcess(pk) {
 					continue
 				}
-				if err := conn.WritePacket(pk); err != nil {
+
+				if err := p.Conn().WritePacket(pk); err != nil {
+					p.Log().Error("conn.WritePacket() error: " + err.Error())
 					return
 				}
 			}
 
 			p.SendAck()
-			conn.Flush()
+			p.Conn().Flush()
 		}
 	}()
 	g.Wait()
