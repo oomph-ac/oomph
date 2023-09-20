@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"github.com/sandertv/gophertunnel/minecraft/resource"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sandertv/gophertunnel/minecraft/resource"
 )
 
 // ResourcePacks loads all resource packs in a path.
@@ -17,7 +18,7 @@ func ResourcePacks(path string) []*resource.Pack {
 			}
 
 			if strings.HasSuffix(info.Name(), ".zip") || strings.HasSuffix(info.Name(), ".mcpack") {
-				pack, err := resource.Compile(path + "/" + info.Name())
+				pack, err := resource.Compile(path)
 				if err != nil {
 					return err
 				}
