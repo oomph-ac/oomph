@@ -9,7 +9,7 @@ require (
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/go-gl/mathgl v1.1.0
 	github.com/pelletier/go-toml v1.9.5
-	github.com/sandertv/gophertunnel v1.31.1
+	github.com/sandertv/gophertunnel v1.32.1
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/text v0.13.0
@@ -23,7 +23,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.3.1 // indirect
-	github.com/klauspost/compress v1.16.7 // indirect
+	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/sandertv/go-raknet v1.12.1 // indirect
@@ -38,4 +38,4 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.31.1 => github.com/ethaniccc/gophertunnel v0.0.0-20230907154951-bb4a72356e48
+replace github.com/sandertv/gophertunnel v1.32.1 => github.com/ethaniccc/gophertunnel v0.0.0-20230920202438-692074b3fb5f
