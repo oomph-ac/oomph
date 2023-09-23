@@ -127,9 +127,9 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 
 	// Update the flying speed of the player.
-	p.mInfo.FlyingSpeed = 0.02
+	p.mInfo.AirSpeed = 0.02
 	if p.mInfo.Sprinting {
-		p.mInfo.FlyingSpeed += 0.006
+		p.mInfo.AirSpeed += 0.006
 	}
 
 	// If the player is not holding the jump key, reset the ticks until next jump.
@@ -842,7 +842,7 @@ type MovementInfo struct {
 	LeftImpulse    float32
 
 	JumpVelocity          float32
-	FlyingSpeed           float32
+	AirSpeed              float32
 	MovementSpeed         float32
 	ClientCalculatedSpeed float32
 
@@ -905,5 +905,5 @@ func (m *MovementInfo) getFrictionInfluencedSpeed(f float32) float32 {
 		return m.MovementSpeed * (0.162771336 / (f * f * f))
 	}
 
-	return m.FlyingSpeed
+	return m.AirSpeed
 }
