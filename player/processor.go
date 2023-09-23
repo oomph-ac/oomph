@@ -373,7 +373,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 					p.mInfo.MovementSpeed = a.Value
 					if p.debugger.LogMovement {
-						p.Log().Debugf("ack: movement speed updated to %f", a.Value)
+						p.Log().Debugf("ack(): movement speed updated to %f", a.Value)
 					}
 
 					p.miMu.Unlock()

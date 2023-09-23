@@ -283,6 +283,10 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 	p.mInfo.Teleporting = true
 	p.mInfo.CanExempt = true
 	p.mInfo.ServerPosition = pos
+
+	if p.debugger.LogMovement {
+		p.log.Debugf("p.Teleport(): teleported to %v at frame %v", pos, p.clientFrame.Load())
+	}
 }
 
 // MoveEntity moves an entity to the given position.
@@ -904,7 +908,7 @@ func (p *Player) tryDoSync() {
 			p.clientTick.Store(sTick)
 			p.isSyncedWithServer = true
 			p.awaitingSync = false
-			p.nextSyncTick = p.ServerTick() + uint64(p.TickLatency()) + 20
+			p.nextSyncTick = p.ServerTick() + uint64(p.TickLatency()) + 10
 		})
 	}
 }
@@ -963,7 +967,11 @@ func (p *Player) doTick() {
 	// Send the acknowledgement packet to the client and then flush the client's connection so that they recieve packets
 	// from the server.
 	p.SendAck()
-	p.conn.Flush()
+
+	p.Conn().Flush()
+	if p.ServerConn() != nil {
+		p.ServerConn().Flush()
+	}
 
 	p.lastServerTicked = time.Now()
 }

@@ -161,7 +161,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				}
 			}
 
-			p.ServerConn().Flush()
+			//p.ServerConn().Flush()
 		}
 	}()
 	go func() {
@@ -196,8 +196,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				}
 			}
 
-			p.SendAck()
-			p.Conn().Flush()
+			//p.SendAck()
+			//p.Conn().Flush()
 		}
 	}()
 	g.Wait()
