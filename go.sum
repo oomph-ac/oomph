@@ -15,6 +15,10 @@ github.com/df-mc/dragonfly v0.9.9-0.20230822233357-6a5c283387a4 h1:zIq1wWGu2CJPI
 github.com/df-mc/dragonfly v0.9.9-0.20230822233357-6a5c283387a4/go.mod h1:yCIxAQa6AcCIlcxpzhMqLYXsz2T2LRXQjkSUIJRrNas=
 github.com/df-mc/dragonfly v0.9.9-0.20230826102332-5303318f64a0 h1:SZtd3Mlza+qLVh/OoXlzX9IlBvmoVcc13alme9/8aqE=
 github.com/df-mc/dragonfly v0.9.9-0.20230826102332-5303318f64a0/go.mod h1:yCIxAQa6AcCIlcxpzhMqLYXsz2T2LRXQjkSUIJRrNas=
+github.com/df-mc/dragonfly v0.9.9-0.20230923145834-398b9a6442b8 h1:Ogcj8M0I0Baxg4sfXV51GTnDeZ9iZZyv0JLjw+7/JtU=
+github.com/df-mc/dragonfly v0.9.9-0.20230923145834-398b9a6442b8/go.mod h1:yCIxAQa6AcCIlcxpzhMqLYXsz2T2LRXQjkSUIJRrNas=
+github.com/df-mc/dragonfly v0.9.9-0.20230923145857-960edf5a02ce h1:Mw65ioJ2vy4D7+SwQcWUOtATqtB/gf/fQwNqkEsRvWc=
+github.com/df-mc/dragonfly v0.9.9-0.20230923145857-960edf5a02ce/go.mod h1:InkIHmsYMUxCpGVfPYYcd/yeuUG1RQmrTBDG3RiEo3I=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
 github.com/df-mc/worldupgrader v1.0.9 h1:hJxbovEEzhTg/TPZqpwg8BsVTVeoVgDp6q7dMoBlwmA=
@@ -25,6 +29,8 @@ github.com/ethaniccc/gophertunnel v0.0.0-20230907154951-bb4a72356e48 h1:ycBUuHM9
 github.com/ethaniccc/gophertunnel v0.0.0-20230907154951-bb4a72356e48/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/ethaniccc/gophertunnel v0.0.0-20230920202438-692074b3fb5f h1:pFzWMNM/JEG0wmPd6qSTwlpxb/jpXZuzHPKjo4G8sxQ=
 github.com/ethaniccc/gophertunnel v0.0.0-20230920202438-692074b3fb5f/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
+github.com/ethaniccc/gophertunnel v0.0.0-20230923154305-3f9c9b2d608a h1:Nq4S86RrvFw1l2O3V96RlA50Msd7WzmuX4Cd8keox0g=
+github.com/ethaniccc/gophertunnel v0.0.0-20230923154305-3f9c9b2d608a/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/go-gl/mathgl v1.1.0 h1:0lzZ+rntPX3/oGrDzYGdowSLC2ky8Osirvf5uAwfIEA=
 github.com/go-gl/mathgl v1.1.0/go.mod h1:yhpkQzEiH9yPyxDUGzkmgScbaBVlhC06qodikEM0ZwQ=
@@ -66,6 +72,8 @@ github.com/sandertv/gophertunnel v1.31.1-0.20230906175229-b2906971c446 h1:EI2jaS
 github.com/sandertv/gophertunnel v1.31.1-0.20230906175229-b2906971c446/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/sandertv/gophertunnel v1.32.1 h1:yOrr5WA3gZxG2JhdAtMSf+jx7B8MxKLHgT3wknLGssE=
 github.com/sandertv/gophertunnel v1.32.1/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
+github.com/sandertv/gophertunnel v1.32.2 h1:vlm6TonrgdESjcgY8Ixt4mHT4/bdih+NrnsqlBhaUok=
+github.com/sandertv/gophertunnel v1.32.2/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
