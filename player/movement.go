@@ -85,6 +85,17 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	// affect certain movement aspects, such as gravity.
 	p.tickEffects()
 
+	// Check the player's client-side flight status.
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartFlying) {
+		p.mInfo.ToggleFly = true
+		if p.mInfo.TrustFlyStatus {
+			// If we don't trust the players flight status, we will have to wait for an update from the server.
+			p.mInfo.Flying = true
+		}
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopFlying) {
+		p.mInfo.Flying = false
+	}
+
 	// Update the sneaking state of the player.
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
 		p.mInfo.Sneaking = true
@@ -856,15 +867,14 @@ type MovementInfo struct {
 	TicksSinceBlockRefresh uint32
 	TicksUntilNextJump     int32
 
-	Sneaking, SneakBindPressed   bool
-	Jumping, JumpBindPressed     bool
-	Sprinting, SprintBindPressed bool
-	Teleporting                  bool
-	Immobile                     bool
-	ToggleFly, Flying            bool
-	NoClip                       bool
-	KnownInsideBlock             bool
-	TrustFlyStatus               bool
+	Sneaking, SneakBindPressed        bool
+	Jumping, JumpBindPressed          bool
+	Sprinting, SprintBindPressed      bool
+	Teleporting                       bool
+	Immobile                          bool
+	ToggleFly, Flying, TrustFlyStatus bool
+	NoClip                            bool
+	KnownInsideBlock                  bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
 	XCollision, ZCollision                               bool
