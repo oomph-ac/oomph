@@ -126,19 +126,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
 			cancel = p.handleBlockPlace(t)
 		}
-	case *packet.RequestAbility:
-		if pk.Ability != packet.AbilityFlying {
-			return false
-		}
-
-		fly := pk.Value.(bool)
-		p.mInfo.ToggleFly = fly
-		// If we can't trust their flight status, we need to wait for the server to update the player's flying state.
-		if fly && !p.mInfo.TrustFlyStatus {
-			return false
-		}
-
-		p.mInfo.Flying = pk.Value.(bool)
 	case *packet.Text:
 		cmd := strings.Split(pk.Message, " ")
 		if cmd[0] == "!oomph_debug" {
@@ -469,6 +456,10 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			for _, l := range pk.AbilityData.Layers {
 				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
 				if p.mInfo.ToggleFly {
+					// If the player toggled flight, but the server did not allow it, we longer trust
+					// their flight status. This is done to ensure players that have permission to fly
+					// are able to do so w/o any movement corrections, but players that do not have permission
+					// to do so aren't able to bypass movement predictions with it.
 					p.mInfo.TrustFlyStatus = p.mInfo.Flying
 				}
 				p.mInfo.ToggleFly = false
