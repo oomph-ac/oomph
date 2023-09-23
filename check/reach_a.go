@@ -11,7 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const interpolatedFrames float32 = 10
+const interpolatedFrames float32 = 15
 
 type ReachA struct {
 	eid uint64
@@ -32,7 +32,7 @@ func (*ReachA) Description() string {
 }
 
 func (*ReachA) MaxViolations() float64 {
-	return math.MaxFloat64
+	return 10
 }
 
 func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
@@ -70,7 +70,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		bb := e.AABB().Translate(e.LastPosition()).Grow(0.1)
+		bb := e.AABB().Translate(e.LastPosition()).Grow(0.15)
 		pe := p.Entity()
 
 		atkPos := pe.LastPosition().Add(mgl32.Vec3{0, 1.62})

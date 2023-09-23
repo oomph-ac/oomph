@@ -27,7 +27,7 @@ func (*ReachB) Description() string {
 }
 
 func (*ReachB) MaxViolations() float64 {
-	return math.MaxFloat64
+	return 15
 }
 
 func (r *ReachB) Process(p Processor, pk packet.Packet) bool {

@@ -177,13 +177,16 @@ func (a *Acknowledgements) Validate() bool {
 func (p *Player) SendAck() {
 	acks := p.Acknowledgements()
 	if pk := acks.Create(); pk != nil {
+		defer acks.Refresh()
+
 		buf, ok := acks.GetMap(acks.CurrentTimestamp)
 		if !ok {
 			return
 		}
 
-		if len(buf) != 0 {
-			p.conn.WritePacket(pk)
+		if len(buf) == 0 {
+			acks.Remove(acks.CurrentTimestamp)
+			return
 		}
 
 		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
@@ -193,6 +196,6 @@ func (p *Player) SendAck() {
 		//	acks.AddMap(m, acks.CurrentTimestamp/1000)
 		//}
 
-		acks.Refresh()
+		p.conn.WritePacket(pk)
 	}
 }
