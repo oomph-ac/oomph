@@ -173,11 +173,6 @@ func (p *Player) validateMovement() {
 	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
 	movDiff := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
 
-	//p.mInfo.ServerPosition[0] -= game.ClampFloat(posDiff.X(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
-	//p.mInfo.ServerPosition[1] -= game.ClampFloat(posDiff.Y(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
-	//p.mInfo.ServerPosition[2] -= game.ClampFloat(posDiff.Z(), -p.mInfo.UnsupportedAcceptance, p.mInfo.UnsupportedAcceptance)
-	//posDiff = p.mInfo.ServerPosition.Sub(p.Position())
-
 	if p.debugger.LogMovement {
 		p.Log().Debugf("validateMovement(): client pos:%v server pos:%v", p.Position(), p.mInfo.ServerPosition)
 		p.Log().Debugf("validateMovement(): client mov:%v server mov:%v", p.mInfo.ClientMovement, p.mInfo.OldServerMovement)
@@ -279,11 +274,6 @@ func (p *Player) aiStep() {
 		if p.debugger.LogMovement {
 			p.Log().Debug("aiStep(): simulated jump")
 		}
-	}
-
-	// If the player is teleporting, set their motion to 0 vec.
-	if p.mInfo.Teleporting {
-		p.mInfo.ServerMovement = mgl32.Vec3{}
 	}
 
 	p.doGroundMove()
