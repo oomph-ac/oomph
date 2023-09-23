@@ -18,7 +18,7 @@ func ResourcePacks(path string) []*resource.Pack {
 			}
 
 			if strings.HasSuffix(info.Name(), ".zip") || strings.HasSuffix(info.Name(), ".mcpack") {
-				pack, err := resource.Compile(path)
+				pack, err := resource.ReadPath(path)
 				if err != nil {
 					return err
 				}
