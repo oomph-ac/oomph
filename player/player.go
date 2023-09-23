@@ -194,7 +194,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewTimerA(),
 
 			check.NewInvalidA(),
-			check.NewInvalidB(),
+			//check.NewInvalidB(),
 		},
 
 		mInfo: &MovementInfo{
