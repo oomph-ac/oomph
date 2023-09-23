@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 	"time"
 	_ "unsafe"
@@ -161,22 +160,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.debugger.UsePacketBuffer = b
 			case "packet_buffer":
 				p.UsePacketBuffering(b)
-			case "game_speed":
-				// convert to float32 using strconv.ParseFloat
-				f, err := strconv.ParseFloat(cmd[2], 32)
-				if err != nil {
-					p.SendOomphDebug("Invalid value: "+cmd[2], packet.TextTypeChat)
-					return true
-				}
-
-				pk := &packet.LevelEvent{
-					EventType: packet.LevelEventSimTimeScale,
-					Position:  mgl32.Vec3{1},
-				}
-
-				p.conn.WritePacket(pk)
-				pk.Position = mgl32.Vec3{float32(f)}
-				p.conn.WritePacket(pk)
 			case "movement":
 				p.debugger.LogMovement = b
 
@@ -266,7 +249,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			return false
 		}
 
-		p.cleanChunks(p.chunkRadius)
+		p.cleanChunks(p.chunkRadius + 4)
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.runtimeID {
 			// We are the player.
