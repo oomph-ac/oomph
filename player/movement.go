@@ -855,6 +855,7 @@ type MovementInfo struct {
 
 	TicksSinceKnockback    uint32
 	TicksSinceBlockRefresh uint32
+	TicksSinceTeleport     uint32
 	TicksUntilNextJump     int32
 
 	Sneaking, SneakBindPressed        bool
@@ -895,6 +896,7 @@ func (m *MovementInfo) SetKnockback(k mgl32.Vec3) {
 func (m *MovementInfo) Tick() {
 	m.TicksSinceKnockback++
 	m.TicksSinceBlockRefresh++
+	m.TicksSinceTeleport++
 
 	m.TicksUntilNextJump--
 }
