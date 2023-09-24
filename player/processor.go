@@ -231,12 +231,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		p.SendOomphDebug(text.Colourf("<green>Completed transfer to remote server!</green>"), packet.TextTypeChat)
 		return true
-	case *packet.NetworkChunkPublisherUpdate:
-		if p.serverConn != nil && pk.Position.X()>>4 == 0 && pk.Position.Z()>>4 == 0 {
-			return false
-		}
-
-		p.cleanChunks(p.chunkRadius + 4)
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.runtimeID {
 			// We are the player.
@@ -539,6 +533,10 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	defer func() {
 		p.mInfo.LastUsedInput = pk
 	}()
+
+	if p.mInfo.TicksSinceTeleport >= 40 && p.inLoadedChunk {
+		p.cleanChunks(p.chunkRadius + 4)
+	}
 
 	// Determine wether the player's current position has a chunk.
 	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
