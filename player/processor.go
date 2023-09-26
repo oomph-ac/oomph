@@ -381,6 +381,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		p.Acknowledgement(func() {
+			p.lastAttributeData = pk
 			for _, a := range pk.Attributes {
 				if a.Name == "minecraft:movement" {
 					p.miMu.Lock()

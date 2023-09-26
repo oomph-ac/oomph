@@ -221,6 +221,12 @@ func (p *Player) correctMovement() {
 		p.mInfo.TicksSinceBlockRefresh = 0
 	}
 
+	if p.lastAttributeData != nil {
+		p.lastAttributeData.Tick = p.ClientFrame()
+		p.lastAttributeData.EntityRuntimeID = p.clientRuntimeID
+		p.conn.WritePacket(p.lastAttributeData)
+	}
+
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
 		Position: pos.Add(mgl32.Vec3{0, 1.62 + 1e-3}),
