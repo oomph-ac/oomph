@@ -104,6 +104,7 @@ type Player struct {
 
 	lastAttackData    *packet.InventoryTransaction
 	lastEquipmentData *packet.MobEquipment
+	lastAttributeData *packet.UpdateAttributes
 
 	nextTickActions   []func()
 	nextTickActionsMu sync.Mutex
