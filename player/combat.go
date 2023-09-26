@@ -39,6 +39,10 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 
 	// If the player is in a gamemode that has extended reach, there is no need to validate combat.
 	if p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure {
+		if p.lastAttackData != nil {
+			p.SendPacketToServer(p.lastAttackData)
+		}
+
 		return
 	}
 
@@ -161,6 +165,15 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	}
 
 	targetAABB := t.AABB().Grow(0.13).Translate(rew.Position)
+
+	if targetAABB.IntersectsWith(p.AABB()) {
+		p.SendPacketToServer(p.lastAttackData)
+		if p.debugger.LogCombat {
+			p.SendOomphDebug("hit valid: intersected with player", packet.TextTypeChat)
+		}
+
+		return
+	}
 
 	// AABB distance check, to make sure the player is within search range of the entity.
 	touchDist := game.AABBVectorDistance(targetAABB, attackPos)
