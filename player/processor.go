@@ -518,9 +518,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		pk.EntityRuntimeID = p.clientRuntimeID
-	case *packet.Disconnect:
-		p.Disconnect(pk.Message)
-		return true
 	}
 	return false
 }
