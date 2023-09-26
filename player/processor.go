@@ -373,7 +373,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 				p.isSyncedWithServer = false
 				p.dead = true
 
-				p.clearAllChunks()
 				p.inLoadedChunk = false
 				p.inLoadedChunkTicks = 0
 
