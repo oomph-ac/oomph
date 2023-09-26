@@ -281,7 +281,7 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 	defer p.miMu.Unlock()
 
 	p.mInfo.Teleporting = true
-	p.mInfo.TicksSinceTeleport = 0
+	p.mInfo.AwaitingTeleport = false
 	p.mInfo.CanExempt = true
 	p.mInfo.ServerPosition = pos
 

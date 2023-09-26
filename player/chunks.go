@@ -28,6 +28,10 @@ func (p *Player) AddChunk(c *chunk.Chunk, pos protocol.ChunkPos) {
 	p.chunkMu.Lock()
 	defer p.chunkMu.Unlock()
 
+	if p.debugger.LogMovement {
+		p.Log().Debugf("AddChunk(): adding chunk at pos %v", pos)
+	}
+
 	p.chunks[pos] = c
 }
 
@@ -188,23 +192,18 @@ func (p *Player) networkClientBreaksBlock(pos protocol.BlockPos) {
 
 // cleanChunks filters out any chunks that are out of the player's view, and returns a value of
 // how many chunks were cleaned
-func (p *Player) cleanChunks(chunkRadius int32) {
+func (p *Player) cleanChunks(chunkRadius int32, chunkPos protocol.ChunkPos) {
 	p.chunkMu.Lock()
 	defer p.chunkMu.Unlock()
 
-	activePos := protocol.ChunkPos{
-		int32(p.mInfo.ServerPosition.X()) >> 4,
-		int32(p.mInfo.ServerPosition.Z()) >> 4,
-	}
-
 	// Delete from any chunks that are out of the player's view.
 	for pos := range p.chunks {
-		diffX, diffZ := pos[0]-activePos[0], pos[1]-activePos[1]
-		dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
-
-		// If the distance is within the player's chunk view, leave it alone.
-		if int32(dist) <= chunkRadius {
+		if chunkInRange(p.chunkRadius, pos, chunkPos) {
 			continue
+		}
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("cleanChunks(): deleting chunk at pos %v", pos)
 		}
 
 		// The chunks are out of the player's view, so delete it.
@@ -219,5 +218,17 @@ func (p *Player) clearAllChunks() {
 
 	for k := range p.chunks {
 		delete(p.chunks, k)
+
+		if !p.debugger.LogMovement {
+			continue
+		}
+		p.Log().Debugf("clearAllChunks(): deleting chunk at pos %v", k)
 	}
+}
+
+func chunkInRange(radius int32, cpos, pos protocol.ChunkPos) bool {
+	diffX, diffZ := pos[0]-cpos[0], pos[1]-cpos[1]
+	dist := math32.Sqrt(float32(diffX*diffX) + float32(diffZ*diffZ))
+
+	return int32(dist) <= radius
 }
