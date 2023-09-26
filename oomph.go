@@ -11,6 +11,7 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -46,7 +47,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 		TexturePacksRequired:   requirePacks,
 		AcceptedProtocols:      protocols,
 		FlushRate:              -1,
-		ReadBatches:            true,
+		ReadBatches:            false,
 		AllowInvalidPackets:    true,
 		AllowUnknownPackets:    true,
 	}.Listen("raknet", o.addr)
@@ -71,7 +72,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		IdentityData: conn.IdentityData(),
 		ClientData:   conn.ClientData(),
 		FlushRate:    -1,
-		ReadBatches:  true,
+		ReadBatches:  false,
 	}.Dial("raknet", remoteAddr)
 
 	if err != nil {
@@ -121,44 +122,45 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			pks, err := p.Conn().ReadBatch()
+			pk, err := p.Conn().ReadPacket()
 			if err != nil || p == nil {
 				o.log.Error(err)
 				return
 			}
 
-			if len(pks) == 0 {
+			if _, ok := pk.(*packet.Disconnect); ok {
+				p.ServerConn().WritePacket(pk)
+				p.Close()
+
 				return
 			}
 
-			for _, pk := range pks {
-				if p.UsesPacketBuffer() {
-					if !p.QueuePacket(pk) {
-						continue
-					}
-
-					err = p.SendPacketToServer(pk)
-					if err == nil {
-						continue
-					}
-
-					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-						_ = listener.Disconnect(p.Conn(), disconnect.Error())
-					}
-				}
-
-				if p.ClientProcess(pk) {
+			if p.UsesPacketBuffer() {
+				if !p.QueuePacket(pk) {
 					continue
 				}
 
-				err = p.ServerConn().WritePacket(pk)
-				if err != nil {
-					p.Log().Error("serverConn.WritePacket() error: " + err.Error())
-					if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-						_ = listener.Disconnect(p.Conn(), disconnect.Error())
-					}
-					return
+				err = p.SendPacketToServer(pk)
+				if err == nil {
+					continue
 				}
+
+				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+					_ = listener.Disconnect(p.Conn(), disconnect.Error())
+				}
+			}
+
+			if p.ClientProcess(pk) {
+				continue
+			}
+
+			err = p.ServerConn().WritePacket(pk)
+			if err != nil {
+				p.Log().Error("serverConn.WritePacket() error: " + err.Error())
+				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+					_ = listener.Disconnect(p.Conn(), disconnect.Error())
+				}
+				return
 			}
 
 			//p.ServerConn().Flush()
@@ -171,11 +173,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			pks, err := p.ServerConn().ReadBatch()
-
-			if len(pks) == 0 {
-				return
-			}
+			pk, err := p.ServerConn().ReadPacket()
 
 			if err != nil {
 				p.Log().Error("serverConn.ReadBatch() error: " + err.Error())
@@ -185,15 +183,21 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			for _, pk := range pks {
-				if p.ServerProcess(pk) {
-					continue
-				}
+			if d, ok := pk.(*packet.Disconnect); ok {
+				p.Conn().WritePacket(d)
+				p.Conn().Flush()
+				p.Close()
 
-				if err := p.Conn().WritePacket(pk); err != nil {
-					p.Log().Error("conn.WritePacket() error: " + err.Error())
-					return
-				}
+				return
+			}
+
+			if p.ServerProcess(pk) {
+				continue
+			}
+
+			if err := p.Conn().WritePacket(pk); err != nil {
+				p.Log().Error("conn.WritePacket() error: " + err.Error())
+				return
 			}
 
 			//p.SendAck()
