@@ -287,8 +287,16 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			return false
 		}
 
+		p.miMu.Lock()
+		p.mInfo.AwaitingTeleport = true
+		p.miMu.Unlock()
+
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position)
+		})
+		p.cleanChunks(p.chunkRadius, protocol.ChunkPos{
+			int32(math32.Floor(pk.Position[0])) >> 4,
+			int32(math32.Floor(pk.Position[2])) >> 4,
 		})
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.runtimeID {
@@ -302,8 +310,21 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		pk.EntityRuntimeID = p.clientRuntimeID
 		pk.Tick = 0 // prevent any rewind from being done
+
+		if pk.Mode != packet.MoveModeTeleport && pk.Mode != packet.MoveModeReset {
+			return false
+		}
+
+		p.miMu.Lock()
+		p.mInfo.AwaitingTeleport = true
+		p.miMu.Unlock()
+
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position)
+		})
+		p.cleanChunks(p.chunkRadius, protocol.ChunkPos{
+			int32(math32.Floor(pk.Position[0])) >> 4,
+			int32(math32.Floor(pk.Position[2])) >> 4,
 		})
 	case *packet.SetActorData:
 		pk.Tick = 0 // prevent any rewind from being done
@@ -412,7 +433,9 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.handleSubChunk(pk)
 		})
 	case *packet.ChunkRadiusUpdated:
-		p.chunkRadius = pk.ChunkRadius + 4
+		p.Acknowledgement(func() {
+			p.chunkRadius = pk.ChunkRadius
+		})
 	case *packet.UpdateBlock:
 		if p.movementMode == utils.ModeClientAuthoritative {
 			return false
@@ -534,15 +557,14 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		p.mInfo.LastUsedInput = pk
 	}()
 
-	if p.mInfo.TicksSinceTeleport >= 40 && p.inLoadedChunk {
-		p.cleanChunks(p.chunkRadius + 4)
-	}
-
-	// Determine wether the player's current position has a chunk.
-	p.inLoadedChunk = p.ChunkExists(protocol.ChunkPos{
+	cPos := protocol.ChunkPos{
 		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
-	})
+	}
+	if !p.mInfo.AwaitingTeleport {
+		p.cleanChunks(p.chunkRadius, cPos)
+	}
+	p.inLoadedChunk = p.ChunkExists(cPos)
 
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
 	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
