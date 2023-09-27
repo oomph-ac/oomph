@@ -128,13 +128,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			if _, ok := pk.(*packet.Disconnect); ok {
-				p.ServerConn().WritePacket(pk)
-				p.Close()
-
-				return
-			}
-
 			if p.UsesPacketBuffer() {
 				if !p.QueuePacket(pk) {
 					continue
