@@ -13,7 +13,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const maxCrosshairAttackDist float32 = 3.005
+const maxCrosshairAttackDist float32 = 3.0
 const maxTouchAttackDist float32 = 3.1
 
 // updateCombatData updates the player's current combat data, and sets the needsCombatValidation flag to true. The combat data will be
