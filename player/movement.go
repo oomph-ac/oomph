@@ -731,7 +731,7 @@ func (p *Player) pushOutOfBlocks(x, y, z float32) {
 	case 1:
 		p.mInfo.ServerPosition[0] += 0.5
 	case 3:
-		p.mInfo.ServerPosition[1] += 0.6
+		p.mInfo.ServerPosition[1] = math32.Ceil(p.mInfo.ServerPosition[1])
 		p.mInfo.OnGround = true
 		p.mInfo.VerticallyCollided = true
 	case 4:
