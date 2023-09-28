@@ -209,7 +209,7 @@ func (p *Player) correctMovement() {
 
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
-	if p.mInfo.TicksSinceBlockRefresh >= 60 {
+	if p.mInfo.TicksSinceBlockRefresh >= 10 {
 		for bpos, b := range p.GetNearbyBlocks(p.AABB()) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
@@ -251,6 +251,17 @@ func (p *Player) aiStep() {
 	// If the player's Z movement is below 1e-7, set it to 0.
 	if mgl32.Abs(p.mInfo.ServerMovement[2]) < 1e-7 {
 		p.mInfo.ServerMovement[2] = 0
+	}
+
+	// Attempt to push the player out of any blocks they're inside of.
+	oldPos := p.mInfo.ServerPosition
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+
+	if p.debugger.LogMovement {
+		p.Log().Debugf("aiStep(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
 	}
 
 	// If the player is not in a loaded chunk, or is immobile, set their movement to 0 vec.
@@ -328,7 +339,6 @@ func (p *Player) doGroundMove() {
 
 	oldMov := p.mInfo.ServerMovement
 	p.simulateCollisions()
-	p.handleInsideBlockMovement()
 
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
 
@@ -552,56 +562,6 @@ func (p *Player) maybeBackOffFromEdge() {
 	p.Log().Debugf("maybeBackOffFromEdge(): oldMov=%v, newMov=%v", currentVel, p.mInfo.ServerMovement)
 }
 
-// handleInsideBlockMovement handles movement that occurs when a player is first inside a block.
-func (p *Player) handleInsideBlockMovement() {
-	b, inside := p.isInsideBlock()
-	defer func() {
-		p.mInfo.KnownInsideBlock = inside
-	}()
-
-	if !inside {
-		if p.debugger.LogMovement {
-			p.Log().Debug("handleInsideBlockMovement(): player not inside block")
-		}
-
-		return
-	}
-
-	if p.mInfo.KnownInsideBlock {
-		if p.debugger.LogMovement {
-			p.Log().Debug("handleInsideBlockMovement(): player known to be inside block")
-		}
-
-		return
-	}
-
-	if utils.CanPassBlock(b) {
-		if p.debugger.LogMovement {
-			p.Log().Debugf("handleInsideBlockMovement(): block is passable (%v)", utils.BlockName(b))
-		}
-
-		return
-	}
-
-	if p.mInfo.Teleporting {
-		if p.debugger.LogMovement {
-			p.Log().Debug("handleInsideBlockMovement(): ignored due to teleport")
-		}
-
-		return
-	}
-
-	p.mInfo.ServerMovement[0] *= -1.5
-	p.mInfo.ServerMovement[1] *= -1
-	p.mInfo.ServerMovement[2] *= -1.5
-
-	if !p.debugger.LogMovement {
-		return
-	}
-
-	p.Log().Debugf("handleInsideBlockMovement(): modified vel, movement=%v", p.mInfo.ServerMovement)
-}
-
 // isInsideBlock returns true if the player is inside a block.
 func (p *Player) isInsideBlock() (world.Block, bool) {
 	if p.mInfo.StepClipOffset > 0 {
@@ -725,6 +685,62 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 	return mgl32.Vec3{xMov, yMov, zMov}
 }
 
+// pushOutOfBlocks simulates the movement occured when the player is inside a block.
+func (p *Player) pushOutOfBlocks(x, y, z float32) {
+	blockPos := cube.PosFromVec3(mgl32.Vec3{x, y, z})
+	d0, d1, d2 := x-float32(blockPos.X()), y-float32(blockPos.Y()), z-float32(blockPos.Z())
+
+	if p.IsBlockOpenSpace(blockPos) {
+		if p.debugger.LogMovement {
+			p.Log().Debugf("pushOutOfBlocks(): block at %v detected as full space, cannot continue", blockPos)
+		}
+
+		return
+	}
+
+	i := -1
+	d3 := float32(9999.0)
+
+	if !p.IsBlockFullCube(blockPos.Side(cube.FaceWest)) && d0 < d3 {
+		d3 = d0
+		i = 0
+	}
+
+	if !p.IsBlockFullCube(blockPos.Side(cube.FaceEast)) && 1.0-d0 < d3 {
+		d3 = 1.0 - d0
+		i = 1
+	}
+
+	if !p.IsBlockFullCube(blockPos.Side(cube.FaceUp)) && 1.0-d1 < d3 {
+		d3 = 1.0 - d1
+		i = 3
+	}
+
+	if !p.IsBlockFullCube(blockPos.Side(cube.FaceNorth)) && d2 < d3 {
+		d3 = d2
+		i = 4
+	}
+
+	if !p.IsBlockFullCube(blockPos.Side(cube.FaceSouth)) && 1.0-d2 < d3 {
+		i = 5
+	}
+
+	switch i {
+	case 0:
+		p.mInfo.ServerPosition[0] -= 0.5
+	case 1:
+		p.mInfo.ServerPosition[0] += 0.5
+	case 3:
+		p.mInfo.ServerPosition[1] += 0.6
+		p.mInfo.OnGround = true
+		p.mInfo.VerticallyCollided = true
+	case 4:
+		p.mInfo.ServerPosition[2] -= 0.5
+	case 5:
+		p.mInfo.ServerPosition[2] += 0.5
+	}
+}
+
 // simulateGravity simulates the gravity of the player
 func (p *Player) simulateGravity() {
 	p.mInfo.ServerMovement[1] -= p.mInfo.Gravity
@@ -795,16 +811,6 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 func (p *Player) checkUnsupportedMovementScenarios() bool {
 	bb := p.AABB()
 	blocks := p.GetNearbyBlocks(bb)
-
-	/* The following checks below determine wether or not the player is in an unspported rewind scenario.
-	What this means is that the movement corrections on the client won't work properly and the player will
-	essentially be jerked around indefinently, and therefore, corrections should not be done if these conditions
-	are met. */
-
-	// This check determines if the player is inside any blocks
-	/* if cube.AnyIntersections(boxes, bb) && !p.mInfo.HorizontallyCollided && !p.mInfo.VerticallyCollided {
-		p.mInfo.InUnsupportedRewindScenario = true
-	} */
 
 	p.mInfo.UnsupportedAcceptance = 0.0
 

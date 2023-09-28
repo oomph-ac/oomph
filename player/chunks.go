@@ -129,6 +129,23 @@ func (p *Player) SetBlock(pos cube.Pos, b world.Block) {
 	c.SetBlock(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0, rid)
 }
 
+// IsBlockFullCube returns true if the block is a full cube (1x1x1)
+func (p *Player) IsBlockFullCube(pos cube.Pos) bool {
+	block := p.Block(pos)
+	bbs := utils.BlockBoxes(block, pos, p.SurroundingBlocks(pos))
+
+	if len(bbs) != 1 {
+		return false
+	}
+
+	bb := bbs[0]
+	return bb.Width() == 1 && bb.Height() == 1 && !utils.CanPassBlock(block)
+}
+
+func (p *Player) IsBlockOpenSpace(pos cube.Pos) bool {
+	return !p.IsBlockFullCube(pos) && !p.IsBlockFullCube(pos.Side(cube.FaceUp))
+}
+
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box - which is usually
 // the player's bounding box.
 func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
