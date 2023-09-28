@@ -253,17 +253,6 @@ func (p *Player) aiStep() {
 		p.mInfo.ServerMovement[2] = 0
 	}
 
-	// Attempt to push the player out of any blocks they're inside of.
-	oldPos := p.mInfo.ServerPosition
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
-
-	if p.debugger.LogMovement {
-		p.Log().Debugf("aiStep(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
-	}
-
 	// If the player is not in a loaded chunk, or is immobile, set their movement to 0 vec.
 	if p.mInfo.Immobile || !p.inLoadedChunk {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
@@ -400,6 +389,17 @@ func (p *Player) doGroundMove() {
 		f := utils.BlockSpeedFactor(blockUnder)
 		p.mInfo.ServerMovement[0] *= f
 		p.mInfo.ServerMovement[2] *= f
+	}
+
+	// Attempt to push the player out of any blocks they're inside of.
+	oldPos := p.mInfo.ServerPosition
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+
+	if p.debugger.LogMovement {
+		p.Log().Debugf("aiStep(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
 	}
 }
 
