@@ -2,7 +2,8 @@
 config.toml
 token.tok
 tests/*
-tests2/*
+.oomph_prod/*
+.oomph_portal_prod/*
 survival_proxy/*
 players/*
 world/*
