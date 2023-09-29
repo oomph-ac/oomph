@@ -283,11 +283,10 @@ func (p *Player) Teleport(pos mgl32.Vec3) {
 
 	p.mInfo.Teleporting = true
 	p.mInfo.AwaitingTeleport = false
-	p.mInfo.CanExempt = true
 	p.mInfo.ServerPosition = pos
 
 	if p.debugger.LogMovement {
-		p.log.Debugf("p.Teleport(): teleported to %v at frame %v", pos, p.clientFrame.Load())
+		p.log.Debugf("p.Teleport(): teleported to %v", pos)
 	}
 }
 

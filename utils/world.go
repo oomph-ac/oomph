@@ -95,6 +95,8 @@ func BlockBoxes(b world.Block, pos cube.Pos, sblocks map[cube.Face]world.Block) 
 		return []cube.BBox{}
 	case "minecraft:trip_wire":
 		return []cube.BBox{}
+	case "minecraft:portal", "minecraft:end_portal":
+		return []cube.BBox{}
 	case "minecraft:web":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:bed":
