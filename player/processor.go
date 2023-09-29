@@ -310,7 +310,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		pk.EntityRuntimeID = p.clientRuntimeID
 		pk.Tick = 0 // prevent any rewind from being done
-
 		if pk.Mode != packet.MoveModeTeleport && pk.Mode != packet.MoveModeReset {
 			return false
 		}
@@ -411,7 +410,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// If the player is behind by more than the knockback network cutoff, then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff) || p.debugger.UseServerKnockback {
+		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff && pk.Velocity.LenSqr() > 0) || p.debugger.UseServerKnockback {
 			p.SetKnockback(pk.Velocity)
 			return false
 		}
@@ -488,9 +487,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		pk.EntityRuntimeID = p.clientRuntimeID
-
 		p.Acknowledgement(func() {
-			p.mInfo.ServerPosition = pk.Position.Add(mgl32.Vec3{0, 1.62})
 			p.dead = false
 			p.respawned = true
 		})
@@ -549,10 +546,8 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		return
 	}
 
-	// Set the last used input of the player to the current input. This will execute at the end of the function.
-	defer func() {
-		p.mInfo.LastUsedInput = pk
-	}()
+	// Set the last used input of the player to the current input.
+	p.mInfo.LastUsedInput = pk
 
 	cPos := protocol.ChunkPos{
 		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,

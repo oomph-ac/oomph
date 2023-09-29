@@ -27,7 +27,7 @@ func (p *Player) doMovementSimulation() {
 		defer p.Log().Debugf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame())
 	}
 
-	if (p.inLoadedChunkTicks < 30 && p.movementMode != utils.ModeFullAuthoritative) || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
+	if p.inLoadedChunkTicks < 40 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
 		p.mInfo.OnGround = false
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
@@ -137,7 +137,7 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	// Update the jumping state of the player.
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 
-	// Update the flying speed of the player.
+	// Update the air speed of the player.
 	p.mInfo.AirSpeed = 0.02
 	if p.mInfo.Sprinting {
 		p.mInfo.AirSpeed += 0.006
@@ -175,7 +175,7 @@ func (p *Player) validateMovement() {
 
 	if p.debugger.LogMovement {
 		p.Log().Debugf("validateMovement(): client pos:%v server pos:%v", p.Position(), p.mInfo.ServerPosition)
-		p.Log().Debugf("validateMovement(): client mov:%v server mov:%v", p.mInfo.ClientMovement, p.mInfo.OldServerMovement)
+		p.Log().Debugf("validateMovement(): clientDelta:%v serverDelta:%v", p.mInfo.ClientPredictedMovement, p.mInfo.ServerMovement)
 	}
 
 	// TODO: Make Microjang fix shitty unsupported scenarios & fix my step code!!! -ethaniccc
@@ -201,7 +201,7 @@ func (p *Player) correctMovement() {
 	}
 
 	// Do not correct player movement if the player is in a scenario we cannot correct reliably.
-	if p.mInfo.CanExempt || p.mInfo.Teleporting {
+	if p.mInfo.CanExempt {
 		return
 	}
 
@@ -238,6 +238,11 @@ func (p *Player) correctMovement() {
 
 // aiStep starts the movement simulation of the player.
 func (p *Player) aiStep() {
+	if p.mInfo.Teleporting {
+		p.mInfo.ServerMovement = mgl32.Vec3{}
+		return
+	}
+
 	// If the player's X movement is below 1e-7, set it to 0.
 	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-7 {
 		p.mInfo.ServerMovement[0] = 0
@@ -392,14 +397,17 @@ func (p *Player) doGroundMove() {
 	}
 
 	// Attempt to push the player out of any blocks they're inside of.
-	oldPos := p.mInfo.ServerPosition
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+	if !p.mInfo.Teleporting {
+		oldPos := p.mInfo.ServerPosition
 
-	if p.debugger.LogMovement {
-		p.Log().Debugf("aiStep(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
+		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+
+		if p.debugger.LogMovement && oldPos != p.mInfo.ServerPosition {
+			p.Log().Debugf("doGroundMove(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
+		}
 	}
 }
 
@@ -701,43 +709,54 @@ func (p *Player) pushOutOfBlocks(x, y, z float32) {
 	i := -1
 	d3 := float32(9999.0)
 
+	var pos cube.Pos
+
 	if !p.IsBlockFullCube(blockPos.Side(cube.FaceWest)) && d0 < d3 {
 		d3 = d0
 		i = 0
+		pos = blockPos.Side(cube.FaceWest)
 	}
 
 	if !p.IsBlockFullCube(blockPos.Side(cube.FaceEast)) && 1.0-d0 < d3 {
 		d3 = 1.0 - d0
 		i = 1
+		pos = blockPos.Side(cube.FaceEast)
 	}
 
-	if !p.IsBlockFullCube(blockPos.Side(cube.FaceUp)) && 1.0-d1 < d3 {
+	if !p.IsBlockFullCube(blockPos.Side(cube.FaceDown)) && 1.0-d1 < d3 {
 		d3 = 1.0 - d1
 		i = 3
+		pos = blockPos.Side(cube.FaceDown)
+	} else if !p.IsBlockFullCube(blockPos.Side(cube.FaceUp)) && 1.0-d1 < d3 {
+		d3 = 1.0 - d1
+		i = 2
+		pos = blockPos.Side(cube.FaceUp)
 	}
 
 	if !p.IsBlockFullCube(blockPos.Side(cube.FaceNorth)) && d2 < d3 {
 		d3 = d2
 		i = 4
+		pos = blockPos.Side(cube.FaceNorth)
 	}
 
 	if !p.IsBlockFullCube(blockPos.Side(cube.FaceSouth)) && 1.0-d2 < d3 {
 		i = 5
+		pos = blockPos.Side(cube.FaceSouth)
 	}
 
 	switch i {
 	case 0:
-		p.mInfo.ServerPosition[0] -= 0.5
+		p.mInfo.ServerPosition[0] = float32(pos.X()) + 0.7
 	case 1:
-		p.mInfo.ServerPosition[0] += 0.5
+		p.mInfo.ServerPosition[0] = float32(pos.X()) + 0.3
+	case 2:
+		p.mInfo.ServerPosition[1] = float32(pos.Y())
 	case 3:
-		p.mInfo.ServerPosition[1] = math32.Ceil(p.mInfo.ServerPosition[1])
-		p.mInfo.OnGround = true
-		p.mInfo.VerticallyCollided = true
+		p.mInfo.ServerPosition[1] = float32(pos.Y())
 	case 4:
-		p.mInfo.ServerPosition[2] -= 0.5
+		p.mInfo.ServerPosition[2] = float32(pos.Z()) + 0.7
 	case 5:
-		p.mInfo.ServerPosition[2] += 0.5
+		p.mInfo.ServerPosition[2] = float32(pos.Z()) + 0.3
 	}
 }
 
