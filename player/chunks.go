@@ -144,13 +144,7 @@ func (p *Player) IsBlockFullCube(pos cube.Pos) bool {
 
 // IsBlockOpenSpace returns true if there is space available at the given position.
 func (p *Player) IsBlockOpenSpace(pos cube.Pos) bool {
-	return !p.BlockHasBB(pos) && !p.IsBlockFullCube(pos.Side(cube.FaceUp))
-}
-
-// BlockHasBB returns true if the block has at least one bounding box.
-func (p *Player) BlockHasBB(pos cube.Pos) bool {
-	block := p.Block(pos)
-	return len(utils.BlockBoxes(block, pos, p.SurroundingBlocks(pos))) > 0
+	return !p.IsBlockFullCube(pos) && !p.IsBlockFullCube(pos.Side(cube.FaceUp))
 }
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box - which is usually
