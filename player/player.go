@@ -250,12 +250,28 @@ func (p *Player) Conn() *minecraft.Conn {
 	return p.conn
 }
 
+// SetConn sets the connection of the player.
+func (p *Player) SetConn(c *minecraft.Conn) {
+	p.ccMu.Lock()
+	defer p.ccMu.Unlock()
+
+	p.conn = c
+}
+
 // ServerConn returns the server connection of the player.
 func (p *Player) ServerConn() *minecraft.Conn {
 	p.scMu.Lock()
 	defer p.scMu.Unlock()
 
 	return p.serverConn
+}
+
+// SetServerConn sets the server connection of the player.
+func (p *Player) SetServerConn(c *minecraft.Conn) {
+	p.scMu.Lock()
+	defer p.scMu.Unlock()
+
+	p.serverConn = c
 }
 
 // Log returns the log of the player.
