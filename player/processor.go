@@ -168,7 +168,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			pk.XUID = ""
 		}
 	case *packet.ContainerClose:
-		p.SendOomphDebug("container closed by client", packet.TextTypeChat)
 		p.containerOpen = false
 	case *packet.Respawn:
 		pk.EntityRuntimeID = p.runtimeID
@@ -232,7 +231,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			return true
 		}
 
-		p.SendOomphDebug(text.Colourf("<green>Completed transfer to remote server!</green>"), packet.TextTypeChat)
 		return true
 	case *packet.AddPlayer:
 		if pk.EntityRuntimeID == p.runtimeID {
@@ -527,16 +525,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.miMu.Lock()
 			p.containerOpen = true
 			p.miMu.Unlock()
-
-			p.SendOomphDebug("container opened by server", packet.TextTypeChat)
 		})
 	case *packet.ContainerClose:
 		p.Acknowledgement(func() {
 			p.miMu.Lock()
 			p.containerOpen = false
 			p.miMu.Unlock()
-
-			p.SendOomphDebug("container closed by server", packet.TextTypeChat)
 		})
 	}
 	return false
