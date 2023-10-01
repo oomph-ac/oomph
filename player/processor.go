@@ -167,6 +167,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			// Strip the XUID to prevent certain server software from flagging the message as spam.
 			pk.XUID = ""
 		}
+	case *packet.ContainerClose:
+		p.SendOomphDebug("container closed by client", packet.TextTypeChat)
+		p.containerOpen = false
 	case *packet.Respawn:
 		pk.EntityRuntimeID = p.runtimeID
 	case *packet.Animate:
@@ -515,6 +518,26 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		pk.EntityRuntimeID = p.clientRuntimeID
+	case *packet.ContainerOpen:
+		if pk.ContainerEntityUniqueID == p.clientUniqueID {
+			pk.ContainerEntityUniqueID = math.MaxInt64
+		}
+
+		p.Acknowledgement(func() {
+			p.miMu.Lock()
+			p.containerOpen = true
+			p.miMu.Unlock()
+
+			p.SendOomphDebug("container opened by server", packet.TextTypeChat)
+		})
+	case *packet.ContainerClose:
+		p.Acknowledgement(func() {
+			p.miMu.Lock()
+			p.containerOpen = false
+			p.miMu.Unlock()
+
+			p.SendOomphDebug("container closed by server", packet.TextTypeChat)
+		})
 	}
 	return false
 }

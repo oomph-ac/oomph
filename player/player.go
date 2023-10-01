@@ -81,6 +81,7 @@ type Player struct {
 	respawned             bool
 	dead                  bool
 	needsCombatValidation bool
+	containerOpen         bool
 	closed                bool
 
 	isSyncedWithServer, awaitingSync bool
