@@ -81,8 +81,11 @@ type Player struct {
 	respawned             bool
 	dead                  bool
 	needsCombatValidation bool
-	containerOpen         bool
 	closed                bool
+
+	containerID        byte
+	containerOpen      bool
+	containerMoveTicks int64
 
 	isSyncedWithServer, awaitingSync bool
 	nextSyncTick                     uint64
