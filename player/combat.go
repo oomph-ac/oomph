@@ -96,7 +96,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 				return true
 			}
 
-			targetAABB := e.AABB().Grow(0.13).Translate(rew.Position)
+			targetAABB := e.AABB().Grow(0.1).Translate(rew.Position)
 
 			res, ok := trace.BBoxIntercept(targetAABB, attackPos, attackPos.Add(dV.Mul(maxCrosshairAttackDist)))
 			if !ok {
@@ -164,7 +164,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		return
 	}
 
-	targetAABB := t.AABB().Grow(0.13).Translate(rew.Position)
+	targetAABB := t.AABB().Grow(0.1).Translate(rew.Position)
 
 	if targetAABB.IntersectsWith(p.AABB()) {
 		p.SendPacketToServer(p.lastAttackData)

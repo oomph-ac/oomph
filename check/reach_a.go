@@ -70,7 +70,7 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		bb := e.AABB().Translate(e.LastPosition()).Grow(0.15)
+		bb := e.AABB().Translate(e.LastPosition()).Grow(0.1)
 		pe := p.Entity()
 
 		atkPos := pe.LastPosition().Add(mgl32.Vec3{0, 1.62})
