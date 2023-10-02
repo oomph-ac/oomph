@@ -148,20 +148,14 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 		p.mInfo.TicksUntilNextJump = 0
 	}
 
-	// If the player has a container open, their forward and left impulse must be set to 0.
-	if p.containerOpen {
-		if (p.mInfo.ForwardImpulse > 0 || p.mInfo.LeftImpulse > 0 || p.mInfo.Jumping || p.mInfo.JumpBindPressed) && p.debugger.LogMovement {
-			p.Log().Debugf("updateMovementStates(): client attempted to move with container open (%v, %v, %v, %v)", p.mInfo.ForwardImpulse, p.mInfo.LeftImpulse, p.mInfo.Jumping, p.mInfo.JumpBindPressed)
+	// The client seems to send the ContainerClose packet late, so the client ends up moving around with the container *assumed* open.
+	if p.containerOpen && (p.mInfo.ForwardImpulse > 0 || p.mInfo.LeftImpulse > 0 || p.mInfo.Jumping || p.mInfo.JumpBindPressed) {
+		p.containerMoveTicks++
+		if p.containerMoveTicks > 10 {
+			p.Disconnect(game.ErrorInvalidInput)
 		}
-
-		p.mInfo.ForwardImpulse = 0
-		p.mInfo.LeftImpulse = 0
-		p.mInfo.Jumping = false
-		p.mInfo.JumpBindPressed = false
-
-		if p.debugger.LogMovement {
-			p.Log().Debug("updateMovementStates(): container open, impulses set to 0")
-		}
+	} else if !p.containerOpen {
+		p.containerMoveTicks = 0
 	}
 }
 

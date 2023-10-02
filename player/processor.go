@@ -169,6 +169,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 	case *packet.ContainerClose:
 		p.containerOpen = false
+		p.containerID = 0
 	case *packet.Respawn:
 		pk.EntityRuntimeID = p.runtimeID
 	case *packet.Animate:
@@ -524,12 +525,14 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.Acknowledgement(func() {
 			p.miMu.Lock()
 			p.containerOpen = true
+			p.containerID = pk.WindowID
 			p.miMu.Unlock()
 		})
 	case *packet.ContainerClose:
 		p.Acknowledgement(func() {
 			p.miMu.Lock()
 			p.containerOpen = false
+			p.containerID = 0
 			p.miMu.Unlock()
 		})
 	}
