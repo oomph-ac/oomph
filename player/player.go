@@ -295,14 +295,15 @@ func (p *Player) Move(pk *packet.PlayerAuthInput) {
 }
 
 // Teleport sets the position of the player and resets the teleport ticks of the player.
-func (p *Player) Teleport(pos mgl32.Vec3) {
-	pos = pos.Sub(mgl32.Vec3{0, 1.62}).Add(mgl32.Vec3{0, 5e-3})
+func (p *Player) Teleport(pos mgl32.Vec3, ground bool) {
+	pos = pos.Sub(mgl32.Vec3{0, 1.62})
 
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 
 	p.mInfo.Teleporting = true
 	p.mInfo.AwaitingTeleport = false
+	p.mInfo.OnGround = ground
 	p.mInfo.ServerPosition = pos
 
 	if p.debugger.LogMovement {
@@ -822,7 +823,7 @@ func (p *Player) tryTransfer(address string) error {
 		IdentityData: p.conn.IdentityData(),
 		ClientData:   p.conn.ClientData(),
 		FlushRate:    -1,
-		ReadBatches:  true,
+		ReadBatches:  false,
 	}.DialTimeout("raknet", address, time.Second)
 
 	if err != nil {
