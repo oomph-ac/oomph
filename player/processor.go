@@ -294,7 +294,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.miMu.Unlock()
 
 		p.Acknowledgement(func() {
-			p.Teleport(pk.Position)
+			p.Teleport(pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 		})
 		p.cleanChunks(p.chunkRadius, protocol.ChunkPos{
 			int32(math32.Floor(pk.Position[0])) >> 4,
@@ -321,7 +321,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.miMu.Unlock()
 
 		p.Acknowledgement(func() {
-			p.Teleport(pk.Position)
+			p.Teleport(pk.Position, pk.OnGround)
 		})
 		p.cleanChunks(p.chunkRadius, protocol.ChunkPos{
 			int32(math32.Floor(pk.Position[0])) >> 4,
@@ -539,8 +539,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	return false
 }
 
-// handlePlayerAuthInput processes the input packet sent by the client to the server. This also updates some of the movement states such as
-// if the player is sprinting, jumping, or in a loaded chunk.
+// handlePlayerAuthInput processes the input packet sent by the client to the server.
 func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
@@ -820,9 +819,7 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 	}
 
 	if widthExists {
-		if isPlayer {
-			e.SetAABB(game.AABBFromDimensions(width.(float32), e.AABB().Height()))
-		}
+		e.SetAABB(game.AABBFromDimensions(width.(float32), e.AABB().Height()))
 	}
 	if heightExists {
 		e.SetAABB(game.AABBFromDimensions(e.AABB().Width(), height.(float32)))
@@ -831,6 +828,7 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 	if !isPlayer {
 		return
 	}
+	e.AABB().Translate(p.mInfo.ServerPosition)
 
 	f, ok := pk.EntityMetadata[entity.DataKeyFlags]
 	if !ok {
