@@ -920,6 +920,7 @@ func (p *Player) tryTransfer(address string) error {
 
 	p.conn.Flush()
 	p.serverConn.Flush()
+
 	return nil
 }
 
@@ -997,9 +998,16 @@ func (p *Player) doTick() {
 	// from the server.
 	p.SendAck()
 
-	p.Conn().Flush()
+	err := p.Conn().Flush()
+	if err != nil {
+		p.Log().Errorf("p.doTick(): unable to flush client connection: %v", err)
+	}
+
 	if p.ServerConn() != nil {
-		p.ServerConn().Flush()
+		err = p.ServerConn().Flush()
+		if err != nil {
+			p.Log().Errorf("p.doTick(): unable to flush server connection: %v", err)
+		}
 	}
 
 	p.lastServerTicked = time.Now()
