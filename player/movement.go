@@ -115,7 +115,7 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	} else if startFlag && !p.mInfo.Sprinting {
 		p.mInfo.Sprinting = true
 		needsSpeedAdjustment = true
-	} else if (utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || p.mInfo.ForwardImpulse <= 0 || p.mInfo.Sneaking) && p.mInfo.Sprinting {
+	} else if (stopFlag || p.mInfo.ForwardImpulse <= 0 || p.mInfo.Sneaking) && p.mInfo.Sprinting {
 		p.mInfo.Sprinting = false
 	}
 
@@ -219,7 +219,7 @@ func (p *Player) correctMovement() {
 
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
-	if p.mInfo.TicksSinceBlockRefresh >= 10 {
+	if p.mInfo.TicksSinceBlockRefresh >= uint32(p.TickLatency())+5 {
 		for bpos, b := range p.GetNearbyBlocks(p.AABB()) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
@@ -239,7 +239,7 @@ func (p *Player) correctMovement() {
 
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
-		Position: pos.Add(mgl32.Vec3{0, 1.62 + 1e-3}),
+		Position: pos.Add(mgl32.Vec3{0, 1.62 + 1e-4}),
 		Delta:    delta,
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
@@ -250,6 +250,15 @@ func (p *Player) correctMovement() {
 func (p *Player) aiStep() {
 	if p.mInfo.Teleporting {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
+		if p.mInfo.OnGround {
+			p.mInfo.ServerMovement[1] = -0.002
+		}
+
+		p.mInfo.TicksUntilNextJump = 0
+		if p.mInfo.Jumping {
+			p.simulateJump()
+		}
+
 		return
 	}
 
@@ -288,12 +297,14 @@ func (p *Player) aiStep() {
 		}
 	}
 
-	if (p.mInfo.Jumping || p.mInfo.JumpBindPressed) && p.mInfo.OnGround && p.mInfo.TicksUntilNextJump <= 0 {
-		p.simulateJump()
-		p.mInfo.TicksUntilNextJump = 10
-
-		if p.debugger.LogMovement {
-			p.Log().Debug("aiStep(): simulated jump")
+	if p.mInfo.Jumping {
+		if p.mInfo.OnGround && p.mInfo.TicksUntilNextJump <= 0 {
+			p.simulateJump()
+			if p.debugger.LogMovement {
+				p.Log().Debug("aiStep(): simulated jump")
+			}
+		} else if p.debugger.LogMovement {
+			p.Log().Debugf("aiStep(): refusing jump simulation (%v %v)", p.mInfo.OnGround, p.mInfo.TicksUntilNextJump)
 		}
 	}
 
@@ -407,17 +418,15 @@ func (p *Player) doGroundMove() {
 	}
 
 	// Attempt to push the player out of any blocks they're inside of.
-	if !p.mInfo.Teleporting {
-		oldPos := p.mInfo.ServerPosition
+	oldPos := p.mInfo.ServerPosition
 
-		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
-		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-		p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
 
-		if p.debugger.LogMovement && oldPos != p.mInfo.ServerPosition {
-			p.Log().Debugf("doGroundMove(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
-		}
+	if p.debugger.LogMovement && oldPos != p.mInfo.ServerPosition {
+		p.Log().Debugf("doGroundMove(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
 	}
 }
 
@@ -786,6 +795,7 @@ func (p *Player) simulateHorizontalFriction(friction float32) {
 func (p *Player) simulateJump() {
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
 	p.mInfo.Jumping = true
+	p.mInfo.TicksUntilNextJump = 10
 	if !p.mInfo.Sprinting {
 		return
 	}
