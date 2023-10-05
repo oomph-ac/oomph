@@ -836,7 +836,6 @@ func (p *Player) handleSetActorData(pk *packet.SetActorData) {
 	if !isPlayer {
 		return
 	}
-	e.AABB().Translate(p.mInfo.ServerPosition)
 
 	f, ok := pk.EntityMetadata[entity.DataKeyFlags]
 	if !ok {

@@ -128,7 +128,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			if p.UsesPacketBuffer() {
+			/* if p.UsesPacketBuffer() {
 				if !p.QueuePacket(pk) {
 					continue
 				}
@@ -141,9 +141,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					_ = listener.Disconnect(p.Conn(), disconnect.Error())
 				}
-			}
+			} */
 
+			p.StartHandlePacket()
 			if p.ClientProcess(pk) {
+				p.EndHandlePacket()
 				continue
 			}
 
@@ -151,10 +153,13 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			if err != nil {
 				p.Log().Error("serverConn.WritePacket() error: " + err.Error())
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-					_ = listener.Disconnect(p.Conn(), disconnect.Error())
+					listener.Disconnect(p.Conn(), disconnect.Error())
 				}
+				p.EndHandlePacket()
+
 				return
 			}
+			p.EndHandlePacket()
 
 			//p.ServerConn().Flush()
 		}
@@ -184,14 +189,18 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
+			p.StartHandlePacket()
 			if p.ServerProcess(pk) {
+				p.EndHandlePacket()
 				continue
 			}
 
 			if err := p.Conn().WritePacket(pk); err != nil {
 				p.Log().Error("conn.WritePacket() error: " + err.Error())
+				p.EndHandlePacket()
 				return
 			}
+			p.EndHandlePacket()
 
 			//p.SendAck()
 			//p.Conn().Flush()

@@ -39,6 +39,7 @@ type Player struct {
 	log              *logrus.Logger
 	conn, serverConn *minecraft.Conn
 	ccMu, scMu       sync.Mutex
+	pkMu             sync.Mutex
 
 	debugger *Debugger
 
@@ -283,6 +284,16 @@ func (p *Player) SetServerConn(c *minecraft.Conn) {
 	defer p.scMu.Unlock()
 
 	p.serverConn = c
+}
+
+// StartHandlePacket locks the packet handler mutex.
+func (p *Player) StartHandlePacket() {
+	p.pkMu.Lock()
+}
+
+// EndHandlePacket unlocks the packet handler mutex.
+func (p *Player) EndHandlePacket() {
+	p.pkMu.Unlock()
 }
 
 // Log returns the log of the player.
@@ -998,17 +1009,19 @@ func (p *Player) doTick() {
 	// from the server.
 	p.SendAck()
 
+	// We want to make sure we are not flushing the connections while oomph is still processing packets.
+	p.pkMu.Lock()
 	err := p.Conn().Flush()
 	if err != nil {
 		p.Log().Errorf("p.doTick(): unable to flush client connection: %v", err)
 	}
-
 	if p.ServerConn() != nil {
 		err = p.ServerConn().Flush()
 		if err != nil {
 			p.Log().Errorf("p.doTick(): unable to flush server connection: %v", err)
 		}
 	}
+	p.pkMu.Unlock()
 
 	p.lastServerTicked = time.Now()
 }
