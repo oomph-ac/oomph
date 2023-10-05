@@ -82,7 +82,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	data := serverConn.GameData()
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-	data.PlayerMovementSettings.RewindHistorySize = 40
+	data.PlayerMovementSettings.RewindHistorySize = 100
 
 	p := player.NewPlayer(logrus.New(), conn, serverConn)
 	p.MovementInfo().ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
