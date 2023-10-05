@@ -112,11 +112,16 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 		// is horizontally collided and call setSprinting(false) on the same call of onLivingUpdate()
 		p.mInfo.Sprinting = false
 		needsSpeedAdjustment = true
-	} else if startFlag && !p.mInfo.Sprinting {
+		p.mInfo.HasServerSpeedState = false
+	} else if startFlag {
 		p.mInfo.Sprinting = true
 		needsSpeedAdjustment = true
-	} else if (stopFlag || p.mInfo.ForwardImpulse <= 0 || p.mInfo.Sneaking) && p.mInfo.Sprinting {
+		p.mInfo.HasServerSpeedState = false
+	} else if stopFlag {
 		p.mInfo.Sprinting = false
+		// The client, if it has not recieved a speed state from the server, will set it's own speed (0.1). However, if the client stops sprinting
+		// but has recieved a speed state from the server, it will wait for an update.
+		needsSpeedAdjustment = !p.mInfo.HasServerSpeedState
 	}
 
 	// Estimate the client calculated speed of the player.
@@ -229,12 +234,6 @@ func (p *Player) correctMovement() {
 			})
 		}
 		p.mInfo.TicksSinceBlockRefresh = 0
-	}
-
-	if p.lastAttributeData != nil {
-		p.lastAttributeData.Tick = p.ClientFrame()
-		p.lastAttributeData.EntityRuntimeID = p.clientRuntimeID
-		p.conn.WritePacket(p.lastAttributeData)
 	}
 
 	// This packet will correct the player to the server's predicted position.
@@ -915,6 +914,7 @@ type MovementInfo struct {
 	Immobile                          bool
 	ToggleFly, Flying, TrustFlyStatus bool
 	NoClip                            bool
+	HasServerSpeedState               bool
 	KnownInsideBlock                  bool
 
 	IsCollided, VerticallyCollided, HorizontallyCollided bool
