@@ -16,6 +16,10 @@ const interpolatedFrames float32 = 15
 type ReachA struct {
 	eid uint64
 	run bool
+
+	currEntityPos mgl32.Vec3
+	prevEntityPos mgl32.Vec3
+
 	basic
 }
 
@@ -50,8 +54,16 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
+		e, ok := p.SearchEntity(d.TargetEntityRuntimeID)
+		if !ok {
+			return false
+		}
+
 		r.eid = d.TargetEntityRuntimeID
 		r.run = true
+
+		r.currEntityPos = e.Position()
+		r.prevEntityPos = e.LastPosition()
 
 		return false
 	}
@@ -70,23 +82,29 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 			return false
 		}
 
-		bb := e.AABB().Translate(e.LastPosition()).Grow(0.1)
+		bb := e.AABB().Grow(0.1)
 		pe := p.Entity()
 
 		atkPos := pe.LastPosition().Add(mgl32.Vec3{0, 1.62})
+
 		cDv, lDv := game.DirectionVector(pe.Rotation()[2], pe.Rotation()[0]),
 			game.DirectionVector(pe.LastRotation()[2], pe.LastRotation()[0])
 		dvDelta := cDv.Sub(lDv).Mul(1 / interpolatedFrames)
 		uDv := lDv
+
+		cPos, lPos := r.currEntityPos, r.prevEntityPos
+		posDelta := cPos.Sub(lPos).Mul(1 / interpolatedFrames)
+		uPos := lPos
 
 		minDist, valid := float32(6900.0), false
 
 		for y := float32(0.0); y < interpolatedFrames; y++ {
 			if y != 0 {
 				uDv = uDv.Add(dvDelta)
+				uPos = uPos.Add(posDelta)
 			}
 
-			result, ok := trace.BBoxIntercept(bb, atkPos, atkPos.Add(uDv.Mul(14.0)))
+			result, ok := trace.BBoxIntercept(bb.Translate(uPos), atkPos, atkPos.Add(uDv.Mul(14.0)))
 			if !ok {
 				continue
 			}
