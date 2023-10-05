@@ -972,6 +972,9 @@ func (p *Player) startTicking() {
 
 // doTick ticks the player.
 func (p *Player) doTick() {
+	p.pkMu.Lock()
+	defer p.pkMu.Unlock()
+
 	// This code calculates how much the server tick should be incremented by. This is done by checking the
 	// difference between the last time the server ticked and the current time.
 	delta := time.Since(p.lastServerTicked).Milliseconds()
@@ -997,6 +1000,7 @@ func (p *Player) doTick() {
 	// If the player is not responding to acknowledgements, we have to kick them to prevent
 	// abusive behavior (bypasses).
 	if !p.Acknowledgements().Validate() {
+		p.Log().Errorf("%v did not respond to acknowledgements in time", p.Name())
 		p.Disconnect(game.ErrorNoAcks)
 	}
 
@@ -1009,8 +1013,6 @@ func (p *Player) doTick() {
 	// from the server.
 	p.SendAck()
 
-	// We want to make sure we are not flushing the connections while oomph is still processing packets.
-	p.pkMu.Lock()
 	err := p.Conn().Flush()
 	if err != nil {
 		p.Log().Errorf("p.doTick(): unable to flush client connection: %v", err)
@@ -1021,7 +1023,6 @@ func (p *Player) doTick() {
 			p.Log().Errorf("p.doTick(): unable to flush server connection: %v", err)
 		}
 	}
-	p.pkMu.Unlock()
 
 	p.lastServerTicked = time.Now()
 }
