@@ -388,6 +388,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 					p.miMu.Lock()
 
 					p.mInfo.MovementSpeed = a.Value
+					p.mInfo.HasServerSpeedState = true
 					if p.debugger.LogMovement {
 						p.Log().Debugf("ack(): movement speed updated to %f", a.Value)
 					}
@@ -414,6 +415,10 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
 		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff && pk.Velocity.LenSqr() > 0) || p.debugger.UseServerKnockback {
 			p.SetKnockback(pk.Velocity)
+			if p.debugger.LogMovement {
+				p.Log().Debugf("server authoritative kb for %v", pk.Velocity)
+			}
+
 			return false
 		}
 
@@ -421,6 +426,9 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// does take knockback when it recieves it.
 		p.Acknowledgement(func() {
 			p.SetKnockback(pk.Velocity)
+			if p.debugger.LogMovement {
+				p.Log().Debugf("client authoritative kb for %v", pk.Velocity)
+			}
 		})
 	case *packet.LevelChunk:
 		p.handleLevelChunk(pk)
