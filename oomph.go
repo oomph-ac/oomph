@@ -122,45 +122,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			pk, err := p.Conn().ReadPacket()
-			if err != nil || p == nil {
-				o.log.Error(err)
+			if !handleConn(p, listener) {
 				return
 			}
-
-			/* if p.UsesPacketBuffer() {
-				if !p.QueuePacket(pk) {
-					continue
-				}
-
-				err = p.SendPacketToServer(pk)
-				if err == nil {
-					continue
-				}
-
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-					_ = listener.Disconnect(p.Conn(), disconnect.Error())
-				}
-			} */
-
-			p.StartHandlePacket()
-			if p.ClientProcess(pk) {
-				p.EndHandlePacket()
-				continue
-			}
-
-			err = p.ServerConn().WritePacket(pk)
-			if err != nil {
-				p.Log().Error("serverConn.WritePacket() error: " + err.Error())
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-					listener.Disconnect(p.Conn(), disconnect.Error())
-				}
-				p.EndHandlePacket()
-
-				return
-			}
-			p.EndHandlePacket()
-
 			//p.ServerConn().Flush()
 		}
 	}()
@@ -171,36 +135,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			g.Done()
 		}()
 		for {
-			pk, err := p.ServerConn().ReadPacket()
-
-			if err != nil {
-				p.Log().Error("serverConn.ReadBatch() error: " + err.Error())
-				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-					_ = listener.Disconnect(p.Conn(), disconnect.Error())
-				}
+			if !handleServerConn(p, listener) {
 				return
 			}
-
-			if d, ok := pk.(*packet.Disconnect); ok {
-				p.Conn().WritePacket(d)
-				p.Conn().Flush()
-				p.Close()
-
-				return
-			}
-
-			p.StartHandlePacket()
-			if p.ServerProcess(pk) {
-				p.EndHandlePacket()
-				continue
-			}
-
-			if err := p.Conn().WritePacket(pk); err != nil {
-				p.Log().Error("conn.WritePacket() error: " + err.Error())
-				p.EndHandlePacket()
-				return
-			}
-			p.EndHandlePacket()
 
 			//p.SendAck()
 			//p.Conn().Flush()
@@ -208,4 +145,89 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 	p.Close()
+}
+
+func handleConn(p *player.Player, listener *minecraft.Listener) bool {
+	if p == nil {
+		return false
+	}
+
+	pk, err := p.Conn().ReadPacket()
+	if err != nil {
+		p.Log().Error(err)
+		return false
+	}
+
+	p.StartHandlePacket()
+	defer p.EndHandlePacket()
+
+	/* if p.UsesPacketBuffer() {
+		if !p.QueuePacket(pk) {
+			continue
+		}
+
+		err = p.SendPacketToServer(pk)
+		if err == nil {
+			continue
+		}
+
+		if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+			_ = listener.Disconnect(p.Conn(), disconnect.Error())
+		}
+	} */
+
+	if p.ClientProcess(pk) {
+		return true
+	}
+
+	err = p.ServerConn().WritePacket(pk)
+	if err != nil {
+		p.Log().Error("serverConn.WritePacket() error: " + err.Error())
+		if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+			listener.Disconnect(p.Conn(), disconnect.Error())
+		}
+
+		return false
+	}
+
+	return true
+}
+
+func handleServerConn(p *player.Player, listener *minecraft.Listener) bool {
+	if p == nil {
+		return false
+	}
+
+	pk, err := p.ServerConn().ReadPacket()
+
+	if err != nil {
+		p.Log().Error("serverConn.ReadBatch() error: " + err.Error())
+		if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+			_ = listener.Disconnect(p.Conn(), disconnect.Error())
+		}
+
+		return false
+	}
+
+	if d, ok := pk.(*packet.Disconnect); ok {
+		p.Conn().WritePacket(d)
+		p.Conn().Flush()
+		p.Close()
+
+		return false
+	}
+
+	p.StartHandlePacket()
+	defer p.EndHandlePacket()
+
+	if p.ServerProcess(pk) {
+		return true
+	}
+
+	if err := p.Conn().WritePacket(pk); err != nil {
+		p.Log().Error("conn.WritePacket() error: " + err.Error())
+		return false
+	}
+
+	return true
 }
