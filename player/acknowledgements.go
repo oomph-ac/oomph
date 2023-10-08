@@ -4,6 +4,8 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/oomph-ac/oomph/game"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -22,8 +24,9 @@ type Acknowledgements struct {
 	HasTicked  bool
 	LegacyMode bool
 
-	awaitResTicks uint64
-	mu            sync.Mutex
+	acknowledgementOrder []int64
+	awaitResTicks        uint64
+	mu                   sync.Mutex
 }
 
 func (a *Acknowledgements) UseLegacy(b bool) {
@@ -60,34 +63,6 @@ func (a *Acknowledgements) GetMap(t int64) ([]func(), bool) {
 	}
 
 	return m, true
-}
-
-// Handle gets the acknowledgement in the map with the timestamp given in the function. If there is no acknowledgement
-// found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
-// "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
-func (a *Acknowledgements) Handle(i int64, tryOther bool) bool {
-	if a.LegacyMode {
-		ok := a.tryHandle(i)
-		if ok {
-			return true
-		}
-
-		if !tryOther {
-			return false
-		}
-
-		return a.tryHandle(i / 1000)
-	}
-
-	ok := a.tryHandle(i / NetworkStackLatencyDivider)
-
-	// FUCK. What the fuck have they done to the PlayStation NSL? Is the behavior the
-	// same on all platforms now? Is there a different divider...? TODO!
-	if !ok && tryOther {
-		ok = a.tryHandle(i / 1000)
-	}
-
-	return ok
 }
 
 // tryHandle checks if an acknowledgement ID has a map of functions, and if so, executes them.
@@ -173,6 +148,48 @@ func (a *Acknowledgements) Validate() bool {
 	return a.awaitResTicks < 200
 }
 
+// Handle gets the acknowledgement in the map with the timestamp given in the function. If there is no acknowledgement
+// found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
+// "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
+func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
+	a := p.Acknowledgements()
+	if a == nil {
+		return false
+	}
+
+	var ok bool
+	if a.LegacyMode {
+		ok = a.tryHandle(i)
+		if !ok {
+			i /= 1000
+			ok = a.tryHandle(i)
+		}
+	} else {
+		i /= NetworkStackLatencyDivider
+		ok = a.tryHandle(i)
+	}
+
+	// If this is Oomph's acknowledgement, we want to make sure that it is in order.
+	if ok {
+		expected := a.acknowledgementOrder[0]
+		a.acknowledgementOrder = a.acknowledgementOrder[1:]
+
+		if expected != i {
+			p.Log().Errorf("acknowledgement order mismatch: expected %v, got %v", expected, i)
+			p.Disconnect(game.ErrorBadAckOrder)
+			return false
+		}
+	}
+
+	// FUCK. What the fuck have they done to the PlayStation NSL? Is the behavior the
+	// same on all platforms now? Is there a different divider...? TODO!
+	/* if !ok && tryOther {
+		ok = a.tryHandle(i / 1000)
+	} */
+
+	return ok
+}
+
 // SendAck sends an acknowledgement packet to the client.
 func (p *Player) SendAck() {
 	acks := p.Acknowledgements()
@@ -196,6 +213,12 @@ func (p *Player) SendAck() {
 		//	acks.AddMap(m, acks.CurrentTimestamp/1000)
 		//}
 
+		expectedTimestamp := pk.Timestamp
+		if acks.LegacyMode && p.ClientData().DeviceOS == protocol.DeviceOrbis {
+			expectedTimestamp /= 1000
+		}
+
+		acks.acknowledgementOrder = append(acks.acknowledgementOrder, expectedTimestamp)
 		p.conn.WritePacket(pk)
 	}
 }

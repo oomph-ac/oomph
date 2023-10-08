@@ -74,7 +74,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.SetRuntimeID(p.Conn().GameData().EntityRuntimeID)
 		p.SetUniqueID(p.Conn().GameData().EntityUniqueID)
 	case *packet.NetworkStackLatency:
-		cancel = p.Acknowledgements().Handle(pk.Timestamp, p.ClientData().DeviceOS == protocol.DeviceOrbis)
+		cancel = p.handleNetworkStackLatency(pk.Timestamp, p.ClientData().DeviceOS == protocol.DeviceOrbis)
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
