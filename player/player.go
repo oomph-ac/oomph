@@ -842,7 +842,7 @@ func (p *Player) TryTransfer(address string) error {
 		ClientData:   p.conn.ClientData(),
 		FlushRate:    -1,
 		ReadBatches:  false,
-	}.DialTimeout("raknet", address, time.Second)
+	}.DialTimeout("raknet", address, time.Second*5)
 
 	if err != nil {
 		return err
