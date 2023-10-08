@@ -830,8 +830,8 @@ func (p *Player) updateLatency() {
 	})
 }
 
-// tryTransfer attempts to transfer the player to the given address w/o disconnecting them from oomph.
-func (p *Player) tryTransfer(address string) error {
+// TryTransfer attempts to transfer the player to the given address w/o disconnecting them from oomph.
+func (p *Player) TryTransfer(address string) error {
 	p.scMu.Lock()
 	p.ccMu.Lock()
 	defer p.scMu.Unlock()
