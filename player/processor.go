@@ -226,7 +226,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			return false
 		}
 
-		err := p.tryTransfer(pk.Address + ":" + fmt.Sprint(pk.Port))
+		err := p.TryTransfer(pk.Address + ":" + fmt.Sprint(pk.Port))
 		if err != nil {
 			p.SendOomphDebug(text.Colourf("<red>Failed to transfer to remote server: %v</red>", err.Error()), packet.TextTypeChat)
 			return true
