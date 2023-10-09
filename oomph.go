@@ -78,7 +78,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: false,
-	}.DialTimeout("raknet", remoteAddr, time.Second*5)
+	}.DialTimeout("raknet", remoteAddr, time.Second*10)
 
 	if err != nil {
 		conn.Close()
@@ -207,7 +207,7 @@ func handleServerConn(p *player.Player, listener *minecraft.Listener) bool {
 	pk, err := p.ServerConn().ReadPacket()
 
 	if err != nil {
-		p.Log().Error("serverConn.ReadBatch() error: " + err.Error())
+		p.Log().Error("serverConn.ReadPacket() error: " + err.Error())
 		if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 			_ = listener.Disconnect(p.Conn(), disconnect.Error())
 		}
