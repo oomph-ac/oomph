@@ -212,7 +212,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		mInfo: &MovementInfo{
 			MovementSpeed:  0.1,
-			TrustFlyStatus: true,
+			TrustFlyStatus: false,
 		},
 
 		movementMode: utils.ModeFullAuthoritative,
