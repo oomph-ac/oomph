@@ -3,6 +3,7 @@ package oomph
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/oomph-ac/oomph/utils"
 
@@ -51,6 +52,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 		AllowInvalidPackets:    true,
 		AllowUnknownPackets:    true,
 	}.Listen("raknet", o.addr)
+
 	if err != nil {
 		return err
 	}
@@ -73,10 +75,14 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		ClientData:   conn.ClientData(),
 		FlushRate:    -1,
 		ReadBatches:  false,
-	}.Dial("raknet", remoteAddr)
+
+		DisconnectOnUnknownPackets: false,
+		DisconnectOnInvalidPackets: false,
+	}.DialTimeout("raknet", remoteAddr, time.Second*5)
 
 	if err != nil {
-		o.log.Error(err)
+		conn.Close()
+		o.log.Error("unable to reach server: " + err.Error())
 		return
 	}
 
@@ -91,7 +97,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
-		if err := p.Conn().StartGame(data); err != nil {
+		if err := p.Conn().StartGameTimeout(data, time.Second*5); err != nil {
 			o.log.Error("oomph conn.StartGame(): " + err.Error())
 			p.Close()
 			p = nil
@@ -100,7 +106,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		g.Done()
 	}()
 	go func() {
-		if err := p.ServerConn().DoSpawn(); err != nil {
+		if err := p.ServerConn().DoSpawnTimeout(time.Second * 5); err != nil {
 			o.log.Error("oomph serverConn.DoSpawn(): " + err.Error())
 			p.Close()
 			p = nil
