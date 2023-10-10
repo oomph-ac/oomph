@@ -344,6 +344,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
 			p.gameMode = pk.GameType
+
+			// Since some servers do not send abillities back, we need to not trust the flight status in a
+			// gamemode type that usually doesn't allow flight.
+			if p.gameMode == packet.GameTypeSurvival || p.gameMode == packet.GameTypeAdventure {
+				p.mInfo.TrustFlyStatus = false
+			}
 		})
 	case *packet.RemoveActor:
 		if pk.EntityUniqueID == p.uniqueID {
@@ -481,6 +487,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.Acknowledgement(func() {
 			for _, l := range pk.AbilityData.Layers {
 				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
+				p.mInfo.NoClip = utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip)
 				if p.mInfo.ToggleFly {
 					// If the player toggled flight, but the server did not allow it, we longer trust
 					// their flight status. This is done to ensure players that have permission to fly
