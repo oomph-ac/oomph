@@ -81,6 +81,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}.DialTimeout("raknet", remoteAddr, time.Second*10)
 
 	if err != nil {
+		conn.WritePacket(&packet.Disconnect{
+			Message: err.Error(),
+		})
 		conn.Close()
 		o.log.Error("unable to reach server: " + err.Error())
 		return
