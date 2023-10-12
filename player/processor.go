@@ -67,6 +67,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
+			p.gamemode = p.serverConn.GameData().PlayerGameMode
+			if p.gamemode == 5 {
+				p.gamemode = p.serverConn.GameData().WorldGameMode
+			}
+
 			p.Acknowledgement(func() {
 				p.ready = true
 			})
