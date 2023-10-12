@@ -38,7 +38,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	}
 
 	// If the player is in a gamemode that has extended reach, there is no need to validate combat.
-	if p.gameMode != packet.GameTypeSurvival && p.gameMode != packet.GameTypeAdventure {
+	if p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure {
 		if p.lastAttackData != nil {
 			p.SendPacketToServer(p.lastAttackData)
 		}
