@@ -27,7 +27,7 @@ func (p *Player) doMovementSimulation() {
 		defer p.Log().Debugf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame())
 	}
 
-	if p.inLoadedChunkTicks <= 5 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip {
+	if p.inLoadedChunkTicks <= 5 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) {
 		p.mInfo.OnGround = false
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
