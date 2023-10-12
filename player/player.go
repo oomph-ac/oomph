@@ -80,7 +80,7 @@ type Player struct {
 	queueMu               sync.Mutex
 	queuedEntityLocations map[uint64]utils.LocationData
 
-	gameMode  int32
+	gamemode  int32
 	inputMode uint32
 
 	eyeOffset float32
@@ -175,7 +175,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		stackLatency:      0,
 		needLatencyUpdate: true,
 
-		gameMode: data.PlayerGameMode,
+		gamemode: data.PlayerGameMode,
 
 		chunks:        make(map[protocol.ChunkPos]*chunk.Chunk),
 		inLoadedChunk: false,
@@ -584,7 +584,7 @@ func (p *Player) IsSyncedWithServer() bool {
 
 // GameMode returns the current game mode of the player.
 func (p *Player) GameMode() int32 {
-	return p.gameMode
+	return p.gamemode
 }
 
 // InputMode returns the input mode of the player
@@ -900,7 +900,7 @@ func (p *Player) TryTransfer(address string) error {
 	p.conn.WritePacket(&packet.SetPlayerGameType{
 		GameType: data.PlayerGameMode,
 	})
-	p.gameMode = data.PlayerGameMode
+	p.gamemode = data.PlayerGameMode
 
 	// Send the player the current server's gamerules
 	p.conn.WritePacket(&packet.GameRulesChanged{

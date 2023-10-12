@@ -343,12 +343,14 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		})
 	case *packet.SetPlayerGameType:
 		p.Acknowledgement(func() {
-			p.gameMode = pk.GameType
+			p.gamemode = pk.GameType
 
 			// Since some servers do not send abillities back, we need to not trust the flight status in a
 			// gamemode type that usually doesn't allow flight.
-			if p.gameMode == packet.GameTypeSurvival || p.gameMode == packet.GameTypeAdventure {
+			if p.gamemode == packet.GameTypeSurvival || p.gamemode == packet.GameTypeAdventure {
 				p.mInfo.TrustFlyStatus = false
+			} else {
+				p.mInfo.TrustFlyStatus = true
 			}
 		})
 	case *packet.RemoveActor:
@@ -488,12 +490,14 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			for _, l := range pk.AbilityData.Layers {
 				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
 				p.mInfo.NoClip = utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip)
+				mayFly := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
+
 				if p.mInfo.ToggleFly {
 					// If the player toggled flight, but the server did not allow it, we longer trust
 					// their flight status. This is done to ensure players that have permission to fly
 					// are able to do so w/o any movement corrections, but players that do not have permission
 					// to do so aren't able to bypass movement predictions with it.
-					p.mInfo.TrustFlyStatus = p.mInfo.Flying
+					p.mInfo.TrustFlyStatus = p.mInfo.Flying || mayFly
 				}
 				p.mInfo.ToggleFly = false
 			}
