@@ -70,9 +70,12 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 
 // handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
 func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, remoteAddr string) {
+	clientDat := conn.ClientData()
+	clientDat.ServerAddress = remoteAddr
+
 	serverConn, err := minecraft.Dialer{
 		IdentityData: conn.IdentityData(),
-		ClientData:   conn.ClientData(),
+		ClientData:   clientDat,
 		FlushRate:    -1,
 		ReadBatches:  false,
 
