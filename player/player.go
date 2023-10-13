@@ -837,9 +837,12 @@ func (p *Player) TryTransfer(address string) error {
 	defer p.scMu.Unlock()
 	defer p.ccMu.Unlock()
 
+	clientDat := p.conn.ClientData()
+	clientDat.ServerAddress = address
+
 	serverConn, err := minecraft.Dialer{
 		IdentityData: p.conn.IdentityData(),
-		ClientData:   p.conn.ClientData(),
+		ClientData:   clientDat,
 		FlushRate:    -1,
 		ReadBatches:  false,
 	}.DialTimeout("raknet", address, time.Second*5)
