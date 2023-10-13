@@ -212,6 +212,29 @@ func BlockBoxes(b world.Block, pos cube.Pos, sblocks map[cube.Face]world.Block) 
 		}
 
 		return []cube.BBox{bb}
+	case "minecraft:snow_layer":
+		_, dat := b.EncodeBlock()
+		height, ok := dat["height"]
+		if !ok {
+			return []cube.BBox{}
+		}
+
+		blockBBY := float32(height.(int32)) / 8.0
+		return []cube.BBox{cube.Box(0, 0, 0, 1, blockBBY, 1)}
+	case "minecraft:redstone_ore", "minecraft:redstone_wire":
+		return []cube.BBox{}
+	case "minecraft:golden_rail", "minecraft:detector_rail", "minecraft:activator_rail", "minecraft:rail":
+		return []cube.BBox{}
+	case "minecraft:lever":
+		return []cube.BBox{}
+	case "minecraft:redstone_torch", "minecraft:unlit_redstone_torch":
+		return []cube.BBox{}
+	case "minecraft:repeater", "minecraft:unpowered_repeater", "minecraft:powered_repeater":
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/8.0, 1)}
+	case "minecraft:comparator", "minecraft:unpowered_comparator", "minecraft:powered_comparator":
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/8.0, 1)}
+	case "minecraft:daylight_detector", "minecraft:daylight_detector_inverted":
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 3.0/8.0, 1)}
 	}
 
 	dfBoxes := b.Model().BBox(df_cube.Pos{
