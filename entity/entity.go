@@ -8,6 +8,15 @@ import (
 	"github.com/oomph-ac/oomph/utils"
 )
 
+/*
+ * After some testing, it seems that mobs, compared to players, have their positions smoothed out over a longer period of time.
+ * The EntityMobInterpolationTicks is my best estimate, after testing, to what "newPosRotationIncrements" should be set to for mobs.
+ */
+const (
+	EntityPlayerInterpolationTicks = 3
+	EntityMobInterpolationTicks    = 6
+)
+
 // Entity represents an entity in a world with a *player.Player.
 type Entity struct {
 	// mu protects all the following fields.
@@ -151,10 +160,14 @@ func (e *Entity) UpdatePosition(dat utils.LocationData, offset bool) {
 
 	if dat.Teleport {
 		e.teleportTicks = 0
-		e.newPosRotationIncrements = 1
 	} else {
 		e.teleportTicks++
-		e.newPosRotationIncrements = 3
+	}
+
+	if e.player {
+		e.newPosRotationIncrements = EntityPlayerInterpolationTicks
+	} else {
+		e.newPosRotationIncrements = EntityMobInterpolationTicks
 	}
 
 	if offset {
