@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/block/model"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -10,6 +11,14 @@ import (
 )
 
 const fenceInset = 0.5 - (0.25 / 2)
+
+const (
+	noCorner = iota
+	cornerRightInner
+	cornerLeftInner
+	cornerRightOuter
+	cornerLeftOuter
+)
 
 // BlockName returns the name of the block.
 func BlockName(b world.Block) string {
@@ -247,6 +256,85 @@ func BlockBoxes(b world.Block, pos cube.Pos, sblocks map[cube.Face]world.Block) 
 	}
 
 	return boxes
+}
+
+// IsStairBlock returns true if the block given is a stair block.
+func IsStairBlock(b world.Block) bool {
+	switch BlockName(b) {
+	case "minecraft:prismarine_stairs", "minecraft:dark_prismarine_stairs", "minecraft:prismarine_bricks_stairs", "minecraft:granite_stairs",
+		"minecraft:diorite_stairs", "minecraft:andesite_stairs", "minecraft:polished_granite_stairs", "minecraft:polished_diorite_stairs", "minecraft:polished_andesite_stairs",
+		"minecraft:mossy_stone_brick_stairs", "minecraft:smooth_red_sandstone_stairs", "minecraft:smooth_sandstone_stairs", "minecraft:end_brick_stairs",
+		"minecraft:mossy_cobblestone_stairs", "minecraft:normal_stone_stairs", "minecraft:red_nether_brick_stairs", "minecraft:smooth_quartz_stairs",
+		"minecraft:oak_stairs", "minecraft:stone_stairs", "minecraft:brick_stairs", "minecraft:stone_brick_stairs", "minecraft:nether_brick_stairs",
+		"minecraft:sandstone_stairs", "minecraft:spruce_stairs", "minecraft:birch_stairs", "minecraft:jungle_stairs", "minecraft:quartz_stairs",
+		"minecraft:acacia_stairs", "minecraft:dark_oak_stairs", "minecraft:red_sandstone_stairs", "minecraft:purpur_stairs":
+		return true
+	default:
+		return false
+	}
+}
+
+// StairCornerType returns the corner type of the stair block.
+func StairCornerType(currentDirection cube.Direction, upsideDown bool, sblocks map[cube.Face]world.Block) uint8 {
+	rotatedFacing := currentDirection.RotateRight()
+
+	closedSide, ok := sblocks[currentDirection.Face()]
+	if ok {
+		closedStair, ok := closedSide.Model().(model.Stair)
+		if ok && closedStair.UpsideDown == upsideDown {
+			if cube.Direction(closedStair.Facing) == rotatedFacing {
+				return cornerLeftOuter
+			} else if cube.Direction(closedStair.Facing) == rotatedFacing.Opposite() {
+				side, ok := sblocks[currentDirection.RotateRight().Face()]
+				if !ok {
+					return cornerRightOuter
+				}
+
+				sideStair, ok := side.Model().(model.Stair)
+				if !ok {
+					return cornerRightOuter
+				}
+
+				if cube.Face(sideStair.Facing) != currentDirection.Face() || sideStair.UpsideDown != upsideDown {
+					return cornerRightOuter
+				}
+				return noCorner
+			}
+		}
+	}
+
+	openSide, ok := sblocks[currentDirection.RotateRight().Face()]
+	if !ok {
+		return noCorner
+	}
+
+	openStair, ok := openSide.Model().(model.Stair)
+	if !ok {
+		return noCorner
+	}
+
+	if openStair.UpsideDown == upsideDown {
+		if cube.Direction(openStair.Facing) == rotatedFacing {
+			side, ok := sblocks[currentDirection.RotateRight().Face()]
+			if !ok {
+				return cornerRightInner
+			}
+
+			sideStair, ok := side.Model().(model.Stair)
+			if !ok {
+				return cornerRightInner
+			}
+
+			if cube.Face(sideStair.Facing) != currentDirection.Face() || sideStair.UpsideDown != upsideDown {
+				return cornerRightInner
+			}
+			return noCorner
+		} else if cube.Direction(openStair.Facing) == rotatedFacing.Opposite() {
+			return cornerLeftInner
+		}
+	}
+
+	return noCorner
 }
 
 // Check fence connection checks for connections on the x and z axis the fence may have.
