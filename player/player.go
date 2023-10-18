@@ -234,8 +234,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	return p
 }
 
-// AllowDebug sets whether the player is allowed to run debug commands in Oomph.
-func (p *Player) AllowDebug(b bool) {
+// AllowedDebug sets whether the player is allowed to run debug commands in Oomph.
+func (p *Player) AllowedDebug(b bool) {
 	p.debugger.AllowedDebug = b
 }
 
