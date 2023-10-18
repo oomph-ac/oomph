@@ -89,6 +89,7 @@ type Player struct {
 	respawned             bool
 	dead                  bool
 	needsCombatValidation bool
+	inDimensionChange     bool
 	closed                bool
 
 	containerID        byte
@@ -514,6 +515,15 @@ func (p *Player) Acknowledgement(f func()) {
 	p.Acknowledgements().Add(f)
 }
 
+// SetInDimensionChange sets wether the player is in a dimension change state or not.
+func (p *Player) SetInDimensionChange(b bool) {
+	p.inDimensionChange = b
+	if p.inDimensionChange {
+		p.Acknowledgements().Clear()
+	}
+}
+
+// OnNextClientTick runs a function on the next input the client sends (aka. its next tick)
 func (p *Player) OnNextClientTick(f func()) {
 	p.nextTickActionsMu.Lock()
 	defer p.nextTickActionsMu.Unlock()

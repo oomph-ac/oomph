@@ -71,6 +71,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			if p.gamemode == 5 {
 				p.gamemode = p.serverConn.GameData().WorldGameMode
 			}
+			p.chunkRadius = int32(p.Conn().ChunkRadius()) + 2
 
 			p.Acknowledgement(func() {
 				p.ready = true
@@ -187,6 +188,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		}
 	case *packet.PlayerAction:
 		pk.EntityRuntimeID = p.runtimeID
+
+		if pk.ActionType == protocol.PlayerActionDimensionChangeDone && p.inDimensionChange {
+			p.inDimensionChange = false
+		}
 	}
 
 	// Run all registered checks.
@@ -559,6 +564,9 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			p.containerID = 0
 			p.miMu.Unlock()
 		})
+	case *packet.ChangeDimension:
+		p.inDimensionChange = true
+		p.Acknowledgements().Clear()
 	}
 	return false
 }
