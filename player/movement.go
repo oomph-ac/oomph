@@ -225,7 +225,7 @@ func (p *Player) correctMovement() {
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
 	if p.mInfo.TicksSinceBlockRefresh >= uint32(p.TickLatency())+5 {
-		for bpos, b := range p.GetNearbyBlocks(p.AABB()) {
+		for bpos, b := range p.GetNearbyBlocks(p.AABB(), true) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 				NewBlockRuntimeID: world.BlockRuntimeID(b),
@@ -595,7 +595,7 @@ func (p *Player) isInsideBlock() (world.Block, bool) {
 	}
 
 	bb := p.AABB()
-	for pos, block := range p.GetNearbyBlocks(bb) {
+	for pos, block := range p.GetNearbyBlocks(bb, false) {
 		boxes := utils.BlockBoxes(block, pos, p.SurroundingBlocks(pos))
 		for _, box := range boxes {
 			if !p.AABB().IntersectsWith(box.Translate(pos.Vec3())) {
@@ -848,7 +848,7 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 // Returns true if the player is in a scenario we cannot predict reliably.
 func (p *Player) checkUnsupportedMovementScenarios() bool {
 	bb := p.AABB()
-	blocks := p.GetNearbyBlocks(bb)
+	blocks := p.GetNearbyBlocks(bb, false)
 
 	p.mInfo.UnsupportedAcceptance = 0.0
 
