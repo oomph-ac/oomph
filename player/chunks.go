@@ -178,7 +178,7 @@ func (p *Player) GetNearbyBBoxes(aabb cube.BBox) []cube.BBox {
 }
 
 // GetNearbyBlocks returns a list of blocks that are within the given bounding box.
-func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
+func (p *Player) GetNearbyBlocks(aabb cube.BBox, includeAir bool) map[cube.Pos]world.Block {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
@@ -190,7 +190,12 @@ func (p *Player) GetNearbyBlocks(aabb cube.BBox) map[cube.Pos]world.Block {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
-				blocks[pos] = p.Block(pos)
+				b := p.Block(pos)
+				if _, isAir := b.(block.Air); !includeAir && isAir {
+					continue
+				}
+
+				blocks[pos] = b
 			}
 		}
 	}
