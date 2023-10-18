@@ -7,4 +7,6 @@ type Debugger struct {
 
 	UseServerKnockback bool
 	UsePacketBuffer    bool
+
+	AllowedDebug bool
 }
