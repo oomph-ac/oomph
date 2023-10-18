@@ -148,6 +148,16 @@ func (a *Acknowledgements) Validate() bool {
 	return a.awaitResTicks < 200
 }
 
+// Clear clears all existing acknowledgements.
+func (a *Acknowledgements) Clear() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.AcknowledgeMap = make(map[int64][]func())
+	a.awaitResTicks = 0
+	a.acknowledgementOrder = []int64{}
+}
+
 // Handle gets the acknowledgement in the map with the timestamp given in the function. If there is no acknowledgement
 // found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
 // "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
@@ -202,6 +212,12 @@ func (p *Player) SendAck() {
 		}
 
 		if len(buf) == 0 {
+			acks.Remove(acks.CurrentTimestamp)
+			return
+		}
+
+		// It seems that when the client is changing dimensions, they do not send back NetworkStackLatency.
+		if p.inDimensionChange {
 			acks.Remove(acks.CurrentTimestamp)
 			return
 		}
