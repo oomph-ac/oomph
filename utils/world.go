@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
@@ -8,6 +9,7 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
+	oomph_world "github.com/oomph-ac/oomph/world"
 )
 
 const fenceInset = 0.5 - (0.25 / 2)
@@ -89,7 +91,17 @@ func IsFence(n string) bool {
 }
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
-func BlockBoxes(b world.Block, pos cube.Pos, sblocks map[cube.Face]world.Block) []cube.BBox {
+func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
+	sblocks := map[cube.Face]world.Block{}
+	for _, f := range cube.Faces() {
+		b := w.GetBlock(pos.Side(f))
+		if _, isAir := b.(block.Air); isAir {
+			continue
+		}
+
+		sblocks[f] = b
+	}
+
 	switch BlockName(b) {
 	case "minecraft:wooden_pressure_plate", "minecraft:spruce_pressure_plate", "minecraft:birch_pressure_plate",
 		"minecraft:jungle_pressure_plate", "minecraft:acacia_pressure_plate", "minecraft:dark_oak_pressure_plate",
@@ -415,6 +427,82 @@ func WallConnectionCompatiable(n string) bool {
 	default:
 		return !IsFence(n)
 	}
+}
+
+// IsBlockFullCube returns true if at least one of the bounding boxes of the block is 1x1x1.
+func IsBlockFullCube(pos cube.Pos, w *oomph_world.World) bool {
+	block := w.GetBlock(cube.Pos(pos))
+	for _, bb := range BlockBoxes(block, pos, w) {
+		if bb.Width() != 1 || bb.Height() != 1 || bb.Length() != 1 {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
+// IsBlockOpenSpace returns true if the blocks at the given position and above the given position are not considered "full cubes".
+func IsBlockOpenSpace(pos cube.Pos, w *oomph_world.World) bool {
+	return !IsBlockFullCube(pos, w) && !IsBlockFullCube(pos.Side(cube.FaceUp), w)
+}
+
+// GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, w *oomph_world.World) map[cube.Pos]world.Block {
+	grown := aabb.Grow(0.5)
+	min, max := grown.Min(), grown.Max()
+	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
+	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
+
+	blocks := make(map[cube.Pos]world.Block)
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			for z := minZ; z <= maxZ; z++ {
+				pos := cube.Pos{x, y, z}
+				b := w.GetBlock(pos)
+				if _, isAir := b.(block.Air); !includeAir && isAir {
+					b = nil
+					continue
+				}
+
+				blocks[pos] = b
+				b = nil
+			}
+		}
+	}
+
+	return blocks
+}
+
+// GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
+func GetNearbyBBoxes(aabb cube.BBox, w *oomph_world.World) []cube.BBox {
+	grown := aabb.Grow(0.5)
+	min, max := grown.Min(), grown.Max()
+	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
+	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
+
+	// A prediction of one BBox per block, plus an additional 2, in case
+	var bboxList []cube.BBox
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			for z := minZ; z <= maxZ; z++ {
+				pos := cube.Pos{x, y, z}
+				block := w.GetBlock(pos)
+
+				for _, box := range BlockBoxes(block, pos, w) {
+					b := box.Translate(pos.Vec3())
+					if !b.IntersectsWith(aabb) || CanPassBlock(block) {
+						continue
+					}
+
+					bboxList = append(bboxList, b)
+				}
+			}
+		}
+	}
+
+	return bboxList
 }
 
 // BlockClimbable returns whether the given block is climbable.
