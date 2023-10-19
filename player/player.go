@@ -3,25 +3,26 @@ package player
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/df-mc/atomic"
 	"github.com/df-mc/dragonfly/server/event"
-	"github.com/df-mc/dragonfly/server/world"
-	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/check"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
+	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 )
 
@@ -50,6 +51,8 @@ type Player struct {
 
 	movementMode utils.AuthorityType
 	combatMode   utils.AuthorityType
+
+	world *world.World
 
 	locale language.Tag
 
@@ -122,11 +125,8 @@ type Player struct {
 	nextTickActions   []func()
 	nextTickActionsMu sync.Mutex
 
-	chunks             map[protocol.ChunkPos]*chunk.Chunk
-	chunkMu            sync.Mutex
-	cachedBlockResults sync.Map
-	chunkRadius        int32
-	breakingBlockPos   *protocol.BlockPos
+	chunkRadius      int32
+	breakingBlockPos *protocol.BlockPos
 
 	checkMu sync.Mutex
 	checks  []check.Check
@@ -136,8 +136,6 @@ type Player struct {
 
 	c    chan struct{}
 	once sync.Once
-
-	world.NopViewer
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
@@ -178,7 +176,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		gamemode: data.PlayerGameMode,
 
-		chunks:        make(map[protocol.ChunkPos]*chunk.Chunk),
 		inLoadedChunk: false,
 
 		c: make(chan struct{}),
@@ -223,6 +220,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		combatNetworkCutoff:    DefaultNetworkLatencyCutoff,
 
 		nextTickActions: make([]func(), 0),
+
+		world: world.NewWorld(),
 	}
 
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
@@ -239,6 +238,11 @@ func (p *Player) AllowedDebug(b bool) {
 	p.debugger.AllowedDebug = b
 }
 
+// World returns the world of thte player.
+func (p *Player) World() *world.World {
+	return p.world
+}
+
 // SetRuntimeID sets the runtime ID of the player.
 func (p *Player) SetRuntimeID(id uint64) {
 	p.runtimeID = id
@@ -250,6 +254,7 @@ func (p *Player) SetRuntimeID(id uint64) {
 	p.clientRuntimeID = id
 }
 
+// SetUniqueID sets the unique ID of the player.
 func (p *Player) SetUniqueID(id int64) {
 	p.uniqueID = id
 	if p.hasClientUid {
@@ -418,6 +423,7 @@ func (p *Player) AABB() cube.BBox {
 	return cube.Box(bb.Min().X(), bb.Min().Y(), bb.Min().Z(), bb.Max().X(), bb.Max().Y(), bb.Max().Z()).Translate(pos)
 }
 
+// Acknowledgements returns the acknowledgements of the player.
 func (p *Player) Acknowledgements() *Acknowledgements {
 	return p.acks
 }
@@ -735,7 +741,6 @@ func (p *Player) SendOomphDebug(message string, t byte) {
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
 	p.conn.Flush()
-	p.Close()
 }
 
 // Closed returns if the player is closed.
@@ -752,8 +757,6 @@ func (p *Player) Close() error {
 		p.checks = nil
 		p.checkMu.Unlock()
 
-		p.clearAllChunks()
-
 		p.entities.Range(func(k, _ any) bool {
 			p.entities.Delete(k)
 			return true
@@ -764,12 +767,27 @@ func (p *Player) Close() error {
 			return true
 		})
 
+		p.queueMu.Lock()
+		maps.Clear(p.queuedEntityLocations)
+		p.queueMu.Unlock()
+
+		p.entity = nil
+		p.Acknowledgements().Clear()
 		close(p.c)
 
-		_ = p.conn.Close()
+		p.ccMu.Lock()
+		p.conn.Close()
+		p.conn = nil
+		p.ccMu.Unlock()
+
 		if p.serverConn != nil {
-			_ = p.serverConn.Close()
+			p.scMu.Lock()
+			p.serverConn.Close()
+			p.serverConn = nil
+			p.scMu.Unlock()
 		}
+
+		runtime.GC()
 	})
 
 	return nil
@@ -879,7 +897,7 @@ func (p *Player) TryTransfer(address string) error {
 		return err
 	}
 
-	p.clearAllChunks()
+	p.World().PurgeChunks()
 
 	p.serverConn.Close()
 	p.serverConn = serverConn

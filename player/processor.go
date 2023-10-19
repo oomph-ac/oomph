@@ -52,9 +52,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	}()
 
 	switch pk := pk.(type) {
-	case *packet.Disconnect:
-		p.Close()
-		return false
 	case *packet.TickSync:
 		// The tick sync packet is sent once by the client on join and the server responds with another.
 		// From what I can tell, the client frame is supposed to be rewound to `ServerReceptionTime` in the
@@ -95,12 +92,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			if p.movementMode == utils.ModeSemiAuthoritative {
 				p.setMovementToClient()
 			}
-
-			// Clear the cached block results.
-			p.cachedBlockResults.Range(func(k, _ any) bool {
-				p.cachedBlockResults.Delete(k)
-				return true
-			})
 		}()
 
 		prevPos := p.mInfo.ServerPosition
@@ -310,7 +301,8 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 		})
-		p.cleanChunks(p.chunkRadius, protocol.ChunkPos{
+
+		p.World().CleanChunks(p.chunkRadius, protocol.ChunkPos{
 			int32(math32.Floor(pk.Position[0])) >> 4,
 			int32(math32.Floor(pk.Position[2])) >> 4,
 		})
@@ -337,7 +329,8 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position, pk.OnGround)
 		})
-		p.cleanChunks(p.chunkRadius, protocol.ChunkPos{
+
+		p.World().CleanChunks(p.chunkRadius, protocol.ChunkPos{
 			int32(math32.Floor(pk.Position[0])) >> 4,
 			int32(math32.Floor(pk.Position[2])) >> 4,
 		})
@@ -478,12 +471,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		}
 
 		if p.movementMode == utils.ModeFullAuthoritative {
-			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
+			p.World().SetBlock(utils.BlockToCubePos(pk.Position), b)
 			return false
 		}
 
 		p.Acknowledgement(func() {
-			p.SetBlock(utils.BlockToCubePos(pk.Position), b)
+			p.World().SetBlock(utils.BlockToCubePos(pk.Position), b)
 		})
 	case *packet.MobEffect:
 		if pk.EntityRuntimeID != p.runtimeID {
@@ -608,10 +601,11 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.mInfo.ServerPosition[0])) >> 4,
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	}
+
 	if !p.mInfo.AwaitingTeleport {
-		p.cleanChunks(p.chunkRadius, cPos)
+		p.World().CleanChunks(p.chunkRadius, cPos)
 	}
-	p.inLoadedChunk = p.ChunkExists(cPos)
+	p.inLoadedChunk = p.World().ChunkExists(cPos)
 
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
 	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
@@ -629,7 +623,11 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				p.networkClientBreaksBlock(action.BlockPos)
+				p.World().SetBlock(cube.Pos{
+					int(action.BlockPos.X()),
+					int(action.BlockPos.Y()),
+					int(action.BlockPos.Z()),
+				}, block.Air{})
 				continue
 			}
 
@@ -658,7 +656,11 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				p.networkClientBreaksBlock(*p.breakingBlockPos)
+				p.World().SetBlock(cube.Pos{
+					int(action.BlockPos.X()),
+					int(action.BlockPos.Y()),
+					int(action.BlockPos.Z()),
+				}, block.Air{})
 				p.breakingBlockPos = nil
 			}
 		}
@@ -697,12 +699,12 @@ func (p *Player) handleLevelChunk(pk *packet.LevelChunk) {
 	c.Compact()
 
 	if p.movementMode == utils.ModeFullAuthoritative {
-		p.AddChunk(c, pk.Position)
+		p.World().SetChunk(c, pk.Position)
 		return
 	}
 
 	p.Acknowledgement(func() {
-		p.AddChunk(c, pk.Position)
+		p.World().SetChunk(c, pk.Position)
 	})
 }
 
@@ -721,11 +723,11 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 		}
 
 		var c *chunk.Chunk
-		c, ok := p.Chunk(chunkPos)
+		c = p.World().Chunk(chunkPos)
 
 		// If the chunk doesn't already exist in the player map, it is being sent to the client
 		// for the first time, so we create a new one.
-		if !ok {
+		if c == nil {
 			c = chunk.New(air, dimensionFromNetworkID(pk.Dimension).Range())
 		}
 
@@ -737,7 +739,7 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 
 		c.Sub()[index] = sub
 
-		p.AddChunk(c, chunkPos)
+		p.World().SetChunk(c, chunkPos)
 	}
 }
 
@@ -769,7 +771,7 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	// Find the replace position of the block. This will be used if the block at the current position
 	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(t.BlockPosition)
-	fb := p.Block(replacePos)
+	fb := p.World().GetBlock(replacePos)
 
 	// If the block at the position is not replacable, we want to place the block on the side of the block.
 	if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
@@ -809,8 +811,8 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		return false
 	}
 
-	// Set the block in the world
-	p.SetBlock(replacePos, b)
+	// Set the block in the world.
+	p.World().SetBlock(replacePos, b)
 	return false
 }
 
