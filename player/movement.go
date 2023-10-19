@@ -224,8 +224,8 @@ func (p *Player) correctMovement() {
 
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
-	if p.mInfo.TicksSinceBlockRefresh >= uint32(p.TickLatency())+5 {
-		for bpos, b := range p.GetNearbyBlocks(p.AABB(), true) {
+	if p.mInfo.TicksSinceBlockRefresh >= 40 {
+		for bpos, b := range utils.GetNearbyBlocks(p.AABB(), true, p.World()) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 				NewBlockRuntimeID: world.BlockRuntimeID(b),
@@ -316,7 +316,7 @@ func (p *Player) doGroundMove() {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	}
 
-	blockUnder := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.5})))
+	blockUnder := p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.5})))
 	blockFriction := game.DefaultAirFriction
 
 	if p.mInfo.OnGround {
@@ -330,7 +330,7 @@ func (p *Player) doGroundMove() {
 	v3 := p.mInfo.getFrictionInfluencedSpeed(blockFriction)
 	p.moveRelative(v3)
 
-	nearClimableBlock := utils.BlockClimbable(p.Block(cube.PosFromVec3(p.mInfo.ServerPosition)))
+	nearClimableBlock := utils.BlockClimbable(p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition)))
 	if nearClimableBlock {
 		p.mInfo.ServerMovement[0] = game.ClampFloat(p.mInfo.ServerMovement.X(), -0.2, 0.2)
 		p.mInfo.ServerMovement[2] = game.ClampFloat(p.mInfo.ServerMovement.Z(), -0.2, 0.2)
@@ -373,9 +373,9 @@ func (p *Player) doGroundMove() {
 	}
 
 	// Update `blockUnder` after collisions have been applied and the new position has been determined.
-	blockUnder = p.Block(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.2})))
+	blockUnder = p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.2})))
 	if _, ok := blockUnder.(block.Air); ok {
-		blockUnder2 := p.Block(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown))
+		blockUnder2 := p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown))
 		n := utils.BlockName(blockUnder2)
 		if utils.IsFence(n) || utils.IsWall(n) || strings.Contains(n, "fence_gate") { // ask MCP
 			blockUnder = blockUnder2
@@ -540,7 +540,7 @@ func (p *Player) maybeBackOffFromEdge() {
 	bb := p.AABB().GrowVec3(mgl32.Vec3{-0.025, 0, -0.025})
 	xMov, zMov, offset := currentVel.X(), currentVel.Z(), float32(0.05)
 
-	for xMov != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -1.0, 0}))) == 0 {
+	for xMov != 0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -1.0, 0}), p.World())) == 0 {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -550,7 +550,7 @@ func (p *Player) maybeBackOffFromEdge() {
 		}
 	}
 
-	for zMov != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -1.0, zMov}))) == 0 {
+	for zMov != 0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -1.0, zMov}), p.World())) == 0 {
 		if zMov < offset && zMov >= -offset {
 			zMov = 0
 		} else if zMov > 0 {
@@ -560,7 +560,7 @@ func (p *Player) maybeBackOffFromEdge() {
 		}
 	}
 
-	for xMov != 0 && zMov != 0 && len(p.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -1.0, zMov}))) == 0 {
+	for xMov != 0 && zMov != 0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -1.0, zMov}), p.World())) == 0 {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -595,8 +595,9 @@ func (p *Player) isInsideBlock() (world.Block, bool) {
 	}
 
 	bb := p.AABB()
-	for pos, block := range p.GetNearbyBlocks(bb, false) {
-		boxes := utils.BlockBoxes(block, pos, p.SurroundingBlocks(pos))
+	for pos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
+		boxes := utils.BlockBoxes(block, pos, p.World())
+
 		for _, box := range boxes {
 			if !p.AABB().IntersectsWith(box.Translate(pos.Vec3())) {
 				continue
@@ -616,7 +617,7 @@ func (p *Player) isInsideBlock() (world.Block, bool) {
 // simulateCollisions simulates the player's collisions with blocks
 func (p *Player) simulateCollisions() {
 	currVel := p.mInfo.ServerMovement
-	bbList := p.GetNearbyBBoxes(p.AABB().Extend(currVel))
+	bbList := utils.GetNearbyBBoxes(p.AABB().Extend(currVel), p.World())
 	newVel := currVel
 
 	if currVel.LenSqr() > 0.0 {
@@ -640,7 +641,7 @@ func (p *Player) simulateCollisions() {
 
 	if hasGroundState && (xCollision || zCollision) {
 		stepVel := mgl32.Vec3{currVel.X(), game.StepHeight, currVel.Z()}
-		list := p.GetNearbyBBoxes(p.AABB().Extend(stepVel))
+		list := utils.GetNearbyBBoxes(p.AABB().Extend(stepVel), p.World())
 
 		bb := p.AABB()
 		bb, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, bb, list, stepVel.Y())
@@ -716,7 +717,7 @@ func (p *Player) pushOutOfBlocks(x, y, z float32) {
 	blockPos := cube.PosFromVec3(mgl32.Vec3{x, y, z})
 	d0, d1, d2 := x-float32(blockPos.X()), y-float32(blockPos.Y()), z-float32(blockPos.Z())
 
-	if p.IsBlockOpenSpace(blockPos) {
+	if utils.IsBlockOpenSpace(blockPos, p.World()) {
 		if p.debugger.LogMovement {
 			p.Log().Debugf("pushOutOfBlocks(): block at %v detected as full space, cannot continue", blockPos)
 		}
@@ -729,35 +730,35 @@ func (p *Player) pushOutOfBlocks(x, y, z float32) {
 
 	var pos cube.Pos
 
-	if !p.IsBlockFullCube(blockPos.Side(cube.FaceWest)) && d0 < d3 {
+	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceWest), p.World()) && d0 < d3 {
 		d3 = d0
 		i = 0
 		pos = blockPos.Side(cube.FaceWest)
 	}
 
-	if !p.IsBlockFullCube(blockPos.Side(cube.FaceEast)) && 1.0-d0 < d3 {
+	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceEast), p.World()) && 1.0-d0 < d3 {
 		d3 = 1.0 - d0
 		i = 1
 		pos = blockPos.Side(cube.FaceEast)
 	}
 
-	if !p.IsBlockFullCube(blockPos.Side(cube.FaceDown)) && 1.0-d1 < d3 {
+	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceDown), p.World()) && 1.0-d1 < d3 {
 		d3 = 1.0 - d1
 		i = 3
 		pos = blockPos.Side(cube.FaceDown)
-	} else if !p.IsBlockFullCube(blockPos.Side(cube.FaceUp)) && 1.0-d1 < d3 {
+	} else if !utils.IsBlockFullCube(blockPos.Side(cube.FaceUp), p.World()) && 1.0-d1 < d3 {
 		d3 = 1.0 - d1
 		i = 2
 		pos = blockPos.Side(cube.FaceUp)
 	}
 
-	if !p.IsBlockFullCube(blockPos.Side(cube.FaceNorth)) && d2 < d3 {
+	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceNorth), p.World()) && d2 < d3 {
 		d3 = d2
 		i = 4
 		pos = blockPos.Side(cube.FaceNorth)
 	}
 
-	if !p.IsBlockFullCube(blockPos.Side(cube.FaceSouth)) && 1.0-d2 < d3 {
+	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceSouth), p.World()) && 1.0-d2 < d3 {
 		i = 5
 		pos = blockPos.Side(cube.FaceSouth)
 	}
@@ -848,7 +849,7 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 // Returns true if the player is in a scenario we cannot predict reliably.
 func (p *Player) checkUnsupportedMovementScenarios() bool {
 	bb := p.AABB()
-	blocks := p.GetNearbyBlocks(bb, false)
+	blocks := utils.GetNearbyBlocks(bb, false, p.World())
 
 	p.mInfo.UnsupportedAcceptance = 0.0
 
