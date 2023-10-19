@@ -128,10 +128,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		if cmd[0] == "!oomph_debug" {
 			if !p.debugger.AllowedDebug {
 				p.SendOomphDebug(text.Colourf("<red>You are not authorized to run debug commands on Oomph.</red>"), packet.TextTypeChat)
+				return true
 			}
 
 			if len(cmd) != 3 {
-				p.SendOomphDebug("Usage: oomph_debug <mode> <value>", packet.TextTypeChat)
+				p.SendOomphDebug("Usage: !oomph_debug <mode> <value>", packet.TextTypeChat)
 				return true
 			}
 
