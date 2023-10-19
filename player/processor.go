@@ -460,7 +460,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		})
 	case *packet.ChunkRadiusUpdated:
 		p.Acknowledgement(func() {
-			p.chunkRadius = pk.ChunkRadius
+			p.chunkRadius = pk.ChunkRadius + 2
 		})
 	case *packet.UpdateBlock:
 		if p.movementMode == utils.ModeClientAuthoritative {
