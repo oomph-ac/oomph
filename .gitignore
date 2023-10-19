@@ -6,6 +6,5 @@ tests/*
 .oomph_portal_prod/*
 survival_proxy/*
 players/*
-world/*
 .DS_Store
 .fleet/
