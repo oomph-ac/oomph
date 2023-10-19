@@ -429,10 +429,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
 		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff && pk.Velocity.LenSqr() > 0) || p.debugger.UseServerKnockback {
-			p.SetKnockback(pk.Velocity)
-			if p.debugger.LogMovement {
-				p.Log().Debugf("server authoritative kb for %v", pk.Velocity)
-			}
+			p.OnNextClientTick(func() {
+				p.mInfo.SetKnockback(pk.Velocity)
+				if p.debugger.LogMovement {
+					p.Log().Debugf("server authoritative kb for %v", pk.Velocity)
+				}
+			})
 
 			return false
 		}
@@ -440,7 +442,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// Send an acknowledgement to the player to get the client tick where the player will apply KB and verify that the client
 		// does take knockback when it recieves it.
 		p.Acknowledgement(func() {
-			p.SetKnockback(pk.Velocity)
+			p.mInfo.SetKnockback(pk.Velocity)
 			if p.debugger.LogMovement {
 				p.Log().Debugf("client authoritative kb for %v", pk.Velocity)
 			}
