@@ -27,7 +27,7 @@ func (p *Player) doMovementSimulation() {
 		defer p.Log().Debugf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame())
 	}
 
-	if p.inLoadedChunkTicks <= 5 || !p.ready || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) {
+	if (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) {
 		p.mInfo.OnGround = false
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
@@ -247,6 +247,11 @@ func (p *Player) correctMovement() {
 
 // aiStep starts the movement simulation of the player.
 func (p *Player) aiStep() {
+	if !p.ready {
+		p.mInfo.ServerMovement = mgl32.Vec3{}
+		return
+	}
+
 	if p.mInfo.Teleporting {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 		if p.mInfo.OnGround {
