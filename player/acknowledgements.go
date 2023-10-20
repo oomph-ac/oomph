@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -180,7 +179,7 @@ func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
 	}
 
 	// If this is Oomph's acknowledgement, we want to make sure that it is in order.
-	if ok {
+	/* if ok {
 		expected := a.acknowledgementOrder[0]
 		a.acknowledgementOrder = a.acknowledgementOrder[1:]
 
@@ -189,7 +188,7 @@ func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
 			p.Disconnect(game.ErrorBadAckOrder)
 			return false
 		}
-	}
+	} */
 
 	// FUCK. What the fuck have they done to the PlayStation NSL? Is the behavior the
 	// same on all platforms now? Is there a different divider...? TODO!
@@ -234,7 +233,7 @@ func (p *Player) SendAck() {
 			expectedTimestamp /= 1000
 		}
 
-		acks.acknowledgementOrder = append(acks.acknowledgementOrder, expectedTimestamp)
+		//acks.acknowledgementOrder = append(acks.acknowledgementOrder, expectedTimestamp)
 		p.conn.WritePacket(pk)
 	}
 }
