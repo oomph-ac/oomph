@@ -26,13 +26,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-// Ensure DF users using Oomph are using the gophertunnel fork @ https://www.github.com/ethaniccc/gophertunnel
-func init() {
-	_ = minecraft.ListenConfig{
-		ReadBatches: false,
-	}
-}
-
 const DefaultNetworkLatencyCutoff int64 = 6
 
 // Player contains information about a player, such as its virtual world or AABB.
@@ -877,7 +870,6 @@ func (p *Player) TryTransfer(address string) error {
 		IdentityData: p.conn.IdentityData(),
 		ClientData:   clientDat,
 		FlushRate:    -1,
-		ReadBatches:  false,
 	}.DialTimeout("raknet", address, time.Second*5)
 
 	if err != nil {

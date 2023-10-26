@@ -424,10 +424,13 @@ func (p *Player) doGroundMove() {
 	// Attempt to push the player out of any blocks they're inside of.
 	oldPos := p.mInfo.ServerPosition
 
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+	// TODO: Fix this.
+	p.pushOutOfBlock()
+
+	/* p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
 	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
 	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
+	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35) */
 
 	if p.debugger.LogMovement && oldPos != p.mInfo.ServerPosition {
 		p.Log().Debugf("doGroundMove(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
@@ -717,7 +720,69 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 	return mgl32.Vec3{xMov, yMov, zMov}
 }
 
+// pushOutOfBlock pushes the player outside of a block.
+func (p *Player) pushOutOfBlock() {
+	pos := cube.PosFromVec3(p.mInfo.ServerPosition)
+	b, ba := p.World().GetBlock(pos), p.World().GetBlock(pos.Side(cube.FaceUp))
+
+	var pushX, pushY, pushZ float32
+	if utils.CanPassBlock(b) {
+		return
+	}
+
+	bb := p.AABB()
+	for bpos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
+		for _, box := range utils.BlockBoxes(block, bpos, p.World()) {
+			box = box.Translate(bpos.Vec3())
+			alternateBB := box.GrowVec3(mgl32.Vec3{
+				box.Width() * -0.5,
+				box.Height() * -0.5,
+				box.Width() * -0.5,
+			})
+
+			// In this case, the player is already too far inside the block's BB to be pushed out
+			if bb.IntersectsWith(alternateBB) {
+				p.SendOomphDebug("too far inside BB to be pushed out", 1)
+				continue
+			}
+
+			if !bb.IntersectsWith(box) {
+				p.SendOomphDebug("player is not intersecting with block", 1)
+				continue
+			}
+
+			if p.mInfo.ServerPosition.X() > bb.Min().X() {
+				pushX = box.Max().X() - bb.Min().X()
+			} else if p.mInfo.ServerPosition.X() < bb.Max().X() {
+				pushX = box.Min().X() - bb.Max().X()
+			}
+
+			if p.mInfo.ServerPosition.Y() > bb.Min().Y() {
+				pushY = box.Max().Y() - bb.Min().Y()
+			} else if p.mInfo.ServerPosition.Y() < bb.Max().Y() {
+				pushY = box.Min().Y() - bb.Max().Y()
+			}
+
+			if p.mInfo.ServerPosition.Z() > bb.Min().Z() {
+				pushZ = box.Max().Z() - bb.Min().Z()
+			} else if p.mInfo.ServerPosition.Z() < bb.Max().Z() {
+				pushZ = box.Min().Z() - bb.Max().Z()
+			}
+		}
+	}
+
+	if _, ok := ba.(block.Air); !ok {
+		pushY = 0.0
+	}
+
+	fmt.Println(pushX, pushY, pushZ)
+	p.mInfo.ServerPosition[0] += pushX
+	p.mInfo.ServerPosition[1] += pushY
+	p.mInfo.ServerPosition[2] += pushZ
+}
+
 // pushOutOfBlocks simulates the movement occured when the player is inside a block.
+// @deprecated
 func (p *Player) pushOutOfBlocks(x, y, z float32) {
 	blockPos := cube.PosFromVec3(mgl32.Vec3{x, y, z})
 	d0, d1, d2 := x-float32(blockPos.X()), y-float32(blockPos.Y()), z-float32(blockPos.Z())
