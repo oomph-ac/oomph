@@ -266,6 +266,9 @@ func (p *Player) aiStep() {
 		return
 	}
 
+	// Push the player out of any blocks they are inside of.
+	p.pushOutOfBlock()
+
 	// If the player's X movement is below 1e-7, set it to 0.
 	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-7 {
 		p.mInfo.ServerMovement[0] = 0
@@ -419,21 +422,6 @@ func (p *Player) doGroundMove() {
 		f := utils.BlockSpeedFactor(blockUnder)
 		p.mInfo.ServerMovement[0] *= f
 		p.mInfo.ServerMovement[2] *= f
-	}
-
-	// Attempt to push the player out of any blocks they're inside of.
-	oldPos := p.mInfo.ServerPosition
-
-	// TODO: Fix this.
-	p.pushOutOfBlock()
-
-	/* p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()-p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()-p.AABB().Width()*0.35)
-	p.pushOutOfBlocks(p.mInfo.ServerPosition.X()+p.AABB().Width()*0.35, p.AABB().Min().Y()+0.5, p.mInfo.ServerPosition.Z()+p.AABB().Width()*0.35) */
-
-	if p.debugger.LogMovement && oldPos != p.mInfo.ServerPosition {
-		p.Log().Debugf("doGroundMove(): pushed out of block results: old=%v, new=%v", oldPos, p.mInfo.ServerPosition)
 	}
 }
 
@@ -731,42 +719,48 @@ func (p *Player) pushOutOfBlock() {
 	}
 
 	bb := p.AABB()
+	hasIntersection := false
+
 	for bpos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
 		for _, box := range utils.BlockBoxes(block, bpos, p.World()) {
 			box = box.Translate(bpos.Vec3())
-			alternateBB := box.GrowVec3(mgl32.Vec3{
-				box.Width() * -0.5,
-				box.Height() * -0.5,
-				box.Width() * -0.5,
-			})
 
-			// In this case, the player is already too far inside the block's BB to be pushed out
-			if bb.IntersectsWith(alternateBB) {
-				p.SendOomphDebug("too far inside BB to be pushed out", 1)
-				continue
-			}
-
+			// The player is not inside the block's BB.
 			if !bb.IntersectsWith(box) {
-				p.SendOomphDebug("player is not intersecting with block", 1)
 				continue
 			}
+			hasIntersection = true
+			minDelta, maxDelta := box.Max().Sub(bb.Min()), box.Min().Sub(bb.Max())
 
-			if p.mInfo.ServerPosition.X() > bb.Min().X() {
-				pushX = box.Max().X() - bb.Min().X()
-			} else if p.mInfo.ServerPosition.X() < bb.Max().X() {
-				pushX = box.Min().X() - bb.Max().X()
+			if bb.Max().X()-box.Min().X() > 0 && minDelta.X() <= 0.5 {
+				pushX = minDelta.X()
+				break
 			}
 
-			if p.mInfo.ServerPosition.Y() > bb.Min().Y() {
-				pushY = box.Max().Y() - bb.Min().Y()
-			} else if p.mInfo.ServerPosition.Y() < bb.Max().Y() {
-				pushY = box.Min().Y() - bb.Max().Y()
+			if box.Max().X()-bb.Min().X() > 0 && maxDelta.X() >= -0.5 {
+				pushX = maxDelta.X()
+				break
 			}
 
-			if p.mInfo.ServerPosition.Z() > bb.Min().Z() {
-				pushZ = box.Max().Z() - bb.Min().Z()
-			} else if p.mInfo.ServerPosition.Z() < bb.Max().Z() {
-				pushZ = box.Min().Z() - bb.Max().Z()
+			if bb.Max().Z()-box.Min().Z() > 0 && minDelta.Z() <= 0.5 {
+				pushZ = minDelta.Z()
+				break
+			}
+
+			if box.Max().Z()-bb.Min().Z() > 0 && maxDelta.Z() >= -0.5 {
+				pushZ = maxDelta.Z()
+				break
+			}
+
+			/* if bb.Max().Y()-box.Min().Y() > 0 && minDelta.Y() <= 0.4 {
+				pushY = minDelta.Y()
+				fmt.Println("pushY + ")
+				break
+			} */
+
+			if box.Max().Y()-bb.Min().Y() > 0 && maxDelta.Y() >= -0.5 {
+				pushY = maxDelta.Y()
+				break
 			}
 		}
 	}
@@ -775,77 +769,21 @@ func (p *Player) pushOutOfBlock() {
 		pushY = 0.0
 	}
 
-	fmt.Println(pushX, pushY, pushZ)
-	p.mInfo.ServerPosition[0] += pushX
-	p.mInfo.ServerPosition[1] += pushY
-	p.mInfo.ServerPosition[2] += pushZ
-}
-
-// pushOutOfBlocks simulates the movement occured when the player is inside a block.
-// @deprecated
-func (p *Player) pushOutOfBlocks(x, y, z float32) {
-	blockPos := cube.PosFromVec3(mgl32.Vec3{x, y, z})
-	d0, d1, d2 := x-float32(blockPos.X()), y-float32(blockPos.Y()), z-float32(blockPos.Z())
-
-	if utils.IsBlockOpenSpace(blockPos, p.World()) {
-		if p.debugger.LogMovement {
-			p.Log().Debugf("pushOutOfBlocks(): block at %v detected as full space, cannot continue", blockPos)
-		}
-
+	if !hasIntersection {
+		p.mInfo.KnownInsideBlock = false
 		return
 	}
+	p.mInfo.KnownInsideBlock = true
 
-	i := -1
-	d3 := float32(9999.0)
+	if pushX != 0 || pushY != 0 || pushZ != 0 {
+		oldPos := p.mInfo.ServerPosition
+		p.mInfo.ServerPosition[0] += pushX
+		p.mInfo.ServerPosition[1] += pushY
+		p.mInfo.ServerPosition[2] += pushZ
 
-	var pos cube.Pos
-
-	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceWest), p.World()) && d0 < d3 {
-		d3 = d0
-		i = 0
-		pos = blockPos.Side(cube.FaceWest)
-	}
-
-	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceEast), p.World()) && 1.0-d0 < d3 {
-		d3 = 1.0 - d0
-		i = 1
-		pos = blockPos.Side(cube.FaceEast)
-	}
-
-	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceDown), p.World()) && 1.0-d1 < d3 {
-		d3 = 1.0 - d1
-		i = 3
-		pos = blockPos.Side(cube.FaceDown)
-	} else if !utils.IsBlockFullCube(blockPos.Side(cube.FaceUp), p.World()) && 1.0-d1 < d3 {
-		d3 = 1.0 - d1
-		i = 2
-		pos = blockPos.Side(cube.FaceUp)
-	}
-
-	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceNorth), p.World()) && d2 < d3 {
-		d3 = d2
-		i = 4
-		pos = blockPos.Side(cube.FaceNorth)
-	}
-
-	if !utils.IsBlockFullCube(blockPos.Side(cube.FaceSouth), p.World()) && 1.0-d2 < d3 {
-		i = 5
-		pos = blockPos.Side(cube.FaceSouth)
-	}
-
-	switch i {
-	case 0:
-		p.mInfo.ServerPosition[0] = float32(pos.X()) + 0.7
-	case 1:
-		p.mInfo.ServerPosition[0] = float32(pos.X()) + 0.3
-	case 2:
-		p.mInfo.ServerPosition[1] = float32(pos.Y())
-	case 3:
-		p.mInfo.ServerPosition[1] = float32(pos.Y())
-	case 4:
-		p.mInfo.ServerPosition[2] = float32(pos.Z()) + 0.7
-	case 5:
-		p.mInfo.ServerPosition[2] = float32(pos.Z()) + 0.3
+		if p.debugger.LogMovement {
+			p.Log().Debugf("pushOutOfBlock(): pushed player out of blocks [oldPos=%v, newPos=%v]", oldPos, p.mInfo.ServerPosition)
+		}
 	}
 }
 
