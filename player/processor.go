@@ -766,16 +766,6 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 		return false
 	}
 
-	blockName := utils.BlockName(b)
-	if strings.Contains(blockName, "door") {
-		// FUCK NO.
-		return false
-	} else if blockName == "minecraft:bed" {
-		return false
-	} else if strings.Contains(blockName, "sign") {
-		return false
-	}
-
 	// Find the replace position of the block. This will be used if the block at the current position
 	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(t.BlockPosition)
@@ -790,6 +780,12 @@ func (p *Player) handleBlockPlace(t *protocol.UseItemTransactionData) bool {
 	bx := b.Model().BBox(df_cube.Pos(replacePos), nil)
 	boxes := make([]cube.BBox, 0)
 	for _, bxx := range bx {
+		// Don't continue if the block isn't 1x1x1.
+		// TODO: Implement placements for these blocks properly.
+		if bxx.Width() != 1 || bxx.Height() != 1 || bxx.Length() != 1 {
+			return false
+		}
+
 		boxes = append(boxes, game.DFBoxToCubeBox(bxx).Translate(mgl32.Vec3{
 			float32(replacePos.X()),
 			float32(replacePos.Y()),
