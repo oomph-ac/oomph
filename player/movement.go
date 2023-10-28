@@ -710,6 +710,10 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 
 // pushOutOfBlock pushes the player outside of a block.
 func (p *Player) pushOutOfBlock() {
+	if p.mInfo.StepClipOffset > 0 {
+		return
+	}
+
 	pos := cube.PosFromVec3(p.mInfo.ServerPosition)
 	b, ba := p.World().GetBlock(pos), p.World().GetBlock(pos.Side(cube.FaceUp))
 
