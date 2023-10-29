@@ -1,7 +1,6 @@
 package check
 
 import (
-	"math"
 	"time"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -32,7 +31,7 @@ func (*TimerA) Description() string {
 
 // MaxViolations ...
 func (*TimerA) MaxViolations() float64 {
-	return math.MaxFloat64
+	return 5
 }
 
 // Process ...
@@ -67,6 +66,12 @@ func (t *TimerA) Process(p Processor, pk packet.Packet) bool {
 			"client": p.ClientTick(),
 			"server": p.ServerTick(),
 		})
+		t.balance = 0
+	}
+
+	// This can occur if a user is attempting to use negative timer to increase their balance to a high amount,
+	// to then use a high amount of timer after a period of time to bypass the check.
+	if t.balance > 500 && p.ClientTick() > p.ServerTick() {
 		t.balance = 0
 	}
 
