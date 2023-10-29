@@ -3,7 +3,6 @@ package player
 import (
 	"fmt"
 	"math"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -779,8 +778,6 @@ func (p *Player) Close() error {
 			p.serverConn = nil
 			p.scMu.Unlock()
 		}
-
-		runtime.GC()
 	})
 
 	return nil
