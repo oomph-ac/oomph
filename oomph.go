@@ -101,8 +101,12 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
-		if err := p.Conn().StartGameTimeout(data, time.Second*5); err != nil {
+		if err := p.Conn().StartGameTimeout(data, time.Second*15); err != nil {
 			o.log.Error("oomph conn.StartGame(): " + err.Error())
+			conn.WritePacket(&packet.Disconnect{
+				Message: err.Error(),
+			})
+			conn.Flush()
 			p.Close()
 			p = nil
 			return
@@ -110,8 +114,12 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		g.Done()
 	}()
 	go func() {
-		if err := p.ServerConn().DoSpawnTimeout(time.Second * 5); err != nil {
+		if err := p.ServerConn().DoSpawnTimeout(time.Second * 15); err != nil {
 			o.log.Error("oomph serverConn.DoSpawn(): " + err.Error())
+			conn.WritePacket(&packet.Disconnect{
+				Message: err.Error(),
+			})
+			conn.Flush()
 			p.Close()
 			p = nil
 			return
