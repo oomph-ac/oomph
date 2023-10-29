@@ -1044,7 +1044,6 @@ func (p *Player) doTick() {
 	err := p.Conn().Flush()
 	if err != nil {
 		p.Log().Errorf("p.doTick(): unable to flush client connection: %v", err)
-		p.Close()
 		return
 	}
 
@@ -1052,7 +1051,7 @@ func (p *Player) doTick() {
 		err = p.ServerConn().Flush()
 		if err != nil {
 			p.Log().Errorf("p.doTick(): unable to flush server connection: %v", err)
-			p.Close()
+			return
 		}
 	}
 
