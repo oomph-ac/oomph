@@ -2,6 +2,7 @@ package oomph
 
 import (
 	"errors"
+	"runtime"
 	"sync"
 	"time"
 
@@ -163,6 +164,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	g.Wait()
 	p.Close()
+
+	p = nil
+	conn = nil
+	serverConn = nil
+	runtime.GC()
 }
 
 func handleConn(p *player.Player, listener *minecraft.Listener) bool {
