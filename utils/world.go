@@ -103,6 +103,87 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	}
 
 	switch BlockName(b) {
+	case "minecraft:prismarine_stairs", "minecraft:dark_prismarine_stairs", "minecraft:prismarine_bricks_stairs", "minecraft:granite_stairs",
+		"minecraft:diorite_stairs", "minecraft:andesite_stairs", "minecraft:polished_granite_stairs", "minecraft:polished_diorite_stairs", "minecraft:polished_andesite_stairs",
+		"minecraft:mossy_stone_brick_stairs", "minecraft:smooth_red_sandstone_stairs", "minecraft:smooth_sandstone_stairs", "minecraft:end_brick_stairs",
+		"minecraft:mossy_cobblestone_stairs", "minecraft:normal_stone_stairs", "minecraft:red_nether_brick_stairs", "minecraft:smooth_quartz_stairs",
+		"minecraft:oak_stairs", "minecraft:stone_stairs", "minecraft:brick_stairs", "minecraft:stone_brick_stairs", "minecraft:nether_brick_stairs",
+		"minecraft:sandstone_stairs", "minecraft:spruce_stairs", "minecraft:birch_stairs", "minecraft:jungle_stairs", "minecraft:quartz_stairs",
+		"minecraft:acacia_stairs", "minecraft:dark_oak_stairs", "minecraft:red_sandstone_stairs", "minecraft:purpur_stairs":
+		var bbs = []cube.BBox{}
+		bbs = append(bbs, cube.Box(0, 0, 0, 1, 0.5, 1))
+
+		stair := b.Model().(model.Stair)
+		upsideDown := stair.UpsideDown
+		direction := cube.Direction(stair.Facing)
+		face := direction.Face()
+		oppositeFace := face.Opposite()
+
+		// HACK: Since EncodeBlock() will sometimes return the wrong direction due to the world being passed
+		// to it being nil, we will brute force possible directions to see if the stair could be a corner.
+		possibleDirection := cube.Direction(-1)
+		possibleStairType := uint8(0)
+		for _, dir := range []cube.Direction{direction.RotateLeft(), direction.RotateRight()} {
+			sType := StairCornerType(dir, upsideDown, sblocks)
+			if sType == noCorner || sType == cornerRightInner || sType == cornerLeftInner {
+				continue
+			}
+
+			// We only want to apply this possibility if there is a neigboring stair block in the direction.
+			bl, ok := sblocks[direction.Face()]
+			if !ok {
+				continue
+			}
+
+			// If the block isn't a stair, we don't want to apply this possibility.
+			if _, isStair := bl.Model().(model.Stair); !isStair {
+				continue
+			}
+
+			possibleDirection = dir
+			possibleStairType = sType
+			break
+		}
+
+		// HAHAHAHA. FUCK YOU STAIRS! - @ethaniccc
+		stairType := StairCornerType(direction, upsideDown, sblocks)
+		if stairType == noCorner && possibleDirection != -1 {
+			direction = possibleDirection
+			face = direction.Face()
+			oppositeFace = face.Opposite()
+			stairType = possibleStairType
+		}
+
+		if stairType == noCorner || stairType == cornerRightInner || stairType == cornerLeftInner {
+			box := cube.Box(0.5, 0.5, 0.5, 0.5, 1, 0.5).
+				ExtendTowards(face, 0.5).
+				Stretch(direction.RotateRight().Face().Axis(), 0.5)
+			bbs = append(bbs, box)
+		}
+
+		box := cube.Box(0.5, 0.5, 0.5, 0.5, 1, 0.5)
+		switch stairType {
+		case cornerRightOuter:
+			box = box.ExtendTowards(face, 0.5).ExtendTowards(direction.RotateLeft().Face(), 0.5)
+			bbs = append(bbs, box)
+		case cornerLeftOuter:
+			box = box.ExtendTowards(face, 0.5).ExtendTowards(direction.RotateRight().Face(), 0.5)
+			bbs = append(bbs, box)
+		case cornerRightInner:
+			box = box.ExtendTowards(oppositeFace, 0.5).ExtendTowards(direction.RotateRight().Face(), 0.5)
+			bbs = append(bbs, box)
+		case cornerLeftInner:
+			box = box.ExtendTowards(oppositeFace, 0.5).ExtendTowards(direction.RotateLeft().Face(), 0.5)
+			bbs = append(bbs, box)
+		}
+
+		if upsideDown {
+			for i := range bbs {
+				bbs[i+1] = bbs[i+1].Translate(mgl32.Vec3{0, -0.5})
+			}
+		}
+
+		return bbs
 	case "minecraft:wooden_pressure_plate", "minecraft:spruce_pressure_plate", "minecraft:birch_pressure_plate",
 		"minecraft:jungle_pressure_plate", "minecraft:acacia_pressure_plate", "minecraft:dark_oak_pressure_plate",
 		"minecraft:mangrove_pressure_plate", "minecraft:cherry_pressure_plate", "minecraft:crimson_pressure_plate",
@@ -298,24 +379,24 @@ func StairCornerType(currentDirection cube.Direction, upsideDown bool, sblocks m
 				return cornerLeftOuter
 			} else if cube.Direction(closedStair.Facing) == rotatedFacing.Opposite() {
 				side, ok := sblocks[currentDirection.RotateRight().Face()]
-				if !ok {
-					return cornerRightOuter
+				if ok {
+					sideStair, ok := side.Model().(model.Stair)
+					if !ok {
+						return cornerRightOuter
+					}
+
+					if cube.Direction(sideStair.Facing) != currentDirection || sideStair.UpsideDown != upsideDown {
+						return cornerRightOuter
+					}
+					return noCorner
 				}
 
-				sideStair, ok := side.Model().(model.Stair)
-				if !ok {
-					return cornerRightOuter
-				}
-
-				if cube.Face(sideStair.Facing) != currentDirection.Face() || sideStair.UpsideDown != upsideDown {
-					return cornerRightOuter
-				}
 				return noCorner
 			}
 		}
 	}
 
-	openSide, ok := sblocks[currentDirection.RotateRight().Face()]
+	openSide, ok := sblocks[currentDirection.Opposite().Face()]
 	if !ok {
 		return noCorner
 	}
@@ -333,14 +414,9 @@ func StairCornerType(currentDirection cube.Direction, upsideDown bool, sblocks m
 			}
 
 			sideStair, ok := side.Model().(model.Stair)
-			if !ok {
+			if !ok || (cube.Direction(sideStair.Facing) != currentDirection || sideStair.UpsideDown != upsideDown) {
 				return cornerRightInner
 			}
-
-			if cube.Face(sideStair.Facing) != currentDirection.Face() || sideStair.UpsideDown != upsideDown {
-				return cornerRightInner
-			}
-			return noCorner
 		} else if cube.Direction(openStair.Facing) == rotatedFacing.Opposite() {
 			return cornerLeftInner
 		}
