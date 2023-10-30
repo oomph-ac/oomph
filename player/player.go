@@ -213,7 +213,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		nextTickActions: make([]func(), 0),
 
-		world: world.NewWorld(),
+		world: world.NewWorld(log),
 	}
 
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
