@@ -178,12 +178,46 @@ func (p *Player) calculateClientSpeed() {
 	p.mInfo.ClientCalculatedSpeed *= 1.3
 }
 
+// shiftTowardsClient shifts the server position towards the client position by a certain amount.
+func (p *Player) shiftTowardsClient() {
+	if p.mInfo.AwaitingCorrection {
+		return
+	}
+
+	shiftAmt := p.mInfo.SupportedPositionPersuasion
+	if !p.mInfo.InSupportedScenario {
+		shiftAmt = p.mInfo.UnsupportedPositionPersuasion
+	}
+
+	if p.mInfo.StepClipOffset > 1e-6 {
+		shiftAmt += 1.0
+	}
+
+	// Shift the server position towards the client position by the acceptance amount.
+	dPos := p.mInfo.ServerPosition.Sub(p.Position())
+	p.mInfo.ServerPosition[0] -= game.ClampFloat(dPos[0], -shiftAmt, shiftAmt)
+	p.mInfo.ServerPosition[1] -= game.ClampFloat(dPos[1], -shiftAmt, shiftAmt)
+	p.mInfo.ServerPosition[2] -= game.ClampFloat(dPos[2], -shiftAmt, shiftAmt)
+
+	dMov := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
+	p.mInfo.ServerMovement[0] -= game.ClampFloat(dMov[0], -shiftAmt, shiftAmt)
+	p.mInfo.ServerMovement[1] -= game.ClampFloat(dMov[1], -shiftAmt, shiftAmt)
+	p.mInfo.ServerMovement[2] -= game.ClampFloat(dMov[2], -shiftAmt, shiftAmt)
+
+	if p.debugger.LogMovement && shiftAmt > p.mInfo.SupportedPositionPersuasion {
+		p.SendOomphDebug(fmt.Sprintf("diff=%v acceptance=%v (%v)", dPos, shiftAmt, p.mInfo.ClientMovement.Y() >= 0), packet.TextTypeChat)
+	}
+}
+
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
 // If the player's position is within a certain range of the server's predicted position, then the server's position is set to the client's
 func (p *Player) validateMovement() {
 	if p.movementMode != utils.ModeFullAuthoritative {
 		return
 	}
+
+	// Shift the position towards the client to allow for some leinancy.
+	p.shiftTowardsClient()
 
 	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
 	movDiff := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
@@ -193,8 +227,7 @@ func (p *Player) validateMovement() {
 		p.Log().Debugf("validateMovement(): clientDelta:%v serverDelta:%v", p.mInfo.ClientPredictedMovement, p.mInfo.ServerMovement)
 	}
 
-	// TODO: Make Microjang fix shitty unsupported scenarios & fix my step code!!! -ethaniccc
-	if posDiff.LenSqr() <= (p.mInfo.AcceptablePositionOffset + p.mInfo.UnsupportedAcceptance + math32.Pow(p.mInfo.StepClipOffset, 2)) {
+	if posDiff.LenSqr() <= (p.mInfo.MaxSupportedPositionDiff + math32.Pow(p.mInfo.StepClipOffset, 2)) {
 		return
 	}
 
@@ -242,6 +275,11 @@ func (p *Player) correctMovement() {
 		Delta:    delta,
 		OnGround: p.mInfo.OnGround,
 		Tick:     p.ClientFrame(),
+	})
+
+	p.mInfo.AwaitingCorrection = true
+	p.Acknowledgement(func() {
+		p.mInfo.AwaitingCorrection = false
 	})
 }
 
@@ -320,8 +358,10 @@ func (p *Player) aiStep() {
 
 // doGroundMove continues the player's movement simulation.
 func (p *Player) doGroundMove() {
-	if p.mInfo.StepClipOffset > 0 {
+	if p.mInfo.StepClipOffset > 1e-7 {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
+	} else {
+		p.mInfo.StepClipOffset = 0
 	}
 
 	blockUnder := p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.5})))
@@ -390,8 +430,8 @@ func (p *Player) doGroundMove() {
 		}
 	}
 
-	unsupported := p.checkUnsupportedMovementScenarios()
-	if unsupported {
+	// If we cannot predict the movement scenario reliably, we trust the client's movement.
+	if !p.isScenarioPredictable() {
 		defer p.setMovementToClient()
 	}
 
@@ -586,10 +626,6 @@ func (p *Player) maybeBackOffFromEdge() {
 
 // isInsideBlock returns true if the player is inside a block.
 func (p *Player) isInsideBlock() (world.Block, bool) {
-	if p.mInfo.StepClipOffset > 0 {
-		return nil, false
-	}
-
 	bb := p.AABB()
 	for pos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
 		boxes := utils.BlockBoxes(block, pos, p.World())
@@ -857,14 +893,13 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 	}
 }
 
-// checkUnsupportedMovementScenarios checks if the player is in an unsupported movement scenario.
-// Returns true if the player is in a scenario we cannot predict reliably.
-func (p *Player) checkUnsupportedMovementScenarios() bool {
+// isScenarioPredictable checks if the player is in an unsupported movement scenario.
+// Returns false if the player is in a scenario we need to trust the client for.
+func (p *Player) isScenarioPredictable() bool {
 	bb := p.AABB()
 	blocks := utils.GetNearbyBlocks(bb, false, p.World())
 
-	p.mInfo.UnsupportedAcceptance = 0.0
-
+	p.mInfo.InSupportedScenario = true
 	var hasLiquid, hasBounce bool
 
 	for _, bl := range blocks {
@@ -882,25 +917,22 @@ func (p *Player) checkUnsupportedMovementScenarios() bool {
 
 	if hasLiquid {
 		if p.debugger.LogMovement {
-			p.Log().Debug("checkUnsupportedMovementScenarios(): player in liquid")
+			p.Log().Debug("isScenarioPredictable(): player in liquid, cannot predict scenario")
 		}
 
-		return true
+		return false
 	}
 
 	if hasBounce {
-		p.mInfo.UnsupportedAcceptance += 1
+		p.mInfo.InSupportedScenario = false
 	}
 
-	if p.mInfo.UnsupportedAcceptance > 0 && p.debugger.LogMovement {
-		p.Log().Debug("checkUnsupportedMovementScenarios(): player in unsupported rewind scenario")
-	}
-
-	return false
+	return true
 }
 
 type MovementInfo struct {
-	CanExempt bool
+	CanExempt          bool
+	AwaitingCorrection bool
 
 	ForwardImpulse float32
 	LeftImpulse    float32
@@ -912,9 +944,13 @@ type MovementInfo struct {
 
 	Gravity float32
 
-	StepClipOffset           float32
-	AcceptablePositionOffset float32
-	UnsupportedAcceptance    float32
+	StepClipOffset float32
+
+	MaxSupportedPositionDiff      float32
+	MaxUnsupportedPositionDiff    float32
+	SupportedPositionPersuasion   float32
+	UnsupportedPositionPersuasion float32
+	InSupportedScenario           bool
 
 	TicksSinceKnockback    uint32
 	TicksSinceBlockRefresh uint32
@@ -943,10 +979,17 @@ type MovementInfo struct {
 	LastUsedInput *packet.PlayerAuthInput
 }
 
-// SetAcceptablePositionOffset sets the acceptable position offset, and if the client exceeds this,
-// the client will be sent a correction packet to correct it's movement.
-func (m *MovementInfo) SetAcceptablePositionOffset(o float32) {
-	m.AcceptablePositionOffset = o * o
+// SetMaxPositionDeviations sets the amount of position deviation allowed, and if the client exceeds this,
+// a correction will be sent.
+func (m *MovementInfo) SetMaxPositionDeviations(a float32, b float32) {
+	m.MaxSupportedPositionDiff = a * a
+	m.MaxUnsupportedPositionDiff = b * b
+}
+
+// SetPositionPersuasions sets an amount the server position will be shifted toward the client.
+func (m *MovementInfo) SetPositionPersuasions(a float32, b float32) {
+	m.SupportedPositionPersuasion = a
+	m.UnsupportedPositionPersuasion = b
 }
 
 // SetKnockback sets the knockback of the player.
