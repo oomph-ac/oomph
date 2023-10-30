@@ -9,20 +9,49 @@ import (
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
 )
 
 // World is the struct that contains chunks that are stored to create a "world".
 type World struct {
-	chunks map[protocol.ChunkPos]*chunk.Chunk
-	mu     sync.Mutex
+	tick uint64
+
+	chunks         map[protocol.ChunkPos]*chunk.Chunk
+	exemptedChunks map[protocol.ChunkPos]uint8
+
+	log *logrus.Logger
+	mu  sync.Mutex
 }
 
 // NewWorld returns a new world.
-func NewWorld() *World {
+func NewWorld(log *logrus.Logger) *World {
 	return &World{
-		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
+		log: log,
+
+		chunks:         make(map[protocol.ChunkPos]*chunk.Chunk),
+		exemptedChunks: make(map[protocol.ChunkPos]uint8),
 	}
+}
+
+// Tick uns a tick on the world.
+func (w *World) Tick() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Due to a bug of some sort, some chunks may be removed on
+	for pos, t := range w.exemptedChunks {
+		t--
+		if t == 0 {
+			delete(w.exemptedChunks, pos)
+			w.log.Debugf("[WORLD @ %v] chunk %v no longer exempted", w.tick, pos)
+			continue
+		}
+
+		w.exemptedChunks[pos] = t
+	}
+
+	w.tick++
 }
 
 // ChunkExists returns true if the chunk at the given position exists.
@@ -45,6 +74,8 @@ func (w *World) SetChunk(c *chunk.Chunk, pos protocol.ChunkPos) {
 	defer w.mu.Unlock()
 
 	w.chunks[pos] = c
+	w.exemptedChunks[pos] = 200
+	w.log.Debugf("[WORLD @ %v] chunk set at %v", w.tick, pos)
 }
 
 // GetBlock returns the block at the given position.
@@ -92,7 +123,13 @@ func (w *World) CleanChunks(r int32, pos protocol.ChunkPos) {
 			continue
 		}
 
+		// The chunk is currently exempted, so we should not remove it.
+		if _, ok := w.exemptedChunks[p]; ok {
+			continue
+		}
+
 		delete(w.chunks, p)
+		w.log.Debugf("[WORLD @ %v] chunk removed at %v", w.tick, p)
 	}
 }
 
@@ -102,6 +139,7 @@ func (w *World) PurgeChunks() {
 	defer w.mu.Unlock()
 
 	maps.Clear(w.chunks)
+	w.log.Debugf("[WORLD @ %v] chunks purged", w.tick)
 }
 
 // chunkInRange returns true if the chunk position is within the given radius of the chunk position.

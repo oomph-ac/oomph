@@ -64,7 +64,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
-			p.chunkRadius = int32(p.Conn().ChunkRadius()) + 2
+			p.chunkRadius = int32(p.Conn().ChunkRadius()) + 4
 
 			p.Acknowledgement(func() {
 				p.ready = true
@@ -78,17 +78,20 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
 
+		// Tick the world.
+		p.world.Tick()
+
+		// Update some information after the input is processed.
 		defer func() {
-			// Update some basic information.
 			p.mInfo.Teleporting = false
 			p.SetRespawned(false)
-
-			// If the movement mode is only semi authoritative, we only want to validate the movement for this tick,
-			// and then set the movement mode back to the clients.
-			if p.movementMode == utils.ModeSemiAuthoritative {
-				p.setMovementToClient()
-			}
 		}()
+
+		// If the movement mode is only semi authoritative, we only want to validate the movement for this tick,
+		// and then set the movement mode back to the clients.
+		if p.movementMode == utils.ModeSemiAuthoritative {
+			defer p.setMovementToClient()
+		}
 
 		prevPos := p.mInfo.ServerPosition
 		p.handlePlayerAuthInput(pk)
@@ -298,11 +301,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround))
 		})
-
-		p.World().CleanChunks(p.chunkRadius, protocol.ChunkPos{
-			int32(math32.Floor(pk.Position[0])) >> 4,
-			int32(math32.Floor(pk.Position[2])) >> 4,
-		})
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.runtimeID {
 			if pk.EntityRuntimeID == p.clientRuntimeID {
@@ -325,11 +323,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		p.Acknowledgement(func() {
 			p.Teleport(pk.Position, pk.OnGround)
-		})
-
-		p.World().CleanChunks(p.chunkRadius, protocol.ChunkPos{
-			int32(math32.Floor(pk.Position[0])) >> 4,
-			int32(math32.Floor(pk.Position[2])) >> 4,
 		})
 	case *packet.SetActorData:
 		pk.Tick = 0 // prevent any rewind from being done
@@ -457,7 +450,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		})
 	case *packet.ChunkRadiusUpdated:
 		p.Acknowledgement(func() {
-			p.chunkRadius = pk.ChunkRadius + 2
+			p.chunkRadius = pk.ChunkRadius + 4
 		})
 	case *packet.UpdateBlock:
 		if p.movementMode == utils.ModeClientAuthoritative {
@@ -737,7 +730,6 @@ func (p *Player) handleSubChunk(pk *packet.SubChunk) {
 		}
 
 		c.Sub()[index] = sub
-
 		p.World().SetChunk(c, chunkPos)
 	}
 }
