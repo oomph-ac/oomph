@@ -219,7 +219,8 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	p.locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
 	p.chunkRadius = math.MaxInt16
 	p.Acknowledgements().Refresh()
-	p.mInfo.SetAcceptablePositionOffset(0.3)
+	p.mInfo.SetMaxPositionDeviations(0.3, 0.3)
+	p.mInfo.SetPositionPersuasions(0.002, 0.03)
 
 	go p.startTicking()
 	return p
@@ -470,7 +471,7 @@ func (p *Player) CanExemptMovementValidation() bool {
 	p.miMu.Lock()
 	defer p.miMu.Unlock()
 
-	return p.mInfo.CanExempt || p.mInfo.UnsupportedAcceptance > 0 || p.mInfo.StepClipOffset > 0
+	return p.mInfo.CanExempt || p.mInfo.UnsupportedPositionPersuasion > 0 || p.mInfo.StepClipOffset > 0
 }
 
 // MovementMode returns the movement mode of the player. The player's movement mode will determine how
