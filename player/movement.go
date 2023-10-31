@@ -203,10 +203,6 @@ func (p *Player) shiftTowardsClient() {
 	p.mInfo.ServerMovement[0] -= game.ClampFloat(dMov[0], -shiftAmt, shiftAmt)
 	p.mInfo.ServerMovement[1] -= game.ClampFloat(dMov[1], -shiftAmt, shiftAmt)
 	p.mInfo.ServerMovement[2] -= game.ClampFloat(dMov[2], -shiftAmt, shiftAmt)
-
-	if p.debugger.LogMovement && shiftAmt > p.mInfo.SupportedPositionPersuasion {
-		p.SendOomphDebug(fmt.Sprintf("diff=%v acceptance=%v (%v)", dPos, shiftAmt, p.mInfo.ClientMovement.Y() >= 0), packet.TextTypeChat)
-	}
 }
 
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
