@@ -349,11 +349,11 @@ func (p *Player) aiStep() {
 		}
 	}
 
-	p.doGroundMove()
+	p.simulateGroundMove()
 }
 
-// doGroundMove continues the player's movement simulation.
-func (p *Player) doGroundMove() {
+// simulateGroundMove continues the player's movement simulation.
+func (p *Player) simulateGroundMove() {
 	if p.mInfo.StepClipOffset > 1e-7 {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	} else {
