@@ -367,7 +367,7 @@ func (p *Player) simulateGroundMove() {
 		blockFriction *= utils.BlockFriction(blockUnder)
 
 		if p.debugger.LogMovement {
-			p.Log().Debugf("doGroundMove(): block friction set to %f", blockFriction)
+			p.Log().Debugf("simulateGroundMove(): block friction set to %f", blockFriction)
 		}
 	}
 
@@ -388,7 +388,7 @@ func (p *Player) simulateGroundMove() {
 		}
 
 		if p.debugger.LogMovement {
-			p.Log().Debugf("doGroundMove(): player near climbable, movement=%v", p.mInfo.ServerMovement)
+			p.Log().Debugf("simulateGroundMove(): player near climbable, movement=%v", p.mInfo.ServerMovement)
 		}
 	}
 
@@ -401,7 +401,7 @@ func (p *Player) simulateGroundMove() {
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
 
 	if p.debugger.LogMovement {
-		p.Log().Debugf("doGroundMove(): final position=%v", p.mInfo.ServerPosition)
+		p.Log().Debugf("simulateGroundMove(): final position=%v", p.mInfo.ServerPosition)
 	}
 
 	// Check if there any collisions vertically/horizontally and then update the states in MovementInfo
@@ -412,7 +412,7 @@ func (p *Player) simulateGroundMove() {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 
 		if p.debugger.LogMovement {
-			p.Log().Debug("doGroundMove(): in cobweb, mov set to 0 vec")
+			p.Log().Debug("simulateGroundMove(): in cobweb, mov set to 0 vec")
 		}
 	}
 
@@ -437,7 +437,7 @@ func (p *Player) simulateGroundMove() {
 	p.simulateHorizontalFriction(blockFriction)
 
 	if p.debugger.LogMovement {
-		p.Log().Debugf("doGroundMove(): friction and gravity applied, movement=%v", p.mInfo.ServerMovement)
+		p.Log().Debugf("simulateGroundMove(): friction and gravity applied, movement=%v", p.mInfo.ServerMovement)
 	}
 
 	if p.mInfo.OnGround {
@@ -448,7 +448,7 @@ func (p *Player) simulateGroundMove() {
 		p.mInfo.ServerMovement[1] = 0.2
 
 		if p.debugger.LogMovement {
-			p.Log().Debug("doGroundMove(): climb detected at end frame")
+			p.Log().Debug("simulateGroundMove(): climb detected at end frame")
 		}
 	}
 
@@ -471,7 +471,7 @@ func (p *Player) tryCobwebMovement() bool {
 		p.mInfo.ServerMovement[2] *= 0.25
 
 		if p.debugger.LogMovement {
-			p.Log().Debugf("doGroundMove(): in cobweb, new mov=%v", p.mInfo.ServerMovement)
+			p.Log().Debugf("simulateGroundMove(): in cobweb, new mov=%v", p.mInfo.ServerMovement)
 		}
 	}
 
