@@ -179,7 +179,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 
 		if upsideDown {
 			for i := range bbs {
-				bbs[i+1] = bbs[i+1].Translate(mgl32.Vec3{0, -0.5})
+				bbs[i] = bbs[i].Translate(mgl32.Vec3{0, -0.5})
 			}
 		}
 
