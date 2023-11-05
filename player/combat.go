@@ -46,6 +46,12 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		return
 	}
 
+	// If the player hasn't recieved a teleport yet, they are at a disavantage due to latency. This is because most server
+	// softwares will force the player to be at the teleport position before they have even recieved the teleport packet.
+	if p.mInfo.AwaitingTeleport {
+		attackPos = p.mInfo.TeleportPos.Add(mgl32.Vec3{0, p.eyeOffset, 0})
+	}
+
 	// This determines what tick we should rewind to get an entity position for lag compensation.
 	// Lag compensation is limited to 300ms by default in this case, so we want two things:
 	// 1) The tick we should rewind to should be no more than the latency cutoff in the past.
