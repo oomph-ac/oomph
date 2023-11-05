@@ -296,6 +296,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		p.miMu.Lock()
 		p.mInfo.AwaitingTeleport = true
+		p.mInfo.TeleportPos = pk.Position.Sub(mgl32.Vec3{0, 1.62})
 		p.miMu.Unlock()
 
 		p.Acknowledgement(func() {
@@ -319,6 +320,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		p.miMu.Lock()
 		p.mInfo.AwaitingTeleport = true
+		p.mInfo.TeleportPos = pk.Position.Sub(mgl32.Vec3{0, 1.62})
 		p.miMu.Unlock()
 
 		p.Acknowledgement(func() {

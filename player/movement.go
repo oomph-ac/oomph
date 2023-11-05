@@ -955,7 +955,6 @@ type MovementInfo struct {
 	Sneaking, SneakBindPressed        bool
 	Jumping, JumpBindPressed          bool
 	Sprinting, SprintBindPressed      bool
-	Teleporting, AwaitingTeleport     bool
 	Immobile                          bool
 	ToggleFly, Flying, TrustFlyStatus bool
 	NoClip                            bool
@@ -966,6 +965,9 @@ type MovementInfo struct {
 	XCollision, ZCollision                               bool
 	OnGround                                             bool
 	InVoid                                               bool
+
+	Teleporting, AwaitingTeleport bool
+	TeleportPos                   mgl32.Vec3
 
 	ClientPredictedMovement, ClientMovement mgl32.Vec3
 	Knockback                               mgl32.Vec3

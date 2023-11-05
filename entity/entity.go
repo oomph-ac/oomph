@@ -143,6 +143,7 @@ func (e *Entity) TickPosition(tick uint64) {
 		e.position = e.position.Add(delta.Mul(1 / float32(e.newPosRotationIncrements)))
 		e.newPosRotationIncrements--
 	}
+	e.teleportTicks++
 
 	e.positionBuffer = append(e.positionBuffer, utils.LocationData{Tick: tick, Position: e.position})
 	if uint64(len(e.positionBuffer)) > e.positionBufferSize {
@@ -158,16 +159,15 @@ func (e *Entity) UpdatePosition(dat utils.LocationData, offset bool) {
 	e.recievedPosition = dat.Position
 	e.onGround = dat.OnGround
 
-	if dat.Teleport {
-		e.teleportTicks = 0
-	} else {
-		e.teleportTicks++
-	}
-
 	if e.player {
 		e.newPosRotationIncrements = EntityPlayerInterpolationTicks
 	} else {
 		e.newPosRotationIncrements = EntityMobInterpolationTicks
+	}
+
+	if dat.Teleport {
+		e.teleportTicks = 0
+		e.newPosRotationIncrements = 1
 	}
 
 	if offset {
@@ -186,6 +186,10 @@ func (e *Entity) HasUpdated(tick uint64) bool {
 func (e *Entity) RewindPosition(tick uint64) *utils.LocationData {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	if len(e.positionBuffer) == 0 {
+		return nil
+	}
 
 	for _, dat := range e.positionBuffer {
 		if dat.Tick == tick {
