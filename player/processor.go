@@ -64,7 +64,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
-			p.chunkRadius = int32(p.Conn().ChunkRadius()) + 4
 
 			p.Acknowledgement(func() {
 				p.ready = true
@@ -596,10 +595,10 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.mInfo.ServerPosition[2])) >> 4,
 	}
 
-	if !p.mInfo.AwaitingTeleport {
+	p.inLoadedChunk = p.World().ChunkExists(cPos)
+	if p.inLoadedChunk {
 		p.World().CleanChunks(p.chunkRadius, cPos)
 	}
-	p.inLoadedChunk = p.World().ChunkExists(cPos)
 
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
 	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
