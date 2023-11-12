@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -76,6 +77,19 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 	case *packet.PlayerAuthInput:
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
+
+		// Send a latency report to the server (if not in direct mode) if needed.
+		if p.serverConn != nil && p.latencyIntervalUpdate != 0 && int64(p.clientTick.Load())%p.latencyIntervalUpdate == 0 {
+			enc, _ := json.Marshal(map[string]interface{}{
+				"raknet": p.Conn().Latency() * 2,
+				"oomph":  p.stackLatency,
+			})
+
+			p.serverConn.WritePacket(&packet.ScriptMessage{
+				Identifier: "oomph:latency_report",
+				Data:       enc,
+			})
+		}
 
 		// Tick the world.
 		p.world.Tick()
