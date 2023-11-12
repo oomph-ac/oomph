@@ -2,10 +2,10 @@ package player
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 	_ "unsafe"
 
@@ -28,6 +28,9 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
+var blacklist = map[string]bool{}
+var bMu sync.Mutex
+
 var air uint32
 
 func init() {
@@ -47,12 +50,35 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		return false
 	}
 
+	if !p.checkedBlacklist {
+		bMu.Lock()
+		if _, ok := blacklist[p.Name()]; ok {
+			p.Log().Warnf("%s is blacklisted from the server.", p.Name())
+			p.Disconnect(text.Colourf("Oomph: <bold><red>UNAUTHORIZED.</red></bold>"))
+			bMu.Unlock()
+			return true
+		}
+
+		p.checkedBlacklist = true
+		bMu.Unlock()
+	}
+
 	defer func() {
 		ctx := event.C()
 		p.handler().HandleClientPacket(ctx, pk)
 	}()
 
 	switch pk := pk.(type) {
+	case *packet.ScriptMessage:
+		if pk.Identifier == "oomph:latency_report" || pk.Identifier == "oomph:authentication" || pk.Identifier == "oomph:flagged" {
+			p.Log().Warnf("%s attempted to send invalid Oomph data to the server.", p.Name())
+			bMu.Lock()
+			blacklist[p.Name()] = true
+			bMu.Unlock()
+
+			p.Disconnect(text.Colourf("<bold><red>FRADULENT PAYLOAD: This incident has been reported.</red></bold>"))
+			return true
+		}
 	case *packet.TickSync:
 		// The tick sync packet is sent once by the client on join and the server responds with another.
 		// From what I can tell, the client frame is supposed to be rewound to `ServerReceptionTime` in the
@@ -79,15 +105,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.clientFrame.Store(pk.Tick)
 
 		// Send a latency report to the server (if not in direct mode) if needed.
-		if p.serverConn != nil && p.latencyIntervalUpdate != 0 && int64(p.clientTick.Load())%p.latencyIntervalUpdate == 0 {
-			enc, _ := json.Marshal(map[string]interface{}{
-				"raknet": p.Conn().Latency() * 2,
+		if p.latencyIntervalUpdate != 0 && int64(p.clientTick.Load())%p.latencyIntervalUpdate == 0 {
+			p.SendOomphEventToServer("oomph:latency_report", map[string]interface{}{
+				"raknet": p.Conn().Latency().Milliseconds() * 2,
 				"oomph":  p.stackLatency,
-			})
-
-			p.ServerConn().WritePacket(&packet.ScriptMessage{
-				Identifier: "oomph:latency_report",
-				Data:       enc,
 			})
 		}
 
