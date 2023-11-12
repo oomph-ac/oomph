@@ -1,6 +1,7 @@
 package oomph
 
 import (
+	"encoding/json"
 	"errors"
 	"runtime"
 	"sync"
@@ -112,6 +113,16 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			p = nil
 			return
 		}
+		enc, _ := json.Marshal(map[string]string{
+			"xuid":     p.IdentityData().XUID,
+			"uuid":     p.IdentityData().Identity,
+			"ip":       p.Conn().RemoteAddr().String(),
+			"username": p.IdentityData().DisplayName,
+		})
+		p.Conn().WritePacket(&packet.ScriptMessage{
+			Identifier: "oomph:authentication",
+			Data:       enc,
+		})
 		g.Done()
 	}()
 	go func() {
