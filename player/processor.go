@@ -85,7 +85,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				"oomph":  p.stackLatency,
 			})
 
-			p.serverConn.WritePacket(&packet.ScriptMessage{
+			p.ServerConn().WritePacket(&packet.ScriptMessage{
 				Identifier: "oomph:latency_report",
 				Data:       enc,
 			})
