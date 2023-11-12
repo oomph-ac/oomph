@@ -588,7 +588,7 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 			"violations": check.Violations(),
 		})
 
-		p.serverConn.WritePacket(&packet.ScriptMessage{
+		p.ServerConn().WritePacket(&packet.ScriptMessage{
 			Identifier: "oomph:flagged",
 			Data:       enc,
 		})
