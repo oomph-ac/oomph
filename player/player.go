@@ -1,6 +1,7 @@
 package player
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -110,6 +111,8 @@ type Player struct {
 	knockbackNetworkCutoff int64
 	combatNetworkCutoff    int64
 
+	latencyIntervalUpdate int64
+
 	lastAttackData    *packet.InventoryTransaction
 	lastEquipmentData *packet.MobEquipment
 	lastAttributeData *packet.UpdateAttributes
@@ -163,8 +166,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		queuedEntityLocations: make(map[uint64]utils.LocationData),
 
-		stackLatency:      0,
-		needLatencyUpdate: true,
+		stackLatency:          0,
+		latencyIntervalUpdate: 10,
+		needLatencyUpdate:     true,
 
 		gamemode: data.PlayerGameMode,
 
@@ -508,6 +512,11 @@ func (p *Player) SetCombatCutoff(i int64) {
 	p.combatNetworkCutoff = i
 }
 
+// SetLatencyIntervalUpdate sets the interval in ticks that the player's latency will be updated.
+func (p *Player) SetLatencyIntervalUpdate(i int64) {
+	p.latencyIntervalUpdate = i
+}
+
 // Acknowledgement runs a function after an acknowledgement from the client.
 // TODO: Find something with similar usage to NSL - it will possibly be removed in future versions of Minecraft
 func (p *Player) Acknowledgement(f func()) {
@@ -567,6 +576,22 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 
 	if log {
 		p.log.Infof("%s was flagged for %s%s: %s", p.Name(), name, variant, utils.PrettyParameters(params, true))
+	}
+
+	// Send the flag event to the server if Oomph is not in direct mode.
+	if p.serverConn != nil {
+		n1, n2 := check.Name()
+		enc, _ := json.Marshal(map[string]interface{}{
+			"player":     p.Name(),
+			"check_main": n1,
+			"check_sub":  n2,
+			"violations": check.Violations(),
+		})
+
+		p.serverConn.WritePacket(&packet.ScriptMessage{
+			Identifier: "oomph:flagged",
+			Data:       enc,
+		})
 	}
 
 	if now, max := check.Violations(), check.MaxViolations(); now < max {
