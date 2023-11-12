@@ -114,8 +114,10 @@ func (r *ReachA) Process(p Processor, pk packet.Packet) bool {
 		}
 
 		if minDist < 3.01 {
-			r.Buff(-0.0125)
-			r.violations -= math.Max(r.violations-0.002, 0)
+			r.Buff(-0.01)
+			if r.buffer <= 1 {
+				r.violations -= math.Max(r.violations-0.001, 0)
+			}
 			return false
 		}
 
