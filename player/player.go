@@ -1,7 +1,6 @@
 package player
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -131,6 +130,8 @@ type Player struct {
 
 	c    chan struct{}
 	once sync.Once
+
+	checkedBlacklist bool
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
@@ -579,20 +580,13 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 	}
 
 	// Send the flag event to the server if Oomph is not in direct mode.
-	if p.serverConn != nil {
-		n1, n2 := check.Name()
-		enc, _ := json.Marshal(map[string]interface{}{
-			"player":     p.Name(),
-			"check_main": n1,
-			"check_sub":  n2,
-			"violations": check.Violations(),
-		})
-
-		p.ServerConn().WritePacket(&packet.ScriptMessage{
-			Identifier: "oomph:flagged",
-			Data:       enc,
-		})
-	}
+	n1, n2 := check.Name()
+	p.SendOomphEventToServer("oomph:flagged", map[string]interface{}{
+		"player":     p.Name(),
+		"check_main": n1,
+		"check_sub":  n2,
+		"violations": check.Violations(),
+	})
 
 	if now, max := check.Violations(), check.MaxViolations(); now < max {
 		return
