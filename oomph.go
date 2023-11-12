@@ -119,7 +119,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			"ip":       p.Conn().RemoteAddr().String(),
 			"username": p.IdentityData().DisplayName,
 		})
-		p.Conn().WritePacket(&packet.ScriptMessage{
+		p.ServerConn().WritePacket(&packet.ScriptMessage{
 			Identifier: "oomph:authentication",
 			Data:       enc,
 		})
