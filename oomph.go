@@ -40,7 +40,7 @@ func New(log *logrus.Logger, localAddr string) *Oomph {
 func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []minecraft.Protocol, requirePacks bool, authDisabled bool) error {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	l, err := minecraft.ListenConfig{
 		StatusProvider:         p,
@@ -61,7 +61,7 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		go o.handleConn(c.(*minecraft.Conn), l, remoteAddr)
