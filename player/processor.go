@@ -523,8 +523,8 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	case *packet.UpdateAbilities:
 		p.Acknowledgement(func() {
 			for _, l := range pk.AbilityData.Layers {
-				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
 				p.mInfo.NoClip = utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip)
+				p.mInfo.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying) || p.mInfo.NoClip
 				mayFly := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
 
 				if p.mInfo.ToggleFly {
