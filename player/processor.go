@@ -91,10 +91,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		p.Acknowledgement(func() {
 			p.clientTick.Store(curr)
 			p.isSyncedWithServer = true
+			p.ready = true
 
-			p.Acknowledgement(func() {
-				p.ready = true
-			})
+			p.mInfo.Flying = p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure
 		})
 		p.SetRuntimeID(p.Conn().GameData().EntityRuntimeID)
 		p.SetUniqueID(p.Conn().GameData().EntityUniqueID)
