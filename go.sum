@@ -27,6 +27,8 @@ github.com/ethaniccc/gophertunnel v0.0.0-20231009193124-ac8e3f1f13b3 h1:Nt4I8gAJ
 github.com/ethaniccc/gophertunnel v0.0.0-20231009193124-ac8e3f1f13b3/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/ethaniccc/gophertunnel v0.0.0-20231112221911-6d48ec762a98 h1:fGtTqebDO6Ytspwnd1uE7WfSavih+EEt9wvwXR1KLwM=
 github.com/ethaniccc/gophertunnel v0.0.0-20231112221911-6d48ec762a98/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
+github.com/ethaniccc/gophertunnel v0.0.0-20231115014503-f04033bd67b9 h1:YoWMLyHHtrW7lBm4Xc4OiRRtz44qLsnHVfxTIPJFsyE=
+github.com/ethaniccc/gophertunnel v0.0.0-20231115014503-f04033bd67b9/go.mod h1:+Dbhj3bs74gZoSkyab7kglx1Rbq8S5G7sJd/wr5Qm9g=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/go-echarts/go-echarts/v2 v2.2.3 h1:H8oPdUpzuiV2K8S4xYZa1JRNjP3U0h7HVqvhPrmCk1A=
 github.com/go-echarts/go-echarts/v2 v2.2.3/go.mod h1:6TOomEztzGDVDkOSCFBq3ed7xOYfbOqhaBzD0YV771A=
