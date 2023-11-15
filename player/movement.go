@@ -320,6 +320,10 @@ func (p *Player) aiStep() {
 			p.simulateJump()
 		}
 
+		if p.debugger.LogMovement {
+			p.Log().Debugf("aiStep(): finished non-smooth teleport to %v w/ mov %v", p.mInfo.ServerPosition, p.mInfo.ServerMovement)
+		}
+
 		return
 	}
 
