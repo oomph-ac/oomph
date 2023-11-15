@@ -331,7 +331,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, ground bool) {
 	p.mInfo.Teleporting = true
 	p.mInfo.AwaitingTeleport = false
 	p.mInfo.OnGround = ground
-	p.mInfo.ServerPosition = pos
+	p.mInfo.IsTeleportOnGround = ground
 
 	if p.debugger.LogMovement {
 		p.log.Debugf("p.Teleport(): teleported to %v", pos)

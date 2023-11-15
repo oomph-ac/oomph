@@ -286,7 +286,30 @@ func (p *Player) aiStep() {
 		return
 	}
 
-	if p.mInfo.Teleporting {
+	if p.mInfo.IsSmoothTeleport && p.mInfo.TicksSinceSmoothTeleport <= 3 {
+		p.mInfo.ServerMovement = mgl32.Vec3{0, -0.078}
+
+		delta := p.mInfo.TeleportPos.Sub(p.mInfo.ServerPosition)
+		newPosRotInc := 3 - p.mInfo.TicksSinceSmoothTeleport
+		if newPosRotInc != 0 {
+			p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(delta.Mul(1 / float32(newPosRotInc)))
+
+			if p.debugger.LogMovement {
+				p.Log().Debugf("aiStep(): smooth teleport newPosRotInc=%v, pos=%v", newPosRotInc, p.mInfo.ServerPosition)
+			}
+			return
+		}
+
+		p.mInfo.ServerPosition = p.mInfo.TeleportPos
+		p.mInfo.OnGround = p.mInfo.IsTeleportOnGround
+
+		if p.debugger.LogMovement {
+			p.Log().Debugf("aiStep(): finishing smooth teleport to %v", p.mInfo.ServerPosition)
+		}
+	}
+
+	if p.mInfo.Teleporting && !p.mInfo.IsSmoothTeleport {
+		p.mInfo.ServerPosition = p.mInfo.TeleportPos
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 		if p.mInfo.OnGround {
 			p.mInfo.ServerMovement[1] = -0.002
@@ -948,9 +971,11 @@ type MovementInfo struct {
 	UnsupportedPositionPersuasion float32
 	InSupportedScenario           bool
 
-	TicksSinceKnockback    uint32
-	TicksSinceBlockRefresh uint32
-	TicksUntilNextJump     int32
+	TicksSinceKnockback      uint32
+	TicksSinceBlockRefresh   uint32
+	TicksSinceSmoothTeleport uint32
+
+	TicksUntilNextJump int32
 
 	Sneaking, SneakBindPressed        bool
 	Jumping, JumpBindPressed          bool
@@ -967,6 +992,8 @@ type MovementInfo struct {
 	InVoid                                               bool
 
 	Teleporting, AwaitingTeleport bool
+	IsTeleportOnGround            bool
+	IsSmoothTeleport              bool
 	TeleportPos                   mgl32.Vec3
 
 	ClientPredictedMovement, ClientMovement mgl32.Vec3
@@ -1000,6 +1027,7 @@ func (m *MovementInfo) SetKnockback(k mgl32.Vec3) {
 func (m *MovementInfo) Tick() {
 	m.TicksSinceKnockback++
 	m.TicksSinceBlockRefresh++
+	m.TicksSinceSmoothTeleport++
 
 	m.TicksUntilNextJump--
 }

@@ -193,6 +193,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.SendOomphDebug("Unknown debug mode: "+cmd[1], packet.TextTypeChat)
 				return true
 			}
+
 			p.SendOomphDebug("OK.", packet.TextTypeChat)
 			return true
 		}
@@ -347,9 +348,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		pk.EntityRuntimeID = p.clientRuntimeID
 		pk.Tick = 0 // prevent any rewind from being done
-		if pk.Mode != packet.MoveModeTeleport && pk.Mode != packet.MoveModeReset {
-			return false
-		}
+		pk.Mode = packet.MoveModeNormal
 
 		p.miMu.Lock()
 		p.mInfo.AwaitingTeleport = true
@@ -357,6 +356,11 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.miMu.Unlock()
 
 		p.Acknowledgement(func() {
+			p.mInfo.IsSmoothTeleport = pk.Mode == packet.MoveModeNormal
+			if p.mInfo.IsSmoothTeleport {
+				p.mInfo.TicksSinceSmoothTeleport = 0
+			}
+
 			p.Teleport(pk.Position, pk.OnGround)
 		})
 	case *packet.SetActorData:
