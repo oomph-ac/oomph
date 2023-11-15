@@ -43,4 +43,4 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.33.0 => github.com/ethaniccc/gophertunnel v0.0.0-20231112221911-6d48ec762a98
+replace github.com/sandertv/gophertunnel v1.33.0 => github.com/ethaniccc/gophertunnel v0.0.0-20231115014503-f04033bd67b9
