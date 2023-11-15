@@ -8,5 +8,7 @@ type Debugger struct {
 	UseServerKnockback bool
 	UsePacketBuffer    bool
 
+	SmoothTeleports bool
+
 	AllowedDebug bool
 }
