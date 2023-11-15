@@ -348,7 +348,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		pk.EntityRuntimeID = p.clientRuntimeID
 		pk.Tick = 0 // prevent any rewind from being done
-		pk.Mode = packet.MoveModeNormal
 
 		p.miMu.Lock()
 		p.mInfo.AwaitingTeleport = true
