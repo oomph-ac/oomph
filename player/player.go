@@ -890,6 +890,7 @@ func (p *Player) TryTransfer(address string) error {
 	}.DialTimeout("raknet", address, time.Second*5)
 
 	if err != nil {
+		p.Log().Errorf("unable to transfer to %s: %s", address, err.Error())
 		return err
 	}
 
