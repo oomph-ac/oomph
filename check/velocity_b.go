@@ -54,7 +54,7 @@ func (v *VelocityB) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	if math32.Abs(100.0-pct) <= 0.1 {
+	if math32.Abs(100.0-pct) <= 0.5 {
 		v.violations = math.Max(0, v.violations-0.2)
 		v.Buff(-0.2, 5)
 		return false
