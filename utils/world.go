@@ -119,6 +119,10 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		face := direction.Face()
 		oppositeFace := face.Opposite()
 
+		if upsideDown {
+			break
+		}
+
 		// HACK: Since EncodeBlock() will sometimes return the wrong direction due to the world being passed
 		// to it being nil, we will brute force possible directions to see if the stair could be a corner.
 		possibleDirection := cube.Direction(-1)
