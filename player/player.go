@@ -1058,15 +1058,21 @@ func (p *Player) doTick() {
 	// from the server.
 	p.SendAck()
 
-	err := p.Conn().Flush()
-	if err != nil {
+	p.ccMu.Lock()
+	p.scMu.Lock()
+	defer p.ccMu.Unlock()
+	defer p.scMu.Unlock()
+
+	// Flush the client's connection.
+	if p.conn == nil {
+		return
+	} else if err := p.conn.Flush(); err != nil {
 		p.Log().Errorf("p.doTick(): unable to flush client connection: %v", err)
 		return
 	}
 
-	if p.ServerConn() != nil {
-		err = p.ServerConn().Flush()
-		if err != nil {
+	if p.serverConn != nil {
+		if err := p.serverConn.Flush(); err != nil {
 			p.Log().Errorf("p.doTick(): unable to flush server connection: %v", err)
 			return
 		}
