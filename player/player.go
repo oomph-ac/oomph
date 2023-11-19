@@ -132,6 +132,7 @@ type Player struct {
 	once sync.Once
 
 	checkedBlacklist bool
+	handleTransfer   bool
 }
 
 // NewPlayer creates a new player from the given identity data, client data, position, and world.
@@ -673,6 +674,11 @@ func (p *Player) Respawned() bool {
 // SetRespawned sets the respawned state of the player.
 func (p *Player) SetRespawned(v bool) {
 	p.respawned = v
+}
+
+// ShouldHandleTransfer sets if Oomph should intercept TransferPacket from the server.
+func (p *Player) ShouldHandleTransfer(b bool) {
+	p.handleTransfer = b
 }
 
 // InLoadedChunk returns true if the player is in a chunk loaded by its world
