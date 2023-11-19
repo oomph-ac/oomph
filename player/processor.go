@@ -263,7 +263,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		pk.EntityRuntimeID = p.clientRuntimeID
 	case *packet.Transfer:
-		if p.ServerConn() == nil {
+		if p.ServerConn() == nil || !p.handleTransfer {
 			return false
 		}
 
