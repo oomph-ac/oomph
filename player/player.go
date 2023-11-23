@@ -228,6 +228,9 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	p.mInfo.SetMaxPositionDeviations(0.3, 0.3)
 	p.mInfo.SetPositionPersuasions(0.002, 0.03)
 
+	// Any version below 1.20.10 handles NetworkStackLatency differently.
+	p.acks.UseLegacy(p.conn.Protocol().ID() < GameVersion1_20_10)
+
 	go p.startTicking()
 	return p
 }

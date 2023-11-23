@@ -247,6 +247,12 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	}()
 
 	switch pk := pk.(type) {
+	case *packet.LevelSoundEvent:
+		// The client does not send a missed swing flag pre 1.20.10, so we listen for LevelSoundEvent instead.
+		if p.conn.Protocol().ID() < GameVersion1_20_10 && pk.SoundType == packet.SoundEventAttackNoDamage {
+			p.Click()
+			p.updateCombatData(nil)
+		}
 	case *packet.Animate:
 		if pk.EntityRuntimeID != p.runtimeID {
 			return false
@@ -643,14 +649,16 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	}
 
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
-	if utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+	if p.conn.Protocol().ID() <= GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 		p.Click()
 		p.updateCombatData(nil)
 	}
 
+	// TODO: Implement 1.20.40 block breaking via. fix in block breaking position on gophertunnel fork.
+
 	// The client is doing a block action on it's side, so we want to replicate this to
 	// make the copy of the server and client world identical.
-	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) && p.movementMode != utils.ModeClientAuthoritative {
+	if p.conn.Protocol().ID() <= GameVersion1_20_30 && utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) && p.movementMode != utils.ModeClientAuthoritative {
 		for _, action := range pk.BlockActions {
 			// If we are in direct mode using dragonfly, server authoritative block breaking is enabled.
 			if p.serverConn == nil || p.serverConn.GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
