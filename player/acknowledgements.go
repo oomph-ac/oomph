@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 
@@ -167,8 +166,6 @@ func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
 		return false
 	}
 
-	p.SendOomphDebug(fmt.Sprintf("received %v", i), 1)
-
 	var ok bool
 	if a.LegacyMode {
 		ok = a.tryHandle(i)
@@ -233,8 +230,6 @@ func (p *Player) SendAck() {
 			acks.AddMap(buf, acks.CurrentTimestamp/1000)
 			expectedTimestamp /= 1000
 		}
-
-		p.SendOomphDebug(fmt.Sprintf("sent %v", expectedTimestamp), 1)
 
 		//acks.acknowledgementOrder = append(acks.acknowledgementOrder, expectedTimestamp)
 		p.conn.WritePacket(pk)
