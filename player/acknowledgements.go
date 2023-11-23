@@ -169,12 +169,20 @@ func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
 	var ok bool
 	if a.LegacyMode {
 		ok = a.tryHandle(i)
-		if !ok {
+		if tryOther && !ok {
 			i /= 1000
 			ok = a.tryHandle(i)
+		} else if tryOther {
+			delete(a.AcknowledgeMap, i/1000)
 		}
-	} else {
-		i /= NetworkStackLatencyDivider
+
+		return ok
+	}
+
+	i /= NetworkStackLatencyDivider
+	ok = a.tryHandle(i)
+	if tryOther && ok {
+		i *= 1000
 		ok = a.tryHandle(i)
 	}
 
@@ -188,12 +196,6 @@ func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
 			p.Disconnect(game.ErrorBadAckOrder)
 			return false
 		}
-	} */
-
-	// FUCK. What the fuck have they done to the PlayStation NSL? Is the behavior the
-	// same on all platforms now? Is there a different divider...? TODO!
-	/* if !ok && tryOther {
-		ok = a.tryHandle(i / 1000)
 	} */
 
 	return ok
@@ -223,10 +225,9 @@ func (p *Player) SendAck() {
 
 		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
 		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
-		// TODO: Figure out if this is still needed.
-		//if p.ClientData().DeviceOS == protocol.DeviceOrbis {
-		//	acks.AddMap(m, acks.CurrentTimestamp/1000)
-		//}
+		if acks.LegacyMode && p.ClientData().DeviceOS == protocol.DeviceOrbis {
+			acks.AddMap(buf, acks.CurrentTimestamp/1000)
+		}
 
 		expectedTimestamp := pk.Timestamp
 		if acks.LegacyMode && p.ClientData().DeviceOS == protocol.DeviceOrbis {

@@ -12,6 +12,13 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+const (
+	GameVersion1_20_0  = 589
+	GameVersion1_20_10 = 594
+	GameVersion1_20_30 = 618
+	GameVersion1_20_40 = 622
+)
+
 // IdentityData returns the login.IdentityData of a player. It contains the UUID, XUID and username of the connection.
 func (p *Player) IdentityData() login.IdentityData {
 	return p.conn.IdentityData()
