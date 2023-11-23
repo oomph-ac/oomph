@@ -9,7 +9,6 @@ require (
 	github.com/df-mc/atomic v1.10.0
 	github.com/df-mc/dragonfly v0.9.9
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
-	github.com/go-echarts/statsview v0.3.4
 	github.com/go-gl/mathgl v1.1.0
 	github.com/pelletier/go-toml v1.9.5
 	github.com/sandertv/gophertunnel v1.33.0
@@ -23,14 +22,12 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.10 // indirect
-	github.com/go-echarts/go-echarts/v2 v2.3.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/klauspost/compress v1.17.2 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
-	github.com/rs/cors v1.10.1 // indirect
 	github.com/sandertv/go-raknet v1.12.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.15.0 // indirect
@@ -43,4 +40,4 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.33.0 => github.com/ethaniccc/gophertunnel v0.0.0-20231115014503-f04033bd67b9
+replace github.com/sandertv/gophertunnel v1.33.0 => github.com/ethaniccc/gophertunnel v0.0.0-20231123222755-df5aec0868fc
