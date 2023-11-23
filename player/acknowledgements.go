@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 
@@ -166,6 +167,8 @@ func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
 		return false
 	}
 
+	p.SendOomphDebug(fmt.Sprintf("received %v", i), 1)
+
 	var ok bool
 	if a.LegacyMode {
 		ok = a.tryHandle(i)
@@ -225,14 +228,13 @@ func (p *Player) SendAck() {
 
 		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
 		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
-		if acks.LegacyMode && p.ClientData().DeviceOS == protocol.DeviceOrbis {
-			acks.AddMap(buf, acks.CurrentTimestamp/1000)
-		}
-
 		expectedTimestamp := pk.Timestamp
-		if acks.LegacyMode && p.ClientData().DeviceOS == protocol.DeviceOrbis {
+		if p.ClientData().DeviceOS == protocol.DeviceOrbis && acks.LegacyMode {
+			acks.AddMap(buf, acks.CurrentTimestamp/1000)
 			expectedTimestamp /= 1000
 		}
+
+		p.SendOomphDebug(fmt.Sprintf("sent %v", expectedTimestamp), 1)
 
 		//acks.acknowledgementOrder = append(acks.acknowledgementOrder, expectedTimestamp)
 		p.conn.WritePacket(pk)
