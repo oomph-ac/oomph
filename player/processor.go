@@ -159,7 +159,12 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			p.Click()
 		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
-			cancel = p.handleBlockPlace(t)
+			if t.ActionType == protocol.UseItemActionBreakBlock {
+				p.World().SetBlock(utils.BlockToCubePos(t.BlockPosition), block.Air{})
+				fmt.Println("inv break", t.BlockPosition)
+			} else {
+				cancel = p.handleBlockPlace(t)
+			}
 		}
 	case *packet.Text:
 		cmd := strings.Split(pk.Message, " ")
@@ -654,7 +659,11 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		p.updateCombatData(nil)
 	}
 
-	// TODO: Implement 1.20.40 block breaking via. fix in block breaking position on gophertunnel fork.
+	if utils.HasFlag(pk.InputData, packet.InputFlagPerformItemInteraction) && pk.ItemInteractionData.ActionType == protocol.UseItemActionBreakBlock {
+		p.World().SetBlock(utils.BlockToCubePos(pk.ItemInteractionData.BlockPosition), block.Air{})
+		fmt.Println("input 1 break", pk.ItemInteractionData.BlockPosition)
+
+	}
 
 	// The client is doing a block action on it's side, so we want to replicate this to
 	// make the copy of the server and client world identical.
@@ -699,6 +708,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
+				fmt.Println("input 2 break", action.BlockPos)
 				p.World().SetBlock(cube.Pos{
 					int(action.BlockPos.X()),
 					int(action.BlockPos.Y()),
