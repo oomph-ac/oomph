@@ -718,8 +718,6 @@ func (p *Player) simulateCollisions() {
 		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, list, -(stepVel.Y()))
 		stepVel[1] += rDy
 
-		fmt.Println(rDy, stepVel[1], p.mInfo.StepClipOffset, p.mInfo.Jumping, game.Vec3HzDistSqr(newVel), game.Vec3HzDistSqr(stepVel))
-
 		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
 			p.mInfo.StepClipOffset += stepVel.Y()
 			newVel = stepVel
