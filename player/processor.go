@@ -158,13 +158,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}
 
 			p.Click()
-		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
-			if t.ActionType == protocol.UseItemActionBreakBlock {
-				p.World().SetBlock(utils.BlockToCubePos(t.BlockPosition), block.Air{})
-				fmt.Println("inv break", t.BlockPosition)
-			} else if t.ActionType == protocol.UseItemActionClickBlock {
-				cancel = p.handleBlockPlace(t)
-			}
+		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
+			cancel = p.handleBlockPlace(t)
 		}
 	case *packet.Text:
 		cmd := strings.Split(pk.Message, " ")
@@ -659,15 +654,8 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 		p.updateCombatData(nil)
 	}
 
-	if utils.HasFlag(pk.InputData, packet.InputFlagPerformItemInteraction) && pk.ItemInteractionData.ActionType == protocol.UseItemActionBreakBlock {
-		p.World().SetBlock(utils.BlockToCubePos(pk.ItemInteractionData.BlockPosition), block.Air{})
-		fmt.Println("input 1 break", pk.ItemInteractionData.BlockPosition)
-
-	}
-
-	// The client is doing a block action on it's side, so we want to replicate this to
-	// make the copy of the server and client world identical.
-	if p.conn.Protocol().ID() <= GameVersion1_20_30 && utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) && p.movementMode != utils.ModeClientAuthoritative {
+	// The client is doing a block action on it's side, so we want to replicate this to make the copy of the server and client world identical.
+	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) && p.movementMode != utils.ModeClientAuthoritative {
 		for _, action := range pk.BlockActions {
 			// If we are in direct mode using dragonfly, server authoritative block breaking is enabled.
 			if p.serverConn == nil || p.serverConn.GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
@@ -708,11 +696,11 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				fmt.Println("input 2 break", action.BlockPos)
+				fmt.Println("input 2 break", *p.breakingBlockPos)
 				p.World().SetBlock(cube.Pos{
-					int(action.BlockPos.X()),
-					int(action.BlockPos.Y()),
-					int(action.BlockPos.Z()),
+					int(p.breakingBlockPos.X()),
+					int(p.breakingBlockPos.Y()),
+					int(p.breakingBlockPos.Z()),
 				}, block.Air{})
 				p.breakingBlockPos = nil
 			}
