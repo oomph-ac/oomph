@@ -696,7 +696,6 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				fmt.Println("input 2 break", *p.breakingBlockPos)
 				p.World().SetBlock(cube.Pos{
 					int(p.breakingBlockPos.X()),
 					int(p.breakingBlockPos.Y()),
