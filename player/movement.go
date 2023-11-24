@@ -327,9 +327,6 @@ func (p *Player) aiStep() {
 		return
 	}
 
-	// Push the player out of any blocks they are inside of.
-	p.pushOutOfBlock()
-
 	// If the player's X movement is below 1e-7, set it to 0.
 	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-7 {
 		p.mInfo.ServerMovement[0] = 0
@@ -377,6 +374,9 @@ func (p *Player) aiStep() {
 	}
 
 	p.simulateGroundMove()
+
+	// Push the player out of any blocks they are inside of.
+	p.pushOutOfBlock()
 }
 
 // simulateGroundMove continues the player's movement simulation.
