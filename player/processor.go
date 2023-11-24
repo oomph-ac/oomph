@@ -139,6 +139,12 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			acks.HasTicked = true
 		}
 		p.needsCombatValidation = false
+	case *packet.LevelSoundEvent:
+		// The client does not send a missed swing flag pre 1.20.10, so we listen for LevelSoundEvent instead.
+		if p.conn.Protocol().ID() < GameVersion1_20_10 && pk.SoundType == packet.SoundEventAttackNoDamage {
+			p.Click()
+			p.updateCombatData(nil)
+		}
 	case *packet.MobEquipment:
 		p.lastEquipmentData = pk
 		pk.EntityRuntimeID = p.runtimeID
@@ -247,12 +253,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 	}()
 
 	switch pk := pk.(type) {
-	case *packet.LevelSoundEvent:
-		// The client does not send a missed swing flag pre 1.20.10, so we listen for LevelSoundEvent instead.
-		if p.conn.Protocol().ID() < GameVersion1_20_10 && pk.SoundType == packet.SoundEventAttackNoDamage {
-			p.Click()
-			p.updateCombatData(nil)
-		}
 	case *packet.Animate:
 		if pk.EntityRuntimeID != p.runtimeID {
 			return false
