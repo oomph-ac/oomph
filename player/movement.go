@@ -939,7 +939,7 @@ func (p *Player) isScenarioPredictable() bool {
 	blocks := utils.GetNearbyBlocks(bb, false, p.World())
 
 	p.mInfo.InSupportedScenario = true
-	var hasLiquid, hasBounce bool
+	var hasLiquid, hasBounce, hasBamboo bool
 
 	for _, bl := range blocks {
 		_, ok := bl.(world.Liquid)
@@ -951,12 +951,14 @@ func (p *Player) isScenarioPredictable() bool {
 		switch utils.BlockName(bl) {
 		case "minecraft:slime", "minecraft:bed":
 			hasBounce = true
+		case "minecraft:bamboo":
+			hasBamboo = true
 		}
 	}
 
-	if hasLiquid {
+	if hasLiquid || hasBamboo {
 		if p.debugger.LogMovement {
-			p.Log().Debug("isScenarioPredictable(): player in liquid, cannot predict scenario")
+			p.Log().Debug("isScenarioPredictable(): cannot predict scenario")
 		}
 
 		return false
