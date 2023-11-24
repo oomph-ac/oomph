@@ -781,7 +781,7 @@ func (p *Player) pushOutOfBlock() {
 		return
 	}
 
-	bb := p.AABB()
+	bb := p.AABB().Grow(-1e-3)
 	hasIntersection := false
 
 	for bpos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
