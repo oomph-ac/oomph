@@ -180,7 +180,7 @@ func (p *Player) calculateClientSpeed() {
 
 // shiftTowardsClient shifts the server position towards the client position by a certain amount.
 func (p *Player) shiftTowardsClient() {
-	if p.mInfo.AwaitingCorrection {
+	if p.mInfo.AwaitingCorrectionAcks > 0 || p.mInfo.StepClipOffset > 0 {
 		return
 	}
 
@@ -189,9 +189,9 @@ func (p *Player) shiftTowardsClient() {
 		shiftAmt = p.mInfo.UnsupportedPositionPersuasion
 	}
 
-	if p.mInfo.StepClipOffset > 1e-6 {
+	/* if p.mInfo.StepClipOffset > 1e-6 {
 		shiftAmt += 1.0
-	}
+	} */
 
 	// Shift the server position towards the client position by the acceptance amount.
 	dPos := p.mInfo.ServerPosition.Sub(p.Position())
@@ -199,10 +199,10 @@ func (p *Player) shiftTowardsClient() {
 	p.mInfo.ServerPosition[1] -= game.ClampFloat(dPos[1], -shiftAmt, shiftAmt)
 	p.mInfo.ServerPosition[2] -= game.ClampFloat(dPos[2], -shiftAmt, shiftAmt)
 
-	dMov := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
+	/* dMov := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
 	p.mInfo.ServerMovement[0] -= game.ClampFloat(dMov[0], -shiftAmt, shiftAmt)
 	p.mInfo.ServerMovement[1] -= game.ClampFloat(dMov[1], -shiftAmt, shiftAmt)
-	p.mInfo.ServerMovement[2] -= game.ClampFloat(dMov[2], -shiftAmt, shiftAmt)
+	p.mInfo.ServerMovement[2] -= game.ClampFloat(dMov[2], -shiftAmt, shiftAmt) */
 }
 
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
@@ -223,7 +223,13 @@ func (p *Player) validateMovement() {
 		p.Log().Debugf("validateMovement(): clientDelta:%v serverDelta:%v", p.mInfo.ClientPredictedMovement, p.mInfo.ServerMovement)
 	}
 
-	if posDiff.LenSqr() <= (p.mInfo.MaxSupportedPositionDiff + math32.Pow(p.mInfo.StepClipOffset, 2)) {
+	threshold := p.mInfo.MaxSupportedPositionDiff
+	if !p.mInfo.InSupportedScenario {
+		threshold = p.mInfo.MaxUnsupportedPositionDiff
+	}
+	threshold += p.mInfo.StepClipOffset
+
+	if posDiff.LenSqr() <= threshold {
 		return
 	}
 
@@ -273,9 +279,9 @@ func (p *Player) correctMovement() {
 		Tick:     p.ClientFrame(),
 	})
 
-	p.mInfo.AwaitingCorrection = true
+	p.mInfo.AwaitingCorrectionAcks++
 	p.Acknowledgement(func() {
-		p.mInfo.AwaitingCorrection = false
+		p.mInfo.AwaitingCorrectionAcks--
 	})
 }
 
@@ -366,13 +372,13 @@ func (p *Player) aiStep() {
 	}
 
 	if p.mInfo.Jumping {
-		if p.mInfo.OnGround && p.mInfo.TicksUntilNextJump <= 0 {
+		if (p.mInfo.OnGround || p.mInfo.StepClipOffset > 0) && p.mInfo.TicksUntilNextJump <= 0 {
 			p.simulateJump()
 			if p.debugger.LogMovement {
 				p.Log().Debug("aiStep(): simulated jump")
 			}
 		} else if p.debugger.LogMovement {
-			p.Log().Debugf("aiStep(): refusing jump simulation (%v %v)", p.mInfo.OnGround, p.mInfo.TicksUntilNextJump)
+			p.Log().Debugf("aiStep(): refusing jump simulation (%v %v %v)", p.mInfo.OnGround, p.mInfo.TicksUntilNextJump, p.mInfo.StepClipOffset)
 		}
 	}
 
@@ -385,6 +391,10 @@ func (p *Player) simulateGroundMove() {
 		p.mInfo.StepClipOffset *= game.StepClipMultiplier
 	} else {
 		p.mInfo.StepClipOffset = 0
+	}
+
+	if p.debugger.LogMovement {
+		p.Log().Debugf("simulateGroundMove(): stepClipOffset=%f", p.mInfo.StepClipOffset)
 	}
 
 	blockUnder := p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.5})))
@@ -699,11 +709,16 @@ func (p *Player) simulateCollisions() {
 		list := utils.GetNearbyBBoxes(p.AABB().Extend(stepVel), p.World())
 
 		bb := p.AABB()
-		bb, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, bb, list, stepVel.Y())
+		initBB := bb.Translate(mgl32.Vec3{stepVel.X(), 0, stepVel.Z()})
+
+		_, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, initBB, list, stepVel.Y())
+		bb = bb.Translate(mgl32.Vec3{0, stepVel.Y()})
 		bb, stepVel[0] = utils.DoBoxCollision(utils.CollisionX, bb, list, stepVel.X())
 		bb, stepVel[2] = utils.DoBoxCollision(utils.CollisionZ, bb, list, stepVel.Z())
 		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, list, -(stepVel.Y()))
 		stepVel[1] += rDy
+
+		fmt.Println(rDy, stepVel[1], p.mInfo.StepClipOffset, p.mInfo.Jumping, game.Vec3HzDistSqr(newVel), game.Vec3HzDistSqr(stepVel))
 
 		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
 			p.mInfo.StepClipOffset += stepVel.Y()
@@ -957,8 +972,8 @@ func (p *Player) isScenarioPredictable() bool {
 }
 
 type MovementInfo struct {
-	CanExempt          bool
-	AwaitingCorrection bool
+	CanExempt              bool
+	AwaitingCorrectionAcks uint32
 
 	ForwardImpulse float32
 	LeftImpulse    float32
