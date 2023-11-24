@@ -341,6 +341,8 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/8.0, 1)}
 	case "minecraft:daylight_detector", "minecraft:daylight_detector_inverted":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 3.0/8.0, 1)}
+	case "minecraft:bamboo_sapling":
+		return []cube.BBox{}
 	}
 
 	dfBoxes := b.Model().BBox(df_cube.Pos{
