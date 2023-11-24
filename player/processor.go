@@ -649,7 +649,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 	}
 
 	// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
-	if p.conn.Protocol().ID() <= GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+	if p.conn.Protocol().ID() >= GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 		p.Click()
 		p.updateCombatData(nil)
 	}
