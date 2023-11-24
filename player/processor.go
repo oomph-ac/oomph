@@ -158,11 +158,11 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			}
 
 			p.Click()
-		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && t.ActionType == protocol.UseItemActionClickBlock {
+		} else if t, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 			if t.ActionType == protocol.UseItemActionBreakBlock {
 				p.World().SetBlock(utils.BlockToCubePos(t.BlockPosition), block.Air{})
 				fmt.Println("inv break", t.BlockPosition)
-			} else {
+			} else if t.ActionType == protocol.UseItemActionClickBlock {
 				cancel = p.handleBlockPlace(t)
 			}
 		}
