@@ -327,6 +327,9 @@ func (p *Player) aiStep() {
 		return
 	}
 
+	// Push the player out of any blocks they are inside of.
+	p.pushOutOfBlock()
+
 	// If the player's X movement is below 1e-7, set it to 0.
 	if mgl32.Abs(p.mInfo.ServerMovement[0]) < 1e-7 {
 		p.mInfo.ServerMovement[0] = 0
@@ -374,9 +377,6 @@ func (p *Player) aiStep() {
 	}
 
 	p.simulateGroundMove()
-
-	// Push the player out of any blocks they are inside of.
-	p.pushOutOfBlock()
 }
 
 // simulateGroundMove continues the player's movement simulation.
@@ -787,6 +787,9 @@ func (p *Player) pushOutOfBlock() {
 	for bpos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
 		for _, box := range utils.BlockBoxes(block, bpos, p.World()) {
 			box = box.Translate(bpos.Vec3())
+			if box.Width() != 1 || box.Height() != 1 || box.Length() != 1 {
+				continue
+			}
 
 			// The player is not inside the block's BB.
 			if !bb.IntersectsWith(box) {
