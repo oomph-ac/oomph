@@ -19,6 +19,10 @@ const (
 	GameVersion1_20_40 = 622
 )
 
+func VersionInRange(version int, min int, max int) bool {
+	return version >= min && version <= max
+}
+
 // IdentityData returns the login.IdentityData of a player. It contains the UUID, XUID and username of the connection.
 func (p *Player) IdentityData() login.IdentityData {
 	return p.conn.IdentityData()
