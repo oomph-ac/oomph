@@ -8,7 +8,6 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -171,13 +170,11 @@ func (p *Player) calculateClientSpeed() {
 	p.mInfo.ClientCalculatedSpeed = 0.1
 
 	if p.mInfo.ClientPredictsSpeed {
-		if v, ok := p.effects.Load(1); ok {
-			spd := v.(effect.Effect)
+		if spd, ok := p.Effect(1); ok {
 			p.mInfo.ClientCalculatedSpeed += float32(spd.Level()) * 0.02
 		}
 
-		if v2, ok := p.effects.Load(2); ok {
-			slw := v2.(effect.Effect)
+		if slw, ok := p.Effect(2); ok {
 			p.mInfo.ClientCalculatedSpeed -= float32(slw.Level()) * 0.015
 		}
 	}
