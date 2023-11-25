@@ -2,7 +2,6 @@ package player
 
 import (
 	"fmt"
-	"maps"
 	"strings"
 
 	"github.com/ethaniccc/float32-cube/cube"
@@ -34,10 +33,11 @@ func (p *Player) doMovementSimulation() {
 	}
 
 	// If the player is AFK, do not run a movement simulation.
-	afk := math32.Abs(p.mInfo.ForwardImpulse) == 0 && math32.Abs(p.mInfo.LeftImpulse) == 0 &&
-		p.mInfo.ServerMovement == mgl32.Vec3{0, -0.0784, 0} && !p.mInfo.JumpBindPressed && !p.mInfo.SneakBindPressed &&
-		!p.mInfo.SprintBindPressed && p.mInfo.TicksSinceKnockback > 0 && p.mInfo.TicksSinceSmoothTeleport > 3 &&
-		!p.mInfo.Teleporting && maps.Equal(p.mInfo.LastBlocksSurrounding, surrounding)
+	/* afk := math32.Abs(p.mInfo.ForwardImpulse) == 0 && math32.Abs(p.mInfo.LeftImpulse) == 0 &&
+	p.mInfo.ServerMovement == mgl32.Vec3{0, -0.0784, 0} && !p.mInfo.JumpBindPressed && !p.mInfo.SneakBindPressed &&
+	!p.mInfo.SprintBindPressed && p.mInfo.TicksSinceKnockback > 0 && p.mInfo.TicksSinceSmoothTeleport > 3 &&
+	!p.mInfo.Teleporting && maps.Equal(p.mInfo.LastBlocksSurrounding, surrounding) */
+	afk := false
 
 	if (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.inDimensionChange || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) {
 		p.mInfo.OnGround = false
