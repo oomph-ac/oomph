@@ -80,6 +80,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: false,
+		IPAddress:                  conn.RemoteAddr().String(),
 	}.DialTimeout("raknet", remoteAddr, time.Second*10)
 
 	if err != nil {
