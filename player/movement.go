@@ -8,6 +8,7 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
+	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -168,6 +169,18 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 func (p *Player) calculateClientSpeed() {
 	// The base client calculated speed (no effects) is 0.1.
 	p.mInfo.ClientCalculatedSpeed = 0.1
+
+	if p.mInfo.ClientPredictsSpeed {
+		if v, ok := p.effects.Load(1); ok {
+			spd := v.(effect.Effect)
+			p.mInfo.ClientCalculatedSpeed += float32(spd.Level()) * 0.02
+		}
+
+		if v2, ok := p.effects.Load(2); ok {
+			slw := v2.(effect.Effect)
+			p.mInfo.ClientCalculatedSpeed -= float32(slw.Level()) * 0.015
+		}
+	}
 
 	// If the player is not sprinting, we don't need to multiply the
 	// client calculated speed by 1.3.
@@ -973,6 +986,7 @@ func (p *Player) isScenarioPredictable() bool {
 
 type MovementInfo struct {
 	CanExempt              bool
+	ClientPredictsSpeed    bool
 	AwaitingCorrectionAcks uint32
 
 	ForwardImpulse float32
