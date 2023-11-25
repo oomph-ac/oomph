@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"math"
+
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -531,7 +533,7 @@ func IsBlockOpenSpace(pos cube.Pos, w *oomph_world.World) bool {
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, w *oomph_world.World) map[cube.Pos]world.Block {
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oomph_world.World) map[cube.Pos]world.Block {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
@@ -544,6 +546,12 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, w *oomph_world.World) map[
 				pos := cube.Pos{x, y, z}
 				b := w.GetBlock(pos)
 				if _, isAir := b.(block.Air); !includeAir && isAir {
+					b = nil
+					continue
+				}
+
+				// If the hash is MaxUint64, then the block is unknown to dragonfly.
+				if !includeUnknown && b.Hash() == math.MaxUint64 {
 					b = nil
 					continue
 				}

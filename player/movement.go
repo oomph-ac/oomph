@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/ethaniccc/float32-cube/cube"
@@ -27,6 +28,17 @@ func (p *Player) doMovementSimulation() {
 		defer p.Log().Debugf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame())
 	}
 
+	surrounding := utils.GetNearbyBlocks(p.AABB(), true, false, p.World())
+	if p.mInfo.LastBlocksSurrounding == nil {
+		p.mInfo.LastBlocksSurrounding = surrounding
+	}
+
+	// If the player is AFK, do not run a movement simulation.
+	afk := math32.Abs(p.mInfo.ForwardImpulse) == 0 && math32.Abs(p.mInfo.LeftImpulse) == 0 &&
+		p.mInfo.ServerMovement == mgl32.Vec3{0, -0.0784, 0} && !p.mInfo.JumpBindPressed && !p.mInfo.SneakBindPressed &&
+		!p.mInfo.SprintBindPressed && p.mInfo.TicksSinceKnockback > 0 && p.mInfo.TicksSinceSmoothTeleport > 3 &&
+		!p.mInfo.Teleporting && maps.Equal(p.mInfo.LastBlocksSurrounding, surrounding)
+
 	if (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.inDimensionChange || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) {
 		p.mInfo.OnGround = false
 		p.mInfo.ServerPosition = p.Position()
@@ -34,10 +46,11 @@ func (p *Player) doMovementSimulation() {
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 		p.mInfo.CanExempt = true
 		exempt = true
-	} else {
+	} else if !afk {
 		exempt = p.mInfo.CanExempt
 		p.aiStep()
 		p.mInfo.CanExempt = false
+		p.mInfo.LastBlocksSurrounding = surrounding
 	}
 
 	p.mInfo.Tick()
@@ -270,7 +283,7 @@ func (p *Player) correctMovement() {
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
 	if p.mInfo.TicksSinceBlockRefresh >= 40 {
-		for bpos, b := range utils.GetNearbyBlocks(p.AABB(), true, p.World()) {
+		for bpos, b := range utils.GetNearbyBlocks(p.AABB(), true, true, p.World()) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 				NewBlockRuntimeID: world.BlockRuntimeID(b),
@@ -670,7 +683,7 @@ func (p *Player) maybeBackOffFromEdge() {
 // isInsideBlock returns true if the player is inside a block.
 func (p *Player) isInsideBlock() (world.Block, bool) {
 	bb := p.AABB()
-	for pos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
+	for pos, block := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
 		boxes := utils.BlockBoxes(block, pos, p.World())
 
 		for _, box := range boxes {
@@ -807,7 +820,7 @@ func (p *Player) pushOutOfBlock() {
 	bb := p.AABB().Grow(-1e-3)
 	hasIntersection := false
 
-	for bpos, block := range utils.GetNearbyBlocks(bb, false, p.World()) {
+	for bpos, block := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
 		for _, box := range utils.BlockBoxes(block, bpos, p.World()) {
 			box = box.Translate(bpos.Vec3())
 			if box.Width() != 1 || box.Height() != 1 || box.Length() != 1 {
@@ -946,7 +959,7 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 // Returns false if the player is in a scenario we need to trust the client for.
 func (p *Player) isScenarioPredictable() bool {
 	bb := p.AABB()
-	blocks := utils.GetNearbyBlocks(bb, false, p.World())
+	blocks := utils.GetNearbyBlocks(bb, false, false, p.World())
 
 	p.mInfo.InSupportedScenario = true
 	var hasLiquid, hasBounce, hasBamboo bool
@@ -1034,7 +1047,8 @@ type MovementInfo struct {
 	ServerMovement, OldServerMovement       mgl32.Vec3
 	ServerPosition                          mgl32.Vec3
 
-	LastUsedInput *packet.PlayerAuthInput
+	LastBlocksSurrounding map[cube.Pos]world.Block
+	LastUsedInput         *packet.PlayerAuthInput
 }
 
 // SetMaxPositionDeviations sets the amount of position deviation allowed, and if the client exceeds this,
