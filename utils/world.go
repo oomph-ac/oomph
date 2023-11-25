@@ -345,6 +345,8 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 3.0/8.0, 1)}
 	case "minecraft:bamboo_sapling":
 		return []cube.BBox{}
+	case "minecraft:vine":
+		return []cube.BBox{}
 	}
 
 	dfBoxes := b.Model().BBox(df_cube.Pos{
@@ -602,6 +604,12 @@ func BlockClimbable(b world.Block) bool {
 		return true
 		// TODO: Add vines here.
 	}
+
+	switch BlockName(b) {
+	case "minecraft:vine":
+		return true
+	}
+
 	return false
 }
 
