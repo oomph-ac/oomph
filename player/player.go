@@ -874,7 +874,20 @@ func (p *Player) updateLatency() {
 
 	p.Acknowledgement(func() {
 		p.needLatencyUpdate = true
+
+		oldLatency := p.stackLatency
 		p.stackLatency = time.Since(curr).Milliseconds()
+
+		diff := p.stackLatency - oldLatency
+		tickLatency := p.TickLatency()
+
+		// Make the player aware that their network conditions may affect their gameplay.
+		if diff >= 100 || tickLatency > p.combatNetworkCutoff || tickLatency > p.knockbackNetworkCutoff {
+			p.conn.WritePacket(&packet.Text{
+				TextType: packet.TextTypePopup,
+				Message:  text.Colourf("<red><bold>network problem</bold></red>"),
+			})
+		}
 
 		if !p.debugger.LogLatency {
 			return
@@ -898,7 +911,7 @@ func (p *Player) TryTransfer(address string) error {
 		IdentityData: p.conn.IdentityData(),
 		ClientData:   clientDat,
 		FlushRate:    -1,
-	}.DialTimeout("raknet", address, time.Second*5)
+	}.DialTimeout("raknet", address, time.Second*10)
 
 	if err != nil {
 		p.Log().Errorf("unable to transfer to %s: %s", address, err.Error())
@@ -1022,13 +1035,15 @@ func (p *Player) startTicking() {
 		case <-p.c:
 			return
 		case <-t.C:
-			p.doTick()
+			if !p.doTick() {
+				return
+			}
 		}
 	}
 }
 
 // doTick ticks the player.
-func (p *Player) doTick() {
+func (p *Player) doTick() bool {
 	p.pkMu.Lock()
 	defer p.pkMu.Unlock()
 
@@ -1036,7 +1051,7 @@ func (p *Player) doTick() {
 	// difference between the last time the server ticked and the current time.
 	delta := time.Since(p.lastServerTicked).Milliseconds()
 	if delta > 50 {
-		p.serverTick.Add(uint64(delta / 50))
+		p.serverTick.Add(uint64(delta/50) + 1)
 	} else {
 		p.serverTick.Inc()
 	}
@@ -1059,6 +1074,7 @@ func (p *Player) doTick() {
 	if !p.Acknowledgements().Validate() {
 		p.Log().Errorf("%v did not respond to acknowledgements in time", p.Name())
 		p.Disconnect(game.ErrorNoAcks)
+		return false
 	}
 
 	// Attempt to sync the client tick and server tick - if the client is running smoothly the difference between
@@ -1070,27 +1086,30 @@ func (p *Player) doTick() {
 	// from the server.
 	p.SendAck()
 
+	// Lock the client conn and server conn, as we need to be able to flush packets w/o new ones being processed
+	// at the same time.
 	p.ccMu.Lock()
 	p.scMu.Lock()
 	defer p.ccMu.Unlock()
 	defer p.scMu.Unlock()
 
 	// Flush the client's connection.
-	if p.conn == nil {
-		return
-	} else if err := p.conn.Flush(); err != nil {
-		p.Log().Errorf("p.doTick(): unable to flush client connection: %v", err)
-		return
+	if p.conn != nil {
+		if err := p.conn.Flush(); err != nil {
+			p.Log().Errorf("p.doTick(): unable to flush client connection: %v", err)
+			return false
+		}
 	}
 
 	if p.serverConn != nil {
 		if err := p.serverConn.Flush(); err != nil {
 			p.Log().Errorf("p.doTick(): unable to flush server connection: %v", err)
-			return
+			return false
 		}
 	}
 
 	p.lastServerTicked = time.Now()
+	return true
 }
 
 // handler returns the handler of the player.
