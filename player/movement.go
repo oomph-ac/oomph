@@ -732,7 +732,7 @@ func (p *Player) simulateCollisions() {
 		list := utils.GetNearbyBBoxes(p.AABB().Extend(stepVel), p.World())
 
 		bb := p.AABB()
-		initBB := bb.Translate(mgl32.Vec3{stepVel.X(), 0, stepVel.Z()})
+		initBB := bb.Translate(mgl32.Vec3{stepVel.X(), newVel.Y(), stepVel.Z()})
 
 		_, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, initBB, list, stepVel.Y())
 		bb = bb.Translate(mgl32.Vec3{0, stepVel.Y()})
