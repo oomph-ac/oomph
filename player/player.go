@@ -76,7 +76,7 @@ type Player struct {
 	queuedEntityLocations map[uint64]utils.LocationData
 
 	gamemode  int32
-	inputMode uint32
+	inputMode int32
 
 	eyeOffset float32
 
@@ -339,9 +339,7 @@ func (p *Player) Teleport(pos mgl32.Vec3, ground bool) {
 	p.mInfo.OnGround = ground
 	p.mInfo.IsTeleportOnGround = ground
 
-	if p.debugger.LogMovement {
-		p.log.Debugf("p.Teleport(): teleported to %v", pos)
-	}
+	p.TryDebug(fmt.Sprintf("p.Teleport(): teleported to %v", pos), DebugTypeLogged, p.debugger.LogMovement)
 }
 
 // MoveEntity moves an entity to the given position.
@@ -627,7 +625,7 @@ func (p *Player) GameMode() int32 {
 }
 
 // InputMode returns the input mode of the player
-func (p *Player) InputMode() uint32 {
+func (p *Player) InputMode() int32 {
 	return p.inputMode
 }
 
