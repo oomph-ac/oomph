@@ -234,7 +234,6 @@ func (p *Player) validateMovement() {
 
 	posDiff := p.mInfo.ServerPosition.Sub(p.Position())
 	movDiff := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
-
 	p.TryDebug(fmt.Sprintf("validateMovement(): client pos:%v server pos:%v", p.Position(), p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 	p.TryDebug(fmt.Sprintf("validateMovement(): clientDelta:%v serverDelta:%v", p.mInfo.ClientPredictedMovement, p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
 
