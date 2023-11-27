@@ -25,7 +25,7 @@ type Debugger struct {
 	AllowedDebug bool
 }
 
-func (p *Player) tryDebug(msg string, dtype int, log bool) {
+func (p *Player) TryDebug(msg string, dtype int, log bool) {
 	if !log {
 		return
 	}
