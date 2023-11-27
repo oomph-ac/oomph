@@ -103,10 +103,7 @@ func (p *Player) handlePacketQueue() {
 		p.excessBufferScore = 0
 	}
 
-	if p.debugger.UsePacketBuffer {
-		p.SendOomphDebug(fmt.Sprint("bufferSize=", startLen, " credits=", p.queueCredits, " ignored=", ignored, " doDouble=", doDouble, " filling=", buffer == nil), packet.TextTypeChat)
-	}
-
+	p.TryDebug(fmt.Sprint("bufferSize=", startLen, " credits=", p.queueCredits, " ignored=", ignored, " doDouble=", doDouble, " filling=", buffer == nil), DebugTypeChat, p.debugger.UsePacketBuffer)
 	if buffer == nil {
 		if !p.isBufferReady {
 			return

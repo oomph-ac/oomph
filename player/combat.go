@@ -14,12 +14,14 @@ import (
 )
 
 const maxCrosshairAttackDist float32 = 3.0
-const maxTouchAttackDist float32 = 3.1
+const maxTouchAttackDist float32 = 3.125
 
 // updateCombatData updates the player's current combat data, and sets the needsCombatValidation flag to true. The combat data will be
 // nil if the player swung in the air (check for possible client misprediction).
 func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
-	p.lastAttackData = pk
+	if pk == nil && p.lastAttackData == nil {
+		p.lastAttackData = pk
+	}
 	p.needsCombatValidation = true
 }
 
@@ -61,10 +63,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	// If the current tick we want to rewind to is lower than the latency cutoff, we need to cut it off.
 	if rewTick+cut < sTick {
 		rewTick = sTick - cut + 1
-
-		if p.debugger.LogCombat {
-			p.SendOomphDebug(fmt.Sprint("cutoff reached - least available tick is ", rewTick, " (max rewind is ", p.combatNetworkCutoff, ")"), packet.TextTypeChat)
-		}
+		p.TryDebug(fmt.Sprint("cutoff reached - least available tick is ", rewTick, " (max rewind is ", p.combatNetworkCutoff, ")"), DebugTypeChat, p.debugger.LogCombat)
 	}
 
 	// The rewind cannot exceed the current (server tick - 1). If it does, set the rewind tick to the server tick.
@@ -75,7 +74,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	if p.lastAttackData == nil {
 		// We can't assume the touch client has mispredicted a hit because they can pretty
 		// much touch anywhere on their screen and hit an entity.
-		if p.inputMode == packet.InputModeTouch {
+		if p.inputMode == packet.InteractionModelTouch {
 			return
 		}
 
@@ -126,10 +125,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		})
 
 		if valid {
-			if p.debugger.LogCombat {
-				p.SendOomphDebug("client misprediction - sent attack to server w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), packet.TextTypeChat)
-			}
-
+			p.TryDebug("(client misprediction) valid w/ dist="+fmt.Sprint(math.Sqrt(float64(min))), DebugTypeChat, p.debugger.LogCombat)
 			p.SendPacketToServer(&packet.InventoryTransaction{
 				TransactionData: &protocol.UseItemOnEntityTransactionData{
 					TargetEntityRuntimeID: eid,
@@ -174,27 +170,21 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 
 	if targetAABB.IntersectsWith(p.AABB()) {
 		p.SendPacketToServer(p.lastAttackData)
-		if p.debugger.LogCombat {
-			p.SendOomphDebug("hit valid: intersected with player", packet.TextTypeChat)
-		}
-
+		p.TryDebug("hit valid: intersected with player", DebugTypeChat, p.debugger.LogCombat)
 		return
 	}
 
 	// AABB distance check, to make sure the player is within search range of the entity.
 	touchDist := game.AABBVectorDistance(targetAABB, attackPos)
 	if touchDist > maxTouchAttackDist {
-		if p.debugger.LogCombat {
-			p.SendOomphDebug("hit invalid: aabb dist check failed w/ dist="+fmt.Sprint(touchDist), packet.TextTypeChat)
-		}
-
+		p.TryDebug("hit invalid: aabb dist check failed w/ dist="+fmt.Sprint(touchDist), DebugTypeChat, p.debugger.LogCombat)
 		return
 	}
 
 	// If a player's input mode is touch, then a raycast will not be performed to validate combat.
 	// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 	// which would allow the player to attack another entity without actually looking at them.
-	if p.inputMode == packet.InputModeTouch {
+	if p.inputMode == packet.InteractionModelTouch {
 		p.SendPacketToServer(p.lastAttackData)
 		return
 	}
@@ -208,28 +198,22 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 		valid := dist <= maxCrosshairAttackDist
 
 		if b != nil && d < dist {
-			if p.debugger.LogCombat {
-				p.SendOomphDebug("client-predicted hit INVALID: block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), packet.TextTypeChat)
-			}
-
+			p.TryDebug("(misprediction) block "+utils.BlockName(b)+" in the way at dist "+fmt.Sprint(d), DebugTypeChat, p.debugger.LogCombat)
 			return
 		}
 
-		if p.debugger.LogCombat {
-			color := "§c"
-			if valid {
-				color = "§a"
-			}
-
-			p.SendOomphDebug("dist="+fmt.Sprint(dist)+" && valid="+color+fmt.Sprint(valid), packet.TextTypeChat)
+		color := "§c"
+		if valid {
+			color = "§a"
 		}
+		p.TryDebug("dist="+fmt.Sprint(dist)+" && valid="+color+fmt.Sprint(valid), DebugTypeChat, p.debugger.LogCombat)
 
 		if !valid {
 			return
 		}
 
 		p.SendPacketToServer(p.lastAttackData)
-	} else if p.debugger.LogCombat {
-		p.SendOomphDebug("hit invalid: casted ray did not land. rewTick:"+fmt.Sprint(rewTick), packet.TextTypeChat)
+	} else {
+		p.TryDebug("hit invalid: casted ray did not land. rewTick:"+fmt.Sprint(rewTick), DebugTypeChat, p.debugger.LogCombat)
 	}
 }

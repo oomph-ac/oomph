@@ -443,9 +443,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 					p.mInfo.MovementSpeed = a.Value
 					p.mInfo.HasServerSpeedState = true
-					if p.debugger.LogMovement {
-						p.Log().Debugf("ack(): movement speed updated to %f", a.Value)
-					}
+					p.TryDebug(fmt.Sprintf("ack(): movement speed updated to %f", a.Value), DebugTypeLogged, p.debugger.LogMovement)
 
 					p.miMu.Unlock()
 
@@ -470,9 +468,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff && pk.Velocity.LenSqr() > 0) || p.debugger.UseServerKnockback {
 			p.OnNextClientTick(func() {
 				p.mInfo.SetKnockback(pk.Velocity)
-				if p.debugger.LogMovement {
-					p.Log().Debugf("server authoritative kb for %v", pk.Velocity)
-				}
+				p.TryDebug(fmt.Sprintf("server authoritative kb for %v", pk.Velocity), DebugTypeLogged, p.debugger.LogMovement)
 			})
 
 			return false
@@ -482,9 +478,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// does take knockback when it recieves it.
 		p.Acknowledgement(func() {
 			p.mInfo.SetKnockback(pk.Velocity)
-			if p.debugger.LogMovement {
-				p.Log().Debugf("client authoritative kb for %v", pk.Velocity)
-			}
+			p.TryDebug(fmt.Sprintf("client authoritative kb for %v", pk.Velocity), DebugTypeLogged, p.debugger.LogMovement)
 		})
 	case *packet.LevelChunk:
 		p.handleLevelChunk(pk)
@@ -623,7 +617,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 
 	// Update the input mode of the player. This is mainly used for combat detections.
 	// Note while this can be abused, techincally, there are still combat checks in place for touch players.
-	p.inputMode = pk.InputMode
+	p.inputMode = pk.InteractionModel
 
 	// Call p.Move() to update some movement states, such as the client predicted movement.
 	p.Move(pk)
