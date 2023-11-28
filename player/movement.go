@@ -201,20 +201,21 @@ func (p *Player) shiftTowardsClient() {
 		return
 	}
 
-	shiftAmt := p.mInfo.SupportedPositionPersuasion
+	shiftVec := mgl32.Vec3{p.mInfo.SupportedPositionPersuasion, p.mInfo.SupportedPositionPersuasion, p.mInfo.SupportedPositionPersuasion}
 	if !p.mInfo.InSupportedScenario {
-		shiftAmt = p.mInfo.UnsupportedPositionPersuasion
+		shiftVec = mgl32.Vec3{p.mInfo.UnsupportedPositionPersuasion, p.mInfo.UnsupportedPositionPersuasion, p.mInfo.UnsupportedPositionPersuasion}
 	}
 
-	/* if p.mInfo.StepClipOffset > 1e-6 {
-		shiftAmt += 1.0
-	} */
+	if p.mInfo.HorizontallyCollided {
+		shiftVec[0] += 0.5
+		shiftVec[2] += 0.5
+	}
 
 	// Shift the server position towards the client position by the acceptance amount.
 	dPos := p.mInfo.ServerPosition.Sub(p.Position())
-	p.mInfo.ServerPosition[0] -= game.ClampFloat(dPos[0], -shiftAmt, shiftAmt)
-	p.mInfo.ServerPosition[1] -= game.ClampFloat(dPos[1], -shiftAmt, shiftAmt)
-	p.mInfo.ServerPosition[2] -= game.ClampFloat(dPos[2], -shiftAmt, shiftAmt)
+	p.mInfo.ServerPosition[0] -= game.ClampFloat(dPos.X(), -shiftVec.X(), shiftVec.X())
+	p.mInfo.ServerPosition[1] -= game.ClampFloat(dPos.Y(), -shiftVec.Y(), shiftVec.Y())
+	p.mInfo.ServerPosition[2] -= game.ClampFloat(dPos.Z(), -shiftVec.Z(), shiftVec.Z())
 
 	/* dMov := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
 	p.mInfo.ServerMovement[0] -= game.ClampFloat(dMov[0], -shiftAmt, shiftAmt)
@@ -674,6 +675,11 @@ func (p *Player) simulateCollisions() {
 		bb, stepVel[2] = utils.DoBoxCollision(utils.CollisionZ, bb, list, stepVel.Z())
 		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, list, -(stepVel.Y()))
 		stepVel[1] += rDy
+
+		if mgl32.FloatEqualThreshold(stepVel.Y(), 0.0, 1e-3) && newVel.Y() > 0 {
+			p.TryDebug(fmt.Sprintf("collide(): ignored stepVel %v, using newVel %v", stepVel, newVel), DebugTypeLogged, p.debugger.LogMovement)
+			stepVel = newVel
+		}
 
 		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
 			p.mInfo.StepClipOffset += stepVel.Y()
