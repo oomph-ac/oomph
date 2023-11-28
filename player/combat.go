@@ -19,9 +19,7 @@ const maxTouchAttackDist float32 = 3.125
 // updateCombatData updates the player's current combat data, and sets the needsCombatValidation flag to true. The combat data will be
 // nil if the player swung in the air (check for possible client misprediction).
 func (p *Player) updateCombatData(pk *packet.InventoryTransaction) {
-	if pk == nil && p.lastAttackData == nil {
-		p.lastAttackData = pk
-	}
+	p.lastAttackData = pk
 	p.needsCombatValidation = true
 }
 
