@@ -150,8 +150,10 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		pk.EntityRuntimeID = p.runtimeID
 	case *packet.InventoryTransaction:
 		if t, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-			cancel = p.combatMode == utils.ModeFullAuthoritative
-			p.updateCombatData(pk)
+			if t.ActionType == protocol.UseItemOnEntityActionAttack {
+				cancel = p.combatMode == utils.ModeFullAuthoritative
+				p.updateCombatData(pk)
+			}
 
 			if t.TargetEntityRuntimeID == math.MaxInt64 {
 				t.TargetEntityRuntimeID = p.clientRuntimeID
