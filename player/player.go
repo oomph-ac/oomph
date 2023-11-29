@@ -420,7 +420,7 @@ func (p *Player) AABB() cube.BBox {
 		pos = p.mInfo.ServerPosition
 	}
 
-	return cube.Box(bb.Min().X(), bb.Min().Y(), bb.Min().Z(), bb.Max().X(), bb.Max().Y(), bb.Max().Z()).Translate(pos).Grow(-1e-3)
+	return cube.Box(bb.Min().X(), bb.Min().Y(), bb.Min().Z(), bb.Max().X(), bb.Max().Y(), bb.Max().Z()).Translate(pos)
 }
 
 // Acknowledgements returns the acknowledgements of the player.
