@@ -207,8 +207,8 @@ func (p *Player) shiftTowardsClient() {
 	}
 
 	if p.mInfo.HorizontallyCollided {
-		shiftVec[0] += 0.5
-		shiftVec[2] += 0.5
+		shiftVec[0] += 0.2
+		shiftVec[2] += 0.2
 	}
 
 	// Shift the server position towards the client position by the acceptance amount.
@@ -217,10 +217,10 @@ func (p *Player) shiftTowardsClient() {
 	p.mInfo.ServerPosition[1] -= game.ClampFloat(dPos.Y(), -shiftVec.Y(), shiftVec.Y())
 	p.mInfo.ServerPosition[2] -= game.ClampFloat(dPos.Z(), -shiftVec.Z(), shiftVec.Z())
 
-	/* dMov := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
-	p.mInfo.ServerMovement[0] -= game.ClampFloat(dMov[0], -shiftAmt, shiftAmt)
-	p.mInfo.ServerMovement[1] -= game.ClampFloat(dMov[1], -shiftAmt, shiftAmt)
-	p.mInfo.ServerMovement[2] -= game.ClampFloat(dMov[2], -shiftAmt, shiftAmt) */
+	dMov := p.mInfo.ServerMovement.Sub(p.mInfo.ClientPredictedMovement)
+	p.mInfo.ServerMovement[0] -= game.ClampFloat(dMov.X(), -shiftVec.X(), shiftVec.X())
+	p.mInfo.ServerMovement[1] -= game.ClampFloat(dMov.Y(), -shiftVec.Y(), shiftVec.Y())
+	p.mInfo.ServerMovement[2] -= game.ClampFloat(dMov.Z(), -shiftVec.Z(), shiftVec.Z())
 }
 
 // validateMovement validates the movement of the player. If the position or the velocity of the player is offset by a certain amount, the player's movement will be corrected.
@@ -676,12 +676,10 @@ func (p *Player) simulateCollisions() {
 		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, list, -(stepVel.Y()))
 		stepVel[1] += rDy
 
-		if mgl32.FloatEqualThreshold(stepVel.Y(), 0.0, 1e-3) && newVel.Y() > 0 {
+		if mgl32.FloatEqualThreshold(stepVel.Y(), 0.0, 1e-3) && newVel.Y() >= -(p.mInfo.Gravity*game.GravityMultiplier) {
 			p.TryDebug(fmt.Sprintf("collide(): ignored stepVel %v, using newVel %v", stepVel, newVel), DebugTypeLogged, p.debugger.LogMovement)
 			stepVel = newVel
-		}
-
-		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
+		} else if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
 			p.mInfo.StepClipOffset += stepVel.Y()
 			newVel = stepVel
 			p.TryDebug(fmt.Sprintf("collide(): step detected %v", stepVel), DebugTypeLogged, p.debugger.LogMovement)
@@ -732,16 +730,13 @@ func (p *Player) pushOutOfBlock() {
 	pos := cube.PosFromVec3(p.mInfo.ServerPosition)
 	b, ba := p.World().GetBlock(pos), p.World().GetBlock(pos.Side(cube.FaceUp))
 
-	var pushX, pushY, pushZ float32
 	if utils.CanPassBlock(b) {
 		return
 	}
 
-	bb := p.AABB().Grow(-1e-3)
-	hasIntersection := false
-
-	for bpos, block := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
-		for _, box := range utils.BlockBoxes(block, bpos, p.World()) {
+	bb := p.AABB().Grow(-1e-4)
+	for bpos, b := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
+		for _, box := range utils.BlockBoxes(b, bpos, p.World()) {
 			box = box.Translate(bpos.Vec3())
 			if box.Width() != 1 || box.Height() != 1 || box.Length() != 1 {
 				continue
@@ -751,58 +746,39 @@ func (p *Player) pushOutOfBlock() {
 			if !bb.IntersectsWith(box) {
 				continue
 			}
-			hasIntersection = true
 			minDelta, maxDelta := box.Max().Sub(bb.Min()), box.Min().Sub(bb.Max())
 
+			_, isAir := ba.(block.Air)
+			if isAir && !p.mInfo.OnGround && box.Max().Y()-bb.Min().Y() > 0 && minDelta.Y() <= 0.5 {
+				p.mInfo.ServerPosition[1] = box.Max().Y() + 1e-3
+				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 1 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
+				break
+			}
+
 			if bb.Max().X()-box.Min().X() > 0 && minDelta.X() <= 0.5 {
-				pushX = minDelta.X()
+				p.mInfo.ServerPosition[0] = box.Max().X() + 0.5
+				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 2 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 				break
 			}
 
 			if box.Max().X()-bb.Min().X() > 0 && maxDelta.X() >= -0.5 {
-				pushX = maxDelta.X()
+				p.mInfo.ServerPosition[0] = box.Min().X() - 0.5
+				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 3 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 				break
 			}
 
 			if bb.Max().Z()-box.Min().Z() > 0 && minDelta.Z() <= 0.5 {
-				pushZ = minDelta.Z()
+				p.mInfo.ServerPosition[2] = box.Max().Z() + 0.5
+				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 4 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 				break
 			}
 
 			if box.Max().Z()-bb.Min().Z() > 0 && maxDelta.Z() >= -0.5 {
-				pushZ = maxDelta.Z()
-				break
-			}
-
-			/* if bb.Max().Y()-box.Min().Y() > 0 && minDelta.Y() <= 0.4 {
-				pushY = minDelta.Y()
-				fmt.Println("pushY + ")
-				break
-			} */
-
-			if box.Max().Y()-bb.Min().Y() > 0 && maxDelta.Y() >= -0.5 {
-				pushY = maxDelta.Y()
+				p.mInfo.ServerPosition[2] = box.Min().Z() - 0.5
+				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 5 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 				break
 			}
 		}
-	}
-
-	if _, ok := ba.(block.Air); !ok {
-		pushY = 0.0
-	}
-
-	if !hasIntersection {
-		p.mInfo.KnownInsideBlock = false
-		return
-	}
-	p.mInfo.KnownInsideBlock = true
-
-	if pushX != 0 || pushY != 0 || pushZ != 0 {
-		oldPos := p.mInfo.ServerPosition
-		p.mInfo.ServerPosition[0] += pushX
-		p.mInfo.ServerPosition[1] += pushY
-		p.mInfo.ServerPosition[2] += pushZ
-		p.TryDebug(fmt.Sprintf("pushOutOfBlock(): pushed player out of blocks [oldPos=%v, newPos=%v]", oldPos, p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 	}
 }
 

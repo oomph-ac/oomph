@@ -96,6 +96,12 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
 
+	data.GameRules = append(data.GameRules, protocol.GameRule{
+		Name:                  "doimmediaterespawn",
+		CanBeModifiedByPlayer: false,
+		Value:                 true,
+	})
+
 	p := player.NewPlayer(logrus.New(), conn, serverConn)
 	p.MovementInfo().ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
 	p.MovementInfo().OnGround = true
