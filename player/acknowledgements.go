@@ -219,6 +219,7 @@ func (p *Player) SendAck() {
 
 		// It seems that when the client is changing dimensions, they do not send back NetworkStackLatency.
 		if p.inDimensionChange {
+			acks.tryHandle(acks.CurrentTimestamp)
 			acks.Remove(acks.CurrentTimestamp)
 			return
 		}
