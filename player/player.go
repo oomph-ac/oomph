@@ -114,6 +114,7 @@ type Player struct {
 
 	lastAttackData    *packet.InventoryTransaction
 	lastEquipmentData *packet.MobEquipment
+	lastActorData     *packet.SetActorData
 	lastAttributeData *packet.UpdateAttributes
 
 	nextTickActions   []func()
