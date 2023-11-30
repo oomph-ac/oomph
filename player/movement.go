@@ -284,6 +284,18 @@ func (p *Player) correctMovement() {
 		p.mInfo.TicksSinceBlockRefresh = 0
 	}
 
+	// This packet will correct the player's data, such as it's speed, etc.
+	if p.lastAttributeData != nil {
+		p.lastAttributeData.Tick = p.ClientFrame()
+		p.conn.WritePacket(p.lastAttributeData)
+	}
+
+	// This packet will correct the player's states, such as sprinting, sneaking, etc.
+	if p.lastActorData != nil {
+		p.lastActorData.Tick = p.ClientFrame()
+		p.conn.WritePacket(p.lastActorData)
+	}
+
 	// This packet will correct the player to the server's predicted position.
 	p.conn.WritePacket(&packet.CorrectPlayerMovePrediction{
 		Position: pos.Add(mgl32.Vec3{0, 1.62 + 1e-4}),

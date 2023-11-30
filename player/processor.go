@@ -872,6 +872,8 @@ func (p *Player) handleMobEffect(pk *packet.MobEffect) {
 // handleSetActorData handles the SetActorData packet sent by the server. This is used to update
 // some of the player's metadata.
 func (p *Player) handleSetActorData(pk *packet.SetActorData) {
+	p.lastActorData = pk
+
 	isPlayer := pk.EntityRuntimeID == p.runtimeID
 	width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 	height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
