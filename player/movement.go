@@ -748,6 +748,10 @@ func (p *Player) pushOutOfBlock() {
 
 	bb := p.AABB().Grow(-1e-4)
 	for bpos, b := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
+		if utils.CanPassBlock(b) {
+			continue
+		}
+
 		for _, box := range utils.BlockBoxes(b, bpos, p.World()) {
 			box = box.Translate(bpos.Vec3())
 			if box.Width() != 1 || box.Height() != 1 || box.Length() != 1 {
