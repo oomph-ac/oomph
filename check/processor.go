@@ -5,6 +5,7 @@ import (
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
+	"github.com/sirupsen/logrus"
 )
 
 // Processor represents a check processor, which can be used to process certain checks.
@@ -90,6 +91,6 @@ type Processor interface {
 	// SendOomphDebug sends a debug message to the processor.
 	SendOomphDebug(message string, t byte)
 
-	// Disconnect disconnects the processor with the given reason.
-	Disconnect(reason string)
+	// Log returns the logger of the processor.
+	Log() *logrus.Logger
 }

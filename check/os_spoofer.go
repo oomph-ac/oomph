@@ -1,7 +1,6 @@
 package check
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/oomph-ac/oomph/utils"
@@ -78,7 +77,7 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) bool {
 				"Expected OS": utils.Device(expected),
 			})
 		} else if !ok {
-			p.Disconnect(fmt.Sprintf("unrecognized ID (report to staff): %s", titleID))
+			p.Log().Warnf("unknown title ID %s", titleID)
 		}
 	}
 
