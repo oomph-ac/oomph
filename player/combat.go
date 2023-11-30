@@ -72,7 +72,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	if p.lastAttackData == nil {
 		// We can't assume the touch client has mispredicted a hit because they can pretty
 		// much touch anywhere on their screen and hit an entity.
-		if p.inputMode == packet.InteractionModelTouch {
+		if p.inputMode == packet.InputModeTouch {
 			return
 		}
 
@@ -182,7 +182,7 @@ func (p *Player) validateCombat(attackPos mgl32.Vec3) {
 	// If a player's input mode is touch, then a raycast will not be performed to validate combat.
 	// This is because touchscreen players have the ability to use touch controls (instead of split controls),
 	// which would allow the player to attack another entity without actually looking at them.
-	if p.inputMode == packet.InteractionModelTouch {
+	if p.inputMode == packet.InputModeTouch {
 		p.SendPacketToServer(p.lastAttackData)
 		return
 	}
