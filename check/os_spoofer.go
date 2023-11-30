@@ -1,6 +1,9 @@
 package check
 
 import (
+	"fmt"
+	"slices"
+
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -38,6 +41,22 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) bool {
 		deviceOS := p.ClientData().DeviceOS
 		titleID := p.IdentityData().TitleID
 
+		// 1904044383 is the title ID of the preview client in MC:BE. According to @GameParrot, the preview client
+		// can be found on Windows, iOS, and Xbox.
+		if titleID == "1904044383" && !slices.Contains([]protocol.DeviceOS{
+			protocol.DeviceWin10,
+			protocol.DeviceXBOX,
+			protocol.DeviceIOS,
+		}, deviceOS) {
+			p.Flag(o, 1, map[string]any{
+				"Title ID":    titleID,
+				"Given OS":    utils.Device(deviceOS),
+				"Expected OS": "Windows/iOS/Xbox",
+			})
+
+			return false
+		}
+
 		if expected, ok := map[string]protocol.DeviceOS{
 			"1739947436": protocol.DeviceAndroid,
 			"1810924247": protocol.DeviceIOS,
@@ -59,10 +78,7 @@ func (o *OSSpoofer) Process(p Processor, pk packet.Packet) bool {
 				"Expected OS": utils.Device(expected),
 			})
 		} else if !ok {
-			p.Debug(o, map[string]any{
-				"Unknown Title ID": titleID,
-				"Given OS":         utils.Device(deviceOS),
-			})
+			p.Disconnect(fmt.Sprintf("unrecognized ID (report to staff): %s", titleID))
 		}
 	}
 
