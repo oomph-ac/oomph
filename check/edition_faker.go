@@ -8,33 +8,28 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// OSSpoofer checks if the player's device os does not equal the one that matches with their title id.
-type OSSpoofer struct {
+type EditionFaker struct {
 	basic
 }
 
-// NewOSSpoofer creates a new OSSpoofer check.
-func NewOSSpoofer() *OSSpoofer {
-	return &OSSpoofer{}
+func NewEditionFaker() *EditionFaker {
+	return &EditionFaker{}
 }
 
-// Name ...
-func (*OSSpoofer) Name() (string, string) {
-	return "OS Spoofer", "A"
+func (*EditionFaker) Name() (string, string) {
+	return "EditionFaker", "A"
 }
 
-// Description ...
-func (*OSSpoofer) Description() string {
+func (*EditionFaker) Description() string {
 	return "This checks if the player is faking their device os."
 }
 
-// MaxViolations ...
-func (*OSSpoofer) MaxViolations() float64 {
+func (*EditionFaker) MaxViolations() float64 {
 	return 1
 }
 
 // Process ...
-func (o *OSSpoofer) Process(p Processor, pk packet.Packet) bool {
+func (o *EditionFaker) Process(p Processor, pk packet.Packet) bool {
 	switch pk.(type) {
 	case *packet.TickSync: // Sent by the client right as it spawns in.
 		deviceOS := p.ClientData().DeviceOS

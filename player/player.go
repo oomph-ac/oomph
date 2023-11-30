@@ -197,7 +197,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewVelocityA(),
 			check.NewVelocityB(),
 
-			check.NewOSSpoofer(),
+			check.NewEditionFaker(),
 
 			check.NewTimerA(),
 
