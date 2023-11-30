@@ -2,8 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"strings"
+
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // Device returns the device name from the DeviceOS.
@@ -38,6 +40,22 @@ func Device(os protocol.DeviceOS) string {
 	case protocol.DeviceWP:
 		return "Windows Phone"
 	}
+	return "Unknown"
+}
+
+// InputMode returns the input mode name from the InputMode.
+func InputMode(mode int) string {
+	switch mode {
+	case packet.InputModeMouse:
+		return "Keyboard/Mouse"
+	case packet.InputModeTouch:
+		return "Touch"
+	case packet.InputModeGamePad:
+		return "Gamepad"
+	case packet.InputModeMotionController:
+		return "Motion Controller"
+	}
+
 	return "Unknown"
 }
 

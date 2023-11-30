@@ -90,6 +90,8 @@ type Processor interface {
 
 	// SendOomphDebug sends a debug message to the processor.
 	SendOomphDebug(message string, t byte)
+	// Disconnect disconnects the processor with the given message.
+	Disconnect(message string)
 
 	// Log returns the logger of the processor.
 	Log() *logrus.Logger
