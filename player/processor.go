@@ -619,7 +619,7 @@ func (p *Player) handlePlayerAuthInput(pk *packet.PlayerAuthInput) {
 
 	// Update the input mode of the player. This is mainly used for combat detections.
 	// Note while this can be abused, techincally, there are still combat checks in place for touch players.
-	p.inputMode = pk.InteractionModel
+	p.inputMode = int32(pk.InputMode)
 
 	// Call p.Move() to update some movement states, such as the client predicted movement.
 	p.Move(pk)
