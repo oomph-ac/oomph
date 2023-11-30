@@ -197,12 +197,12 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 			check.NewVelocityA(),
 			check.NewVelocityB(),
 
-			check.NewEditionFaker(),
+			check.NewEditionFakerA(),
+			check.NewEditionFakerB(),
 
 			check.NewTimerA(),
 
 			check.NewInvalidA(),
-			//check.NewInvalidB(),
 		},
 
 		mInfo: &MovementInfo{

@@ -550,12 +550,11 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		if pk.EntityRuntimeID != p.runtimeID || pk.State != packet.RespawnStateReadyToSpawn {
 			return false
 		}
-
 		pk.EntityRuntimeID = p.clientRuntimeID
-		p.Acknowledgement(func() {
-			p.dead = false
-			p.respawned = true
-		})
+
+		p.dead = false
+		p.respawned = true
+		p.mInfo.ServerPosition = pk.Position
 	case *packet.AddItemActor:
 		if pk.EntityRuntimeID == p.clientRuntimeID && pk.EntityRuntimeID != p.runtimeID {
 			pk.EntityRuntimeID = math.MaxInt64
