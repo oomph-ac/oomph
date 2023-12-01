@@ -201,14 +201,9 @@ func (p *Player) shiftTowardsClient() {
 		return
 	}
 
-	shiftVec := mgl32.Vec3{p.mInfo.SupportedPositionPersuasion, p.mInfo.SupportedPositionPersuasion, p.mInfo.SupportedPositionPersuasion}
+	shiftVec := mgl32.Vec3{p.mInfo.SupportedPositionPersuasion, 0, p.mInfo.SupportedPositionPersuasion}
 	if !p.mInfo.InSupportedScenario {
 		shiftVec = mgl32.Vec3{p.mInfo.UnsupportedPositionPersuasion, p.mInfo.UnsupportedPositionPersuasion, p.mInfo.UnsupportedPositionPersuasion}
-	}
-
-	if p.mInfo.HorizontallyCollided {
-		shiftVec[0] += 0.2
-		shiftVec[2] += 0.2
 	}
 
 	// Shift the server position towards the client position by the acceptance amount.
@@ -272,7 +267,7 @@ func (p *Player) correctMovement() {
 
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
-	if p.mInfo.TicksSinceBlockRefresh >= 40 {
+	if p.mInfo.TicksSinceBlockRefresh >= 10 {
 		for bpos, b := range utils.GetNearbyBlocks(p.AABB(), true, true, p.World()) {
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
@@ -679,10 +674,11 @@ func (p *Player) simulateCollisions() {
 		list := utils.GetNearbyBBoxes(p.AABB().Extend(stepVel), p.World())
 
 		bb := p.AABB()
-		initBB := bb.Translate(mgl32.Vec3{stepVel.X(), newVel.Y(), stepVel.Z()})
-
+		/* initBB := bb.Translate(mgl32.Vec3{stepVel.X(), newVel.Y(), stepVel.Z()})
 		_, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, initBB, list, stepVel.Y())
-		bb = bb.Translate(mgl32.Vec3{0, stepVel.Y()})
+		bb = bb.Translate(mgl32.Vec3{0, stepVel.Y()}) */
+
+		bb, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, bb, list, stepVel.Y())
 		bb, stepVel[0] = utils.DoBoxCollision(utils.CollisionX, bb, list, stepVel.X())
 		bb, stepVel[2] = utils.DoBoxCollision(utils.CollisionZ, bb, list, stepVel.Z())
 		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, list, -(stepVel.Y()))
