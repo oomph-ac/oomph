@@ -336,9 +336,7 @@ func (p *Player) aiStep() {
 		}
 
 		p.mInfo.TicksUntilNextJump = 0
-		if p.mInfo.Jumping {
-			p.simulateJump()
-		}
+		p.trySimulateJump()
 
 		p.TryDebug(fmt.Sprintf("aiStep(): finished non-smooth teleport to %v w/ mov %v", p.mInfo.ServerPosition, p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
 		return
@@ -375,15 +373,7 @@ func (p *Player) aiStep() {
 		p.TryDebug(fmt.Sprintf("aiStep(): knockback applied %v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
 	}
 
-	if p.mInfo.Jumping {
-		if (p.mInfo.OnGround || p.mInfo.StepClipOffset > 0) && p.mInfo.TicksUntilNextJump <= 0 {
-			p.simulateJump()
-			p.TryDebug("aiStep(): simulated jump", DebugTypeLogged, p.debugger.LogMovement)
-		} else {
-			p.TryDebug(fmt.Sprintf("aiStep(): refusing jump simulation (%v %v %v)", p.mInfo.OnGround, p.mInfo.TicksUntilNextJump, p.mInfo.StepClipOffset), DebugTypeLogged, p.debugger.LogMovement)
-		}
-	}
-
+	p.trySimulateJump()
 	p.simulateGroundMove()
 }
 
@@ -806,8 +796,27 @@ func (p *Player) simulateHorizontalFriction(friction float32) {
 	p.mInfo.ServerMovement[2] *= friction
 }
 
-// simulateJump simulates the jump movement of the player
-func (p *Player) simulateJump() {
+// trySimulateJump simulates the jump movement of the player
+func (p *Player) trySimulateJump() {
+	if !p.mInfo.Jumping {
+		return
+	}
+
+	// If the player is not on the ground, we cannot simulate a jump.
+	if !p.mInfo.OnGround {
+		p.TryDebug("trySimulateJump#1: rejected jump, player not on ground", DebugTypeLogged, p.debugger.LogMovement)
+		return
+	}
+
+	// If the player still has ticks remaining before they're allowed to jump, we cannot simulate this.
+	if p.mInfo.TicksUntilNextJump > 0 {
+		p.TryDebug(fmt.Sprintf("trySimulateJump#2: rejected jump, ticksUntilNextJump=%v", p.mInfo.TicksUntilNextJump), DebugTypeLogged, p.debugger.LogMovement)
+		return
+	}
+
+	// Debug velocity after simulating as jump.
+	defer p.TryDebug(fmt.Sprintf("trySimulateJump#3: jumpVel=%v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
+
 	p.mInfo.ServerMovement[1] = p.mInfo.JumpVelocity
 	p.mInfo.Jumping = true
 	p.mInfo.TicksUntilNextJump = 10
