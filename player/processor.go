@@ -507,10 +507,10 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 			return false
 		}
 
-		if p.movementMode == utils.ModeFullAuthoritative {
+		/* if p.movementMode == utils.ModeFullAuthoritative {
 			p.World().SetBlock(utils.BlockToCubePos(pk.Position), b)
 			return false
-		}
+		} */
 
 		p.Acknowledgement(func() {
 			p.World().SetBlock(utils.BlockToCubePos(pk.Position), b)
