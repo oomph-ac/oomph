@@ -304,31 +304,33 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		connectWest, connectEast, connectNorth, connectSouth := CheckWallConnections(b, sblocks)
 
 		var inset float32 = 0.25
-		_, post := sblocks[cube.FaceUp]
+		wallModel := b.Model().(model.Wall)
+		post := wallModel.Post
 
 		if !post && ((connectNorth && connectSouth && !connectWest && !connectEast) || (connectWest && connectEast && !connectNorth && !connectSouth)) {
 			inset = 0.3125
 		}
 
-		bb := cube.Box(0, 0, 0, 1, 1.5, 1)
+		min, max := mgl32.Vec3{}, mgl32.Vec3{1, 1.5, 1}
 		if !connectNorth {
-			bb = bb.ExtendTowards(cube.FaceNorth, -inset)
+			min[2] += inset
 		}
+
 		if !connectSouth {
-			bb = bb.ExtendTowards(cube.FaceSouth, -inset)
+			max[2] -= inset
 		}
 		if !connectWest {
-			bb = bb.ExtendTowards(cube.FaceWest, -inset)
+			min[0] += inset
 		}
 		if !connectEast {
-			bb = bb.ExtendTowards(cube.FaceEast, -inset)
+			max[0] -= inset
 		}
 
 		if _, ok := sblocks[cube.FaceUp]; ok {
-			bb = bb.ExtendTowards(cube.FaceDown, 0.5)
+			max[1] = 1
 		}
 
-		return []cube.BBox{bb}
+		return []cube.BBox{cube.Box(min.X(), min.Y(), min.Z(), max.X(), max.Y(), max.Z())}
 	case "minecraft:snow_layer":
 		_, dat := b.EncodeBlock()
 		height, ok := dat["height"]
@@ -475,6 +477,14 @@ func CheckFenceConnections(b world.Block, sblocks map[cube.Face]world.Block) (bo
 
 // FenceConnectionCompatiable returns true if the given block is compatiable to conenct to a fence.
 func FenceConnectionCompatiable(b world.Block) bool {
+	if _, isFence := b.Model().(model.Fence); isFence {
+		return true
+	}
+
+	if _, isFenceGate := b.Model().(model.FenceGate); isFenceGate {
+		return true
+	}
+
 	n := BlockName(b)
 	switch n {
 	case "minecraft:azalea_leaves", "minecraft:azalea_leaves_flowered", "minecraft:cherry_leaves", "minecraft:leaves",
@@ -529,6 +539,10 @@ func CheckWallConnections(b world.Block, sblocks map[cube.Face]world.Block) (boo
 
 // WallConnectionCompatiable returns true if the given block is compatiable to conenct to a wall.
 func WallConnectionCompatiable(b world.Block) bool {
+	if _, isWall := b.Model().(model.Wall); isWall {
+		return true
+	}
+
 	n := BlockName(b)
 	switch n {
 	case "minecraft:azalea_leaves", "minecraft:azalea_leaves_flowered", "minecraft:cherry_leaves", "minecraft:leaves",
