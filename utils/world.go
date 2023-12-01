@@ -218,9 +218,14 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		"minecraft:crimson_fence", "minecraft:warped_fence":
 		var bbs []cube.BBox
 
+		initHeight := float32(1.5)
+		if _, ok := sblocks[cube.FaceUp]; ok {
+			initHeight = 1.0
+		}
+
 		connectWest, connectEast, connectNorth, connectSouth := CheckFenceConnections(b, sblocks)
 		if connectWest || connectEast {
-			bb := cube.Box(0, 0, 0, 1, 1.5, 1).
+			bb := cube.Box(0, 0, 0, 1, initHeight, 1).
 				Stretch(cube.Z, -fenceInset)
 
 			if !connectWest {
@@ -235,7 +240,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		}
 
 		if connectNorth || connectSouth {
-			bb := cube.Box(0, 0, 0, 1, 1.5, 1).
+			bb := cube.Box(0, 0, 0, 1, initHeight, 1).
 				Stretch(cube.X, -fenceInset)
 
 			if !connectNorth {
@@ -250,7 +255,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		}
 
 		if len(bbs) == 0 {
-			return []cube.BBox{cube.Box(0, 0, 0, 1, 1.5, 1).
+			return []cube.BBox{cube.Box(0, 0, 0, 1, initHeight, 1).
 				Stretch(cube.X, -fenceInset).
 				Stretch(cube.Z, -fenceInset),
 			}
@@ -317,6 +322,10 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		}
 		if !connectEast {
 			bb = bb.ExtendTowards(cube.FaceEast, -inset)
+		}
+
+		if _, ok := sblocks[cube.FaceUp]; ok {
+			bb = bb.ExtendTowards(cube.FaceDown, 0.5)
 		}
 
 		return []cube.BBox{bb}
