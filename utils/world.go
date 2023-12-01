@@ -361,9 +361,9 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	return boxes
 }
 
-// IsStairBlock returns true if the block given is a stair block.
-func IsStairBlock(b world.Block) bool {
-	switch BlockName(b) {
+// IsStair returns true if the block given is a stair block.
+func IsStair(n string) bool {
+	switch n {
 	case "minecraft:prismarine_stairs", "minecraft:dark_prismarine_stairs", "minecraft:prismarine_bricks_stairs", "minecraft:granite_stairs",
 		"minecraft:diorite_stairs", "minecraft:andesite_stairs", "minecraft:polished_granite_stairs", "minecraft:polished_diorite_stairs", "minecraft:polished_andesite_stairs",
 		"minecraft:mossy_stone_brick_stairs", "minecraft:smooth_red_sandstone_stairs", "minecraft:smooth_sandstone_stairs", "minecraft:end_brick_stairs",
@@ -442,10 +442,10 @@ func CheckFenceConnections(b world.Block, sblocks map[cube.Face]world.Block) (bo
 	eb, connectEast := sblocks[cube.FaceEast]
 
 	// Check if the block can connect with the fence.
-	if connectWest && !FenceConnectionCompatiable(BlockName(wb)) {
+	if connectWest && !FenceConnectionCompatiable(wb) {
 		connectWest = false
 	}
-	if connectEast && !FenceConnectionCompatiable(BlockName(eb)) {
+	if connectEast && !FenceConnectionCompatiable(eb) {
 		connectEast = false
 	}
 
@@ -454,10 +454,10 @@ func CheckFenceConnections(b world.Block, sblocks map[cube.Face]world.Block) (bo
 	sb, connectSouth := sblocks[cube.FaceSouth]
 
 	// Check if the block can connect with the fence.
-	if connectNorth && !FenceConnectionCompatiable(BlockName(nb)) {
+	if connectNorth && !FenceConnectionCompatiable(nb) {
 		connectNorth = false
 	}
-	if connectSouth && !FenceConnectionCompatiable(BlockName(sb)) {
+	if connectSouth && !FenceConnectionCompatiable(sb) {
 		connectSouth = false
 	}
 
@@ -465,13 +465,27 @@ func CheckFenceConnections(b world.Block, sblocks map[cube.Face]world.Block) (bo
 }
 
 // FenceConnectionCompatiable returns true if the given block is compatiable to conenct to a fence.
-func FenceConnectionCompatiable(n string) bool {
+func FenceConnectionCompatiable(b world.Block) bool {
+	n := BlockName(b)
 	switch n {
 	case "minecraft:azalea_leaves", "minecraft:azalea_leaves_flowered", "minecraft:cherry_leaves", "minecraft:leaves",
 		"minecraft:leaves2", "minecraft:mangrove_leaves":
 		return false
 	default:
-		return !IsWall(n)
+		if IsWall(n) {
+			return false
+		}
+
+		// Assume for now only blocks that are 1x1x1 are compatiable for connections. True for majority of blocks.
+		// FIXME: Some non-full cube blocks can still make a connection w/ walls.
+		bbs := b.Model().BBox(df_cube.Pos{}, nil)
+		for _, bb := range bbs {
+			if bb.Width() != 1 || bb.Height() != 1 || bb.Length() != 1 {
+				return false
+			}
+		}
+
+		return true
 	}
 }
 
@@ -482,10 +496,10 @@ func CheckWallConnections(b world.Block, sblocks map[cube.Face]world.Block) (boo
 	eb, connectEast := sblocks[cube.FaceEast]
 
 	// Check if the block can connect with the wall.
-	if connectWest && !WallConnectionCompatiable(BlockName(wb)) {
+	if connectWest && !WallConnectionCompatiable(wb) {
 		connectWest = false
 	}
-	if connectEast && !WallConnectionCompatiable(BlockName(eb)) {
+	if connectEast && !WallConnectionCompatiable(eb) {
 		connectEast = false
 	}
 
@@ -494,10 +508,10 @@ func CheckWallConnections(b world.Block, sblocks map[cube.Face]world.Block) (boo
 	sb, connectSouth := sblocks[cube.FaceSouth]
 
 	// Check if the block can connect with the wall.
-	if connectNorth && !WallConnectionCompatiable(BlockName(nb)) {
+	if connectNorth && !WallConnectionCompatiable(nb) {
 		connectNorth = false
 	}
-	if connectSouth && !WallConnectionCompatiable(BlockName(sb)) {
+	if connectSouth && !WallConnectionCompatiable(sb) {
 		connectSouth = false
 	}
 
@@ -505,21 +519,40 @@ func CheckWallConnections(b world.Block, sblocks map[cube.Face]world.Block) (boo
 }
 
 // WallConnectionCompatiable returns true if the given block is compatiable to conenct to a wall.
-func WallConnectionCompatiable(n string) bool {
+func WallConnectionCompatiable(b world.Block) bool {
+	n := BlockName(b)
 	switch n {
 	case "minecraft:azalea_leaves", "minecraft:azalea_leaves_flowered", "minecraft:cherry_leaves", "minecraft:leaves",
 		"minecraft:leaves2", "minecraft:mangrove_leaves":
 		return false
 	default:
-		return !IsFence(n)
+		if IsFence(n) {
+			return false
+		}
+
+		// Assume for now only blocks that are 1x1x1 are compatiable for connections. True for majority of blocks.
+		// FIXME: Some non-full cube blocks can still make a connection w/ walls.
+		bbs := b.Model().BBox(df_cube.Pos{}, nil)
+		for _, bb := range bbs {
+			if bb.Width() != 1 || bb.Height() != 1 || bb.Length() != 1 {
+				return false
+			}
+		}
+
+		return true
 	}
+}
+
+// IsBBFullCube returns true if the bounding box is 1x1x1.
+func IsBBFullCube(bb cube.BBox) bool {
+	return bb.Width() == 1 && bb.Height() == 1 && bb.Length() == 1
 }
 
 // IsBlockFullCube returns true if at least one of the bounding boxes of the block is 1x1x1.
 func IsBlockFullCube(pos cube.Pos, w *oomph_world.World) bool {
 	block := w.GetBlock(cube.Pos(pos))
 	for _, bb := range BlockBoxes(block, pos, w) {
-		if bb.Width() != 1 || bb.Height() != 1 || bb.Length() != 1 {
+		if !IsBBFullCube(bb) {
 			continue
 		}
 
