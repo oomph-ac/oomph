@@ -184,6 +184,7 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		checks: []check.Check{
 			check.NewAutoClickerA(),
 			check.NewAutoClickerB(),
+			check.NewAutoClickerC(),
 
 			check.NewKillAuraA(),
 
