@@ -37,7 +37,7 @@ func (*AutoClickerC) Description() string {
 
 // MaxViolations ...
 func (*AutoClickerC) MaxViolations() float64 {
-	return 15
+	return math32.MaxFloat32
 }
 
 // Process ...
