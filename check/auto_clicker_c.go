@@ -1,20 +1,27 @@
 package check
 
 import (
+	"fmt"
+
+	"github.com/chewxy/math32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // AutoClickerC checks for duplicated statistical values in clicks.
 type AutoClickerC struct {
-	samples []uint64
+	clickSamples []float64
+	statSamples  []string
+
 	basic
 }
 
 // NewAutoClickerC creates a new AutoClickerC check.
 func NewAutoClickerC() *AutoClickerC {
 	c := &AutoClickerC{}
-	c.samples = make([]uint64, 0, 20)
+	c.clickSamples = make([]float64, 0, 20)
+	c.statSamples = make([]string, 0, 10)
+
 	return c
 }
 
@@ -38,21 +45,54 @@ func (a *AutoClickerC) Process(p Processor, pk packet.Packet) bool {
 	if !p.Clicking() {
 		return false
 	}
-	a.samples = append(a.samples, p.ClickDelay())
 
-	if len(a.samples) != 20 {
+	a.clickSamples = append(a.clickSamples, float64(p.ClickDelay()))
+	if len(a.clickSamples) != 20 {
 		return false
 	}
 
-	duplicates := game.Duplicates(a.samples)
-
-	if (len(duplicates) > 4 && p.CPS() > 10) {
-		p.Flag(a, a.violationAfterTicks(p.ClientTick(), 100), map[string]any{
-			"Duplicates": len(duplicates),
-			"CPS": p.CPS(),
-		})
+	interpolatedCPS := 20 / math32.Min(0.05, float32(game.Mean(a.clickSamples)))
+	if interpolatedCPS < 10 {
+		a.clickSamples = make([]float64, 0, 20)
+		return false
 	}
-	a.samples = a.samples[:0]
-	
+
+	a.statSamples = append(a.statSamples, fmt.Sprintf("%v %v %v", game.Kurtosis(a.clickSamples), game.Skewness(a.clickSamples), float64(game.Outliers(a.clickSamples))))
+	a.clickSamples = make([]float64, 0, 20)
+
+	if len(a.statSamples) != 7 {
+		return false
+	}
+
+	dupes := a.duplicates()
+	a.statSamples = a.statSamples[1:]
+	data := map[string]any{
+		"duplicates": dupes,
+		"cps":        p.CPS(),
+	}
+
+	if dupes >= 4 {
+		p.Flag(a, 1, data)
+		a.statSamples = make([]string, 0, 10)
+	}
+
+	p.Debug(a, data)
 	return false
+}
+
+func (a *AutoClickerC) duplicates() int {
+	count := 0
+	for i, sample1 := range a.statSamples {
+		for j, sample2 := range a.statSamples {
+			if i == j {
+				continue
+			}
+
+			if sample1 == sample2 {
+				count++
+			}
+		}
+	}
+
+	return count
 }
