@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"math"
 	"sync"
 
 	"github.com/ethaniccc/float32-cube/cube"
@@ -191,13 +192,22 @@ func (e *Entity) RewindPosition(tick uint64) *utils.LocationData {
 		return nil
 	}
 
+	minDelta := math.MaxFloat32
+	var closestDat *utils.LocationData
+
 	for _, dat := range e.positionBuffer {
 		if dat.Tick == tick {
 			return &dat
 		}
+
+		currentDelta := math.Abs(float64(dat.Tick - tick))
+		if currentDelta < minDelta {
+			closestDat = &dat
+			minDelta = currentDelta
+		}
 	}
 
-	return nil
+	return closestDat
 }
 
 // PositionBuffer returns the position buffer of the entity.
