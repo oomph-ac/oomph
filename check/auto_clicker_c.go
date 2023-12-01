@@ -5,13 +5,13 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// AutoClickerB checks for duplicated statistical values in clicks.
+// AutoClickerC checks for duplicated statistical values in clicks.
 type AutoClickerC struct {
 	samples []uint64
 	basic
 }
 
-// NewAutoClickerB creates a new AutoClickerB check.
+// NewAutoClickerC creates a new AutoClickerC check.
 func NewAutoClickerC() *AutoClickerC {
 	c := &AutoClickerC{}
 	c.samples = make([]uint64, 0, 20)
