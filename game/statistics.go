@@ -150,19 +150,3 @@ func Outliers(collection []float64) int {
 
 	return len(x) + len(y)
 }
-
-// Duplicates ...
-func Duplicates(collection []uint64) []int {
-	seen := make(map[int]bool)
-	duplicates := make([]int, 0)
-
-	for _, num := range collection {
-		if seen[int(num)] {
-			duplicates = append(duplicates, int(num))
-		} else {
-			seen[int(num)] = true
-		}
-	}
-
-	return duplicates
-}
