@@ -148,6 +148,11 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 
 	// Update the jumping state of the player.
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+	if p.mInfo.JumpBindPressed {
+		p.mInfo.TicksSinceJumpBindPressed = 0
+	} else {
+		p.mInfo.TicksSinceJumpBindPressed++
+	}
 
 	// Update the air speed of the player.
 	p.mInfo.AirSpeed = 0.02
@@ -419,11 +424,17 @@ func (p *Player) simulateGroundMove() {
 	oldMov := p.mInfo.ServerMovement
 	p.simulateCollisions()
 
+	isClimb := nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed)
+	if isClimb {
+		p.mInfo.ServerMovement[1] = 0.2
+		p.TryDebug("simulateGroundMove(): climb detected", DebugTypeLogged, p.debugger.LogMovement)
+	}
+
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
 	p.TryDebug(fmt.Sprintf("simulateGroundMove(): final position=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 
 	// Check if there any collisions vertically/horizontally and then update the states in MovementInfo
-	p.checkCollisions(oldMov)
+	p.checkCollisions(oldMov, isClimb)
 
 	// If the player is in cobweb, we have to reset their movement to zero.
 	if inCobweb {
@@ -454,11 +465,6 @@ func (p *Player) simulateGroundMove() {
 
 	if p.mInfo.OnGround {
 		p.checkFallState(oldMov, blockUnder)
-	}
-
-	if nearClimableBlock && (p.mInfo.HorizontallyCollided || p.mInfo.JumpBindPressed) {
-		p.mInfo.ServerMovement[1] = 0.2
-		p.TryDebug("simulateGroundMove(): climb detected at end frame", DebugTypeLogged, p.debugger.LogMovement)
 	}
 
 	if p.mInfo.OnGround && !p.mInfo.Sneaking {
@@ -662,11 +668,7 @@ func (p *Player) simulateCollisions() {
 	if hasGroundState && (xCollision || zCollision) {
 		stepVel := mgl32.Vec3{currVel.X(), game.StepHeight, currVel.Z()}
 		list := utils.GetNearbyBBoxes(p.AABB().Extend(stepVel), p.World())
-
 		bb := p.AABB()
-		/* initBB := bb.Translate(mgl32.Vec3{stepVel.X(), newVel.Y(), stepVel.Z()})
-		_, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, initBB, list, stepVel.Y())
-		bb = bb.Translate(mgl32.Vec3{0, stepVel.Y()}) */
 
 		bb, stepVel[1] = utils.DoBoxCollision(utils.CollisionY, bb, list, stepVel.Y())
 		bb, stepVel[0] = utils.DoBoxCollision(utils.CollisionX, bb, list, stepVel.X())
@@ -674,10 +676,7 @@ func (p *Player) simulateCollisions() {
 		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, list, -(stepVel.Y()))
 		stepVel[1] += rDy
 
-		if mgl32.FloatEqualThreshold(stepVel.Y(), 0.0, 1e-3) && newVel.Y() >= -(p.mInfo.Gravity*game.GravityMultiplier) {
-			p.TryDebug(fmt.Sprintf("collide(): ignored stepVel %v, using newVel %v", stepVel, newVel), DebugTypeLogged, p.debugger.LogMovement)
-			stepVel = newVel
-		} else if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
+		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
 			p.mInfo.StepClipOffset += stepVel.Y()
 			newVel = stepVel
 			p.TryDebug(fmt.Sprintf("collide(): step detected %v", stepVel), DebugTypeLogged, p.debugger.LogMovement)
@@ -732,7 +731,7 @@ func (p *Player) pushOutOfBlock() {
 		return
 	}
 
-	bb := p.AABB().Grow(-1e-4)
+	bb := p.AABB()
 	for bpos, b := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
 		if utils.CanPassBlock(b) {
 			continue
@@ -836,7 +835,7 @@ func (p *Player) setMovementToClient() {
 }
 
 // checkCollisions compares the old and new velocities to check if there were any collisions made in p.collide()
-func (p *Player) checkCollisions(old mgl32.Vec3) {
+func (p *Player) checkCollisions(old mgl32.Vec3, isClimb bool) {
 	p.mInfo.XCollision = !mgl32.FloatEqualThreshold(old[0], p.mInfo.ServerMovement[0], 1e-5)
 	p.mInfo.ZCollision = !mgl32.FloatEqualThreshold(old[2], p.mInfo.ServerMovement[2], 1e-5)
 
@@ -844,7 +843,7 @@ func (p *Player) checkCollisions(old mgl32.Vec3) {
 	p.mInfo.VerticallyCollided = old[1] != p.mInfo.ServerMovement[1]
 	p.mInfo.OnGround = p.mInfo.VerticallyCollided && old[1] < 0.0
 
-	if p.mInfo.VerticallyCollided {
+	if p.mInfo.VerticallyCollided && !isClimb {
 		p.mInfo.ServerMovement[1] = 0
 		p.TryDebug(fmt.Sprintf("checkCollisions(): collideY, onGround=%v", p.mInfo.OnGround), DebugTypeLogged, p.debugger.LogMovement)
 	}
@@ -919,9 +918,10 @@ type MovementInfo struct {
 	UnsupportedPositionPersuasion float32
 	InSupportedScenario           bool
 
-	TicksSinceKnockback      uint32
-	TicksSinceBlockRefresh   uint32
-	TicksSinceSmoothTeleport uint32
+	TicksSinceKnockback       uint32
+	TicksSinceBlockRefresh    uint32
+	TicksSinceSmoothTeleport  uint32
+	TicksSinceJumpBindPressed uint32
 
 	TicksUntilNextJump int32
 
@@ -977,6 +977,7 @@ func (m *MovementInfo) Tick() {
 	m.TicksSinceKnockback++
 	m.TicksSinceBlockRefresh++
 	m.TicksSinceSmoothTeleport++
+	m.TicksSinceJumpBindPressed++
 
 	m.TicksUntilNextJump--
 }
