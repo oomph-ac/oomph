@@ -467,7 +467,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		// If the player is behind by more than the knockback network cutoff, then instantly set the KB
 		// of the player instead of waiting for an acknowledgement. This will ensure that players
 		// with very high latency do not get a significant advantage due to them receiving knockback late.
-		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() >= p.knockbackNetworkCutoff && pk.Velocity.LenSqr() > 0) || p.debugger.UseServerKnockback {
+		if (p.movementMode == utils.ModeFullAuthoritative && p.TickLatency() > p.knockbackNetworkCutoff && pk.Velocity.LenSqr() > 0) || p.debugger.UseServerKnockback {
 			p.OnNextClientTick(func() {
 				p.mInfo.SetKnockback(pk.Velocity)
 				p.TryDebug(fmt.Sprintf("server authoritative kb for %v", pk.Velocity), DebugTypeLogged, p.debugger.LogMovement)
