@@ -316,10 +316,6 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 			max[0] -= inset
 		}
 
-		if _, ok := sblocks[cube.FaceUp]; ok {
-			max[1] = 1
-		}
-
 		return []cube.BBox{cube.Box(min.X(), min.Y(), min.Z(), max.X(), max.Y(), max.Z())}
 	case "minecraft:snow_layer":
 		_, dat := b.EncodeBlock()
