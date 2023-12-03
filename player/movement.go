@@ -485,32 +485,16 @@ func (p *Player) tryCobwebMovement() bool {
 
 // simulateLandOnBlock simulates the player's movement when they fall and land on certain blocks.
 func (p *Player) simulateLandOnBlock(oldMov mgl32.Vec3, b world.Block) bool {
-	if !p.mInfo.OnGround {
+	if !p.mInfo.OnGround || oldMov.Y() >= 0 || p.mInfo.SneakBindPressed {
 		return false
 	}
 	handled := true
 
 	switch utils.BlockName(b) {
 	case "minecraft:slime":
-		if p.mInfo.SneakBindPressed {
-			return false
-		}
-
-		if oldMov.Y() >= 0 {
-			return false
-		}
-
 		p.mInfo.ServerMovement[1] = oldMov.Y() * game.SlimeBounceMultiplier
 		p.TryDebug(fmt.Sprintf("simulateFallOnBlock(): bounce on slime, new mov=%v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
 	case "minecraft:bed":
-		if p.mInfo.SneakBindPressed {
-			return false
-		}
-
-		if oldMov.Y() >= 0 {
-			return false
-		}
-
 		p.mInfo.ServerMovement[1] = oldMov.Y() * game.BedBounceMultiplier
 		if p.mInfo.ServerMovement[1] > 0.75 {
 			p.mInfo.ServerMovement[1] = 0.75
