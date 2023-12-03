@@ -433,23 +433,28 @@ func (p *Player) simulateGroundMove() {
 	p.mInfo.ServerPosition = p.mInfo.ServerPosition.Add(p.mInfo.ServerMovement)
 	p.TryDebug(fmt.Sprintf("simulateGroundMove(): final position=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 
-	// Check if there any collisions vertically/horizontally and then update the states in MovementInfo
-	p.checkCollisions(oldMov, isClimb)
-
-	// If the player is in cobweb, we have to reset their movement to zero.
-	if inCobweb {
-		p.mInfo.ServerMovement = mgl32.Vec3{}
-		p.TryDebug("simulateGroundMove(): in cobweb, mov set to 0 vec", DebugTypeLogged, p.debugger.LogMovement)
-	}
-
 	// Update `blockUnder` after collisions have been applied and the new position has been determined.
 	blockUnder = p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition.Sub(mgl32.Vec3{0, 0.2})))
-	if _, ok := blockUnder.(block.Air); ok {
+	if _, isAir := blockUnder.(block.Air); isAir {
 		blockUnder2 := p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition).Side(cube.FaceDown))
 		n := utils.BlockName(blockUnder2)
 		if utils.IsFence(n) || utils.IsWall(n) || strings.Contains(n, "fence_gate") { // ask MCP
 			blockUnder = blockUnder2
 		}
+	}
+
+	// Check if there any collisions vertically/horizontally and then update the states in MovementInfo
+	p.checkCollisions(oldMov, isClimb, blockUnder)
+
+	// Simulate certain blocks that may modify the player's movement.
+	if p.mInfo.OnGround && !p.mInfo.Sneaking {
+		p.simulateStepOnBlock(blockUnder)
+	}
+
+	// If the player is in cobweb, we have to reset their movement to zero.
+	if inCobweb {
+		p.mInfo.ServerMovement = mgl32.Vec3{}
+		p.TryDebug("simulateGroundMove(): in cobweb, mov set to 0 vec", DebugTypeLogged, p.debugger.LogMovement)
 	}
 
 	// If we cannot predict the movement scenario reliably, we trust the client's movement.
@@ -462,18 +467,6 @@ func (p *Player) simulateGroundMove() {
 	p.simulateGravity()
 	p.simulateHorizontalFriction(blockFriction)
 	p.TryDebug(fmt.Sprintf("simulateGroundMove(): friction and gravity applied, movement=%v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
-
-	if p.mInfo.OnGround {
-		p.checkFallState(oldMov, blockUnder)
-	}
-
-	if p.mInfo.OnGround && !p.mInfo.Sneaking {
-		p.simulateStepOnBlock(blockUnder)
-
-		f := utils.BlockSpeedFactor(blockUnder)
-		p.mInfo.ServerMovement[0] *= f
-		p.mInfo.ServerMovement[2] *= f
-	}
 }
 
 func (p *Player) tryCobwebMovement() bool {
@@ -490,42 +483,45 @@ func (p *Player) tryCobwebMovement() bool {
 	return inCobweb
 }
 
-// checkFallState checks the falling state of the player and simulates the
-// player's movement when they fall and land on certain blocks.
-func (p *Player) checkFallState(oldMov mgl32.Vec3, b world.Block) {
+// simulateLandOnBlock simulates the player's movement when they fall and land on certain blocks.
+func (p *Player) simulateLandOnBlock(oldMov mgl32.Vec3, b world.Block) bool {
+	if !p.mInfo.OnGround {
+		return false
+	}
+	handled := true
+
 	switch utils.BlockName(b) {
 	case "minecraft:slime":
 		if p.mInfo.SneakBindPressed {
-			return
+			return false
 		}
 
 		if oldMov.Y() >= 0 {
-			return
+			return false
 		}
 
-		// This is the closest we're probably going to get for now...
-		p.mInfo.ServerMovement[1] = ((oldMov.Y() / game.GravityMultiplier) + p.mInfo.Gravity) * game.SlimeBounceMultiplier
-
-		if !p.debugger.LogMovement {
-			return
-		}
-		p.Log().Debugf("simulateFallOnBlock(): bounce on slime, new mov=%v", p.mInfo.ServerMovement)
+		p.mInfo.ServerMovement[1] = oldMov.Y() * game.SlimeBounceMultiplier
+		p.TryDebug(fmt.Sprintf("simulateFallOnBlock(): bounce on slime, new mov=%v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
 	case "minecraft:bed":
 		if p.mInfo.SneakBindPressed {
-			return
+			return false
 		}
 
 		if oldMov.Y() >= 0 {
-			return
+			return false
 		}
 
-		p.mInfo.ServerMovement[1] = ((oldMov.Y() / game.GravityMultiplier) + p.mInfo.Gravity) * game.BedBounceMultiplier
-
-		if !p.debugger.LogMovement {
-			return
+		p.mInfo.ServerMovement[1] = oldMov.Y() * game.BedBounceMultiplier
+		if p.mInfo.ServerMovement[1] > 0.75 {
+			p.mInfo.ServerMovement[1] = 0.75
 		}
-		p.Log().Debugf("simulateFallOnBlock(): bounce on bed, new mov=%v", p.mInfo.ServerMovement)
+
+		p.TryDebug(fmt.Sprintf("simulateFallOnBlock(): bounce on bed, new mov=%v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
+	default:
+		handled = false
 	}
+
+	return handled
 }
 
 // simulateStepOnBlock simulates the player's movement when they step on certain blocks.
@@ -544,6 +540,9 @@ func (p *Player) simulateStepOnBlock(b world.Block) {
 		}
 
 		p.Log().Debugf("simulateStepOnBlock(): walked on slime, new mov=%v", p.mInfo.ServerMovement)
+	case "minecraft:soul_sand":
+		p.mInfo.ServerMovement[0] *= 0.4
+		p.mInfo.ServerMovement[2] *= 0.4
 	}
 }
 
@@ -835,7 +834,7 @@ func (p *Player) setMovementToClient() {
 }
 
 // checkCollisions compares the old and new velocities to check if there were any collisions made in p.collide()
-func (p *Player) checkCollisions(old mgl32.Vec3, isClimb bool) {
+func (p *Player) checkCollisions(old mgl32.Vec3, isClimb bool, b world.Block) {
 	p.mInfo.XCollision = !mgl32.FloatEqualThreshold(old[0], p.mInfo.ServerMovement[0], 1e-5)
 	p.mInfo.ZCollision = !mgl32.FloatEqualThreshold(old[2], p.mInfo.ServerMovement[2], 1e-5)
 
@@ -848,7 +847,10 @@ func (p *Player) checkCollisions(old mgl32.Vec3, isClimb bool) {
 	}
 
 	if p.mInfo.VerticallyCollided {
-		p.mInfo.ServerMovement[1] = 0
+		if !p.simulateLandOnBlock(old, b) {
+			p.mInfo.ServerMovement[1] = 0
+		}
+
 		p.TryDebug(fmt.Sprintf("checkCollisions(): collideY, onGround=%v", p.mInfo.OnGround), DebugTypeLogged, p.debugger.LogMovement)
 	}
 
@@ -870,7 +872,7 @@ func (p *Player) isScenarioPredictable() bool {
 	blocks := utils.GetNearbyBlocks(bb, false, false, p.World())
 
 	p.mInfo.InSupportedScenario = true
-	var hasLiquid, hasBounce, hasBamboo bool
+	var hasLiquid, hasBamboo bool
 
 	for _, bl := range blocks {
 		_, ok := bl.(world.Liquid)
@@ -880,8 +882,6 @@ func (p *Player) isScenarioPredictable() bool {
 		}
 
 		switch utils.BlockName(bl) {
-		case "minecraft:slime", "minecraft:bed":
-			hasBounce = true
 		case "minecraft:bamboo":
 			hasBamboo = true
 		}
@@ -890,10 +890,6 @@ func (p *Player) isScenarioPredictable() bool {
 	if hasLiquid || hasBamboo {
 		p.TryDebug("isScenarioPredictable(): cannot predict scenario", DebugTypeLogged, p.debugger.LogMovement)
 		return false
-	}
-
-	if hasBounce {
-		p.mInfo.InSupportedScenario = false
 	}
 
 	return true

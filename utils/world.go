@@ -48,16 +48,6 @@ func BlockFriction(b world.Block) float32 {
 	}
 }
 
-// BlockSpeedFactor returns the speed factor of the block.
-func BlockSpeedFactor(b world.Block) float32 {
-	switch BlockName(b) {
-	case "minecraft:soul_sand":
-		return 0.3
-	default:
-		return 1
-	}
-}
-
 // CanPassBlock returns true if an entity can pass through the given block.
 func CanPassBlock(b world.Block) bool {
 	switch BlockName(b) {
