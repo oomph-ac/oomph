@@ -519,14 +519,11 @@ func (p *Player) simulateStepOnBlock(b world.Block) {
 			p.mInfo.ServerMovement[2] *= d1
 		}
 
-		if !p.debugger.LogMovement {
-			return
-		}
-
-		p.Log().Debugf("simulateStepOnBlock(): walked on slime, new mov=%v", p.mInfo.ServerMovement)
+		p.TryDebug(fmt.Sprintf("simulateStepOnBlock(): walked on slime, new mov=%v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
 	case "minecraft:soul_sand":
-		p.mInfo.ServerMovement[0] *= 0.4
-		p.mInfo.ServerMovement[2] *= 0.4
+		p.mInfo.ServerMovement[0] *= 0.3
+		p.mInfo.ServerMovement[2] *= 0.3
+		p.TryDebug(fmt.Sprintf("simulateStepOnBlock(): walked on soulsand, mov=%v", p.mInfo.ServerMovement), DebugTypeLogged, p.debugger.LogMovement)
 	}
 }
 
@@ -856,7 +853,7 @@ func (p *Player) isScenarioPredictable() bool {
 	blocks := utils.GetNearbyBlocks(bb, false, false, p.World())
 
 	p.mInfo.InSupportedScenario = true
-	var hasLiquid, hasBamboo bool
+	var hasLiquid, hasSoulSand, hasBamboo bool
 
 	for _, bl := range blocks {
 		_, ok := bl.(world.Liquid)
@@ -868,12 +865,18 @@ func (p *Player) isScenarioPredictable() bool {
 		switch utils.BlockName(bl) {
 		case "minecraft:bamboo":
 			hasBamboo = true
+		case "minecraft:soul_sand":
+			hasSoulSand = true
 		}
 	}
 
 	if hasLiquid || hasBamboo {
 		p.TryDebug("isScenarioPredictable(): cannot predict scenario", DebugTypeLogged, p.debugger.LogMovement)
 		return false
+	}
+
+	if hasSoulSand {
+		p.mInfo.InSupportedScenario = false
 	}
 
 	return true
