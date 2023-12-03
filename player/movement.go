@@ -149,9 +149,9 @@ func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
 	// Update the jumping state of the player.
 	p.mInfo.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 	if p.mInfo.JumpBindPressed {
-		p.mInfo.TicksSinceJumpBindPressed = 0
+		p.mInfo.TicksJumpBindHeld++
 	} else {
-		p.mInfo.TicksSinceJumpBindPressed++
+		p.mInfo.TicksJumpBindHeld = 0
 	}
 
 	// Update the air speed of the player.
@@ -403,7 +403,7 @@ func (p *Player) simulateGroundMove() {
 	p.moveRelative(v3)
 
 	nearClimableBlock := utils.BlockClimbable(p.World().GetBlock(cube.PosFromVec3(p.mInfo.ServerPosition)))
-	if nearClimableBlock {
+	if nearClimableBlock && !p.mInfo.JumpBindPressed {
 		p.mInfo.ServerMovement[0] = game.ClampFloat(p.mInfo.ServerMovement.X(), -0.2, 0.2)
 		p.mInfo.ServerMovement[2] = game.ClampFloat(p.mInfo.ServerMovement.Z(), -0.2, 0.2)
 
@@ -843,7 +843,11 @@ func (p *Player) checkCollisions(old mgl32.Vec3, isClimb bool) {
 	p.mInfo.VerticallyCollided = old[1] != p.mInfo.ServerMovement[1]
 	p.mInfo.OnGround = p.mInfo.VerticallyCollided && old[1] < 0.0
 
-	if p.mInfo.VerticallyCollided && !isClimb {
+	if isClimb {
+		return
+	}
+
+	if p.mInfo.VerticallyCollided {
 		p.mInfo.ServerMovement[1] = 0
 		p.TryDebug(fmt.Sprintf("checkCollisions(): collideY, onGround=%v", p.mInfo.OnGround), DebugTypeLogged, p.debugger.LogMovement)
 	}
@@ -918,10 +922,10 @@ type MovementInfo struct {
 	UnsupportedPositionPersuasion float32
 	InSupportedScenario           bool
 
-	TicksSinceKnockback       uint32
-	TicksSinceBlockRefresh    uint32
-	TicksSinceSmoothTeleport  uint32
-	TicksSinceJumpBindPressed uint32
+	TicksSinceKnockback      uint32
+	TicksSinceBlockRefresh   uint32
+	TicksSinceSmoothTeleport uint32
+	TicksJumpBindHeld        uint32
 
 	TicksUntilNextJump int32
 
@@ -977,7 +981,7 @@ func (m *MovementInfo) Tick() {
 	m.TicksSinceKnockback++
 	m.TicksSinceBlockRefresh++
 	m.TicksSinceSmoothTeleport++
-	m.TicksSinceJumpBindPressed++
+	m.TicksJumpBindHeld++
 
 	m.TicksUntilNextJump--
 }
