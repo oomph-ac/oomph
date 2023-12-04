@@ -301,14 +301,11 @@ func (p *Player) SetServerConn(c *minecraft.Conn) {
 	p.serverConn = c
 }
 
-// StartHandlePacket locks the packet handler mutex.
-func (p *Player) StartHandlePacket() {
+func (p *Player) HandlePacket(f func() error) error {
 	p.pkMu.Lock()
-}
+	defer p.pkMu.Unlock()
 
-// EndHandlePacket unlocks the packet handler mutex.
-func (p *Player) EndHandlePacket() {
-	p.pkMu.Unlock()
+	return f()
 }
 
 // Log returns the log of the player.
