@@ -863,7 +863,7 @@ func (p *Player) updateEntityPositions(m map[uint64]utils.LocationData) {
 
 // updateLatency updates the stack latency of the player.
 func (p *Player) updateLatency() {
-	if !p.needLatencyUpdate || (p.usePacketBuffer && !p.isBufferStarted) {
+	if !p.ready || p.inLoadedChunkTicks <= 20 || !p.needLatencyUpdate || (p.usePacketBuffer && !p.isBufferStarted) {
 		return
 	}
 
@@ -872,15 +872,11 @@ func (p *Player) updateLatency() {
 
 	p.Acknowledgement(func() {
 		p.needLatencyUpdate = true
-
-		oldLatency := p.stackLatency
 		p.stackLatency = time.Since(curr).Milliseconds()
 
-		diff := p.stackLatency - oldLatency
 		tickLatency := p.TickLatency()
-
 		// Make the player aware that their network conditions may affect their gameplay.
-		if diff >= 100 || tickLatency > p.combatNetworkCutoff || tickLatency > p.knockbackNetworkCutoff {
+		if tickLatency > p.combatNetworkCutoff || tickLatency > p.knockbackNetworkCutoff {
 			p.conn.WritePacket(&packet.Text{
 				TextType: packet.TextTypePopup,
 				Message:  text.Colourf("<red><bold>network problem</bold></red>"),
@@ -890,7 +886,6 @@ func (p *Player) updateLatency() {
 		if !p.debugger.LogLatency {
 			return
 		}
-
 		p.SendOomphDebug(fmt.Sprint("RTT + Processing Delays: ", p.stackLatency, "ms\nTick Delta: ", p.TickLatency()), packet.TextTypePopup)
 	})
 }
