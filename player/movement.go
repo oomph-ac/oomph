@@ -20,22 +20,13 @@ import (
 // If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
 // If a difference between the client calculated movement and server calculated are found, a correction will be sent.
 func (p *Player) doMovementSimulation() {
-	var exempt bool
+	var exempt bool = p.mInfo.CanExempt
 
 	p.TryDebug(fmt.Sprintf("%v started movement simulation for frame %d", p.Name(), p.ClientFrame()), DebugTypeLogged, p.debugger.LogMovement)
 	defer p.TryDebug(fmt.Sprintf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame()), DebugTypeLogged, p.debugger.LogMovement)
 
-	surrounding := utils.GetNearbyBlocks(p.AABB(), true, false, p.World())
-	if p.mInfo.LastBlocksSurrounding == nil {
-		p.mInfo.LastBlocksSurrounding = surrounding
-	}
-
-	// If the player is AFK, do not run a movement simulation.
-	/* afk := math32.Abs(p.mInfo.ForwardImpulse) == 0 && math32.Abs(p.mInfo.LeftImpulse) == 0 &&
-	p.mInfo.ServerMovement == mgl32.Vec3{0, -0.0784, 0} && !p.mInfo.JumpBindPressed && !p.mInfo.SneakBindPressed &&
-	!p.mInfo.SprintBindPressed && p.mInfo.TicksSinceKnockback > 0 && p.mInfo.TicksSinceSmoothTeleport > 3 &&
-	!p.mInfo.Teleporting && maps.Equal(p.mInfo.LastBlocksSurrounding, surrounding) */
-	afk := false
+	defer p.mInfo.Tick()
+	defer p.TryDebug(fmt.Sprintf("doMovementSimulation(): player exempted at frame %d", p.ClientFrame()), DebugTypeLogged, exempt && p.debugger.LogMovement)
 
 	if (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.inDimensionChange || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) {
 		p.mInfo.OnGround = false
@@ -44,19 +35,12 @@ func (p *Player) doMovementSimulation() {
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 		p.mInfo.CanExempt = true
 		exempt = true
-	} else if !afk {
-		exempt = p.mInfo.CanExempt
-		p.aiStep()
-		p.mInfo.CanExempt = false
-		p.mInfo.LastBlocksSurrounding = surrounding
+		return
 	}
 
-	p.mInfo.Tick()
-	if exempt {
-		p.TryDebug(fmt.Sprintf("doMovementSimulation(): player exempted at frame %d", p.ClientFrame()), DebugTypeLogged, p.debugger.LogMovement)
-	}
-
+	p.aiStep()
 	p.validateMovement()
+	p.mInfo.CanExempt = false
 }
 
 func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
@@ -733,31 +717,22 @@ func (p *Player) pushOutOfBlock() {
 			if isAir && !p.mInfo.OnGround && box.Max().Y()-bb.Min().Y() > 0 && minDelta.Y() <= 0.5 {
 				p.mInfo.ServerPosition[1] = box.Max().Y() + 1e-3
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 1 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
-				break
 			}
 
 			if bb.Max().X()-box.Min().X() > 0 && minDelta.X() <= 0.5 {
 				p.mInfo.ServerPosition[0] = box.Max().X() + 0.5
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 2 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
-				break
-			}
-
-			if box.Max().X()-bb.Min().X() > 0 && maxDelta.X() >= -0.5 {
+			} else if box.Max().X()-bb.Min().X() > 0 && maxDelta.X() >= -0.5 {
 				p.mInfo.ServerPosition[0] = box.Min().X() - 0.5
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 3 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
-				break
 			}
 
 			if bb.Max().Z()-box.Min().Z() > 0 && minDelta.Z() <= 0.5 {
 				p.mInfo.ServerPosition[2] = box.Max().Z() + 0.5
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 4 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
-				break
-			}
-
-			if box.Max().Z()-bb.Min().Z() > 0 && maxDelta.Z() >= -0.5 {
+			} else if box.Max().Z()-bb.Min().Z() > 0 && maxDelta.Z() >= -0.5 {
 				p.mInfo.ServerPosition[2] = box.Min().Z() - 0.5
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 5 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
-				break
 			}
 		}
 	}
