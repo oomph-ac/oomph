@@ -28,7 +28,7 @@ func (p *Player) doMovementSimulation() {
 	defer p.mInfo.Tick()
 	defer p.TryDebug(fmt.Sprintf("doMovementSimulation(): player exempted at frame %d", p.ClientFrame()), DebugTypeLogged, exempt && p.debugger.LogMovement)
 
-	if (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.inDimensionChange || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) {
+	if (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.inDimensionChange || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) || p.dead || p.respawned {
 		p.mInfo.OnGround = false
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
