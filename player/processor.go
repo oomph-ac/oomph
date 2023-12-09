@@ -555,7 +555,6 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 		p.Acknowledgement(func() {
 			p.dead = false
 			p.respawned = true
-			p.mInfo.ServerPosition = pk.Position.Sub(mgl32.Vec3{0, 1.62})
 		})
 	case *packet.AddItemActor:
 		if pk.EntityRuntimeID == p.clientRuntimeID && pk.EntityRuntimeID != p.runtimeID {
