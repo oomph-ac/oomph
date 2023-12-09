@@ -27,6 +27,7 @@ require (
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
+	github.com/oomph-ac/mv v0.0.0-20231209012122-0876b7bfbcff // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/sandertv/go-raknet v1.12.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
