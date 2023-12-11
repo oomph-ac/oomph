@@ -22,6 +22,8 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.11 // indirect
+	github.com/go-echarts/go-echarts/v2 v2.3.2 // indirect
+	github.com/go-echarts/statsview v0.3.4 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.4.0 // indirect
@@ -29,6 +31,7 @@ require (
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/oomph-ac/mv v0.0.0-20231209012122-0876b7bfbcff // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
+	github.com/rs/cors v1.10.1 // indirect
 	github.com/sandertv/go-raknet v1.12.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.16.0 // indirect

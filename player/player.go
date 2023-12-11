@@ -1,6 +1,7 @@
 package player
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -301,11 +302,48 @@ func (p *Player) SetServerConn(c *minecraft.Conn) {
 	p.serverConn = c
 }
 
-func (p *Player) HandlePacket(f func() error) error {
+func (p *Player) HandlePacket(pk packet.Packet, client bool) error {
 	p.pkMu.Lock()
 	defer p.pkMu.Unlock()
 
-	return f()
+	if client {
+		return p.proxyHandleClient(pk)
+	}
+	return p.proxyHandleServer(pk)
+}
+
+// proxyHandleClient processes a packet sent by the player.
+func (p *Player) proxyHandleClient(pk packet.Packet) error {
+	cancel := p.ClientProcess(pk)
+	if cancel {
+		return nil
+	}
+
+	if err := p.ServerConn().WritePacket(pk); err != nil {
+		p.Log().Error("serverConn.WritePacket(): " + err.Error())
+		if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+			p.Disconnect(disconnect.Error())
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+// proxyHandleServer processes a packet sent by the server.
+func (p *Player) proxyHandleServer(pk packet.Packet) error {
+	cancel := p.ServerProcess(pk)
+	if cancel {
+		return nil
+	}
+
+	if err := p.Conn().WritePacket(pk); err != nil {
+		p.Log().Error("conn.WritePacket(): " + err.Error())
+		return err
+	}
+
+	return nil
 }
 
 // Log returns the log of the player.
