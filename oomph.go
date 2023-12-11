@@ -204,22 +204,7 @@ func handleConn(p *player.Player, listener *minecraft.Listener) bool {
 		}
 	} */
 
-	return p.HandlePacket(func() error {
-		if p.ClientProcess(pk) {
-			return nil
-		}
-
-		if err = p.ServerConn().WritePacket(pk); err != nil {
-			p.Log().Error("serverConn.WritePacket() error: " + err.Error())
-			if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-				listener.Disconnect(p.Conn(), disconnect.Error())
-			}
-
-			return err
-		}
-
-		return nil
-	}) == nil
+	return p.HandlePacket(pk, true) == nil
 }
 
 func handleServerConn(p *player.Player, listener *minecraft.Listener) bool {
@@ -246,16 +231,5 @@ func handleServerConn(p *player.Player, listener *minecraft.Listener) bool {
 		return false
 	}
 
-	return p.HandlePacket(func() error {
-		if p.ServerProcess(pk) {
-			return nil
-		}
-
-		if err := p.Conn().WritePacket(pk); err != nil {
-			p.Log().Error("conn.WritePacket() error: " + err.Error())
-			return err
-		}
-
-		return nil
-	}) == nil
+	return p.HandlePacket(pk, false) == nil
 }
