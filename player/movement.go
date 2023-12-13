@@ -257,7 +257,10 @@ func (p *Player) correctMovement() {
 	// Send block updates for blocks around the player - to make sure that the world state
 	// on the client is the same as the server's.
 	if p.mInfo.TicksSinceBlockRefresh >= 10 {
-		for bpos, b := range utils.GetNearbyBlocks(p.AABB(), true, true, p.World()) {
+		for _, result := range utils.GetNearbyBlocks(p.AABB(), true, true, p.World()) {
+			bpos := result.Position
+			b := result.Block
+
 			p.conn.WritePacket(&packet.UpdateBlock{
 				Position:          protocol.BlockPos{int32(bpos.X()), int32(bpos.Y()), int32(bpos.Z())},
 				NewBlockRuntimeID: world.BlockRuntimeID(b),
@@ -593,7 +596,10 @@ func (p *Player) maybeBackOffFromEdge() {
 // isInsideBlock returns true if the player is inside a block.
 func (p *Player) isInsideBlock() (world.Block, bool) {
 	bb := p.AABB()
-	for pos, block := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
+	for _, result := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
+		pos := result.Position
+		block := result.Block
+
 		boxes := utils.BlockBoxes(block, pos, p.World())
 
 		for _, box := range boxes {
@@ -696,7 +702,10 @@ func (p *Player) pushOutOfBlock() {
 	}
 
 	bb := p.AABB()
-	for bpos, b := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
+	for _, result := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
+		bpos := result.Position
+		b := result.Block
+
 		if utils.CanPassBlock(b) {
 			continue
 		}
@@ -830,7 +839,9 @@ func (p *Player) isScenarioPredictable() bool {
 	p.mInfo.InSupportedScenario = true
 	var hasLiquid, hasSoulSand, hasBamboo bool
 
-	for _, bl := range blocks {
+	for _, result := range blocks {
+		bl := result.Block
+
 		_, ok := bl.(world.Liquid)
 		if ok {
 			hasLiquid = true

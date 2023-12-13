@@ -909,15 +909,6 @@ func (p *Player) updateLatency() {
 		p.needLatencyUpdate = true
 		p.stackLatency = time.Since(curr).Milliseconds()
 
-		tickLatency := p.TickLatency()
-		// Make the player aware that their network conditions may affect their gameplay.
-		if tickLatency > p.combatNetworkCutoff || tickLatency > p.knockbackNetworkCutoff {
-			p.conn.WritePacket(&packet.Text{
-				TextType: packet.TextTypePopup,
-				Message:  text.Colourf("<red><bold>network problem</bold></red>"),
-			})
-		}
-
 		if !p.debugger.LogLatency {
 			return
 		}
@@ -1078,8 +1069,9 @@ func (p *Player) doTick() bool {
 	// This code calculates how much the server tick should be incremented by. This is done by checking the
 	// difference between the last time the server ticked and the current time.
 	delta := time.Since(p.lastServerTicked).Milliseconds()
-	if delta > 50 {
-		p.serverTick.Add(uint64(delta/50) + 1)
+	if delta > 100 {
+		p.log.Warnf("ticking goroutine took %vms to tick", delta)
+		p.serverTick.Add(uint64(delta / 50))
 	} else {
 		p.serverTick.Inc()
 	}
