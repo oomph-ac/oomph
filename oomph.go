@@ -189,21 +189,6 @@ func handleConn(p *player.Player, listener *minecraft.Listener) bool {
 		return false
 	}
 
-	/* if p.UsesPacketBuffer() {
-		if !p.QueuePacket(pk) {
-			continue
-		}
-
-		err = p.SendPacketToServer(pk)
-		if err == nil {
-			continue
-		}
-
-		if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-			_ = listener.Disconnect(p.Conn(), disconnect.Error())
-		}
-	} */
-
 	return p.HandlePacket(pk, true) == nil
 }
 

@@ -185,10 +185,6 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 				p.debugger.LogCombat = b
 			case "server_knockback":
 				p.debugger.UseServerKnockback = b
-			case "buffer_info":
-				p.debugger.UsePacketBuffer = b
-			case "packet_buffer":
-				p.UsePacketBuffering(b)
 			case "movement":
 				p.debugger.LogMovement = b
 

@@ -51,13 +51,6 @@ type Player struct {
 
 	acks *Acknowledgements
 
-	packetBuffer                                    *PacketBuffer
-	bufferQueue                                     []*PacketBuffer
-	expectedFrame, queueCredits                     uint64
-	isBufferReady, isBufferStarted, usePacketBuffer bool
-	excessBufferScore, depletedBufferScore          float64
-	buffListMu                                      sync.Mutex
-
 	clientTick, clientFrame, serverTick atomic.Uint64
 	lastServerTicked                    time.Time
 
@@ -142,10 +135,6 @@ func NewPlayer(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	data := conn.GameData()
 	p := &Player{
 		log: log,
-
-		packetBuffer: NewPacketBuffer(),
-		bufferQueue:  make([]*PacketBuffer, 0),
-		queueCredits: 0,
 
 		debugger: &Debugger{},
 
@@ -898,7 +887,7 @@ func (p *Player) updateEntityPositions(m map[uint64]utils.LocationData) {
 
 // updateLatency updates the stack latency of the player.
 func (p *Player) updateLatency() {
-	if !p.ready || p.inLoadedChunkTicks <= 20 || !p.needLatencyUpdate || (p.usePacketBuffer && !p.isBufferStarted) {
+	if !p.ready || p.inLoadedChunkTicks <= 20 || !p.needLatencyUpdate {
 		return
 	}
 
@@ -1075,9 +1064,6 @@ func (p *Player) doTick() bool {
 	} else {
 		p.serverTick.Inc()
 	}
-
-	// This will handle all the client packets if packet buffering is enabled.
-	p.handlePacketQueue()
 
 	// This will prepare the entity positions to be acknowledged.
 	p.ackEntitiesPos()
