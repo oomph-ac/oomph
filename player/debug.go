@@ -18,9 +18,7 @@ type Debugger struct {
 	LogMovement bool
 
 	UseServerKnockback bool
-	UsePacketBuffer    bool
-
-	SmoothTeleports bool
+	SmoothTeleports    bool
 
 	AllowedDebug bool
 }
