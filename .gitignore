@@ -8,3 +8,4 @@ survival_proxy/*
 players/*
 .DS_Store
 .fleet/
+.vscode.code-workspace

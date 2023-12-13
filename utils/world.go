@@ -24,6 +24,11 @@ const (
 	cornerLeftOuter
 )
 
+type BlockSearchResult struct {
+	Block    world.Block
+	Position cube.Pos
+}
+
 // BlockName returns the name of the block.
 func BlockName(b world.Block) string {
 	n, _ := b.EncodeBlock()
@@ -573,13 +578,13 @@ func IsBlockOpenSpace(pos cube.Pos, w *oomph_world.World) bool {
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oomph_world.World) map[cube.Pos]world.Block {
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oomph_world.World) []BlockSearchResult {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 
-	blocks := make(map[cube.Pos]world.Block)
+	blocks := make([]BlockSearchResult, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
@@ -596,7 +601,11 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oo
 					continue
 				}
 
-				blocks[pos] = b
+				// Add the block to the list of block search results.
+				blocks = append(blocks, BlockSearchResult{
+					Block:    b,
+					Position: pos,
+				})
 				b = nil
 			}
 		}
