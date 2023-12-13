@@ -27,7 +27,6 @@ go func() {
 			return
 		}
 
-		p.UsePacketBuffering(false)
 		p.SetCombatMode(2)
 		p.SetMovementMode(2)
 		p.MovementInfo().SetAcceptablePositionOffset(0.3)
@@ -62,7 +61,6 @@ go func() {
 			panic(err)
 		}
 
-		p.UsePacketBuffering(false)
 		p.SetCombatMode(2)
 		p.SetMovementMode(2)
 		p.MovementInfo().SetAcceptablePositionOffset(0.3)
@@ -87,8 +85,6 @@ ac.Start(":20000", ".", []minecraft.Protocol{}, false, false)
 
 ## Configuration
 You may configure settings for your players are you may like. Here are a few options you are able to change and what they do:
-- **Packet Buffering** [ p.UsePacketBuffering(bool) ]
-    Packet Buffering keeps a buffer of player packets before processing, this contributes to helping players with unstable connections seem as if they are not having issues at all. If a player is running below 20-TPS, packet buffering will fill with their last processed input to make movement run at 20 ticks-per-second on the server side. This type of functionality can be found in games such as VALORANT and Overwatch. **However, this feature is experimental, and it is not advised to run it on production.**
 - **Combat Mode** [ p.SetCombatMode(AuthorityType) ]
     Setting the combat mode will change how Oomph will validate combat actions. The following supported modes are listed below:
     - ModeClientAuthoritative (0) -> Oomph will not validate any combat action(s), and send to the server what the client deems legitimate.
