@@ -13,7 +13,7 @@ import (
 // https://bugs.mojang.com/browse/MCPE-158716
 // pls :(((
 const (
-	NetworkStackLatencyDivider = 1000000
+	NetworkStackLatencyDivider = 1_000_000
 )
 
 type Acknowledgements struct {
