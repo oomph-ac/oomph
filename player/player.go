@@ -620,16 +620,14 @@ func (p *Player) Flag(check check.Check, violations float64, params map[string]a
 		return
 	}
 
-	go func() {
-		message := text.Colourf("<bold><red>Oomph detected the use of third-party software.</red></bold>")
+	message := text.Colourf("<bold><red>Oomph detected the use of third-party software.</red></bold>")
 
-		ctx = event.C()
-		p.handler().HandlePunishment(ctx, check, &message)
-		if !ctx.Cancelled() {
-			p.log.Infof("%s was detected and punished for using %s%s.", p.Name(), name, variant)
-			p.Disconnect(message)
-		}
-	}()
+	ctx = event.C()
+	p.handler().HandlePunishment(ctx, check, &message)
+	if !ctx.Cancelled() {
+		p.log.Infof("%s was detected and punished for using %s%s.", p.Name(), name, variant)
+		p.Disconnect(message)
+	}
 }
 
 // Ready returns true if the player is ready/spawned in.
