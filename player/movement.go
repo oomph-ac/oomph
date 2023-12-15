@@ -20,27 +20,26 @@ import (
 // If no exemptions are needed, then this function will proceed to calculate the expected movement and position of the player this simulation frame.
 // If a difference between the client calculated movement and server calculated are found, a correction will be sent.
 func (p *Player) doMovementSimulation() {
-	var exempt bool = p.mInfo.CanExempt
+	p.mInfo.CanExempt = false // Reset the exempt status.
 
 	p.TryDebug(fmt.Sprintf("%v started movement simulation for frame %d", p.Name(), p.ClientFrame()), DebugTypeLogged, p.debugger.LogMovement)
 	defer p.TryDebug(fmt.Sprintf("%v finished movement simulation for frame %d", p.Name(), p.ClientFrame()), DebugTypeLogged, p.debugger.LogMovement)
 
 	defer p.mInfo.Tick()
-	defer p.TryDebug(fmt.Sprintf("doMovementSimulation(): player exempted at frame %d", p.ClientFrame()), DebugTypeLogged, exempt && p.debugger.LogMovement)
+	defer p.TryDebug(fmt.Sprintf("doMovementSimulation(): player exempted at frame %d", p.ClientFrame()), DebugTypeLogged, p.mInfo.CanExempt && p.debugger.LogMovement)
 
-	if (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.inDimensionChange || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) || p.dead || p.respawned {
+	// If there is a scenario in which Oomph cannot predict reliably, we will have to trust the client's movement.
+	if !p.isScenarioPredictable() || (p.movementMode == utils.ModeSemiAuthoritative && (p.inLoadedChunkTicks <= 5 || !p.ready)) || p.inDimensionChange || p.mInfo.InVoid || p.mInfo.Flying || p.mInfo.NoClip || (p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure) || p.dead || p.respawned {
 		p.mInfo.OnGround = false
 		p.mInfo.ServerPosition = p.Position()
 		p.mInfo.OldServerMovement = p.mInfo.ClientMovement
 		p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
 		p.mInfo.CanExempt = true
-		exempt = true
 		return
 	}
 
 	p.aiStep()
 	p.validateMovement()
-	p.mInfo.CanExempt = false
 }
 
 func (p *Player) updateMovementStates(pk *packet.PlayerAuthInput) {
@@ -442,11 +441,6 @@ func (p *Player) simulateGroundMove() {
 	if inCobweb {
 		p.mInfo.ServerMovement = mgl32.Vec3{}
 		p.TryDebug("simulateGroundMove(): in cobweb, mov set to 0 vec", DebugTypeLogged, p.debugger.LogMovement)
-	}
-
-	// If we cannot predict the movement scenario reliably, we trust the client's movement.
-	if !p.isScenarioPredictable() {
-		defer p.setMovementToClient()
 	}
 
 	p.mInfo.OldServerMovement = p.mInfo.ServerMovement
