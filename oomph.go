@@ -49,8 +49,9 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 		TexturePacksRequired:   requirePacks,
 		AcceptedProtocols:      protocols,
 		FlushRate:              -1,
-		AllowInvalidPackets:    true,
-		AllowUnknownPackets:    true,
+
+		AllowInvalidPackets: false,
+		AllowUnknownPackets: true,
 	}.Listen("raknet", o.addr)
 
 	if err != nil {
@@ -79,7 +80,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		FlushRate:    -1,
 
 		DisconnectOnUnknownPackets: false,
-		DisconnectOnInvalidPackets: false,
+		DisconnectOnInvalidPackets: true,
 		IPAddress:                  conn.RemoteAddr().String(),
 	}.DialTimeout("raknet", remoteAddr, time.Second*10)
 
