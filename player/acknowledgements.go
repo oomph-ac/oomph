@@ -13,7 +13,8 @@ import (
 // https://bugs.mojang.com/browse/MCPE-158716
 // pls :(((
 const (
-	NetworkStackLatencyDivider = 1_000_000
+	DefaultNetworkStackLatencyDivider     = 1_000_000
+	PlaystationNetworkStackLatencyDivider = 1_000
 )
 
 type Acknowledgements struct {
@@ -160,7 +161,7 @@ func (a *Acknowledgements) Clear() {
 // Handle gets the acknowledgement in the map with the timestamp given in the function. If there is no acknowledgement
 // found, then false is returned. If there is an acknowledgement, then it is removed from the map and the function is ran.
 // "awaitResTicks" will also bet set to 0, as the client has responded to an acknowledgement.
-func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
+func (p *Player) handleNetworkStackLatency(i int64, ps4 bool) bool {
 	a := p.Acknowledgements()
 	if a == nil {
 		return false
@@ -169,34 +170,27 @@ func (p *Player) handleNetworkStackLatency(i int64, tryOther bool) bool {
 	var ok bool
 	if a.LegacyMode {
 		ok = a.tryHandle(i)
-		if tryOther && !ok {
+		if ps4 && !ok {
 			i /= 1000
 			ok = a.tryHandle(i)
-		} else if tryOther {
+		} else if ps4 {
 			delete(a.AcknowledgeMap, i/1000)
 		}
 
 		return ok
 	}
 
-	i /= NetworkStackLatencyDivider
-	ok = a.tryHandle(i)
-	if tryOther && ok {
-		i *= 1000
-		ok = a.tryHandle(i)
+	if ps4 {
+		i /= PlaystationNetworkStackLatencyDivider
+	} else {
+		i /= DefaultNetworkStackLatencyDivider
 	}
 
-	// If this is Oomph's acknowledgement, we want to make sure that it is in order.
-	/* if ok {
-		expected := a.acknowledgementOrder[0]
-		a.acknowledgementOrder = a.acknowledgementOrder[1:]
-
-		if expected != i {
-			p.Log().Errorf("acknowledgement order mismatch: expected %v, got %v", expected, i)
-			p.Disconnect(game.ErrorBadAckOrder)
-			return false
-		}
-	} */
+	ok = a.tryHandle(i)
+	if ps4 && ok {
+		i /= PlaystationNetworkStackLatencyDivider
+		ok = a.tryHandle(i)
+	}
 
 	return ok
 }
@@ -226,10 +220,8 @@ func (p *Player) SendAck() {
 
 		// NetworkStackLatency behavior on Playstation devices sends the original timestamp
 		// back to the server for a certain period of time (?) but then starts dividing the timestamp later on.
-		expectedTimestamp := pk.Timestamp
 		if p.ClientData().DeviceOS == protocol.DeviceOrbis && acks.LegacyMode {
 			acks.AddMap(buf, acks.CurrentTimestamp/1000)
-			expectedTimestamp /= 1000
 		}
 
 		//acks.acknowledgementOrder = append(acks.acknowledgementOrder, expectedTimestamp)
