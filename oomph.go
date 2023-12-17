@@ -144,6 +144,10 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	g.Add(2)
 	go func() {
 		defer func() {
+			if err := recover(); err != nil {
+				o.log.Errorf("handleConn() panic: %v", err)
+			}
+
 			_ = listener.Disconnect(p.Conn(), "client connection lost")
 			_ = p.ServerConn().Close()
 			g.Done()
@@ -157,6 +161,10 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 	go func() {
 		defer func() {
+			if err := recover(); err != nil {
+				o.log.Errorf("handleServerConn() panic: %v", err)
+			}
+
 			_ = p.ServerConn().Close()
 			_ = listener.Disconnect(p.Conn(), "server connection lost")
 			g.Done()
