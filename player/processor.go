@@ -122,9 +122,9 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 		// If the movement mode is only semi authoritative, we only want to validate the movement for this tick,
 		// and then set the movement mode back to the clients.
-		/* if p.movementMode == utils.ModeSemiAuthoritative {
+		if p.movementMode == utils.ModeSemiAuthoritative {
 			defer p.setMovementToClient()
-		} */
+		}
 
 		prevPos := p.mInfo.ServerPosition
 		p.handlePlayerAuthInput(pk)

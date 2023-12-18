@@ -55,9 +55,6 @@ func (m *MovementB) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	p.ResetServerPosition()
-	p.ResetServerMovement()
-
 	p.Flag(m, m.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
 		"diffX": diffX,
 		"diffZ": diffZ,
