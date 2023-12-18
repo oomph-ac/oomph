@@ -36,12 +36,19 @@ type Processor interface {
 	// CombatMode returns the combat mode of the processor.
 	CombatMode() utils.AuthorityType
 
+	// ServerPosition returns the server position of the processor.
+	ServerPosition() mgl32.Vec3
 	// ServerMovement returns a Vec3 of how the server predicts the client will move.
 	ServerMovement() mgl32.Vec3
 	// OldServerMovement returns a Vec3 of how the server predicted the client moved in the previous tick.
 	OldServerMovement() mgl32.Vec3
 	// ClientMovement returns the client's movement as a Vec3
 	ClientMovement() mgl32.Vec3
+
+	// ResetServerPosition resets the server position of the processor.
+	ResetServerPosition()
+	// ResetServerMovement resets the server movement of the processor.
+	ResetServerMovement()
 	// CanExemptMovementValidation returns true if the player can exempt movement validation.
 	CanExemptMovementValidation() bool
 
