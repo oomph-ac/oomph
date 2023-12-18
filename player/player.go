@@ -433,6 +433,21 @@ func (p *Player) Position() mgl32.Vec3 {
 	return p.Entity().Position()
 }
 
+// ServerPosition returns the server predicted position of the player.
+func (p *Player) ServerPosition() mgl32.Vec3 {
+	return p.mInfo.ServerPosition
+}
+
+// ResetServerPosition resets the server position of the player.
+func (p *Player) ResetServerPosition() {
+	p.mInfo.ServerPosition = p.Position()
+}
+
+// ResetServerMovement resets the server movement of the player.
+func (p *Player) ResetServerMovement() {
+	p.mInfo.ServerMovement = p.mInfo.ClientPredictedMovement
+}
+
 // Rotation returns the rotation of the player.
 func (p *Player) Rotation() mgl32.Vec3 {
 	return p.Entity().Rotation()

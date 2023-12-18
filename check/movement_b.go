@@ -29,7 +29,7 @@ func (*MovementB) MaxViolations() float64 {
 }
 
 func (m *MovementB) Process(p Processor, pk packet.Packet) bool {
-	i, ok := pk.(*packet.PlayerAuthInput)
+	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return false
 	}
@@ -42,18 +42,23 @@ func (m *MovementB) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	diffX, diffZ := i.Delta[0]-float32(p.ServerMovement()[0]), i.Delta[2]-float32(p.ServerMovement()[2])
-	if math32.Abs(diffX) < 0.02 || math32.Abs(diffZ) < 0.02 {
-		m.Buff(-1, 6)
-		m.violations = math.Max(0, m.violations-1)
+	diffX := p.Entity().Position().X() - p.ServerPosition().X()
+	diffZ := p.Entity().Position().Z() - p.ServerPosition().Z()
+
+	if math32.Abs(diffX) < 0.125 && math32.Abs(diffZ) < 0.125 {
+		m.Buff(-0.02, 10)
+		m.violations = math.Max(0, m.violations-0.005)
 		return false
 	}
 
-	if m.Buff(1, 6) < 5.5 {
+	if m.Buff(1, 10) < 5 {
 		return false
 	}
 
-	p.Flag(m, m.violationAfterTicks(p.ClientFrame(), 20), map[string]any{
+	p.ResetServerPosition()
+	p.ResetServerMovement()
+
+	p.Flag(m, m.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
 		"diffX": diffX,
 		"diffZ": diffZ,
 	})

@@ -12,6 +12,8 @@ type MovementA struct {
 	basic
 }
 
+const movementVerticalThreshold = 0.0784 // 0.98 * 0.08
+
 func NewMovementA() *MovementA {
 	return &MovementA{}
 }
@@ -29,7 +31,7 @@ func (*MovementA) MaxViolations() float64 {
 }
 
 func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
-	i, ok := pk.(*packet.PlayerAuthInput)
+	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return false
 	}
@@ -42,18 +44,22 @@ func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	diff := i.Delta[1] - float32(p.ServerMovement()[1])
-	if math32.Abs(diff) < 0.01 {
-		m.Buff(-1, 6)
-		m.violations = math.Max(0, m.violations-1)
+	diff := p.Entity().Position().Y() - p.ServerPosition().Y()
+	if math32.Abs(diff) < movementVerticalThreshold {
+		m.Buff(-0.02, 10)
+		m.violations = math.Max(0, m.violations-0.005)
 		return false
 	}
 
-	if m.Buff(1, 6) < 5.5 {
+	buffAmt := float64(math32.Min(1, diff/0.0784))
+	if m.Buff(buffAmt, 10) < 7 {
 		return false
 	}
 
-	p.Flag(m, m.violationAfterTicks(p.ClientFrame(), 20), map[string]any{
+	p.ResetServerPosition()
+	p.ResetServerMovement()
+
+	p.Flag(m, m.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
 		"diff": diff,
 	})
 
