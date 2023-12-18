@@ -51,13 +51,9 @@ func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
 		return false
 	}
 
-	buffAmt := float64(math32.Min(1, diff/0.0784))
-	if m.Buff(buffAmt, 10) < 7 {
+	if m.Buff(1, 10) < 7 {
 		return false
 	}
-
-	p.ResetServerPosition()
-	p.ResetServerMovement()
 
 	p.Flag(m, m.violationAfterTicks(p.ClientFrame(), 200), map[string]any{
 		"diff": diff,
