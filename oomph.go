@@ -82,7 +82,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: true,
 		IPAddress:                  conn.RemoteAddr().String(),
-	}.DialTimeout("raknet", remoteAddr, time.Second*10)
+	}.DialTimeout("raknet", remoteAddr, time.Second*20)
 
 	if err != nil {
 		conn.WritePacket(&packet.Disconnect{
@@ -110,7 +110,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	var g sync.WaitGroup
 	g.Add(2)
 	go func() {
-		if err := p.Conn().StartGameTimeout(data, time.Second*15); err != nil {
+		if err := p.Conn().StartGameTimeout(data, time.Minute); err != nil {
 			o.log.Error("oomph conn.StartGame(): " + err.Error())
 			conn.WritePacket(&packet.Disconnect{
 				Message: err.Error(),
@@ -123,7 +123,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		g.Done()
 	}()
 	go func() {
-		if err := p.ServerConn().DoSpawnTimeout(time.Second * 15); err != nil {
+		if err := p.ServerConn().DoSpawnTimeout(time.Minute); err != nil {
 			o.log.Error("oomph serverConn.DoSpawn(): " + err.Error())
 			conn.WritePacket(&packet.Disconnect{
 				Message: err.Error(),
