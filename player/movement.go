@@ -685,6 +685,7 @@ func (p *Player) collideWithBlocks(vel mgl32.Vec3, bb cube.BBox, list []cube.BBo
 // pushOutOfBlock pushes the player outside of a block.
 func (p *Player) pushOutOfBlock() {
 	if p.mInfo.StepClipOffset > 0 {
+		p.mInfo.KnownInsideBlock = false
 		return
 	}
 
@@ -692,10 +693,14 @@ func (p *Player) pushOutOfBlock() {
 	b, ba := p.World().GetBlock(pos), p.World().GetBlock(pos.Side(cube.FaceUp))
 
 	if utils.CanPassBlock(b) {
+		p.mInfo.KnownInsideBlock = false
 		return
 	}
 
 	bb := p.AABB()
+	inside := false
+	newPos := p.mInfo.ServerPosition
+
 	for _, result := range utils.GetNearbyBlocks(bb, false, true, p.World()) {
 		bpos := result.Position
 		b := result.Block
@@ -714,31 +719,41 @@ func (p *Player) pushOutOfBlock() {
 			if !bb.IntersectsWith(box) {
 				continue
 			}
-			minDelta, maxDelta := box.Max().Sub(bb.Min()), box.Min().Sub(bb.Max())
 
+			minDelta, maxDelta := box.Max().Sub(bb.Min()), box.Min().Sub(bb.Max())
 			_, isAir := ba.(block.Air)
 			if isAir && !p.mInfo.OnGround && box.Max().Y()-bb.Min().Y() > 0 && minDelta.Y() <= 0.5 {
-				p.mInfo.ServerPosition[1] = box.Max().Y() + 1e-3
+				newPos[1] = box.Max().Y() + 1e-3
+				inside = true
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 1 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 			}
 
 			if bb.Max().X()-box.Min().X() > 0 && minDelta.X() <= 0.5 {
-				p.mInfo.ServerPosition[0] = box.Max().X() + 0.5
+				newPos[0] = box.Max().X() + 0.5
+				inside = true
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 2 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 			} else if box.Max().X()-bb.Min().X() > 0 && maxDelta.X() >= -0.5 {
-				p.mInfo.ServerPosition[0] = box.Min().X() - 0.5
+				newPos[0] = box.Min().X() - 0.5
+				inside = true
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 3 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 			}
 
 			if bb.Max().Z()-box.Min().Z() > 0 && minDelta.Z() <= 0.5 {
-				p.mInfo.ServerPosition[2] = box.Max().Z() + 0.5
+				newPos[2] = box.Max().Z() + 0.5
+				inside = true
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 4 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 			} else if box.Max().Z()-bb.Min().Z() > 0 && maxDelta.Z() >= -0.5 {
-				p.mInfo.ServerPosition[2] = box.Min().Z() - 0.5
+				newPos[2] = box.Min().Z() - 0.5
+				inside = true
 				p.TryDebug(fmt.Sprintf("pushOutOfBlocks(): push type 5 w/ new pos=%v", p.mInfo.ServerPosition), DebugTypeLogged, p.debugger.LogMovement)
 			}
 		}
 	}
+
+	if !p.mInfo.KnownInsideBlock && inside {
+		p.mInfo.ServerPosition = newPos
+	}
+	p.mInfo.KnownInsideBlock = inside
 }
 
 // simulateGravity simulates the gravity of the player
