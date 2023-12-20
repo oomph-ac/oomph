@@ -46,7 +46,7 @@ func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
 
 	diff := p.Entity().Position().Y() - p.ServerPosition().Y()
 	if math32.Abs(diff) < movementVerticalThreshold {
-		m.Buff(-0.02, 10)
+		m.Buff(-1, 10)
 		m.violations = math.Max(0, m.violations-0.005)
 		return false
 	}
