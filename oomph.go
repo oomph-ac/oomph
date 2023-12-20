@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/utils"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -16,6 +17,14 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
+
+func init() {
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn: "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
+	}); err != nil {
+		panic("failed to init sentry: " + err.Error())
+	}
+}
 
 // Oomph represents an instance of the Oomph proxy.
 type Oomph struct {
@@ -143,13 +152,22 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	g.Add(2)
 	go func() {
+		localHub := sentry.CurrentHub().Clone()
+		localHub.ConfigureScope(func(scope *sentry.Scope) {
+			scope.SetTag("conn_type", "clientConn")
+		})
+
 		defer func() {
+			serverConn.Close()
+
 			if err := recover(); err != nil {
 				o.log.Errorf("handleConn() panic: %v", err)
+				localHub.Recover(err)
+				localHub.Flush(time.Second * 10)
+				listener.Disconnect(conn, "client connection lost: internal error")
+			} else {
+				listener.Disconnect(conn, "client connection lost: unknown")
 			}
-
-			_ = listener.Disconnect(p.Conn(), "client connection lost")
-			_ = p.ServerConn().Close()
 			g.Done()
 		}()
 		for {
@@ -160,13 +178,23 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		}
 	}()
 	go func() {
+		localHub := sentry.CurrentHub().Clone()
+		localHub.ConfigureScope(func(scope *sentry.Scope) {
+			scope.SetTag("conn_type", "serverConn")
+		})
+
 		defer func() {
+			serverConn.Close()
+
 			if err := recover(); err != nil {
 				o.log.Errorf("handleServerConn() panic: %v", err)
+				localHub.Recover(err)
+				localHub.Flush(time.Second * 10)
+				listener.Disconnect(conn, "server connection lost: internal error")
+			} else {
+				listener.Disconnect(conn, "server connection lost: unknown")
 			}
 
-			_ = p.ServerConn().Close()
-			_ = listener.Disconnect(p.Conn(), "server connection lost")
 			g.Done()
 		}()
 		for {
