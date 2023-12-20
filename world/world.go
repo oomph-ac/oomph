@@ -20,6 +20,8 @@ type World struct {
 	chunks         map[protocol.ChunkPos]*chunk.Chunk
 	exemptedChunks map[protocol.ChunkPos]uint8
 
+	furnaces map[cube.Pos]world.Block
+
 	log *logrus.Logger
 	mu  sync.Mutex
 }
@@ -31,6 +33,8 @@ func NewWorld(log *logrus.Logger) *World {
 
 		chunks:         make(map[protocol.ChunkPos]*chunk.Chunk),
 		exemptedChunks: make(map[protocol.ChunkPos]uint8),
+
+		furnaces: make(map[cube.Pos]world.Block),
 	}
 }
 
@@ -84,6 +88,10 @@ func (w *World) GetBlock(pos cube.Pos) world.Block {
 		return block.Air{}
 	}
 
+	if b, ok := w.furnaces[pos]; ok {
+		return b
+	}
+
 	c := w.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
 	if c == nil {
 		return block.Air{}
@@ -103,6 +111,13 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return
 	}
+
+	// TODO: Remove this hack, it seems like furnaces are causing bugs on DF.
+	if _, ok := b.(block.Furnace); ok {
+		w.furnaces[pos] = b
+		return
+	}
+	delete(w.furnaces, pos)
 
 	rid := world.BlockRuntimeID(b)
 	c := w.Chunk(protocol.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)})
