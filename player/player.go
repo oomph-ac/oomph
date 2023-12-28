@@ -126,6 +126,8 @@ type Player struct {
 	c    chan struct{}
 	once sync.Once
 
+	sentSync bool
+
 	checkedBlacklist bool
 	handleTransfer   bool
 }

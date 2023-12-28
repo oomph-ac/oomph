@@ -95,11 +95,19 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 
 			p.mInfo.Flying = p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure
 		})
+
 		p.SetRuntimeID(p.Conn().GameData().EntityRuntimeID)
 		p.SetUniqueID(p.Conn().GameData().EntityUniqueID)
+
+		p.sentSync = true
 	case *packet.NetworkStackLatency:
 		cancel = p.handleNetworkStackLatency(pk.Timestamp, p.ClientData().DeviceOS == protocol.DeviceOrbis)
 	case *packet.PlayerAuthInput:
+		if !p.sentSync {
+			p.Disconnect(game.ErrorNoTickSync)
+			return true
+		}
+
 		p.clientTick.Inc()
 		p.clientFrame.Store(pk.Tick)
 
