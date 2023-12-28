@@ -59,5 +59,8 @@ func (m *MovementA) Process(p Processor, pk packet.Packet) bool {
 		"diff": diff,
 	})
 
+	p.ResetServerPosition()
+	p.ResetServerMovement()
+
 	return false
 }
