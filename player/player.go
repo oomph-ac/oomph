@@ -799,6 +799,9 @@ func (p *Player) SendOomphDebug(message string, t byte) {
 func (p *Player) Disconnect(reason string) {
 	_ = p.conn.WritePacket(&packet.Disconnect{Message: reason})
 	p.conn.Flush()
+
+	p.conn.Close()
+	p.serverConn.Close()
 }
 
 // Closed returns if the player is closed.
