@@ -45,7 +45,7 @@ func (m *MovementB) Process(p Processor, pk packet.Packet) bool {
 	diffX := p.Entity().Position().X() - p.ServerPosition().X()
 	diffZ := p.Entity().Position().Z() - p.ServerPosition().Z()
 
-	if math32.Abs(diffX) < 0.125 && math32.Abs(diffZ) < 0.125 {
+	if math32.Abs(diffX) < 0.05 && math32.Abs(diffZ) < 0.05 {
 		m.Buff(-1, 10)
 		m.violations = math.Max(0, m.violations-0.005)
 		return false
@@ -59,6 +59,9 @@ func (m *MovementB) Process(p Processor, pk packet.Packet) bool {
 		"diffX": diffX,
 		"diffZ": diffZ,
 	})
+
+	p.ResetServerMovement()
+	p.ResetServerPosition()
 
 	return false
 }
