@@ -65,52 +65,47 @@ func (p *Player) RemoteAddr() net.Addr {
 // WritePacket will call minecraft.Conn.WritePacket and process the packet with oomph.
 func (p *Player) WritePacket(pk packet.Packet) error {
 	p.pkMu.Lock()
-	defer p.pkMu.Unlock()
-
 	if p.ServerProcess(pk) {
+		p.pkMu.Unlock()
 		return nil
 	}
 
 	if err := p.conn.WritePacket(pk); err != nil {
+		p.pkMu.Unlock()
 		p.Close()
 		return err
 	}
 
+	p.pkMu.Unlock()
 	return nil
 }
 
 // ReadPacket will call minecraft.Conn.ReadPacket and process the packet with oomph.
 func (p *Player) ReadPacket() (pk packet.Packet, err error) {
-	p.pkMu.Lock()
-	defer p.pkMu.Unlock()
-
 	p.tMu.Lock()
 	if len(p.toSend) > 0 {
 		pk = p.toSend[0]
 		p.toSend = p.toSend[1:]
 		p.tMu.Unlock()
 
-		return pk, err
+		return pk, nil
 	}
 	p.tMu.Unlock()
 
+	p.pkMu.Lock()
 	if pk, err = p.conn.ReadPacket(); err != nil {
+		p.pkMu.Unlock()
 		p.Close()
+
 		return nil, err
 	}
 
-	/* if p.usePacketBuffer {
-		if p.QueuePacket(pk) {
-			return pk, err
-		}
-
-		return p.ReadPacket()
-	} */
-
 	if p.ClientProcess(pk) {
+		p.pkMu.Unlock()
 		return p.ReadPacket()
 	}
 
+	p.pkMu.Unlock()
 	return pk, err
 }
 
