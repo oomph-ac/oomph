@@ -29,9 +29,9 @@ type Player struct {
 	serverTick              int64
 
 	// handlers contains packet handlers registered to the player.
-	handlers map[string]Handler
+	handlers []Handler
 	// detections contains packet handlers specifically used for detections.
-	detections map[string]Handler
+	detections []Handler
 
 	log *logrus.Logger
 
@@ -54,17 +54,18 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		uniqueId:        -1,
 		clientUniqueId:  -1,
 
-		handlers:   make(map[string]Handler),
-		detections: make(map[string]Handler),
+		handlers:   []Handler{},
+		detections: []Handler{},
 
 		log: log,
 		c:   make(chan bool),
 	}
 
+	// NOTE: Handlers must be registered in order in terms of priority.
+	p.RegisterHandler(&LatencyHandler{})
 	p.RegisterHandler(&AcknowledgementHandler{
 		AckMap: map[int64][]func(){},
 	})
-	p.RegisterHandler(&LatencyHandler{})
 	p.RegisterHandler(&MovementHandler{})
 
 	go p.startTicking()
@@ -107,17 +108,47 @@ func (p *Player) HandleFromServer(pk packet.Packet) error {
 
 // RegisterHandler registers a handler to the player.
 func (p *Player) RegisterHandler(h Handler) {
-	p.handlers[h.ID()] = h
+	p.handlers = append(p.handlers, h)
+}
+
+// UnregisterHandler unregisters a handler from the player.
+func (p *Player) UnregisterHandler(id string) {
+	for i, h := range p.handlers {
+		if h.ID() != id {
+			continue
+		}
+
+		p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
+		return
+	}
 }
 
 // Handler returns a handler from the player.
 func (p *Player) Handler(id string) Handler {
-	return p.handlers[id]
+	for _, h := range p.handlers {
+		if h.ID() == id {
+			return h
+		}
+	}
+
+	return nil
 }
 
 // RegisterDetection registers a detection to the player.
 func (p *Player) RegisterDetection(d Handler) {
-	p.detections[d.ID()] = d
+	p.detections = append(p.detections, d)
+}
+
+// UnregisterDetection unregisters a detection from the player.
+func (p *Player) UnregisterDetection(id string) {
+	for i, d := range p.detections {
+		if d.ID() != id {
+			continue
+		}
+
+		p.detections = append(p.detections[:i], p.detections[i+1:]...)
+		return
+	}
 }
 
 // RunDetections runs all the detections registered to the player. It returns false
@@ -152,17 +183,17 @@ func (p *Player) Close() {
 }
 
 func (p *Player) startTicking() {
-	t := time.NewTicker(time.Second / 20)
+	t := time.NewTicker(time.Millisecond)
 	defer t.Stop()
 
 	for {
 		select {
+		case <-p.c:
+			return
 		case <-t.C:
 			if !p.tick() {
 				return
 			}
-		case <-p.c:
-			return
 		}
 	}
 }
@@ -185,20 +216,20 @@ func (p *Player) tick() bool {
 	}
 
 	// Flush all the packets for the client to receive.
-	if err := p.conn.Flush(); err != nil {
-		p.log.Errorf("error flushing packets to client: %v", err)
-		return false
+	if p.conn != nil {
+		if err := p.conn.Flush(); err != nil {
+			p.log.Errorf("error flushing packets to client: %v", err)
+			return false
+		}
 	}
 
 	// serverConn will be nil if direct mode w/ Dragonfly is used.
-	if p.serverConn == nil {
-		return true
-	}
-
-	// Flush all the packets for the server to receive.
-	if err := p.serverConn.Flush(); err != nil {
-		p.log.Errorf("error flushing packets to server: %v", err)
-		return false
+	if p.serverConn != nil {
+		// Flush all the packets for the server to receive.
+		if err := p.serverConn.Flush(); err != nil {
+			p.log.Errorf("error flushing packets to server: %v", err)
+			return false
+		}
 	}
 
 	return true
