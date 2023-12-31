@@ -96,8 +96,8 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 			p.mInfo.Flying = p.gamemode != packet.GameTypeSurvival && p.gamemode != packet.GameTypeAdventure
 		})
 
-		p.SetRuntimeID(p.Conn().GameData().EntityRuntimeID)
-		p.SetUniqueID(p.Conn().GameData().EntityUniqueID)
+		p.SetRuntimeID(p.conn.GameData().EntityRuntimeID)
+		p.SetUniqueID(p.conn.GameData().EntityUniqueID)
 
 		p.sentSync = true
 	case *packet.NetworkStackLatency:
@@ -114,7 +114,7 @@ func (p *Player) ClientProcess(pk packet.Packet) bool {
 		// Send a latency report to the server (if not in direct mode) if needed.
 		if p.latencyIntervalUpdate != 0 && int64(p.clientTick.Load())%p.latencyIntervalUpdate == 0 {
 			p.SendOomphEventToServer("oomph:latency_report", map[string]interface{}{
-				"raknet": p.Conn().Latency().Milliseconds() * 2,
+				"raknet": p.conn.Latency().Milliseconds() * 2,
 				"oomph":  p.stackLatency,
 			})
 		}
@@ -275,7 +275,7 @@ func (p *Player) ServerProcess(pk packet.Packet) (cancel bool) {
 
 		pk.EntityRuntimeID = p.clientRuntimeID
 	case *packet.Transfer:
-		if p.ServerConn() == nil || !p.handleTransfer {
+		if p.serverConn == nil || !p.handleTransfer {
 			return false
 		}
 
