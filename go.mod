@@ -9,6 +9,7 @@ require (
 	github.com/df-mc/atomic v1.10.0
 	github.com/df-mc/dragonfly v0.9.10
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
+	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-gl/mathgl v1.1.0
 	github.com/pelletier/go-toml v1.9.5
 	github.com/sandertv/gophertunnel v1.34.0
@@ -22,7 +23,6 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.11 // indirect
-	github.com/getsentry/sentry-go v0.25.0 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.3.2 // indirect
 	github.com/go-echarts/statsview v0.3.4 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
