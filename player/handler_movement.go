@@ -11,7 +11,7 @@ func (MovementHandler) ID() string {
 	return HandlerIDMovement
 }
 
-func (MovementHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
+func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
 	input, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return true

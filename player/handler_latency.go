@@ -23,14 +23,12 @@ func (LatencyHandler) ID() string {
 func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
 	if _, ok := pk.(*packet.TickSync); ok {
 		h.Responded = true
-	} else if _, ok := pk.(*packet.PlayerAuthInput); ok {
-		p.Message(fmt.Sprintf("%v, %v", p.clientTick, p.serverTick))
 	}
 
 	return true
 }
 
-func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
+func (h LatencyHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
 	return true
 }
 
@@ -51,7 +49,7 @@ func (h *LatencyHandler) OnTick(p *Player) {
 		h.StackLatency = time.Since(currentTime).Milliseconds()
 		p.clientTick = currentTick
 
-		h.LatencyUpdateTick = p.clientTick + 20
+		h.LatencyUpdateTick = currentTick + 20
 		h.Responded = true
 		p.Message(fmt.Sprintf("Latency: %dms", h.StackLatency))
 	})
