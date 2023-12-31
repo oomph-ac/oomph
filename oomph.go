@@ -1,17 +1,13 @@
 package oomph
 
 import (
-	"errors"
-	"runtime"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/oomph-ac/oomph/utils"
-
-	"github.com/go-gl/mathgl/mgl32"
-
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -19,27 +15,28 @@ import (
 )
 
 func init() {
-	if err := sentry.Init(sentry.ClientOptions{
+	err := sentry.Init(sentry.ClientOptions{
 		Dsn: "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
-	}); err != nil {
+	})
+
+	if err != nil {
 		panic("failed to init sentry: " + err.Error())
 	}
 }
 
-// Oomph represents an instance of the Oomph proxy.
 type Oomph struct {
-	players chan *player.Player
 	log     *logrus.Logger
-	addr    string
+	address string
+
+	players chan *player.Player
 }
 
-// New returns a new Oomph instance.
-// If your server is using Dragonfly, be sure to use the Listener function instead.
-func New(log *logrus.Logger, localAddr string) *Oomph {
+// New creates and returns a new Oomph instance.
+func New(log *logrus.Logger, address string) *Oomph {
 	return &Oomph{
-		players: make(chan *player.Player),
-		addr:    localAddr,
 		log:     log,
+		address: address,
+		players: make(chan *player.Player),
 	}
 }
 
@@ -61,13 +58,13 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 
 		AllowInvalidPackets: false,
 		AllowUnknownPackets: true,
-	}.Listen("raknet", o.addr)
+	}.Listen("raknet", o.address)
 
 	if err != nil {
 		return err
 	}
 	defer l.Close()
-	o.log.Printf("Oomph is now listening on %v and directing connections to %v!\n", o.addr, remoteAddr)
+	o.log.Printf("Oomph is now listening on %v and directing connections to %v!\n", o.address, remoteAddr)
 	for {
 		c, err := l.Accept()
 		if err != nil {
@@ -78,8 +75,31 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 	}
 }
 
-// handleConn handles a new incoming minecraft.Conn from the minecraft.Listener passed.
+// Accept returns a player selected from the channel.
+func (o *Oomph) Accept() (*player.Player, error) {
+	p, ok := <-o.players
+	if !ok {
+		return nil, fmt.Errorf("unable to accept player: channel closed")
+	}
+
+	return p, nil
+}
+
+// handleConn handles initates a connection between the client and the server, and handles packets from both.
 func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, remoteAddr string) {
+	sentryHub := sentry.CurrentHub().Clone()
+	sentryHub.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetTag("func", "oomph.handleConn()")
+	})
+
+	defer func() {
+		if err := recover(); err != nil {
+			o.log.Errorf("oomph.handleConn() panic: %v", err)
+			sentryHub.Recover(err)
+			sentryHub.Flush(time.Second * 5)
+		}
+	}()
+
 	clientDat := conn.ClientData()
 	clientDat.ServerAddress = remoteAddr
 
@@ -91,14 +111,15 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: true,
 		IPAddress:                  conn.RemoteAddr().String(),
-	}.DialTimeout("raknet", remoteAddr, time.Second*20)
+	}.Dial("raknet", remoteAddr)
 
 	if err != nil {
 		conn.WritePacket(&packet.Disconnect{
 			Message: err.Error(),
 		})
 		conn.Close()
-		o.log.Error("unable to reach server: " + err.Error())
+
+		o.log.Errorf("unable to reach server: %v", err)
 		return
 	}
 
@@ -106,49 +127,54 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
 
-	data.GameRules = append(data.GameRules, protocol.GameRule{
-		Name:                  "doimmediaterespawn",
-		CanBeModifiedByPlayer: false,
-		Value:                 true,
-	})
-
-	p := player.NewPlayer(logrus.New(), conn, serverConn)
-	p.MovementInfo().ServerPosition = data.PlayerPosition.Sub(mgl32.Vec3{0, 1.62})
-	p.MovementInfo().OnGround = true
-
 	var g sync.WaitGroup
 	g.Add(2)
+
+	success := true
 	go func() {
-		if err := p.Conn().StartGameTimeout(data, time.Minute); err != nil {
-			o.log.Error("oomph conn.StartGame(): " + err.Error())
+		if err := conn.StartGame(data); err != nil {
 			conn.WritePacket(&packet.Disconnect{
 				Message: err.Error(),
 			})
-			conn.Flush()
-			p.Close()
-			p = nil
-			return
+			success = false
 		}
+
 		g.Done()
 	}()
 	go func() {
-		if err := p.ServerConn().DoSpawnTimeout(time.Minute); err != nil {
-			o.log.Error("oomph serverConn.DoSpawn(): " + err.Error())
+		if err := serverConn.DoSpawn(); err != nil {
 			conn.WritePacket(&packet.Disconnect{
 				Message: err.Error(),
 			})
-			conn.Flush()
-			p.Close()
-			p = nil
-			return
+			success = false
 		}
+
 		g.Done()
 	}()
 	g.Wait()
 
-	go func() {
-		o.players <- p
-	}()
+	if !success {
+		conn.Close()
+		serverConn.Close()
+		return
+	}
+
+	p := player.New(o.log, conn, serverConn)
+	select {
+	case o.players <- p:
+		break
+	case <-time.After(time.Second * 3):
+		conn.WritePacket(&packet.Disconnect{
+			Message: "oomph timed out",
+		})
+		conn.Close()
+		p.Close()
+
+		hub := sentry.CurrentHub().Clone()
+		hub.CaptureMessage("Oomph timed out accepting player into channel")
+		hub.Flush(time.Second * 5)
+		return
+	}
 
 	g.Add(2)
 	go func() {
@@ -158,23 +184,33 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		})
 
 		defer func() {
+			conn.Close()
 			serverConn.Close()
 
 			if err := recover(); err != nil {
 				o.log.Errorf("handleConn() panic: %v", err)
 				localHub.Recover(err)
-				localHub.Flush(time.Second * 10)
+				localHub.Flush(time.Second * 5)
+
 				listener.Disconnect(conn, "client connection lost: internal error")
-			} else {
-				listener.Disconnect(conn, "client connection lost: unknown")
-			}
-			g.Done()
-		}()
-		for {
-			if !handleConn(p, listener) {
 				return
 			}
-			//p.ServerConn().Flush()
+
+			listener.Disconnect(conn, "client connection lost: unknown")
+		}()
+		defer g.Done()
+
+		for {
+			pk, err := conn.ReadPacket()
+			if err != nil {
+				o.log.Errorf("error reading packet from client: %v", err)
+				return
+			}
+
+			if err := p.HandleFromClient(pk); err != nil {
+				o.log.Errorf("error handling packet from client: %v", err)
+				return
+			}
 		}
 	}()
 	go func() {
@@ -184,74 +220,36 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		})
 
 		defer func() {
+			conn.Close()
 			serverConn.Close()
 
 			if err := recover(); err != nil {
-				o.log.Errorf("handleServerConn() panic: %v", err)
+				o.log.Errorf("handleConn() panic: %v", err)
 				localHub.Recover(err)
-				localHub.Flush(time.Second * 10)
-				listener.Disconnect(conn, "server connection lost: internal error")
-			} else {
-				listener.Disconnect(conn, "server connection lost: unknown")
-			}
+				localHub.Flush(time.Second * 5)
 
-			g.Done()
-		}()
-		for {
-			if !handleServerConn(p, listener) {
+				listener.Disconnect(conn, "server connection lost: internal error")
 				return
 			}
 
-			//p.SendAck()
-			//p.Conn().Flush()
+			listener.Disconnect(conn, "server connection lost: unknown")
+		}()
+		defer g.Done()
+
+		for {
+			pk, err := serverConn.ReadPacket()
+			if err != nil {
+				o.log.Errorf("error reading packet from server: %v", err)
+				return
+			}
+
+			if err := p.HandleFromServer(pk); err != nil {
+				o.log.Errorf("error handling packet from server: %v", err)
+				return
+			}
 		}
 	}()
+
 	g.Wait()
 	p.Close()
-
-	p = nil
-	conn = nil
-	serverConn = nil
-	runtime.GC()
-}
-
-func handleConn(p *player.Player, listener *minecraft.Listener) bool {
-	if p == nil {
-		return false
-	}
-
-	pk, err := p.Conn().ReadPacket()
-	if err != nil {
-		p.Log().Error(err)
-		return false
-	}
-
-	return p.HandlePacket(pk, true) == nil
-}
-
-func handleServerConn(p *player.Player, listener *minecraft.Listener) bool {
-	if p == nil {
-		return false
-	}
-
-	pk, err := p.ServerConn().ReadPacket()
-
-	if err != nil {
-		p.Log().Error("serverConn.ReadPacket() error: " + err.Error())
-		if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
-			_ = listener.Disconnect(p.Conn(), disconnect.Error())
-		}
-
-		return false
-	}
-
-	if d, ok := pk.(*packet.Disconnect); ok {
-		p.Conn().WritePacket(d)
-		p.Conn().Flush()
-		p.Close()
-
-		return false
-	}
-
-	return p.HandlePacket(pk, false) == nil
 }
