@@ -183,7 +183,7 @@ func (p *Player) Close() {
 }
 
 func (p *Player) startTicking() {
-	t := time.NewTicker(time.Millisecond)
+	t := time.NewTicker(time.Millisecond * 50)
 	defer t.Stop()
 
 	for {

@@ -49,7 +49,7 @@ func (h *LatencyHandler) OnTick(p *Player) {
 		h.StackLatency = time.Since(currentTime).Milliseconds()
 		p.clientTick = currentTick
 
-		h.LatencyUpdateTick = currentTick + 20
+		h.LatencyUpdateTick = currentTick + 10
 		h.Responded = true
 		p.Message(fmt.Sprintf("Latency: %dms", h.StackLatency))
 	})
