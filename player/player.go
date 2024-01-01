@@ -4,12 +4,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
 
 type Player struct {
+	// combatMode and movementMode are the authority modes of the player. They are used to determine
+	// how certain actions should be handled.
+	CombatMode   AuthorityMode
+	MovementMode AuthorityMode
+
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
 	// processMu is a mutex that is locked whenever packets need to be processed. It is used to
@@ -20,7 +26,7 @@ type Player struct {
 
 	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
-	runtimeId, clientRuntimeId int64
+	runtimeId, clientRuntimeId uint64
 	uniqueId, clientUniqueId   int64
 
 	// clientTick is the tick of the client, synchronized with the server's on an interval.
@@ -49,10 +55,10 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		clientFrame: 0,
 		serverTick:  0,
 
-		runtimeId:       -1,
-		clientRuntimeId: -1,
-		uniqueId:        -1,
-		clientUniqueId:  -1,
+		runtimeId:       conn.GameData().EntityRuntimeID,
+		clientRuntimeId: conn.GameData().EntityRuntimeID,
+		uniqueId:        conn.GameData().EntityUniqueID,
+		clientUniqueId:  conn.GameData().EntityUniqueID,
 
 		handlers:   []Handler{},
 		detections: []Handler{},
@@ -63,10 +69,18 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 	// NOTE: Handlers must be registered in order in terms of priority.
 	p.RegisterHandler(&LatencyHandler{})
+	p.RegisterHandler(&MovementHandler{})
+	p.RegisterHandler(&EntityHandler{
+		Entities:       map[uint64]*entity.Entity{},
+		MaxRewindTicks: DefaultEntityHistorySize,
+	})
 	p.RegisterHandler(&AcknowledgementHandler{
 		AckMap: map[int64][]func(){},
 	})
-	p.RegisterHandler(&MovementHandler{})
+
+	// Set the default authority modes to AuthorityModeComplete.
+	p.CombatMode = AuthorityModeComplete
+	p.MovementMode = AuthorityModeComplete
 
 	go p.startTicking()
 	return p
@@ -170,6 +184,7 @@ func (p *Player) Message(msg string) {
 	})
 }
 
+// Close closes the player.
 func (p *Player) Close() {
 	p.once.Do(func() {
 		close(p.c)
@@ -187,6 +202,7 @@ func (p *Player) Close() {
 	})
 }
 
+// startTicking starts the player's tick loop.
 func (p *Player) startTicking() {
 	t := time.NewTicker(time.Millisecond * 50)
 	defer t.Stop()
@@ -203,7 +219,7 @@ func (p *Player) startTicking() {
 	}
 }
 
-// tick returns false if the player should be removed.
+// tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
 func (p *Player) tick() bool {
 	p.processMu.Lock()
 	defer p.processMu.Unlock()
