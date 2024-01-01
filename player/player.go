@@ -174,8 +174,13 @@ func (p *Player) Close() {
 	p.once.Do(func() {
 		close(p.c)
 
+		p.conn.Close()
 		p.conn = nil
-		p.serverConn = nil
+
+		if p.serverConn != nil {
+			p.serverConn.Close()
+			p.serverConn = nil
+		}
 
 		p.handlers = nil
 		p.detections = nil
