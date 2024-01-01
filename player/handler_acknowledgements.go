@@ -13,6 +13,8 @@ const (
 	AckDivider = 1_000
 )
 
+// AcknowledgementHandler handles acknowledgements to the client, so that the anti-cheat knows the precise
+// tick the client processed a certain action.
 type AcknowledgementHandler struct {
 	// LegacyMode is set to true if the client's protocol version is 1.20.0 or lower.
 	LegacyMode bool
