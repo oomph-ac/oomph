@@ -8,6 +8,7 @@ import (
 
 const HandlerIDLatency = "oomph:latency"
 
+// LatencyHandler updates the latency and client tick of the player, which is used for synchronization.
 type LatencyHandler struct {
 	StackLatency      int64
 	LatencyUpdateTick int64

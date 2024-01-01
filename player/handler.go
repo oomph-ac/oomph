@@ -2,6 +2,7 @@ package player
 
 import "github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 
+// Handler is an interface that can be implemented to have the player handle certain packets and events.
 type Handler interface {
 	// ID returns a string that identifies the handler.
 	ID() string

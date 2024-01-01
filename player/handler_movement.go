@@ -17,6 +17,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
 		return true
 	}
 
+	// Update client tick and simulation frame.
 	p.clientFrame = int64(input.Tick)
 	p.clientTick++
 
