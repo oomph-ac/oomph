@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -51,6 +50,5 @@ func (h *LatencyHandler) OnTick(p *Player) {
 
 		h.LatencyUpdateTick = currentTick + 10
 		h.Responded = true
-		p.Message(fmt.Sprintf("Latency: %dms", h.StackLatency))
 	})
 }
