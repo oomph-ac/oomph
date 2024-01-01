@@ -1,6 +1,7 @@
 package oomph
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -239,7 +240,23 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		for {
 			pk, err := serverConn.ReadPacket()
 			if err != nil {
+				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
+					conn.WritePacket(&packet.Disconnect{
+						Message: disconnect.Error(),
+					})
+					listener.Disconnect(conn, disconnect.Error())
+					return
+				}
+
 				o.log.Errorf("error reading packet from server: %v", err)
+				return
+			}
+
+			if d, ok := pk.(*packet.Disconnect); ok {
+				conn.WritePacket(d)
+				conn.Flush()
+				p.Close()
+
 				return
 			}
 
