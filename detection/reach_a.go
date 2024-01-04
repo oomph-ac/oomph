@@ -1,6 +1,9 @@
 package detection
 
 import (
+	"fmt"
+
+	"github.com/elliotchance/orderedmap/v2"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -10,7 +13,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const DetectionIDReachA = "reach_a"
+const DetectionIDReachA = "oomph:reach_a"
 
 const interpolationIncrement float32 = 1 / 20.0
 const noHit float32 = 69.0
@@ -24,6 +27,15 @@ type ReachA struct {
 	startAttackPos mgl32.Vec3
 }
 
+func NewReachA() *ReachA {
+	d := &ReachA{}
+	d.Punishable = true
+	d.MaxViolations = 15
+	d.trustDuration = 90 * player.TicksPerSecond
+
+	return d
+}
+
 func (d *ReachA) ID() string {
 	return DetectionIDReachA
 }
@@ -34,6 +46,10 @@ func (d *ReachA) Name() (string, string) {
 
 func (d *ReachA) Description() string {
 	return "Detects when a player's attack range exceeds 3 blocks."
+}
+
+func (d *ReachA) Punish() bool {
+	return true
 }
 
 func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
@@ -95,7 +111,6 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 		// Do not attempt a raycast if there is a significant change in the player's yaw.
 		if attackDirectionDelta.Z() >= 20 {
-			p.Message("yaw change too high")
 			return true
 		}
 
@@ -135,11 +150,15 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		}
 
 		// TODO: Handle gamemode (don't detect in Creative, Spectator, etc.)
-		if minDist > 3.005 {
-			d.Fail(p, 1.001, Data{"distance", game.Round32(minDist, 2)})
+		if minDist > 0 {
+			p.Message(fmt.Sprintf("%f", minDist))
+			data := orderedmap.NewOrderedMap[string, any]()
+			data.Set("distance", game.Round32(minDist, 4))
+			d.Fail(p, 1.001, data)
+
 			return true
 		}
-		d.Debuff(0.001)
+		d.Debuff(0.0025)
 	}
 
 	return true

@@ -23,6 +23,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.11 // indirect
+	github.com/elliotchance/orderedmap/v2 v2.2.0 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.3.2 // indirect
 	github.com/go-echarts/statsview v0.3.4 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
