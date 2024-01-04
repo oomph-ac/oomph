@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -78,6 +77,22 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
 		}
 
 		h.moveEntity(pk.EntityRuntimeID, p.serverTick, pk.Position)
+	case *packet.SetActorData:
+		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
+		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
+
+		e := h.FindEntity(pk.EntityRuntimeID)
+		if e == nil {
+			return true
+		}
+
+		if widthExists {
+			e.Width = width.(float32)
+		}
+
+		if heightExists {
+			e.Height = height.(float32)
+		}
 	}
 
 	return true
@@ -96,8 +111,8 @@ func (h *EntityHandler) AddEntity(rid uint64, e *entity.Entity) {
 	h.Entities[rid] = e
 }
 
-// Entity returns an entity from the given runtime ID. Nil is returned if the entity does not exist.
-func (h *EntityHandler) Entity(rid uint64) *entity.Entity {
+// FindEntity returns an entity from the given runtime ID. Nil is returned if the entity does not exist.
+func (h *EntityHandler) FindEntity(rid uint64) *entity.Entity {
 	return h.Entities[rid]
 }
 
@@ -108,9 +123,13 @@ func (h *EntityHandler) RemoveEntity(rid uint64) {
 
 // moveEntity moves an entity to the given position.
 func (h *EntityHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
-	e := h.Entity(rid)
+	e := h.FindEntity(rid)
 	if e == nil {
 		return
+	}
+
+	if e.IsPlayer {
+		pos[1] -= 1.62
 	}
 
 	e.RecievePosition(entity.HistoricalPosition{
@@ -121,8 +140,7 @@ func (h *EntityHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
 
 // tickEntities ticks all the entities in the entity handler.
 func (h *EntityHandler) tickEntities(tick int64) {
-	for rid, e := range h.Entities {
+	for _, e := range h.Entities {
 		e.Tick(tick)
-		fmt.Println(tick, rid, e.Position, e.InterpolationTicks)
 	}
 }
