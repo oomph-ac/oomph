@@ -11,6 +11,9 @@ import (
 )
 
 type Player struct {
+	// Connected is true if the player is connected to Oomph.
+	Connected bool
+
 	// combatMode and movementMode are the authority modes of the player. They are used to determine
 	// how certain actions should be handled.
 	CombatMode   AuthorityMode
@@ -34,8 +37,8 @@ type Player struct {
 	clientTick, clientFrame int64
 	serverTick              int64
 
-	// handlers contains packet handlers registered to the player.
-	handlers []Handler
+	// packetHandlers contains packet packetHandlers registered to the player.
+	packetHandlers []Handler
 	// detections contains packet handlers specifically used for detections.
 	detections []Handler
 
@@ -48,6 +51,8 @@ type Player struct {
 // New creates and returns a new Player instance.
 func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	p := &Player{
+		Connected: true,
+
 		conn:       conn,
 		serverConn: serverConn,
 
@@ -60,8 +65,8 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		uniqueId:        conn.GameData().EntityUniqueID,
 		clientUniqueId:  conn.GameData().EntityUniqueID,
 
-		handlers:   []Handler{},
-		detections: []Handler{},
+		packetHandlers: []Handler{},
+		detections:     []Handler{},
 
 		log: log,
 		c:   make(chan bool),
@@ -86,13 +91,23 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	return p
 }
 
+// Conn returns the connection to the client.
+func (p *Player) Conn() *minecraft.Conn {
+	return p.conn
+}
+
+// ServerConn returns the connection to the server.
+func (p *Player) ServerConn() *minecraft.Conn {
+	return p.serverConn
+}
+
 // HandleFromClient handles a packet from the client.
 func (p *Player) HandleFromClient(pk packet.Packet) error {
 	p.processMu.Lock()
 	defer p.processMu.Unlock()
 
 	cancel := false
-	for _, h := range p.handlers {
+	for _, h := range p.packetHandlers {
 		cancel = cancel || !h.HandleClientPacket(pk, p)
 	}
 
@@ -109,7 +124,7 @@ func (p *Player) HandleFromServer(pk packet.Packet) error {
 	defer p.processMu.Unlock()
 
 	cancel := false
-	for _, h := range p.handlers {
+	for _, h := range p.packetHandlers {
 		cancel = cancel || !h.HandleServerPacket(pk, p)
 	}
 
@@ -122,24 +137,24 @@ func (p *Player) HandleFromServer(pk packet.Packet) error {
 
 // RegisterHandler registers a handler to the player.
 func (p *Player) RegisterHandler(h Handler) {
-	p.handlers = append(p.handlers, h)
+	p.packetHandlers = append(p.packetHandlers, h)
 }
 
 // UnregisterHandler unregisters a handler from the player.
 func (p *Player) UnregisterHandler(id string) {
-	for i, h := range p.handlers {
+	for i, h := range p.packetHandlers {
 		if h.ID() != id {
 			continue
 		}
 
-		p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
+		p.packetHandlers = append(p.packetHandlers[:i], p.packetHandlers[i+1:]...)
 		return
 	}
 }
 
 // Handler returns a handler from the player.
 func (p *Player) Handler(id string) Handler {
-	for _, h := range p.handlers {
+	for _, h := range p.packetHandlers {
 		if h.ID() == id {
 			return h
 		}
@@ -184,9 +199,15 @@ func (p *Player) Message(msg string) {
 	})
 }
 
+// Log returns the player's logger.
+func (p *Player) Log() *logrus.Logger {
+	return p.log
+}
+
 // Close closes the player.
 func (p *Player) Close() {
 	p.once.Do(func() {
+		p.Connected = false
 		close(p.c)
 
 		p.conn.Close()
@@ -197,7 +218,7 @@ func (p *Player) Close() {
 			p.serverConn = nil
 		}
 
-		p.handlers = nil
+		p.packetHandlers = nil
 		p.detections = nil
 	})
 }
@@ -227,7 +248,7 @@ func (p *Player) tick() bool {
 	p.serverTick++
 
 	// Tick all the handlers.
-	for _, h := range p.handlers {
+	for _, h := range p.packetHandlers {
 		h.OnTick(p)
 	}
 
