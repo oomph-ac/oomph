@@ -16,6 +16,8 @@ const (
 	GameVersion1_20_40 = 622
 )
 
+const TicksPerSecond = 20
+
 type Player struct {
 	// Connected is true if the player is connected to Oomph.
 	Connected bool
@@ -48,6 +50,9 @@ type Player struct {
 	// detections contains packet handlers specifically used for detections.
 	detections []Handler
 
+	// eventHandler is a handler that handles events such as punishments and flags from detections.
+	eventHandler EventHandler
+
 	log *logrus.Logger
 
 	c    chan bool
@@ -73,6 +78,8 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		packetHandlers: []Handler{},
 		detections:     []Handler{},
+
+		eventHandler: &NopEventHandler{},
 
 		log: log,
 		c:   make(chan bool),
@@ -158,6 +165,16 @@ func (p *Player) Handler(id string) Handler {
 	return nil
 }
 
+// HandleEvents sets the event handler for the player.
+func (p *Player) HandleEvents(h EventHandler) {
+	p.eventHandler = h
+}
+
+// EventHandler returns the event handler for the player.
+func (p *Player) EventHandler() EventHandler {
+	return p.eventHandler
+}
+
 // RegisterDetection registers a detection to the player.
 func (p *Player) RegisterDetection(d Handler) {
 	p.detections = append(p.detections, d)
@@ -197,6 +214,14 @@ func (p *Player) Message(msg string) {
 // Log returns the player's logger.
 func (p *Player) Log() *logrus.Logger {
 	return p.log
+}
+
+// Disconnect disconnects the player with the given reason.
+func (p *Player) Disconnect(reason string) {
+	p.conn.WritePacket(&packet.Disconnect{
+		Message: reason,
+	})
+	p.conn.Flush()
 }
 
 // Close closes the player.

@@ -20,6 +20,8 @@ github.com/df-mc/worldupgrader v1.0.11-0.20231208193353-d636e603679e h1:kaaHbpTo
 github.com/df-mc/worldupgrader v1.0.11-0.20231208193353-d636e603679e/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
 github.com/df-mc/worldupgrader v1.0.11 h1:7dlebxDXY8QND3MnDPnty7qeAqtxJE8kVqvs6VDs1YI=
 github.com/df-mc/worldupgrader v1.0.11/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
+github.com/elliotchance/orderedmap/v2 v2.2.0 h1:7/2iwO98kYT4XkOjA9mBEIwvi4KpGB4cyHeOFOnj4Vk=
+github.com/elliotchance/orderedmap/v2 v2.2.0/go.mod h1:85lZyVbpGaGvHvnKa7Qhx7zncAdBIBq6u56Hb1PRU5Q=
 github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8 h1:cdvxuwQ3kS23Hb2Zb7EoHeDM8IMs64C2B8ZpCkVRlp4=
 github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8/go.mod h1:xBh0GYHZ5yHg3YvvUGriGLSAlm7YW2S9SRULstdLZLk=
 github.com/ethaniccc/gophertunnel v0.0.0-20231208222323-ba8e5fbfee89 h1:y7tryhD6fuYtSEAuUHcJjv1OzLKTwTM9jFW4Kx4lIjw=
