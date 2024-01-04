@@ -1,8 +1,9 @@
-package player
+package handler
 
 import (
 	"time"
 
+	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -16,11 +17,15 @@ type LatencyHandler struct {
 	Responded bool
 }
 
+func NewLatencyHandler() *LatencyHandler {
+	return &LatencyHandler{}
+}
+
 func (LatencyHandler) ID() string {
 	return HandlerIDLatency
 }
 
-func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
+func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if _, ok := pk.(*packet.TickSync); ok {
 		h.Responded = true
 	}
@@ -28,12 +33,12 @@ func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
 	return true
 }
 
-func (h LatencyHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
+func (h LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	return true
 }
 
-func (h *LatencyHandler) OnTick(p *Player) {
-	if p.clientTick < h.LatencyUpdateTick {
+func (h *LatencyHandler) OnTick(p *player.Player) {
+	if p.ClientTick < h.LatencyUpdateTick {
 		return
 	}
 
@@ -43,11 +48,11 @@ func (h *LatencyHandler) OnTick(p *Player) {
 	h.Responded = false
 
 	currentTime := time.Now()
-	currentTick := p.serverTick
+	currentTick := p.ServerTick
 
 	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
 		h.StackLatency = time.Since(currentTime).Milliseconds()
-		p.clientTick = currentTick
+		p.ClientTick = currentTick
 
 		h.LatencyUpdateTick = currentTick + 10
 		h.Responded = true

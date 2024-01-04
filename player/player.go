@@ -4,10 +4,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oomph-ac/oomph/entity"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	GameVersion1_20_0  = 589
+	GameVersion1_20_10 = 594
+	GameVersion1_20_30 = 618
+	GameVersion1_20_40 = 622
 )
 
 type Player struct {
@@ -19,6 +25,16 @@ type Player struct {
 	CombatMode   AuthorityMode
 	MovementMode AuthorityMode
 
+	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
+	// we must translate them to new ones, while still retaining the old ones for the client to use.
+	RuntimeId, ClientRuntimeId uint64
+	UniqueId, ClientUniqueId   int64
+
+	// ClientTick is the tick of the client, synchronized with the server's on an interval.
+	// ClientFrame is the simulation frame of the client, sent in PlayerAuthInput.
+	ClientTick, ClientFrame int64
+	ServerTick              int64
+
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
 	// processMu is a mutex that is locked whenever packets need to be processed. It is used to
@@ -26,16 +42,6 @@ type Player struct {
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
 	// being associated with.
 	processMu sync.Mutex
-
-	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
-	// we must translate them to new ones, while still retaining the old ones for the client to use.
-	runtimeId, clientRuntimeId uint64
-	uniqueId, clientUniqueId   int64
-
-	// clientTick is the tick of the client, synchronized with the server's on an interval.
-	// clientFrame is the simulation frame of the client, sent in PlayerAuthInput.
-	clientTick, clientFrame int64
-	serverTick              int64
 
 	// packetHandlers contains packet packetHandlers registered to the player.
 	packetHandlers []Handler
@@ -56,14 +62,14 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		conn:       conn,
 		serverConn: serverConn,
 
-		clientTick:  0,
-		clientFrame: 0,
-		serverTick:  0,
+		ClientTick:  0,
+		ClientFrame: 0,
+		ServerTick:  0,
 
-		runtimeId:       conn.GameData().EntityRuntimeID,
-		clientRuntimeId: conn.GameData().EntityRuntimeID,
-		uniqueId:        conn.GameData().EntityUniqueID,
-		clientUniqueId:  conn.GameData().EntityUniqueID,
+		RuntimeId:       conn.GameData().EntityRuntimeID,
+		ClientRuntimeId: conn.GameData().EntityRuntimeID,
+		UniqueId:        conn.GameData().EntityUniqueID,
+		ClientUniqueId:  conn.GameData().EntityUniqueID,
 
 		packetHandlers: []Handler{},
 		detections:     []Handler{},
@@ -71,17 +77,6 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		log: log,
 		c:   make(chan bool),
 	}
-
-	// NOTE: Handlers must be registered in order in terms of priority.
-	p.RegisterHandler(&LatencyHandler{})
-	p.RegisterHandler(&MovementHandler{})
-	p.RegisterHandler(&EntityHandler{
-		Entities:       map[uint64]*entity.Entity{},
-		MaxRewindTicks: DefaultEntityHistorySize,
-	})
-	p.RegisterHandler(&AcknowledgementHandler{
-		AckMap: map[int64][]func(){},
-	})
 
 	// Set the default authority modes to AuthorityModeComplete.
 	p.CombatMode = AuthorityModeComplete
@@ -245,7 +240,7 @@ func (p *Player) tick() bool {
 	p.processMu.Lock()
 	defer p.processMu.Unlock()
 
-	p.serverTick++
+	p.ServerTick++
 
 	// Tick all the handlers.
 	for _, h := range p.packetHandlers {

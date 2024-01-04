@@ -4,6 +4,7 @@ import (
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -56,13 +57,13 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			return true
 		}
 
-		entity := p.Handler(player.HandlerIDEntities).(*player.EntityHandler).FindEntity(dat.TargetEntityRuntimeID)
+		entity := p.Handler(handler.HandlerIDEntities).(*handler.EntityHandler).FindEntity(dat.TargetEntityRuntimeID)
 		if entity == nil {
 			return true
 		}
 
 		d.targetedEntity = dat.TargetEntityRuntimeID
-		d.startAttackPos = p.Handler(player.HandlerIDMovement).(*player.MovementHandler).PrevClientPosition
+		d.startAttackPos = p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).PrevClientPosition
 		d.run = true
 	case *packet.PlayerAuthInput:
 		defer func() {
@@ -77,12 +78,12 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			return true
 		}
 
-		entity := p.Handler(player.HandlerIDEntities).(*player.EntityHandler).FindEntity(d.targetedEntity)
+		entity := p.Handler(handler.HandlerIDEntities).(*handler.EntityHandler).FindEntity(d.targetedEntity)
 		if entity == nil {
 			return true
 		}
 
-		movementHandler := p.Handler(player.HandlerIDMovement).(*player.MovementHandler)
+		movementHandler := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 		offset := float32(1.62)
 		if movementHandler.Sneaking {
 			offset = 1.54

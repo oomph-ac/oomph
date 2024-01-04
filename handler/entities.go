@@ -1,10 +1,11 @@
-package player
+package handler
 
 import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -19,19 +20,26 @@ type EntityHandler struct {
 	MaxRewindTicks int
 }
 
+func NewEntityHandler() *EntityHandler {
+	return &EntityHandler{
+		Entities:       make(map[uint64]*entity.Entity),
+		MaxRewindTicks: DefaultEntityHistorySize,
+	}
+}
+
 func (h *EntityHandler) ID() string {
 	return HandlerIDEntities
 }
 
-func (h *EntityHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
-	if _, ok := pk.(*packet.PlayerAuthInput); ok && p.CombatMode == AuthorityModeSemi {
-		h.tickEntities(p.serverTick)
+func (h *EntityHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
+	if _, ok := pk.(*packet.PlayerAuthInput); ok && p.CombatMode == player.AuthorityModeSemi {
+		h.tickEntities(p.ServerTick)
 	}
 
 	return true
 }
 
-func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
+func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.AddActor:
 		h.AddEntity(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, false))
@@ -40,43 +48,43 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
 	case *packet.RemoveActor:
 		h.RemoveEntity(uint64(pk.EntityUniqueID))
 	case *packet.MoveActorAbsolute:
-		if pk.EntityRuntimeID == p.runtimeId {
+		if pk.EntityRuntimeID == p.RuntimeId {
 			return true
 		}
 
-		if pk.EntityRuntimeID == p.clientRuntimeId {
+		if pk.EntityRuntimeID == p.ClientRuntimeId {
 			pk.EntityRuntimeID = math.MaxUint64
 		}
 
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the
 		// position before the entity is moved.
-		if p.CombatMode == AuthorityModeSemi {
+		if p.CombatMode == player.AuthorityModeSemi {
 			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-				h.moveEntity(pk.EntityRuntimeID, p.serverTick, pk.Position)
+				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
 			})
 			return true
 		}
 
-		h.moveEntity(pk.EntityRuntimeID, p.serverTick, pk.Position)
+		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
 	case *packet.MovePlayer:
-		if pk.EntityRuntimeID == p.runtimeId {
+		if pk.EntityRuntimeID == p.RuntimeId {
 			return true
 		}
 
-		if pk.EntityRuntimeID == p.clientRuntimeId {
+		if pk.EntityRuntimeID == p.ClientRuntimeId {
 			pk.EntityRuntimeID = math.MaxUint64
 		}
 
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the
 		// position before the entity is moved.
-		if p.CombatMode == AuthorityModeSemi {
+		if p.CombatMode == player.AuthorityModeSemi {
 			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-				h.moveEntity(pk.EntityRuntimeID, p.serverTick, pk.Position)
+				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
 			})
 			return true
 		}
 
-		h.moveEntity(pk.EntityRuntimeID, p.serverTick, pk.Position)
+		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
 	case *packet.SetActorData:
 		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
@@ -98,12 +106,12 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
 	return true
 }
 
-func (h *EntityHandler) OnTick(p *Player) {
-	if p.CombatMode != AuthorityModeComplete {
+func (h *EntityHandler) OnTick(p *player.Player) {
+	if p.CombatMode != player.AuthorityModeComplete {
 		return
 	}
 
-	h.tickEntities(p.serverTick)
+	h.tickEntities(p.ServerTick)
 }
 
 // AddEntity adds an entity to the entity handler.

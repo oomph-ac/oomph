@@ -1,7 +1,8 @@
-package player
+package handler
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -25,19 +26,23 @@ type MovementHandler struct {
 	TicksSinceKnockback int
 }
 
+func NewMovementHandler() *MovementHandler {
+	return &MovementHandler{}
+}
+
 func (MovementHandler) ID() string {
 	return HandlerIDMovement
 }
 
-func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
+func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	input, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return true
 	}
 
 	// Update client tick and simulation frame.
-	p.clientFrame = int64(input.Tick)
-	p.clientTick++
+	p.ClientFrame = int64(input.Tick)
+	p.ClientTick++
 
 	// Update the amount of ticks since actions.
 	h.TicksSinceKnockback++
@@ -63,10 +68,10 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
 	return true
 }
 
-func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
+func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.SetActorMotion:
-		if pk.EntityRuntimeID != p.runtimeId {
+		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
 		}
 
@@ -79,4 +84,4 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
 	return true
 }
 
-func (MovementHandler) OnTick(p *Player) {}
+func (MovementHandler) OnTick(p *player.Player) {}

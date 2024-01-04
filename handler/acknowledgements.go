@@ -1,8 +1,9 @@
-package player
+package handler
 
 import (
 	"math/rand"
 
+	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -29,14 +30,20 @@ type AcknowledgementHandler struct {
 	CurrentTimestamp int64
 }
 
+func NewAcknowledgementHandler() *AcknowledgementHandler {
+	return &AcknowledgementHandler{
+		AckMap: make(map[int64][]func()),
+	}
+}
+
 func (AcknowledgementHandler) ID() string {
 	return HandlerIDAcknowledgements
 }
 
-func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *Player) bool {
+func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.TickSync:
-		a.Playstation = p.conn.ClientData().DeviceOS == protocol.DeviceOrbis
+		a.Playstation = p.Conn().ClientData().DeviceOS == protocol.DeviceOrbis
 		a.Refresh()
 	case *packet.NetworkStackLatency:
 		return !a.Execute(pk.Timestamp)
@@ -45,13 +52,13 @@ func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *Player)
 	return true
 }
 
-func (AcknowledgementHandler) HandleServerPacket(pk packet.Packet, p *Player) bool {
+func (AcknowledgementHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	return true
 }
 
-func (a *AcknowledgementHandler) OnTick(p *Player) {
+func (a *AcknowledgementHandler) OnTick(p *player.Player) {
 	if pk := a.CreatePacket(); pk != nil {
-		p.conn.WritePacket(pk)
+		p.Conn().WritePacket(pk)
 	}
 
 	a.Refresh()

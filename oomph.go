@@ -8,6 +8,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/detection"
+	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -162,6 +163,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}
 
 	p := player.New(o.log, conn, serverConn)
+	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
 
 	select {
