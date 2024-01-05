@@ -32,11 +32,16 @@ type Player struct {
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
 	RuntimeId, ClientRuntimeId uint64
 	UniqueId, ClientUniqueId   int64
+	IDModified                 bool
 
 	// ClientTick is the tick of the client, synchronized with the server's on an interval.
 	// ClientFrame is the simulation frame of the client, sent in PlayerAuthInput.
 	ClientTick, ClientFrame int64
 	ServerTick              int64
+
+	// GameMode is the gamemode of the player. The player is exempt from movement predictions
+	// if they are not in survival or adventure mode.
+	GameMode int32
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
@@ -76,6 +81,7 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		ClientRuntimeId: conn.GameData().EntityRuntimeID,
 		UniqueId:        conn.GameData().EntityUniqueID,
 		ClientUniqueId:  conn.GameData().EntityUniqueID,
+		IDModified:      false,
 
 		packetHandlers: []Handler{},
 		detections:     []Handler{},

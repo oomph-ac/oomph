@@ -46,7 +46,13 @@ func (d *ReachA) ID() string {
 }
 
 func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
+	// Full authoritative mode uses the rewind system, instead of completely lag compensating
+	// for entity positions on the client
 	if p.CombatMode != player.AuthorityModeSemi {
+		return true
+	}
+
+	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
 		return true
 	}
 
@@ -103,15 +109,20 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			offset = 1.54
 		}
 
+		// Get the current and previous rotation of the player. This will be used for interpolation
+		// possible rotations in between.
 		startRotation := movementHandler.PrevRotation
 		endRotation := movementHandler.Rotation
 		attackRotationDelta := endRotation.Sub(startRotation)
 
-		// Do not attempt a raycast if there is a significant change in the player's yaw.
-		if attackRotationDelta.Z() >= 20 {
+		// Do not attempt a raycast if there is a significant change in the player's yaw. This is because
+		// we only want to perform a fixed number of raycasts, and if the player has a high change in rotation,
+		// the raycasts could lead to unreliable results.
+		if attackRotationDelta.Z() >= (1 / interpolationIncrement) {
 			return true
 		}
 
+		// Get the current and previous position of the player. This will be used for interpolation.
 		startAttackPos := d.startAttackPos.Add(mgl32.Vec3{0, offset})
 		endAttackPos := movementHandler.PrevClientPosition.Add(mgl32.Vec3{0, offset})
 		attackPosDelta := endAttackPos.Sub(startAttackPos)
