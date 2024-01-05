@@ -99,7 +99,9 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			h.teleport(pk.Position.Sub(mgl32.Vec3{0, 1.62}), pk.Mode == packet.MoveModeNormal)
 		})
 	case *packet.MoveActorAbsolute:
-
+		if pk.EntityRuntimeID != p.RuntimeId {
+			return true
+		}
 	}
 
 	return true
