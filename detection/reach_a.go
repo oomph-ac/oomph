@@ -1,8 +1,6 @@
 package detection
 
 import (
-	"fmt"
-
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
@@ -15,7 +13,7 @@ import (
 
 const DetectionIDReachA = "oomph:reach_a"
 
-const interpolationIncrement float32 = 1 / 20.0
+const interpolationIncrement float32 = 1 / 10.0
 const noHit float32 = 69.0
 
 type ReachA struct {
@@ -29,27 +27,22 @@ type ReachA struct {
 
 func NewReachA() *ReachA {
 	d := &ReachA{}
+	d.Type = "Reach"
+	d.SubType = "A"
+
+	d.Description = "Detects if a player's attack range exceeds 3 blocks."
 	d.Punishable = true
+
 	d.MaxViolations = 15
 	d.trustDuration = 90 * player.TicksPerSecond
 
+	d.FailBuffer = 1.001
+	d.MaxBuffer = 2.5
 	return d
 }
 
 func (d *ReachA) ID() string {
 	return DetectionIDReachA
-}
-
-func (d *ReachA) Name() (string, string) {
-	return "Reach", "A"
-}
-
-func (d *ReachA) Description() string {
-	return "Detects when a player's attack range exceeds 3 blocks."
-}
-
-func (d *ReachA) Punish() bool {
-	return true
 }
 
 func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
@@ -78,8 +71,9 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			return true
 		}
 
+		movementHandler := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+		d.startAttackPos = movementHandler.PrevClientPosition
 		d.targetedEntity = dat.TargetEntityRuntimeID
-		d.startAttackPos = p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).PrevClientPosition
 		d.run = true
 	case *packet.PlayerAuthInput:
 		defer func() {
@@ -100,33 +94,37 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		}
 
 		movementHandler := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+		if movementHandler.TicksSinceKnockback == 0 {
+			return true
+		}
+
 		offset := float32(1.62)
 		if movementHandler.Sneaking {
 			offset = 1.54
 		}
 
-		startDirection := movementHandler.PrevRotation
-		endDirection := movementHandler.Rotation
-		attackDirectionDelta := endDirection.Sub(startDirection)
+		startRotation := movementHandler.PrevRotation
+		endRotation := movementHandler.Rotation
+		attackRotationDelta := endRotation.Sub(startRotation)
 
 		// Do not attempt a raycast if there is a significant change in the player's yaw.
-		if attackDirectionDelta.Z() >= 20 {
+		if attackRotationDelta.Z() >= 20 {
 			return true
 		}
 
 		startAttackPos := d.startAttackPos.Add(mgl32.Vec3{0, offset})
-		endAttackPos := startAttackPos.Add(movementHandler.PrevClientVel).Sub(movementHandler.Knockback)
+		endAttackPos := movementHandler.PrevClientPosition.Add(mgl32.Vec3{0, offset})
 		attackPosDelta := endAttackPos.Sub(startAttackPos)
 
 		startEntityPos := entity.PrevPosition
-		endEntityPos := entity.PrevPosition.Add(entity.PrevVelocity)
-		// TODO: See if we need to actually interpolate the entity's position.
+		endEntityPos := entity.Position
 		entityPosDelta := endEntityPos.Sub(startEntityPos)
 
 		minDist := noHit
+		totalDist, count := float32(0), float32(0)
 		for partialTicks := float32(0); partialTicks <= 1; partialTicks += interpolationIncrement {
 			currentAttackPos := startAttackPos.Add(attackPosDelta.Mul(partialTicks))
-			currentAttackDirection := startDirection.Add(attackDirectionDelta.Mul(partialTicks))
+			currentAttackDirection := startRotation.Add(attackRotationDelta.Mul(partialTicks))
 			currentEntityPos := startEntityPos.Add(entityPosDelta.Mul(partialTicks))
 
 			// Calculate the attack direction vector.
@@ -139,6 +137,8 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			}
 
 			distance := rayResult.Position().Sub(currentAttackPos).Len()
+			totalDist += distance
+			count++
 			if distance < minDist {
 				minDist = distance
 			}
@@ -149,16 +149,15 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			return true
 		}
 
-		// TODO: Handle gamemode (don't detect in Creative, Spectator, etc.)
-		if minDist > 0 {
-			p.Message(fmt.Sprintf("%f", minDist))
+		avgDist := totalDist / count
+		if minDist >= 2.97 && avgDist > 3.003 {
 			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("distance", game.Round32(minDist, 4))
-			d.Fail(p, 1.001, data)
+			data.Set("distance", game.Round32(avgDist, 4))
+			d.Fail(p, data)
 
 			return true
 		}
-		d.Debuff(0.0025)
+		d.Debuff(0.002)
 	}
 
 	return true

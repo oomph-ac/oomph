@@ -4,15 +4,23 @@ import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
 type BaseDetection struct {
+	Type        string
+	SubType     string
+	Description string
+
 	Violations    float32
 	MaxViolations float32
-	Buffer        float32
+
+	Buffer     float32
+	FailBuffer float32
+	MaxBuffer  float32
 
 	Punishable bool
 	Settings   map[string]interface{}
@@ -23,18 +31,9 @@ type BaseDetection struct {
 	lastFlagged int64
 }
 
+// ID returns the ID of the detection.
 func (d *BaseDetection) ID() string {
 	panic("detection.ID() not implemented")
-}
-
-// Name returns the name of the detection, along with it's sub-type.
-func (d *BaseDetection) Name() (string, string) {
-	panic("detection.Name() not implemented")
-}
-
-// Description returns a description of the detection.
-func (d *BaseDetection) Description() string {
-	panic("detection.Description() not implemented")
 }
 
 // SetSettings sets the settings of the detection.
@@ -43,9 +42,9 @@ func (d *BaseDetection) SetSettings(settings map[string]interface{}) {
 }
 
 // Fail is called when the detection is triggered from adbnormal behavior.
-func (d *BaseDetection) Fail(p *player.Player, maxBuffer float32, extraData *orderedmap.OrderedMap[string, any]) {
-	d.Buffer = math32.Min(d.Buffer+1, maxBuffer*2)
-	if d.Buffer < maxBuffer {
+func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[string, any]) {
+	d.Buffer = math32.Min(d.Buffer+1, d.MaxBuffer)
+	if d.Buffer < d.FailBuffer {
 		return
 	}
 
@@ -55,8 +54,21 @@ func (d *BaseDetection) Fail(p *player.Player, maxBuffer float32, extraData *ord
 		return
 	}
 
-	d.Violations += float32(p.ClientFrame-d.lastFlagged) / float32(d.trustDuration)
+	d.Violations += math32.Max(0, float32(d.trustDuration)-float32(p.ClientFrame-d.lastFlagged)) / float32(d.trustDuration)
 	d.lastFlagged = p.ClientFrame
+	if d.Violations >= 0.5 {
+		// Send the event to the remote server so that any plugins on it can handle the flag.
+		p.SendRemoteEvent("oomph:flagged", map[string]interface{}{
+			"player":     p.Conn().IdentityData().DisplayName,
+			"check_main": d.Type,
+			"check_sub":  d.SubType,
+			"violations": game.Round32(d.Violations, 2),
+		})
+
+		// Parse the extra data into a string.
+		p.Log().Warnf("%s flagged %s (%s) <x%f> %s", p.Conn().IdentityData().DisplayName, d.Type, d.SubType, game.Round32(d.Violations, 2), OrderedMapToString(*extraData))
+	}
+
 	if d.Violations < d.MaxViolations {
 		return
 	}
@@ -73,6 +85,7 @@ func (d *BaseDetection) Fail(p *player.Player, maxBuffer float32, extraData *ord
 		return
 	}
 
+	p.Log().Warnf("%s was removed from the server for usage of third-party modifications.", p.Conn().IdentityData().DisplayName)
 	p.Disconnect(message)
 }
 

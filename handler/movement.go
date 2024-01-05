@@ -24,6 +24,11 @@ type MovementHandler struct {
 	// Knockback is a Vec3 of the knockback applied to the player.
 	Knockback           mgl32.Vec3
 	TicksSinceKnockback int
+
+	// TeleportPos is the position the player is teleporting to.
+	TeleportPos        mgl32.Vec3
+	SmoothTeleport     bool
+	TicksSinceTeleport int
 }
 
 func NewMovementHandler() *MovementHandler {
@@ -47,7 +52,9 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Update the amount of ticks since actions.
 	h.TicksSinceKnockback++
 	if h.TicksSinceKnockback > 0 {
-		h.Knockback = mgl32.Vec3{0, 0, 0}
+		h.Knockback[0] = 0
+		h.Knockback[1] = 0
+		h.Knockback[2] = 0
 	}
 
 	// Update the client's own position.
@@ -57,7 +64,6 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Update the client's own velocity.
 	h.PrevClientVel = h.ClientVel
 	h.ClientVel = h.ClientPosition.Sub(h.PrevClientPosition)
-	//h.ClientVel = input.Delta
 
 	// Update the client's rotations.
 	h.PrevRotation = h.Rotation
@@ -76,12 +82,38 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			h.Knockback = pk.Velocity
-			h.TicksSinceKnockback = -1
+			h.knockback(pk.Velocity)
 		})
+	case *packet.MovePlayer:
+		if pk.EntityRuntimeID != p.RuntimeId {
+			return true
+		}
+
+		// All other modes are capable of teleporting the player.
+		if pk.Mode == packet.MoveModeRotation {
+			return true
+		}
+
+		// Wait for the client to acknowledge the teleport
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			h.teleport(pk.Position.Sub(mgl32.Vec3{0, 1.62}), pk.Mode == packet.MoveModeNormal)
+		})
+	case *packet.MoveActorAbsolute:
+
 	}
 
 	return true
 }
 
 func (MovementHandler) OnTick(p *player.Player) {}
+
+func (h *MovementHandler) teleport(pos mgl32.Vec3, smooth bool) {
+	h.TeleportPos = pos
+	h.SmoothTeleport = smooth
+	h.TicksSinceTeleport = -1
+}
+
+func (h *MovementHandler) knockback(kb mgl32.Vec3) {
+	h.Knockback = kb
+	h.TicksSinceKnockback = -1
+}

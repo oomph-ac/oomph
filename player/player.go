@@ -1,6 +1,7 @@
 package player
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -173,6 +174,16 @@ func (p *Player) HandleEvents(h EventHandler) {
 // EventHandler returns the event handler for the player.
 func (p *Player) EventHandler() EventHandler {
 	return p.eventHandler
+}
+
+// SendRemoteEvent sends an Oomph event to the remote server.
+// TODO: Better way to do this. Please.
+func (p *Player) SendRemoteEvent(id string, data map[string]interface{}) {
+	enc, _ := json.Marshal(data)
+	p.serverConn.WritePacket(&packet.ScriptMessage{
+		Identifier: id,
+		Data:       enc,
+	})
 }
 
 // RegisterDetection registers a detection to the player.

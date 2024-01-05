@@ -198,7 +198,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				localHub.Recover(err)
 				localHub.Flush(time.Second * 5)
 
-				listener.Disconnect(conn, "client connection lost: internal error")
+				listener.Disconnect(conn, "The proxy encountered an error.")
 				return
 			}
 
@@ -234,7 +234,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				localHub.Recover(err)
 				localHub.Flush(time.Second * 5)
 
-				listener.Disconnect(conn, "server connection lost: internal error")
+				listener.Disconnect(conn, "The proxy encountered an error.")
 				return
 			}
 

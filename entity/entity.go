@@ -11,9 +11,16 @@ const (
 )
 
 type Entity struct {
+	// Position is the current position of the entity, after interpolation.
 	Position, PrevPosition mgl32.Vec3
+	// RecvPosition is the position of the entity recieved by the client. It
+	// is used as the end point for interpolation.
+	RecvPosition mgl32.Vec3
+
+	// Velocity is the current position of the entity subtracted by the
 	Velocity, PrevVelocity mgl32.Vec3
-	RecvPosition           mgl32.Vec3
+	// RecvVelocity is the velocity of the entity sent by the server in SetActorMotion.
+	RecvVelocity, PrevRecvVelocity mgl32.Vec3
 
 	HistorySize     int
 	PositionHistory []HistoricalPosition
@@ -69,6 +76,12 @@ func (e *Entity) UpdatePosition(hp HistoricalPosition) {
 	if len(e.PositionHistory) > e.HistorySize {
 		e.PositionHistory = e.PositionHistory[1:]
 	}
+}
+
+// UpdateVelocity updates the velocity of the entity.
+func (e *Entity) UpdateVelocity(vel mgl32.Vec3) {
+	e.PrevRecvVelocity = e.RecvVelocity
+	e.RecvVelocity = vel
 }
 
 // Box returns the entity's bounding box.
