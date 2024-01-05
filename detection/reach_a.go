@@ -94,7 +94,7 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		}
 
 		movementHandler := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-		if movementHandler.TicksSinceKnockback == 0 {
+		if movementHandler.TicksSinceTeleport <= 10 {
 			return true
 		}
 
