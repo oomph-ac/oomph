@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"math"
-
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/player"
@@ -52,10 +50,6 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		if pk.EntityRuntimeID == p.ClientRuntimeId {
-			pk.EntityRuntimeID = math.MaxUint64
-		}
-
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the
 		// position before the entity is moved.
 		if p.CombatMode == player.AuthorityModeSemi {
@@ -69,10 +63,6 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.RuntimeId {
 			return true
-		}
-
-		if pk.EntityRuntimeID == p.ClientRuntimeId {
-			pk.EntityRuntimeID = math.MaxUint64
 		}
 
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the

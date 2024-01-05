@@ -6,6 +6,7 @@ import "github.com/oomph-ac/oomph/player"
 // in order of priority, so that handlers registered first are called first.
 func RegisterHandlers(p *player.Player) {
 	p.RegisterHandler(NewLatencyHandler())
+	p.RegisterHandler(NewGamemodeHandler())
 	p.RegisterHandler(NewMovementHandler())
 	p.RegisterHandler(NewEntityHandler())
 
