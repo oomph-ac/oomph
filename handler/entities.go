@@ -85,6 +85,19 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
+	case *packet.SetActorMotion:
+		if pk.EntityRuntimeID == p.RuntimeId {
+			return true
+		}
+
+		entity := h.FindEntity(pk.EntityRuntimeID)
+		if entity == nil {
+			return true
+		}
+
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			entity.RecvVelocity = pk.Velocity
+		})
 	case *packet.SetActorData:
 		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
