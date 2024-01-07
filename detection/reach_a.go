@@ -46,7 +46,7 @@ func (d *ReachA) ID() string {
 
 func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	// Full authoritative mode uses the rewind system, instead of completely lag compensating
-	// for entity positions on the client
+	// for entity positions on the client.
 	if p.CombatMode != player.AuthorityModeSemi {
 		return true
 	}
@@ -71,7 +71,7 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			return true
 		}
 
-		entity := p.Handler(handler.HandlerIDEntities).(*handler.EntityHandler).FindEntity(dat.TargetEntityRuntimeID)
+		entity := p.Handler(handler.HandlerIDEntities).(*handler.EntityHandler).Find(dat.TargetEntityRuntimeID)
 		if entity == nil {
 			return true
 		}
@@ -93,7 +93,7 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			return true
 		}
 
-		entity := p.Handler(handler.HandlerIDEntities).(*handler.EntityHandler).FindEntity(d.targetedEntity)
+		entity := p.Handler(handler.HandlerIDEntities).(*handler.EntityHandler).Find(d.targetedEntity)
 		if entity == nil {
 			return true
 		}

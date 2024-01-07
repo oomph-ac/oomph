@@ -40,11 +40,11 @@ func (h *EntityHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.AddActor:
-		h.AddEntity(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, false))
+		h.Add(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, false))
 	case *packet.AddPlayer:
-		h.AddEntity(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, true))
+		h.Add(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, true))
 	case *packet.RemoveActor:
-		h.RemoveEntity(uint64(pk.EntityUniqueID))
+		h.Delete(uint64(pk.EntityUniqueID))
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID == p.RuntimeId {
 			return true
@@ -80,7 +80,7 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		entity := h.FindEntity(pk.EntityRuntimeID)
+		entity := h.Find(pk.EntityRuntimeID)
 		if entity == nil {
 			return true
 		}
@@ -92,7 +92,7 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
 
-		e := h.FindEntity(pk.EntityRuntimeID)
+		e := h.Find(pk.EntityRuntimeID)
 		if e == nil {
 			return true
 		}
@@ -117,24 +117,24 @@ func (h *EntityHandler) OnTick(p *player.Player) {
 	h.tickEntities(p.ServerTick)
 }
 
-// AddEntity adds an entity to the entity handler.
-func (h *EntityHandler) AddEntity(rid uint64, e *entity.Entity) {
+// Add adds an entity to the entity handler.
+func (h *EntityHandler) Add(rid uint64, e *entity.Entity) {
 	h.Entities[rid] = e
 }
 
-// FindEntity returns an entity from the given runtime ID. Nil is returned if the entity does not exist.
-func (h *EntityHandler) FindEntity(rid uint64) *entity.Entity {
-	return h.Entities[rid]
+// Delete removes an entity from the entity handler.
+func (h *EntityHandler) Delete(rid uint64) {
+	delete(h.Entities, rid)
 }
 
-// RemoveEntity removes an entity from the entity handler.
-func (h *EntityHandler) RemoveEntity(rid uint64) {
-	delete(h.Entities, rid)
+// Find returns an entity from the given runtime ID. Nil is returned if the entity does not exist.
+func (h *EntityHandler) Find(rid uint64) *entity.Entity {
+	return h.Entities[rid]
 }
 
 // moveEntity moves an entity to the given position.
 func (h *EntityHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
-	e := h.FindEntity(rid)
+	e := h.Find(rid)
 	if e == nil {
 		return
 	}
