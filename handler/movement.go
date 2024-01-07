@@ -87,11 +87,14 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			h.knockback(pk.Velocity)
 		})
 	case *packet.MovePlayer:
+		// Prevent client-side rewinding.
+		pk.Tick = 0
+
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
 		}
 
-		// All other modes are capable of teleporting the player.
+		// All other modes should be capable of teleporting the player.
 		if pk.Mode == packet.MoveModeRotation {
 			return true
 		}
