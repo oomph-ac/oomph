@@ -50,6 +50,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	p.ClientTick++
 
 	// Update the amount of ticks since actions.
+	h.TicksSinceTeleport++
 	h.TicksSinceKnockback++
 	if h.TicksSinceKnockback > 0 {
 		h.Knockback[0] = 0
@@ -63,7 +64,8 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 
 	// Update the client's own velocity.
 	h.PrevClientVel = h.ClientVel
-	h.ClientVel = h.ClientPosition.Sub(h.PrevClientPosition)
+	h.ClientVel = input.Delta
+	//h.ClientVel = h.ClientPosition.Sub(h.PrevClientPosition)
 
 	// Update the client's rotations.
 	h.PrevRotation = h.Rotation

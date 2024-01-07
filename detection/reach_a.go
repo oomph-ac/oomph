@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
@@ -9,12 +10,11 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
 const DetectionIDReachA = "oomph:reach_a"
-
 const interpolationIncrement float32 = 1 / 10.0
-const noHit float32 = 69.0
 
 type ReachA struct {
 	BaseDetection
@@ -118,9 +118,14 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		// Do not attempt a raycast if there is a significant change in the player's yaw. This is because
 		// we only want to perform a fixed number of raycasts, and if the player has a high change in rotation,
 		// the raycasts could lead to unreliable results.
-		if attackRotationDelta.Z() >= (1 / interpolationIncrement) {
+		if attackRotationDelta.Len() >= 20 {
 			return true
 		}
+
+		// These will be used primarily for calculating the closest point from the attack position
+		// to the entity's hitbox.
+		startAttackDirection := game.DirectionVector(startRotation.Z(), startRotation.X())
+		endAttackDirection := game.DirectionVector(endRotation.Z(), endRotation.X())
 
 		// Get the current and previous position of the player. This will be used for interpolation.
 		startAttackPos := d.startAttackPos.Add(mgl32.Vec3{0, offset})
@@ -131,8 +136,8 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		endEntityPos := entity.Position
 		entityPosDelta := endEntityPos.Sub(startEntityPos)
 
-		minDist := noHit
 		totalDist, count := float32(0), float32(0)
+		minDist := float32(math32.MaxFloat32 - 1)
 		for partialTicks := float32(0); partialTicks <= 1; partialTicks += interpolationIncrement {
 			currentAttackPos := startAttackPos.Add(attackPosDelta.Mul(partialTicks))
 			currentAttackDirection := startRotation.Add(attackRotationDelta.Mul(partialTicks))
@@ -142,6 +147,18 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			directionVector := game.DirectionVector(currentAttackDirection.Z(), currentAttackDirection.X())
 			entityBB := entity.Box(currentEntityPos).Grow(0.1)
 
+			closestPoint := game.ClosestPointToBBoxDirectional(
+				currentAttackPos,
+				startAttackDirection,
+				endAttackDirection,
+				entityBB,
+				14.0,
+			)
+			closestDistance := closestPoint.Sub(currentAttackPos).Len()
+			if closestDistance < minDist {
+				minDist = closestDistance
+			}
+
 			rayResult, hit := trace.BBoxIntercept(entityBB, currentAttackPos, currentAttackPos.Add(directionVector.Mul(14.0)))
 			if !hit {
 				continue
@@ -150,25 +167,31 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			distance := rayResult.Position().Sub(currentAttackPos).Len()
 			totalDist += distance
 			count++
-			if distance < minDist {
-				minDist = distance
-			}
 		}
 
 		// TODO: Hitbox detection.
-		if minDist == noHit {
+		if count == 0 {
 			return true
 		}
 
 		avgDist := totalDist / count
-		if minDist >= 2.97 && avgDist > 3.003 {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("distance", game.Round32(avgDist, 4))
-			d.Fail(p, data)
+		if minDist >= 2.95 && avgDist > 3 {
+			p.Message(text.Colourf("<red><bold>%f %f</bold></red>", minDist, avgDist))
+		} else {
+			p.Message(text.Colourf("<green>%f %f</green>", minDist, avgDist))
+		}
 
+		// Check if the mininum distance from the player's attack position is an amount near three blocks
+		// and if the average distance is greater than three blocks.
+		if minDist >= 2.95 && avgDist > 3 {
+			data := orderedmap.NewOrderedMap[string, any]()
+			data.Set("distance", avgDist)
+			data.Set("origin_min", minDist)
+			d.Fail(p, data)
 			return true
 		}
-		d.Debuff(0.002)
+
+		d.Debuff(0.004)
 	}
 
 	return true
