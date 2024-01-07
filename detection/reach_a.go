@@ -10,7 +10,6 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
 const DetectionIDReachA = "oomph:reach_a"
@@ -174,15 +173,9 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			return true
 		}
 
-		avgDist := totalDist / count
-		if minDist >= 2.95 && avgDist > 3 {
-			p.Message(text.Colourf("<red><bold>%f %f</bold></red>", minDist, avgDist))
-		} else {
-			p.Message(text.Colourf("<green>%f %f</green>", minDist, avgDist))
-		}
-
 		// Check if the mininum distance from the player's attack position is an amount near three blocks
 		// and if the average distance is greater than three blocks.
+		avgDist := totalDist / count
 		if minDist >= 2.95 && avgDist > 3 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("distance", avgDist)
