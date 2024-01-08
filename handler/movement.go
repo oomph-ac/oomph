@@ -11,31 +11,23 @@ import (
 const HandlerIDMovement = "oomph:movement"
 
 type MovementHandler struct {
-	// BoundingBox is the bounding box of the player.
-	BoundingBox cube.BBox
-	// Position and PrevPosition are the current and previous *simulated* positions of the player.
-	Position, PrevPosition mgl32.Vec3
-	// ClientPosition and PrevClientPosition are the current and previous *client* positions of the player.
+	BoundingBox                        cube.BBox
+	Position, PrevPosition             mgl32.Vec3
 	ClientPosition, PrevClientPosition mgl32.Vec3
-	// ClientVel and PrevClientVel are the current and previous *client* velocities of the player.
-	ClientVel, PrevClientVel mgl32.Vec3
+	ClientVel, PrevClientVel           mgl32.Vec3
+
 	// Rotation vectors are formatted as {pitch, headYaw, yaw}
 	Rotation, PrevRotation mgl32.Vec3
 
-	// Sneaking is true if the player is sneaking.
-	Sneaking bool
-	// Sprinting is true if the player is sprinting.
+	Sneaking  bool
 	Sprinting bool
 
-	// Jumping is true if the player is jumping.
 	Jumping            bool
 	TicksUntilNextJump int
 
-	// Knockback is a Vec3 of the knockback applied to the player.
 	Knockback           mgl32.Vec3
 	TicksSinceKnockback int
 
-	// TeleportPos is the position the player is teleporting to.
 	TeleportPos        mgl32.Vec3
 	SmoothTeleport     bool
 	TicksSinceTeleport int
