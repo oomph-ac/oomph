@@ -5,6 +5,7 @@ import (
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
@@ -33,7 +34,7 @@ type BaseDetection struct {
 
 // ID returns the ID of the detection.
 func (d *BaseDetection) ID() string {
-	panic("detection.ID() not implemented")
+	panic(oerror.NewOomphError("detection.ID() not implemented"))
 }
 
 // SetSettings sets the settings of the detection.
