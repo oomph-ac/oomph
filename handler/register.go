@@ -7,6 +7,7 @@ import "github.com/oomph-ac/oomph/player"
 func RegisterHandlers(p *player.Player) {
 	p.RegisterHandler(NewLatencyHandler())
 	p.RegisterHandler(NewGamemodeHandler())
+	p.RegisterHandler(NewEffectsHandler())
 	p.RegisterHandler(NewMovementHandler())
 	p.RegisterHandler(NewEntityHandler())
 
