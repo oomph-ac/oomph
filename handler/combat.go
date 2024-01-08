@@ -34,7 +34,9 @@ type CombatHandler struct {
 }
 
 func NewCombatHandler() *CombatHandler {
-	return &CombatHandler{}
+	return &CombatHandler{
+		InterpolationStep: 0.1,
+	}
 }
 
 func (h *CombatHandler) ID() string {
