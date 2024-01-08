@@ -117,6 +117,9 @@ func (h *EntityHandler) OnTick(p *player.Player) {
 	h.tickEntities(p.ServerTick)
 }
 
+func (*EntityHandler) Defer() {
+}
+
 // Add adds an entity to the entity handler.
 func (h *EntityHandler) Add(rid uint64, e *entity.Entity) {
 	h.Entities[rid] = e

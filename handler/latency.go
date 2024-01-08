@@ -33,7 +33,7 @@ func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) 
 	return true
 }
 
-func (h LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
+func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	return true
 }
 
@@ -57,4 +57,7 @@ func (h *LatencyHandler) OnTick(p *player.Player) {
 		h.LatencyUpdateTick = currentTick + 10
 		h.Responded = true
 	})
+}
+
+func (*LatencyHandler) Defer() {
 }

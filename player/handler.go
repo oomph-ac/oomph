@@ -19,6 +19,8 @@ type Handler interface {
 	HandleServerPacket(pk packet.Packet, p *Player) bool
 	// OnTick is called every server tick.
 	OnTick(p *Player)
+	// Defer is called after all detections and handlers have been ran
+	Defer()
 }
 
 // EventHandler is an interface that can be implemented to have the player handle certain events.
