@@ -9,6 +9,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/detection"
 	"github.com/oomph-ac/oomph/handler"
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -98,7 +99,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	defer func() {
 		if err := recover(); err != nil {
 			o.log.Errorf("oomph.handleConn() panic: %v", err)
-			sentryHub.Recover(err)
+			sentryHub.Recover(oerror.NewOomphError(fmt.Sprintf("%v", err)))
 			sentryHub.Flush(time.Second * 5)
 		}
 	}()
@@ -195,7 +196,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 			if err := recover(); err != nil {
 				o.log.Errorf("handleConn() panic: %v", err)
-				localHub.Recover(err)
+				localHub.Recover(oerror.NewOomphError(fmt.Sprintf("%v", err)))
 				localHub.Flush(time.Second * 5)
 
 				listener.Disconnect(conn, "The proxy encountered an error.")
