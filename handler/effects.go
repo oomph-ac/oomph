@@ -74,7 +74,10 @@ func (h *EffectsHandler) HandleServerPacket(pk packet.Packet, p *player.Player) 
 	return true
 }
 
-func (h *EffectsHandler) OnTick(p *player.Player) {
+func (*EffectsHandler) OnTick(p *player.Player) {
+}
+
+func (*EffectsHandler) Defer() {
 }
 
 func (h *EffectsHandler) Get(id int32) (effect.Effect, bool) {

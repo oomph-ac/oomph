@@ -52,7 +52,7 @@ func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.
 	return true
 }
 
-func (AcknowledgementHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
+func (*AcknowledgementHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	return true
 }
 
@@ -62,6 +62,9 @@ func (a *AcknowledgementHandler) OnTick(p *player.Player) {
 	}
 
 	a.Refresh()
+}
+
+func (*AcknowledgementHandler) Defer() {
 }
 
 // AddCallback adds a callback to AckMap.

@@ -118,6 +118,7 @@ func (p *Player) HandleFromClient(pk packet.Packet) error {
 	cancel := false
 	for _, h := range p.packetHandlers {
 		cancel = cancel || !h.HandleClientPacket(pk, p)
+		defer h.Defer()
 	}
 
 	if !p.RunDetections(pk) || cancel {

@@ -105,3 +105,6 @@ func (d *BaseDetection) HandleServerPacket(pk packet.Packet, p *player.Player) b
 
 func (d *BaseDetection) OnTick(p *player.Player) {
 }
+
+func (d *BaseDetection) Defer() {
+}

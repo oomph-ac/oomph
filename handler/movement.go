@@ -126,7 +126,11 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 	return true
 }
 
-func (MovementHandler) OnTick(p *player.Player) {}
+func (*MovementHandler) OnTick(p *player.Player) {
+}
+
+func (*MovementHandler) Defer() {
+}
 
 // calculateClientSpeed calculates the speed of the client when it is predicting its own speed.
 func (h *MovementHandler) calculateClientSpeed(p *player.Player) (speed float32) {

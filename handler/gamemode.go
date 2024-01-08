@@ -35,4 +35,8 @@ func (h *GamemodeHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 	return true
 }
 
-func (h *GamemodeHandler) OnTick(p *player.Player) {}
+func (*GamemodeHandler) OnTick(p *player.Player) {
+}
+
+func (*GamemodeHandler) Defer() {
+}
