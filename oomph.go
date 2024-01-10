@@ -201,11 +201,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				localHub.Recover(oerror.New(fmt.Sprintf("%v", err)))
 				localHub.Flush(time.Second * 5)
 
-				listener.Disconnect(conn, "The proxy encountered an error.")
+				listener.Disconnect(conn, fmt.Sprintf("Error (report to admin): %v", err))
 				return
 			}
 
-			listener.Disconnect(conn, "client connection lost: unknown")
+			listener.Disconnect(conn, "Report to admin: unknown cause for disconnect.")
 		}()
 		defer g.Done()
 
@@ -237,11 +237,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				localHub.Recover(err)
 				localHub.Flush(time.Second * 5)
 
-				listener.Disconnect(conn, "The proxy encountered an error.")
+				listener.Disconnect(conn, fmt.Sprintf("Error (report to admin): %v", err))
 				return
 			}
 
-			listener.Disconnect(conn, "server connection lost: unknown")
+			listener.Disconnect(conn, "Remote server disconnected from proxy.")
 		}()
 		defer g.Done()
 
