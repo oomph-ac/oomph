@@ -22,6 +22,7 @@ const TicksPerSecond = 20
 type Player struct {
 	// Connected is true if the player is connected to Oomph.
 	Connected bool
+	Closed    bool
 
 	// combatMode and movementMode are the authority modes of the player. They are used to determine
 	// how certain actions should be handled.
@@ -114,6 +115,10 @@ func (p *Player) HandleFromClient(pk packet.Packet) error {
 	p.processMu.Lock()
 	defer p.processMu.Unlock()
 
+	if p.Closed {
+		return nil
+	}
+
 	cancel := false
 	for _, h := range p.packetHandlers {
 		cancel = cancel || !h.HandleClientPacket(pk, p)
@@ -131,6 +136,10 @@ func (p *Player) HandleFromClient(pk packet.Packet) error {
 func (p *Player) HandleFromServer(pk packet.Packet) error {
 	p.processMu.Lock()
 	defer p.processMu.Unlock()
+
+	if p.Closed {
+		return nil
+	}
 
 	cancel := false
 	for _, h := range p.packetHandlers {
@@ -282,6 +291,10 @@ func (p *Player) tick() bool {
 	p.processMu.Lock()
 	defer p.processMu.Unlock()
 
+	if p.Closed {
+		return false
+	}
+
 	p.ServerTick++
 
 	// Tick all the handlers.
@@ -295,20 +308,26 @@ func (p *Player) tick() bool {
 	}
 
 	// Flush all the packets for the client to receive.
-	if p.conn != nil {
-		if err := p.conn.Flush(); err != nil {
-			p.log.Errorf("error flushing packets to client: %v", err)
-			return false
-		}
+	if p.conn == nil {
+		p.log.Error("p.conn is nil - cannot tick")
+		return false
+	}
+
+	if err := p.conn.Flush(); err != nil {
+		p.log.Error("client connection is closed")
+		return false
 	}
 
 	// serverConn will be nil if direct mode w/ Dragonfly is used.
-	if p.serverConn != nil {
-		// Flush all the packets for the server to receive.
-		if err := p.serverConn.Flush(); err != nil {
-			p.log.Errorf("error flushing packets to server: %v", err)
-			return false
-		}
+	if p.serverConn == nil {
+		return true
+	}
+
+	// Flush all the packets for the server to receive.
+	if err := p.serverConn.Flush(); err != nil {
+		p.log.Error("server connection is closed")
+		p.Disconnect("Proxy unexpectedly lost connection to remote server.")
+		return false
 	}
 
 	return true
