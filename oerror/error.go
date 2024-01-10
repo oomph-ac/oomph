@@ -4,7 +4,7 @@ type OomphError struct {
 	Err string
 }
 
-func NewOomphError(err string) *OomphError {
+func New(err string) *OomphError {
 	return &OomphError{Err: err}
 }
 
