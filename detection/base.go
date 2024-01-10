@@ -34,7 +34,7 @@ type BaseDetection struct {
 
 // ID returns the ID of the detection.
 func (d *BaseDetection) ID() string {
-	panic(oerror.NewOomphError("detection.ID() not implemented"))
+	panic(oerror.New("detection.ID() not implemented"))
 }
 
 // SetSettings sets the settings of the detection.

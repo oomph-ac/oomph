@@ -47,10 +47,10 @@ func New(log *logrus.Logger, address string) *Oomph {
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
 // Addresses should be formatted in the following format: "ip:port" (ex: "127.0.0.1:19132").
 // If you're using dragonfly, use Listen instead of Start.
-func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []minecraft.Protocol, requirePacks bool, authDisabled bool) error {
+func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []minecraft.Protocol, requirePacks bool, authDisabled bool) {
 	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
 	if err != nil {
-		return err
+		o.log.Errorf("unable to make status provider: %v", err)
 	}
 	l, err := minecraft.ListenConfig{
 		StatusProvider:         p,
@@ -65,14 +65,16 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 	}.Listen("raknet", o.address)
 
 	if err != nil {
-		return err
+		o.log.Errorf("unable to start oomph: %v", err)
+		return
 	}
+
 	defer l.Close()
 	o.log.Printf("Oomph is now listening on %v and directing connections to %v!\n", o.address, remoteAddr)
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		go o.handleConn(c.(*minecraft.Conn), l, remoteAddr)
@@ -99,7 +101,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	defer func() {
 		if err := recover(); err != nil {
 			o.log.Errorf("oomph.handleConn() panic: %v", err)
-			sentryHub.Recover(oerror.NewOomphError(fmt.Sprintf("%v", err)))
+			sentryHub.Recover(oerror.New(fmt.Sprintf("%v", err)))
 			sentryHub.Flush(time.Second * 5)
 		}
 	}()
@@ -196,7 +198,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 			if err := recover(); err != nil {
 				o.log.Errorf("handleConn() panic: %v", err)
-				localHub.Recover(oerror.NewOomphError(fmt.Sprintf("%v", err)))
+				localHub.Recover(oerror.New(fmt.Sprintf("%v", err)))
 				localHub.Flush(time.Second * 5)
 
 				listener.Disconnect(conn, "The proxy encountered an error.")

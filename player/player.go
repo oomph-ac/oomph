@@ -70,6 +70,9 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	p := &Player{
 		Connected: true,
 
+		CombatMode:   AuthorityModeSemi,
+		MovementMode: AuthorityModeSemi,
+
 		conn:       conn,
 		serverConn: serverConn,
 
@@ -91,10 +94,6 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		log: log,
 		c:   make(chan bool),
 	}
-
-	// Set the default authority modes to AuthorityModeComplete.
-	p.CombatMode = AuthorityModeComplete
-	p.MovementMode = AuthorityModeComplete
 
 	go p.startTicking()
 	return p
