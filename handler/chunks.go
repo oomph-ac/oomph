@@ -1,6 +1,9 @@
 package handler
 
 import (
+	_ "unsafe"
+
+	"bytes"
 	"fmt"
 
 	"github.com/chewxy/math32"
@@ -9,6 +12,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -86,6 +90,56 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 
 		c.Compact()
 		world.InsertToCache(h.World, c, pk.Position)
+	case *packet.SubChunk:
+		if pk.CacheEnabled {
+			panic(oerror.New("subchunk caching not supported on oomph"))
+		}
+
+		var newChunks = map[protocol.ChunkPos]*chunk.Chunk{}
+
+		for _, entry := range pk.SubChunkEntries {
+			// Do not handle sub-chunk responses that returned an error.
+			if entry.Result != protocol.SubChunkResultSuccess {
+				continue
+			}
+
+			chunkPos := protocol.ChunkPos{
+				pk.Position[0] + int32(entry.Offset[0]),
+				pk.Position[2] + int32(entry.Offset[2]),
+			}
+
+			var cached *world.CachedChunk
+			var c *chunk.Chunk
+
+			if found := h.World.GetChunk(chunkPos); found != nil {
+				cached = found
+				c = found.Chunk
+			} else {
+				if new, ok := newChunks[chunkPos]; !ok {
+					c = chunk.New(world.AirRuntimeID, dimensionFromNetworkID(pk.Dimension).Range())
+				} else {
+					c = new
+				}
+			}
+
+			var index byte
+			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
+			if err != nil {
+				panic(err)
+			}
+
+			if cached != nil {
+				cached.InsertSubChunk(h.World, sub, index)
+				return true
+			}
+
+			c.Sub()[index] = sub
+			newChunks[chunkPos] = c
+		}
+
+		for pos, newC := range newChunks {
+			world.InsertToCache(h.World, newC, pos)
+		}
 	}
 
 	return true
@@ -96,3 +150,19 @@ func (h *ChunksHandler) OnTick(p *player.Player) {
 
 func (h *ChunksHandler) Defer() {
 }
+
+// dimensionFromNetworkID returns a world.Dimension from the network id.
+func dimensionFromNetworkID(id int32) df_world.Dimension {
+	if id == 1 {
+		return df_world.Nether
+	}
+	if id == 2 {
+		return df_world.End
+	}
+	return df_world.Overworld
+}
+
+// noinspection ALL
+//
+//go:linkname chunk_subChunkDecode github.com/df-mc/dragonfly/server/world/chunk.decodeSubChunk
+func chunk_subChunkDecode(buf *bytes.Buffer, c *chunk.Chunk, index *byte, e chunk.Encoding) (*chunk.SubChunk, error)
