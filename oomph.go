@@ -11,6 +11,7 @@ import (
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/simulation"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -168,6 +169,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	p := player.New(o.log, conn, serverConn)
 	handler.RegisterHandlers(p)
+	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).UseSimulator(&simulation.MovementSimulator{})
 	detection.RegisterDetections(p)
 
 	select {
