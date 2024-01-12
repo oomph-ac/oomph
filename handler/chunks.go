@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -21,7 +24,8 @@ type ChunksHandler struct {
 
 func NewChunksHandler() *ChunksHandler {
 	return &ChunksHandler{
-		World: world.NewWorld(),
+		World:       world.NewWorld(),
+		ChunkRadius: -1,
 	}
 }
 
@@ -31,12 +35,17 @@ func (h *ChunksHandler) ID() string {
 
 func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
+	case *packet.TickSync:
+		h.ChunkRadius = p.ServerConn().GameData().ChunkRadius
 	case *packet.PlayerAuthInput:
 		// TODO: Use server position on full authority mode.
 		h.World.CleanChunks(h.ChunkRadius, protocol.ChunkPos{
-			int32(math32.Floor(pk.Position.X() / 16)),
-			int32(math32.Floor(pk.Position.Z() / 16)),
+			int32(math32.Floor(pk.Position.X())) >> 4,
+			int32(math32.Floor(pk.Position.Z())) >> 4,
 		})
+
+		n, _ := h.World.GetBlock(pk.Position.Sub(mgl32.Vec3{0, 2.62, 0})).EncodeBlock()
+		p.Message(fmt.Sprintf("%s (%v) [%v]", n, p.ClientFrame, h.ChunkRadius))
 	case *packet.RequestChunkRadius:
 		h.ChunkRadius = pk.ChunkRadius
 	}
@@ -76,7 +85,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		c.Compact()
-		h.World.AddChunk(pk.Position, c)
+		world.InsertToCache(h.World, c, pk.Position)
 	}
 
 	return true

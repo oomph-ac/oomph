@@ -15,6 +15,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/text"
 	"github.com/sirupsen/logrus"
 )
 
@@ -193,19 +194,17 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		})
 
 		defer func() {
-			conn.Close()
-			serverConn.Close()
-
 			if err := recover(); err != nil {
 				o.log.Errorf("handleConn() panic: %v", err)
 				localHub.Recover(oerror.New(fmt.Sprintf("%v", err)))
 				localHub.Flush(time.Second * 5)
 
-				listener.Disconnect(conn, fmt.Sprintf("Error (report to admin): %v", err))
+				listener.Disconnect(conn, text.Colourf("<red><bold>Internal proxy error (report to admin):</red></bold>\n%v", err))
 				return
 			}
 
 			listener.Disconnect(conn, "Report to admin: unknown cause for disconnect.")
+			serverConn.Close()
 		}()
 		defer g.Done()
 
@@ -229,19 +228,17 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		})
 
 		defer func() {
-			conn.Close()
-			serverConn.Close()
-
 			if err := recover(); err != nil {
 				o.log.Errorf("handleConn() panic: %v", err)
 				localHub.Recover(err)
 				localHub.Flush(time.Second * 5)
 
-				listener.Disconnect(conn, fmt.Sprintf("Error (report to admin): %v", err))
+				listener.Disconnect(conn, text.Colourf("<red><bold>Internal proxy error (report to admin):</red></bold>\n%v", err))
 				return
 			}
 
-			listener.Disconnect(conn, "Remote server disconnected from proxy.")
+			listener.Disconnect(conn, "Remote server disconnected unexpectedly from proxy.")
+			serverConn.Close()
 		}()
 		defer g.Done()
 
