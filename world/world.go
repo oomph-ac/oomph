@@ -121,12 +121,19 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 
 // CleanChunks cleans up the chunks in respect to the given chunk radius and chunk position.
 func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
+	w.Lock()
+	defer w.Unlock()
+
 	for chunkPos, c := range w.chunks {
 		if chunkInRange(radius, chunkPos, pos) {
 			continue
 		}
 
+		// We have to temporarily unlock the world mutex here to avoid a deadlock when *CachedChunk.Unsubscribe is called
+		// This is so ugly holy shit kill me.
+		w.Unlock()
 		c.Unsubscribe(w)
+		w.Lock()
 	}
 }
 

@@ -4,14 +4,12 @@ import (
 	_ "unsafe"
 
 	"bytes"
-	"fmt"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/world"
@@ -24,6 +22,8 @@ const HandlerIDChunks = "oomph:chunks"
 type ChunksHandler struct {
 	World       *world.World
 	ChunkRadius int32
+
+	InLoadedChunk bool
 }
 
 func NewChunksHandler() *ChunksHandler {
@@ -43,16 +43,20 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		h.ChunkRadius = p.ServerConn().GameData().ChunkRadius
 	case *packet.PlayerAuthInput:
 		// TODO: Use server position on full authority mode.
-		h.World.CleanChunks(h.ChunkRadius, protocol.ChunkPos{
+		chunkPos := protocol.ChunkPos{
 			int32(math32.Floor(pk.Position.X())) >> 4,
 			int32(math32.Floor(pk.Position.Z())) >> 4,
-		})
+		}
 
-		n, _ := h.World.GetBlock(pk.Position.Sub(mgl32.Vec3{0, 2.62, 0})).EncodeBlock()
-		p.Message(fmt.Sprintf("%s (%v) [%v]", n, p.ClientFrame, h.ChunkRadius))
+		h.World.CleanChunks(h.ChunkRadius, chunkPos)
+
+		h.World.Lock()
+		h.InLoadedChunk = (h.World.GetChunk(chunkPos) != nil)
+		h.World.Unlock()
 	case *packet.RequestChunkRadius:
 		h.ChunkRadius = pk.ChunkRadius
 	}
+
 	return true
 }
 
