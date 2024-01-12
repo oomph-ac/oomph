@@ -62,8 +62,6 @@ type Player struct {
 
 	log *logrus.Logger
 
-	lastTickedTime time.Time
-
 	c    chan bool
 	once sync.Once
 }
@@ -93,8 +91,6 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		detections:     []Handler{},
 
 		eventHandler: &NopEventHandler{},
-
-		lastTickedTime: time.Now(),
 
 		log: log,
 		c:   make(chan bool),
@@ -298,14 +294,6 @@ func (p *Player) tick() bool {
 	if p.Closed {
 		return false
 	}
-
-	delta := time.Since(p.lastTickedTime).Milliseconds()
-	if delta > 50 {
-		p.log.Warnf("server tick took %vms", delta)
-	}
-	defer func() {
-		p.lastTickedTime = time.Now()
-	}()
 
 	p.ServerTick++
 
