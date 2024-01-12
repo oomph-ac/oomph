@@ -59,7 +59,7 @@ func clearCacheDuplicates() {
 					// can remove the other chunk from the cache and notify subscribers of the duplicated chunk
 					// to use the original.
 					if other.ID != cached.ID && other.Equals(cached.Chunk) {
-						other.notifyUpdate(nil, cached)
+						other.notifySubscriptionEdit(nil, cached)
 					}
 				}
 			}
@@ -165,7 +165,25 @@ func (c *CachedChunk) Unsubscribe(w *World) {
 	delete(c.Subscribers, w.id)
 }
 
-func (c *CachedChunk) HandleAction(w *World, a SetBlockAction) {
+func (c *CachedChunk) InsertSubChunk(w *World, sub *chunk.SubChunk, index byte) {
+	c.Lock()
+	defer c.Unlock()
+
+	if len(c.Subscribers) == 1 {
+		c.Sub()[index] = sub
+		return
+	}
+
+	copiedChunk := *c.Chunk
+	newCached := NewCached(c.Pos, &copiedChunk)
+	newCached.Sub()[index] = sub
+
+	c.notifySubscriptionEdit(w, newCached)
+}
+
+// ActionSetBlock sets the block in a chunk. The SetBlockAction contains the block position
+// and the runtime ID of the block.
+func (c *CachedChunk) ActionSetBlock(w *World, a SetBlockAction) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -176,7 +194,7 @@ func (c *CachedChunk) HandleAction(w *World, a SetBlockAction) {
 	}
 
 	if new, ok := c.Transactions[a]; ok {
-		c.notifyUpdate(w, new)
+		c.notifySubscriptionEdit(w, new)
 		return
 	}
 
@@ -193,7 +211,7 @@ func (c *CachedChunk) HandleAction(w *World, a SetBlockAction) {
 	c.Transactions[a] = newCached
 }
 
-func (c *CachedChunk) notifyUpdate(w *World, new *CachedChunk) {
+func (c *CachedChunk) notifySubscriptionEdit(w *World, new *CachedChunk) {
 	// If the w is not nil, only one world needs their chunk updated, rather than all the subscribers
 	// currently using the cached chunk.
 	if w != nil {

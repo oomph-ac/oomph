@@ -113,7 +113,7 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 		panic(oerror.New("unable to set block on null chunk"))
 	}
 
-	c.HandleAction(w, SetBlockAction{
+	c.ActionSetBlock(w, SetBlockAction{
 		BlockPos:       pos,
 		BlockRuntimeId: blockID,
 	})
