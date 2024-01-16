@@ -15,7 +15,10 @@ import (
 const HandlerIDMovement = "oomph:movement"
 
 type MovementHandler struct {
-	BoundingBox                        cube.BBox
+	BoundingBox cube.BBox
+	Width       float32
+	Height      float32
+
 	Position, PrevPosition             mgl32.Vec3
 	Velocity, PrevVelocity             mgl32.Vec3
 	ClientPosition, PrevClientPosition mgl32.Vec3
@@ -27,13 +30,18 @@ type MovementHandler struct {
 	ForwardImpulse float32
 	LeftImpulse    float32
 
+	OnGround bool
+
+	KnownInsideBlock bool
+
 	Sneaking        bool
 	SneakKeyPressed bool
 
 	Sprinting        bool
 	SprintKeyPressed bool
 
-	Gravity float32
+	Gravity        float32
+	StepClipOffset float32
 
 	Jumping            bool
 	JumpKeyPressed     bool
@@ -45,7 +53,11 @@ type MovementHandler struct {
 
 	TeleportPos        mgl32.Vec3
 	SmoothTeleport     bool
+	TeleportOnGround   bool
 	TicksSinceTeleport int
+
+	NoClip   bool
+	Immobile bool
 
 	Flying         bool
 	ToggledFly     bool
@@ -102,6 +114,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 		panic(oerror.New("simulator not set in movement handler"))
 	}
 
+	// Run the movement simulation.
 	h.s.Simulate(p)
 	return true
 }
@@ -116,23 +129,15 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
-
 			if !widthExists {
 				width = h.BoundingBox.Width() / 2
 			}
-
 			if !heightExists {
 				height = h.BoundingBox.Height()
 			}
 
-			h.BoundingBox = cube.Box(
-				-width.(float32)/2,
-				0,
-				-width.(float32)/2,
-				width.(float32)/2,
-				height.(float32),
-				width.(float32)/2,
-			)
+			h.Width = width.(float32)
+			h.Height = height.(float32)
 		})
 	case *packet.UpdateAttributes:
 		if pk.EntityRuntimeID != p.RuntimeId {
@@ -143,6 +148,9 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			h.handleAttribute("minecraft:movement", pk.Attributes, func(attr protocol.Attribute) {
 				h.HasServerSpeed = true
 				h.MovementSpeed = float32(attr.Value)
+			})
+			h.handleAttribute("minecraft:health", pk.Attributes, func(attr protocol.Attribute) {
+				p.Alive = attr.Value > 0
 			})
 		})
 	case *packet.SetActorMotion:
@@ -163,9 +171,9 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			return true
 		}
 
-		// Wait for the client to acknowledge the teleport
+		// Wait for the client to acknowledge the teleport.
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			h.teleport(pk.Position.Sub(mgl32.Vec3{0, 1.62}), pk.Mode == packet.MoveModeNormal)
+			h.teleport(pk.Position.Sub(mgl32.Vec3{0, 1.62}), pk.OnGround, pk.Mode == packet.MoveModeNormal)
 		})
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
@@ -176,9 +184,9 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			return true
 		}
 
-		// Wait for the client to acknowledge the teleport
+		// Wait for the client to acknowledge the teleport.
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			h.teleport(pk.Position, false)
+			h.teleport(pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround), false)
 		})
 	}
 
@@ -191,7 +199,7 @@ func (*MovementHandler) OnTick(p *player.Player) {
 func (*MovementHandler) Defer() {
 }
 
-func (h *MovementHandler) UseSimulator(s Simulator) {
+func (h *MovementHandler) Simulate(s Simulator) {
 	h.s = s
 }
 
@@ -225,8 +233,9 @@ func (h *MovementHandler) calculateClientSpeed(p *player.Player) (speed float32)
 }
 
 // teleport sets the teleport position of the player.
-func (h *MovementHandler) teleport(pos mgl32.Vec3, smooth bool) {
+func (h *MovementHandler) teleport(pos mgl32.Vec3, ground, smooth bool) {
 	h.TeleportPos = pos
+	h.TeleportOnGround = ground
 	h.SmoothTeleport = smooth
 	h.TicksSinceTeleport = -1
 }

@@ -24,6 +24,9 @@ type Player struct {
 	Connected bool
 	Closed    bool
 
+	Alive bool
+	Ready bool
+
 	// combatMode and movementMode are the authority modes of the player. They are used to determine
 	// how certain actions should be handled.
 	CombatMode   AuthorityMode

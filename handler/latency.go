@@ -28,6 +28,7 @@ func (LatencyHandler) ID() string {
 func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if _, ok := pk.(*packet.TickSync); ok {
 		h.Responded = true
+		p.Ready = true
 	}
 
 	return true

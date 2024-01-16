@@ -10,4 +10,6 @@ const (
 	StepClipMultiplier    = float32(0.4)
 	SlimeBounceMultiplier = float32(-1)
 	BedBounceMultiplier   = float32(-0.66)
+
+	JumpDelayTicks = 10
 )
