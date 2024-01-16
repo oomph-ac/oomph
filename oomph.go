@@ -34,39 +34,63 @@ func init() {
 
 type Oomph struct {
 	log     *logrus.Logger
-	address string
-
 	players chan *player.Player
+
+	settings OomphSettings
+}
+
+type OomphSettings struct {
+	LocalAddress   string
+	RemoteAddress  string
+	Authentication bool
+
+	StatusProvider *minecraft.ServerStatusProvider
+
+	ResourcePath string
+	RequirePacks bool
+
+	Protocols []minecraft.Protocol
 }
 
 // New creates and returns a new Oomph instance.
-func New(log *logrus.Logger, address string) *Oomph {
+func New(log *logrus.Logger, s OomphSettings) *Oomph {
 	return &Oomph{
 		log:     log,
-		address: address,
 		players: make(chan *player.Player),
+
+		settings: s,
 	}
 }
 
 // Start will start Oomph! remoteAddr is the address of the target server, and localAddr is the address that players will connect to.
 // Addresses should be formatted in the following format: "ip:port" (ex: "127.0.0.1:19132").
 // If you're using dragonfly, use Listen instead of Start.
-func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []minecraft.Protocol, requirePacks bool, authDisabled bool) {
-	p, err := minecraft.NewForeignStatusProvider(remoteAddr)
-	if err != nil {
-		o.log.Errorf("unable to make status provider: %v", err)
+func (o *Oomph) Start() {
+	s := o.settings
+
+	var statusProvider minecraft.ServerStatusProvider
+	if s.StatusProvider == nil {
+		p, err := minecraft.NewForeignStatusProvider(s.RemoteAddress)
+		if err != nil {
+			o.log.Errorf("unable to make status provider: %v", err)
+		}
+
+		statusProvider = p
+	} else {
+		statusProvider = *s.StatusProvider
 	}
+
 	l, err := minecraft.ListenConfig{
-		StatusProvider:         p,
-		AuthenticationDisabled: authDisabled,
-		ResourcePacks:          utils.ResourcePacks(resourcePackPath),
-		TexturePacksRequired:   requirePacks,
-		AcceptedProtocols:      protocols,
+		StatusProvider:         statusProvider,
+		AuthenticationDisabled: !s.Authentication,
+		ResourcePacks:          utils.ResourcePacks(s.ResourcePath),
+		TexturePacksRequired:   s.RequirePacks,
+		AcceptedProtocols:      s.Protocols,
 		FlushRate:              -1,
 
 		AllowInvalidPackets: false,
 		AllowUnknownPackets: true,
-	}.Listen("raknet", o.address)
+	}.Listen("raknet", s.LocalAddress)
 
 	if err != nil {
 		o.log.Errorf("unable to start oomph: %v", err)
@@ -74,14 +98,14 @@ func (o *Oomph) Start(remoteAddr string, resourcePackPath string, protocols []mi
 	}
 
 	defer l.Close()
-	o.log.Printf("Oomph is now listening on %v and directing connections to %v!\n", o.address, remoteAddr)
+	o.log.Printf("Oomph is now listening on %v and directing connections to %v!\n", s.LocalAddress, s.RemoteAddress)
 	for {
 		c, err := l.Accept()
 		if err != nil {
 			panic(err)
 		}
 
-		go o.handleConn(c.(*minecraft.Conn), l, remoteAddr)
+		go o.handleConn(c.(*minecraft.Conn), l, s.RemoteAddress)
 	}
 }
 
