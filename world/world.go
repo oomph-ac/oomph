@@ -8,7 +8,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"golang.org/x/exp/maps"
@@ -60,29 +59,33 @@ func (w *World) RemoveChunk(pos protocol.ChunkPos) {
 // GetChunk returns a cached chunk at the position passed. The mutex is
 // not locked here because it is assumed that the caller has already locked
 // the mutex before calling this function.
-func (w *World) GetChunk(pos protocol.ChunkPos) *CachedChunk {
+func (w *World) GetChunk(pos protocol.ChunkPos, lock bool) *CachedChunk {
+	if lock {
+		w.Lock()
+		defer w.Unlock()
+	}
+
 	return w.chunks[pos]
 }
 
 // GetBlock returns the block at the position passed.
-func (w *World) GetBlock(pos mgl32.Vec3) world.Block {
+func (w *World) GetBlock(blockPos cube.Pos) world.Block {
 	w.Lock()
 	defer w.Unlock()
 
-	blockPos := cube.Pos{int(math32.Floor(pos[0])), int(math32.Floor(pos[1])), int(math32.Floor(pos[2]))}
 	if blockPos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
 
 	chunkPos := protocol.ChunkPos{int32(blockPos[0]) >> 4, int32(blockPos[2]) >> 4}
-	c := w.GetChunk(chunkPos)
+	c := w.GetChunk(chunkPos, false)
 	if c == nil {
 		return block.Air{}
 	}
 
 	// Validate that the block position is within the chunk.
 	if c.Pos.X() != (int32(blockPos[0])>>4) || c.Pos.Z() != (int32(blockPos[2])>>4) {
-		panic(oerror.New("world.GetBlock returned an invalid chunk"))
+		panic(oerror.New("world.GetBlock: GetChunk() returned an invalid chunk"))
 	}
 
 	c.Lock()
@@ -108,9 +111,9 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 
 	blockID := world.BlockRuntimeID(b)
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
-	c := w.GetChunk(chunkPos)
+	c := w.GetChunk(chunkPos, false)
 	if c == nil {
-		panic(oerror.New("unable to set block on null chunk"))
+		panic(oerror.New("world.SetBlock attempted on null chunk"))
 	}
 
 	c.ActionSetBlock(w, SetBlockAction{

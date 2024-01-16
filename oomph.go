@@ -20,6 +20,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var movementSimulator = simulation.MovementSimulator{}
+
 func init() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn: "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
@@ -169,8 +171,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	p := player.New(o.log, conn, serverConn)
 	handler.RegisterHandlers(p)
-	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).UseSimulator(&simulation.MovementSimulator{})
 	detection.RegisterDetections(p)
+	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(movementSimulator)
 
 	select {
 	case o.players <- p:
