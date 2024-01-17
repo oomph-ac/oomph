@@ -10,26 +10,26 @@ import (
 const HandlerIDEntities = "oomph:entities"
 const DefaultEntityHistorySize = 6
 
-// EntityHandler handles entities and their respective positions to the client. On AuthorityModeSemi, EntityHandler is able to
-// replicate a 1:1 position of what the client sees, which is used for detections. On AuthorityModeComplete, EntityHandler uses rewind
+// EntitiesHandler handles entities and their respective positions to the client. On AuthorityModeSemi, EntitiesHandler is able to
+// replicate a 1:1 position of what the client sees, which is used for detections. On AuthorityModeComplete, EntitiesHandler uses rewind
 // to determine entity positions based on the client tick, and is used for full authority over combat.
-type EntityHandler struct {
+type EntitiesHandler struct {
 	Entities       map[uint64]*entity.Entity
 	MaxRewindTicks int
 }
 
-func NewEntityHandler() *EntityHandler {
-	return &EntityHandler{
+func NewEntityHandler() *EntitiesHandler {
+	return &EntitiesHandler{
 		Entities:       make(map[uint64]*entity.Entity),
 		MaxRewindTicks: DefaultEntityHistorySize,
 	}
 }
 
-func (h *EntityHandler) ID() string {
+func (h *EntitiesHandler) ID() string {
 	return HandlerIDEntities
 }
 
-func (h *EntityHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
+func (h *EntitiesHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if _, ok := pk.(*packet.PlayerAuthInput); ok && p.CombatMode == player.AuthorityModeSemi {
 		h.tickEntities(p.ServerTick)
 	}
@@ -37,7 +37,7 @@ func (h *EntityHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 	return true
 }
 
-func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
+func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.AddActor:
 		h.Add(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, false))
@@ -109,7 +109,7 @@ func (h *EntityHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 	return true
 }
 
-func (h *EntityHandler) OnTick(p *player.Player) {
+func (h *EntitiesHandler) OnTick(p *player.Player) {
 	if p.CombatMode != player.AuthorityModeComplete {
 		return
 	}
@@ -117,26 +117,26 @@ func (h *EntityHandler) OnTick(p *player.Player) {
 	h.tickEntities(p.ServerTick)
 }
 
-func (*EntityHandler) Defer() {
+func (*EntitiesHandler) Defer() {
 }
 
 // Add adds an entity to the entity handler.
-func (h *EntityHandler) Add(rid uint64, e *entity.Entity) {
+func (h *EntitiesHandler) Add(rid uint64, e *entity.Entity) {
 	h.Entities[rid] = e
 }
 
 // Delete removes an entity from the entity handler.
-func (h *EntityHandler) Delete(rid uint64) {
+func (h *EntitiesHandler) Delete(rid uint64) {
 	delete(h.Entities, rid)
 }
 
 // Find returns an entity from the given runtime ID. Nil is returned if the entity does not exist.
-func (h *EntityHandler) Find(rid uint64) *entity.Entity {
+func (h *EntitiesHandler) Find(rid uint64) *entity.Entity {
 	return h.Entities[rid]
 }
 
 // moveEntity moves an entity to the given position.
-func (h *EntityHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
+func (h *EntitiesHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
 	e := h.Find(rid)
 	if e == nil {
 		return
@@ -153,7 +153,7 @@ func (h *EntityHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
 }
 
 // tickEntities ticks all the entities in the entity handler.
-func (h *EntityHandler) tickEntities(tick int64) {
+func (h *EntitiesHandler) tickEntities(tick int64) {
 	for _, e := range h.Entities {
 		e.Tick(tick)
 	}

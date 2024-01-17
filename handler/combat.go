@@ -59,7 +59,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		entity := p.Handler(HandlerIDEntities).(*EntityHandler).Find(dat.TargetEntityRuntimeID)
+		entity := p.Handler(HandlerIDEntities).(*EntitiesHandler).Find(dat.TargetEntityRuntimeID)
 		if entity == nil {
 			return true
 		}
