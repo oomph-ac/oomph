@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"fmt"
-
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
@@ -120,7 +118,6 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Run the movement simulation.
 	h.s.Simulate(p)
 	h.TicksUntilNextJump--
-	fmt.Println(h.Position.Sub(h.ClientPosition), h.Sprinting, p.ClientFrame)
 	return true
 }
 
@@ -286,7 +283,6 @@ func (h *MovementHandler) updateMovementStates(p *player.Player, pk *packet.Play
 		h.Sprinting = false
 		needsSpeedAdjustment = !h.HasServerSpeed
 	}
-	fmt.Println(startFlag, stopFlag, h.Sprinting)
 	h.SprintKeyPressed = utils.HasFlag(pk.InputData, packet.InputFlagSprinting)
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
