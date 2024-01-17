@@ -165,7 +165,7 @@ func (s MovementSimulator) teleport(p *player.Player, mDat *handler.MovementHand
 	} else if mDat.SmoothTeleport && mDat.TicksSinceTeleport <= 3 {
 		mDat.Velocity[1] = -0.078
 		delta := mDat.TeleportPos.Sub(mDat.Position)
-		if mDat.TicksSinceTeleport < 3 {
+		if mDat.TicksSinceTeleport < 2 {
 			mDat.Position = mDat.Position.Add(delta.Mul(1.0 / float32(3-mDat.TicksSinceTeleport)))
 			return true
 		}
