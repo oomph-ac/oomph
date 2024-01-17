@@ -120,7 +120,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Run the movement simulation.
 	h.s.Simulate(p)
 	h.TicksUntilNextJump--
-	fmt.Println(h.Position.Sub(h.ClientPosition), p.ClientFrame)
+	fmt.Println(h.Position.Sub(h.ClientPosition), h.Sprinting, p.ClientFrame)
 	return true
 }
 
@@ -276,14 +276,17 @@ func (h *MovementHandler) updateMovementStates(p *player.Player, pk *packet.Play
 		// first check if the player is holding the sprint key (isn't sneaking, other conditions, etc.), and call setSprinting(true), but then see the player
 		// is horizontally collided and call setSprinting(false) on the same call of onLivingUpdate()
 		h.Sprinting = false
+		h.HasServerSpeed = false
 		needsSpeedAdjustment = true
 	} else if startFlag {
 		h.Sprinting = true
+		h.HasServerSpeed = false
 		needsSpeedAdjustment = true
-	} else {
+	} else if stopFlag {
 		h.Sprinting = false
 		needsSpeedAdjustment = !h.HasServerSpeed
 	}
+	fmt.Println(startFlag, stopFlag, h.Sprinting)
 	h.SprintKeyPressed = utils.HasFlag(pk.InputData, packet.InputFlagSprinting)
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {

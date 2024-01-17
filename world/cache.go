@@ -75,13 +75,17 @@ func clearCacheDuplicates() {
 	}
 }
 
-var queuedChunks = make(chan *AddChunkRequest)
+var queuedChunks = make(chan *AddChunkRequest, 128*128)
 
 func handleQueue() {
 	for {
 		req, ok := <-queuedChunks
 		if !ok {
 			panic(oerror.New("chunk queue closed"))
+		}
+
+		if req.w == nil {
+			continue
 		}
 
 		// Search for a chunk in cache that is equal to the chunk in the request. If a matching
@@ -108,7 +112,7 @@ func InsertToCache(w *World, c *chunk.Chunk, pos protocol.ChunkPos) {
 	select {
 	case queuedChunks <- req:
 		break
-	case <-time.After(time.Second * 5):
+	case <-time.After(time.Millisecond * 50):
 		panic(oerror.New("chunk queue timed out"))
 	}
 }
