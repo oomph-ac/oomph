@@ -113,7 +113,7 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
 	c := w.GetChunk(chunkPos, false)
 	if c == nil {
-		panic(oerror.New("world.SetBlock attempted on null chunk"))
+		return
 	}
 
 	c.ActionSetBlock(w, SetBlockAction{

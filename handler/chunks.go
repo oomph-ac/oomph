@@ -112,7 +112,6 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		h.World.SetBlock(replacePos, b)
 		return true
 	case *packet.PlayerAuthInput:
-		// TODO: Use server position on full authority mode.
 		chunkPos := protocol.ChunkPos{
 			int32(math32.Floor(pk.Position.X())) >> 4,
 			int32(math32.Floor(pk.Position.Z())) >> 4,
@@ -122,6 +121,14 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			for _, action := range pk.BlockActions {
 				switch action.Action {
 				case protocol.PlayerActionPredictDestroyBlock:
+					if p.ServerConn() != nil {
+						continue
+					}
+
+					if !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
+						continue
+					}
+
 					h.World.SetBlock(cube.Pos{
 						int(action.BlockPos.X()),
 						int(action.BlockPos.Y()),
@@ -151,9 +158,9 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 					}
 
 					h.World.SetBlock(cube.Pos{
-						int(action.BlockPos.X()),
-						int(action.BlockPos.Y()),
-						int(action.BlockPos.Z()),
+						int(h.breakingBlockPos.X()),
+						int(h.breakingBlockPos.Y()),
+						int(h.breakingBlockPos.Z()),
 					}, block.Air{})
 					h.breakingBlockPos = nil
 				}
