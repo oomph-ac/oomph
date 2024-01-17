@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
@@ -15,9 +17,8 @@ import (
 const HandlerIDMovement = "oomph:movement"
 
 type MovementHandler struct {
-	BoundingBox cube.BBox
-	Width       float32
-	Height      float32
+	Width  float32
+	Height float32
 
 	Position, PrevPosition             mgl32.Vec3
 	Velocity, PrevVelocity             mgl32.Vec3
@@ -29,6 +30,10 @@ type MovementHandler struct {
 
 	ForwardImpulse float32
 	LeftImpulse    float32
+
+	CollisionX, CollisionZ bool
+	VerticallyCollided     bool
+	HorizontallyCollided   bool
 
 	OnGround bool
 
@@ -78,9 +83,7 @@ type MovementHandler struct {
 }
 
 func NewMovementHandler() *MovementHandler {
-	return &MovementHandler{
-		BoundingBox: cube.Box(-0.3, 0, -0.3, 0.3, 1.8, 0.3),
-	}
+	return &MovementHandler{}
 }
 
 func (MovementHandler) ID() string {
@@ -103,7 +106,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 
 	// Update the client's own velocity.
 	h.PrevClientVel = h.ClientVel
-	h.ClientVel = h.ClientPosition.Sub(h.PrevClientPosition)
+	h.ClientVel = input.Delta
 
 	// Update the client's rotations.
 	h.PrevRotation = h.Rotation
@@ -116,6 +119,8 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 
 	// Run the movement simulation.
 	h.s.Simulate(p)
+	h.TicksUntilNextJump--
+	fmt.Println(h.Position.Sub(h.ClientPosition), p.ClientFrame)
 	return true
 }
 
@@ -130,10 +135,10 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
 			if !widthExists {
-				width = h.BoundingBox.Width() / 2
+				width = h.Width
 			}
 			if !heightExists {
-				height = h.BoundingBox.Height()
+				height = h.Height
 			}
 
 			h.Width = width.(float32)
@@ -201,6 +206,20 @@ func (*MovementHandler) Defer() {
 
 func (h *MovementHandler) Simulate(s Simulator) {
 	h.s = s
+}
+
+func (h *MovementHandler) BoundingBox() cube.BBox {
+	pos := h.Position
+	pos[1] += h.StepClipOffset
+
+	return cube.Box(
+		pos.X()-(h.Width/2),
+		pos.Y(),
+		pos.Z()-(h.Width/2),
+		pos.X()+(h.Width/2),
+		pos.Y()+h.Height,
+		pos.Z()+(h.Width/2),
+	)
 }
 
 func (h *MovementHandler) handleAttribute(n string, list []protocol.Attribute, f func(protocol.Attribute)) {
