@@ -128,7 +128,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 					if p.ServerConn() == nil {
 						continue
 					}
-					
+
 					if !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
 						continue
 					}
