@@ -62,7 +62,8 @@ func (l listener) Accept() (session.Conn, error) {
 	}
 
 	p := player.New(logrus.New(), c.(*minecraft.Conn), nil)
-
+	p.RuntimeId = 1
+	
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
 	
