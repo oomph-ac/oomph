@@ -125,10 +125,10 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			for _, action := range pk.BlockActions {
 				switch action.Action {
 				case protocol.PlayerActionPredictDestroyBlock:
-					if p.ServerConn() != nil {
+					if p.ServerConn() == nil {
 						continue
 					}
-
+					
 					if !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
 						continue
 					}
