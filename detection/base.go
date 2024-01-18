@@ -58,14 +58,15 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 	d.Violations += math32.Max(0, float32(d.trustDuration)-float32(p.ClientFrame-d.lastFlagged)) / float32(d.trustDuration)
 	d.lastFlagged = p.ClientFrame
 	if d.Violations >= 0.5 {
-		// Send the event to the remote server so that any plugins on it can handle the flag.
-		p.SendRemoteEvent("oomph:flagged", map[string]interface{}{
-			"player":     p.Conn().IdentityData().DisplayName,
-			"check_main": d.Type,
-			"check_sub":  d.SubType,
-			"violations": game.Round32(d.Violations, 2),
-		})
-
+		if p.ServerConn() != nil {
+			// Send the event to the remote server so that any plugins on it can handle the flag.
+			p.SendRemoteEvent("oomph:flagged", map[string]interface{}{
+				"player":     p.Conn().IdentityData().DisplayName,
+				"check_main": d.Type,
+				"check_sub":  d.SubType,
+				"violations": game.Round32(d.Violations, 2),
+			})
+		}
 		// Parse the extra data into a string.
 		p.Log().Warnf("%s flagged %s (%s) <x%f> %s", p.Conn().IdentityData().DisplayName, d.Type, d.SubType, game.Round32(d.Violations, 2), OrderedMapToString(*extraData))
 	}

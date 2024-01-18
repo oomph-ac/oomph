@@ -5,6 +5,8 @@ import (
 
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/session"
+	"github.com/oomph-ac/oomph/detection"
+	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
@@ -61,6 +63,10 @@ func (l listener) Accept() (session.Conn, error) {
 
 	p := player.New(logrus.New(), c.(*minecraft.Conn), nil)
 	p.RuntimeId = 1
+
+	handler.RegisterHandlers(p)
+	detection.RegisterDetections(p)
+	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(movementSimulator)
 
 	l.o.players <- p
 	return p, err
