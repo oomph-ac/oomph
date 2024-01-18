@@ -56,8 +56,8 @@ func (d *MovementA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	dat := orderedmap.NewOrderedMap[string, any]()
-	dat.Set("diff", game.Round32(dev, 3))
-	d.Fail(p, dat)
+	data := orderedmap.NewOrderedMap[string, any]()
+	data.Set("diff", game.Round32(dev, 3))
+	d.Fail(p, data)
 	return true
 }

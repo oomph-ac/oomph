@@ -66,10 +66,10 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	d.balance += timeDiff - 50
 	if d.balance <= -150 {
-		dat := orderedmap.NewOrderedMap[string, any]()
-		dat.Set("client_tick", p.ClientTick)
-		dat.Set("server_tick", p.ServerTick)
-		d.Fail(p, dat)
+		data := orderedmap.NewOrderedMap[string, any]()
+		data.Set("client_tick", p.ClientTick)
+		data.Set("server_tick", p.ServerTick)
+		d.Fail(p, data)
 		d.balance = 0
 		return false
 	}

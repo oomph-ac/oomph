@@ -58,9 +58,9 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	dat := orderedmap.NewOrderedMap[string, any]()
-	dat.Set("xDiff", game.Round32(xDev, 3))
-	dat.Set("zDiff", game.Round32(zDev, 3))
-	d.Fail(p, dat)
+	data := orderedmap.NewOrderedMap[string, any]()
+	data.Set("xDiff", game.Round32(xDev, 3))
+	data.Set("zDiff", game.Round32(zDev, 3))
+	d.Fail(p, data)
 	return true
 }
