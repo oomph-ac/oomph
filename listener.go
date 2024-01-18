@@ -60,9 +60,10 @@ func (l listener) Accept() (session.Conn, error) {
 	}
 
 	p := player.New(logrus.New(), c.(*minecraft.Conn), nil)
+	p.RuntimeId = 1
 
 	l.o.players <- p
-	return p.Conn(), err
+	return p, err
 }
 
 // Disconnect disconnects a connection from the Listener with a reason.
