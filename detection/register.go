@@ -9,6 +9,7 @@ func RegisterDetections(p *player.Player) {
 
 	p.RegisterDetection(NewMovementA())
 	p.RegisterDetection(NewMovementB())
+	p.RegisterDetection(NewMovementC())
 
 	p.RegisterDetection(NewVelocityA())
 	p.RegisterDetection(NewVelocityB())
@@ -18,4 +19,7 @@ func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewKillAuraA())
 
 	p.RegisterDetection(NewBadPacketA())
+
+	p.RegisterDetection(NewEditionFakerA())
+	p.RegisterDetection(NewEditionFakerB())
 }

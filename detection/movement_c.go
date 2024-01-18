@@ -25,7 +25,7 @@ func NewMovementC() *MovementC {
 	d.MaxViolations = 30
 	d.trustDuration = 20 * player.TicksPerSecond
 
-	d.FailBuffer = 3
+	d.FailBuffer = 2
 	d.MaxBuffer = 10
 	return d
 }
@@ -46,9 +46,9 @@ func (d *MovementC) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	
-	// if mDat.TicksSinceTeleport == -1 { // ethan halp
-		// return true
-	// }
+	if mDat.TicksSinceTeleport == -1 { // ethan halp
+		return true
+	}
 	
 	if mDat.OffGroundTicks <= 10 {
 		data := orderedmap.NewOrderedMap[string, any]()
