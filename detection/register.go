@@ -12,4 +12,10 @@ func RegisterDetections(p *player.Player) {
 
 	p.RegisterDetection(NewVelocityA())
 	p.RegisterDetection(NewVelocityB())
+
+	p.RegisterDetection(NewTimerA())
+
+	p.RegisterDetection(NewKillAuraA())
+
+	p.RegisterDetection(NewBadPacketA())
 }
