@@ -35,7 +35,7 @@ type CombatHandler struct {
 
 func NewCombatHandler() *CombatHandler {
 	return &CombatHandler{
-		InterpolationStep: 0.1,
+		InterpolationStep: 1 / 20.0,
 	}
 }
 
@@ -73,7 +73,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		h.Phase = CombatPhaseTransaction
 		h.TargetedEntity = entity
 		h.StartAttackPos = movementHandler.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
-		h.EndAttackPos = movementHandler.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+		h.EndAttackPos = movementHandler.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset}).Add(movementHandler.ClientMov)
 
 		// Calculate the closest raw point from the attack positions to the entity's bounding box.
 		entityBB := entity.Box(entity.Position).Grow(0.1)
@@ -142,13 +142,17 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 	endEntityPos := h.TargetedEntity.Position
 	entityPosDelta := endEntityPos.Sub(startEntityPos)
 
-	h.ClosestDirectionalResults = make([]float32, int(math32.Ceil(1.0/h.InterpolationStep)))
-	h.RaycastResults = make([]float32, len(h.ClosestDirectionalResults))
+	h.ClosestDirectionalResults = []float32{}
+	h.RaycastResults = []float32{}
 
 	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
 		attackRotation := startRotation.Add(rotationDelta.Mul(partialTicks))
 		entityPos := startEntityPos.Add(entityPosDelta.Mul(partialTicks))
+
+		if partialTicks == 1.0 {
+			attackPos = movementHandler.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+		}
 
 		directionVector := game.DirectionVector(attackRotation.Z(), attackRotation.X())
 		entityBB := h.TargetedEntity.Box(entityPos).Grow(0.1)
@@ -163,7 +167,7 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 
 		result, ok := trace.BBoxIntercept(entityBB, attackPos, attackPos.Add(directionVector.Mul(14.0)))
 		if ok {
-			h.RaycastResults = append(h.RaycastResults, result.Position().Sub(attackPos).Len())
+			h.RaycastResults = append(h.RaycastResults, attackPos.Sub(result.Position()).Len())
 		}
 	}
 }

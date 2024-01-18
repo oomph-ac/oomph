@@ -22,6 +22,7 @@ type MovementHandler struct {
 	Velocity, PrevVelocity             mgl32.Vec3
 	ClientPosition, PrevClientPosition mgl32.Vec3
 	ClientVel, PrevClientVel           mgl32.Vec3
+	Mov, ClientMov                     mgl32.Vec3
 
 	// Rotation vectors are formatted as {pitch, headYaw, yaw}
 	Rotation, PrevRotation mgl32.Vec3
@@ -77,7 +78,8 @@ type MovementHandler struct {
 	ClientPredictsSpeed bool
 
 	// s is the simulator that will be used for movement simulations. It can be set via. UseSimulator()
-	s Simulator
+	s    Simulator
+	mode player.AuthorityMode
 }
 
 func NewMovementHandler() *MovementHandler {
@@ -93,6 +95,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	if !ok {
 		return true
 	}
+	h.mode = p.MovementMode
 
 	// Update client tick and simulation frame.
 	p.ClientFrame = int64(input.Tick)
@@ -101,6 +104,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Update the client's own position.
 	h.PrevClientPosition = h.ClientPosition
 	h.ClientPosition = input.Position.Sub(mgl32.Vec3{0, 1.62})
+	h.ClientMov = h.ClientPosition.Sub(h.PrevClientPosition)
 
 	// Update the client's own velocity.
 	h.PrevClientVel = h.ClientVel
@@ -198,7 +202,11 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 func (*MovementHandler) OnTick(p *player.Player) {
 }
 
-func (*MovementHandler) Defer() {
+func (h *MovementHandler) Defer() {
+	if h.mode == player.AuthorityModeSemi {
+		h.Velocity = h.ClientVel
+		h.Position = h.ClientPosition
+	}
 }
 
 func (h *MovementHandler) Simulate(s Simulator) {
@@ -207,7 +215,7 @@ func (h *MovementHandler) Simulate(s Simulator) {
 
 func (h *MovementHandler) BoundingBox() cube.BBox {
 	pos := h.Position
-	pos[1] += h.StepClipOffset
+	//pos[1] += h.StepClipOffset
 
 	return cube.Box(
 		pos.X()-(h.Width/2),
