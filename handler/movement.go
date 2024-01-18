@@ -35,6 +35,7 @@ type MovementHandler struct {
 	HorizontallyCollided   bool
 
 	OnGround bool
+	OffGroundTicks int64
 
 	KnownInsideBlock bool
 
@@ -113,6 +114,15 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Update the client's rotations.
 	h.PrevRotation = h.Rotation
 	h.Rotation = mgl32.Vec3{input.Pitch, input.HeadYaw, input.Yaw}
+
+	defer func() {
+		if h.OnGround {
+			h.OffGroundTicks = 0
+			return
+		}
+
+		h.OffGroundTicks++
+	}()
 
 	h.updateMovementStates(p, input)
 	if h.s == nil {

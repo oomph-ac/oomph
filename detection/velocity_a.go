@@ -56,8 +56,8 @@ func (d *VelocityA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	dat := orderedmap.NewOrderedMap[string, any]()
-	dat.Set("pct", game.Round32(pct, 3))
-	d.Fail(p, dat)
+	data := orderedmap.NewOrderedMap[string, any]()
+	data.Set("pct", game.Round32(pct, 3))
+	d.Fail(p, data)
 	return true
 }
