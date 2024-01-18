@@ -46,9 +46,8 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if !ok {
 		return true
 	}
-	
+
 	curr := time.Now()
-	// Get how many milliseconds have passed since the last input packet.
 	timeDiff := float64(time.Since(d.lastTime).Microseconds()) / 1000
 
 	defer func() {
