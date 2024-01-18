@@ -6,4 +6,10 @@ import "github.com/oomph-ac/oomph/player"
 func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewReachA())
 	p.RegisterDetection(NewReachB())
+
+	p.RegisterDetection(NewMovementA())
+	p.RegisterDetection(NewMovementB())
+
+	p.RegisterDetection(NewVelocityA())
+	p.RegisterDetection(NewVelocityB())
 }

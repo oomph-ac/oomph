@@ -27,6 +27,7 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 		mDat.Velocity = mDat.ClientVel
 		mDat.PrevVelocity = mDat.PrevClientVel
 		mDat.Position = mDat.ClientPosition
+		mDat.Mov = mDat.ClientMov
 		mDat.OnGround = true
 		return
 	}
@@ -106,7 +107,9 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	if isClimb {
 		mDat.Velocity[1] = game.ClimbSpeed
 	}
+
 	mDat.Position = mDat.Position.Add(mDat.Velocity)
+	mDat.Mov = mDat.Velocity
 
 	blockUnder = w.GetBlock(cube.PosFromVec3(mDat.Position.Sub(mgl32.Vec3{0, 0.2})))
 	if _, isAir := blockUnder.(block.Air); isAir {

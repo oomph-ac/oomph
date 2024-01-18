@@ -25,8 +25,8 @@ func NewReachA() *ReachA {
 	d.MaxViolations = 15
 	d.trustDuration = 90 * player.TicksPerSecond
 
-	d.FailBuffer = 1.001
-	d.MaxBuffer = 2.5
+	d.FailBuffer = 1.5
+	d.MaxBuffer = 4
 	return d
 }
 
@@ -54,28 +54,20 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	// This gets the mininum distance calculated by game.ClosestPointToBBoxDirectional()
-	minDirectionalDist := float32(1000)
-	for _, result := range combatHandler.ClosestDirectionalResults {
-		minDirectionalDist = math32.Min(minDirectionalDist, result)
-	}
-
 	// This calculates the average distance of all the raycast results.
-	total, count := float32(0), float32(0)
+	minDist := float32(100)
 	for _, result := range combatHandler.RaycastResults {
-		total += result
-		count++
+		minDist = math32.Min(minDist, result)
 	}
 
-	avgDist := total / count
-	if minDirectionalDist >= 3 && avgDist >= 3 {
+	if minDist >= 3.01 {
 		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("distance", minDirectionalDist)
+		data.Set("distance", minDist)
 		d.Fail(p, data)
 
 		return true
 	}
 
-	d.Debuff(0.004)
+	d.Debuff(0.005)
 	return true
 }
