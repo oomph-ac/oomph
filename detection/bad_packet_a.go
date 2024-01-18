@@ -39,6 +39,11 @@ func (d *BadPacketA) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 		return true
 	}
 
+	if !p.Alive {
+		d.prevFrame = 0
+		return true
+	}
+
 	if d.prevFrame != 0 && i.Tick != d.prevFrame+1 {
 		dat := orderedmap.NewOrderedMap[string, any]()
 		dat.Set("curr", i.Tick)
