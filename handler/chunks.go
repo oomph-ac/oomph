@@ -49,7 +49,11 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 	switch pk := pk.(type) {
 	case *packet.TickSync:
-		h.ChunkRadius = p.ServerConn().GameData().ChunkRadius
+		if p.ServerConn() == nil {
+			h.ChunkRadius = p.Conn().GameData().ChunkRadius
+		} else {
+			h.ChunkRadius = p.ServerConn().GameData().ChunkRadius
+		}
 	case *packet.InventoryTransaction:
 		dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
 		if !ok {
