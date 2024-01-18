@@ -32,7 +32,7 @@ type CombatHandler struct {
 	ClosestDirectionalResults []float32
 	RaycastResults            []float32
 
-	LastFrame uint64
+	LastFrame     uint64
 	LastSwingTick int64
 }
 
