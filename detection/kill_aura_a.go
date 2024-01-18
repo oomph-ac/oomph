@@ -1,8 +1,6 @@
 package detection
 
 import (
-	"time"
-
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
@@ -14,10 +12,6 @@ const DetectionIDKillAuraA = "oomph:kill_aura_a"
 
 type KillAuraA struct {
 	BaseDetection
-
-	balance    float64
-	lastTime   time.Time
-	initalized bool
 }
 
 func NewKillAuraA() *KillAuraA {

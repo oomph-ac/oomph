@@ -27,10 +27,10 @@ func NewTimerA() *TimerA {
 	d.Punishable = true
 
 	d.MaxViolations = 15
-	d.trustDuration = 200 * player.TicksPerSecond
+	d.trustDuration = -1
 
-	d.FailBuffer = 1.5
-	d.MaxBuffer = 4
+	d.FailBuffer = 0
+	d.MaxBuffer = 1
 	return d
 }
 
@@ -66,17 +66,14 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	d.balance += timeDiff - 50
 	if d.balance <= -150 {
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("client_tick", p.ClientTick)
-		data.Set("server_tick", p.ServerTick)
-		d.Fail(p, data)
+		d.Fail(p, orderedmap.NewOrderedMap[string, any]())
 		d.balance = 0
 		return false
 	}
 
 	// This can occur if a user is attempting to use negative timer to increase their balance to a high amount,
 	// to then use a high amount of timer after a period of time to bypass the check.
-	if d.balance > 500 && p.ClientTick > p.ServerTick {
+	if d.balance > 500 && p.ClientTick > p.ServerTick+1 {
 		d.balance = 0
 	}
 

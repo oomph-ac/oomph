@@ -32,7 +32,6 @@ type CombatHandler struct {
 	ClosestDirectionalResults []float32
 	RaycastResults            []float32
 
-	LastFrame     uint64
 	LastSwingTick int64
 }
 
@@ -88,7 +87,6 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			point2.Sub(h.EndAttackPos).Len(),
 		)
 	case *packet.PlayerAuthInput:
-		h.LastFrame = pk.Tick
 		if h.Phase != CombatPhaseTransaction {
 			return true
 		}
