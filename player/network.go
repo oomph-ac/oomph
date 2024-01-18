@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -62,46 +63,50 @@ func (p *Player) RemoteAddr() net.Addr {
 	return p.conn.RemoteAddr()
 }
 
-
 // Latency returns the current latency measured over the conn.
 func (p *Player) Latency() time.Duration {
 	return p.conn.Latency()
 }
 
-
 // WritePacket will call minecraft.Conn.WritePacket and process the packet with oomph.
 func (p *Player) WritePacket(pk packet.Packet) error {
-	p.processMu.Lock()
 	if p.conn == nil {
-		p.processMu.Unlock()
-		return nil
+		return oerror.New("conn is nil in session")
 	}
 
-	if err := p.conn.WritePacket(pk); err != nil {
-		p.processMu.Unlock()
-		p.Close()
-		return err
-	}
-
-	p.processMu.Unlock()
+	p.HandleFromServer(pk)
 	return nil
 }
 
 // ReadPacket will call minecraft.Conn.ReadPacket and process the packet with oomph.
 func (p *Player) ReadPacket() (pk packet.Packet, err error) {
-	p.processMu.Lock()
 	if p.conn == nil {
-		p.processMu.Unlock()
+		return pk, oerror.New("conn is nil in session")
+	}
+
+	// Oomph wants to send a packet to the server here.
+	if len(p.packetQueue) > 0 {
+		pk = p.packetQueue[0]
+		p.packetQueue = p.packetQueue[1:]
 		return pk, nil
 	}
-	if pk, err = p.conn.ReadPacket(); err != nil {
-		p.processMu.Unlock()
-		p.Close()
-		return nil, err
+
+	pk, err = p.conn.ReadPacket()
+	if err != nil {
+		return pk, err
 	}
-	p.processMu.Unlock()
-	return pk, err
+	p.HandleFromClient(pk)
+
+	// Check if the packet queue is empty. If it is not, return the first packet in the queue.
+	if len(p.packetQueue) == 0 {
+		return p.ReadPacket()
+	}
+
+	pk = p.packetQueue[0]
+	p.packetQueue = p.packetQueue[1:]
+	return pk, nil
 }
+
 // StartGameContext starts the game for the conn with a context to cancel it.
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
