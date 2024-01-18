@@ -29,9 +29,9 @@ func NewEditionFakerB() *EditionFakerB {
 	d.Punishable = true
 
 	d.MaxViolations = 1
-	d.trustDuration = 30 * player.TicksPerSecond
+	d.trustDuration = -1
 
-	d.FailBuffer = 1
+	d.FailBuffer = 0
 	d.MaxBuffer = 1
 	return d
 }
@@ -49,13 +49,10 @@ func (d *EditionFakerB) HandleClientPacket(pk packet.Packet, p *player.Player) b
 	// Check that the default input mode of the client matches the expected input mode.
 	if defaultInputMode, ok := defaultInputModes[p.ClientData().DeviceOS]; ok && defaultInputMode != p.ClientData().DefaultInputMode {
 		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("title_id", utils.Device(p.ClientData().DeviceOS))
-		data.Set("given_os", utils.InputMode(p.ClientData().DefaultInputMode))
-		data.Set("expected_os", utils.InputMode(defaultInputMode))
+		data.Set("defaultMode", utils.InputMode(p.ClientData().DefaultInputMode))
+		data.Set("expectedMode", utils.InputMode(defaultInputMode))
 		d.Fail(p, data)
 		return false
-	} else if !ok {
-		p.Log().Warnf("unknown default input mode for device os %v (got %v)", p.ClientData().DeviceOS, p.ClientData().DefaultInputMode)
 	}
 
 	return true

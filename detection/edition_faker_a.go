@@ -17,7 +17,6 @@ type EditionFakerA struct {
 	BaseDetection
 }
 
-
 var knownTitleIDs = map[string]protocol.DeviceOS{
 	"1739947436": protocol.DeviceAndroid,
 	"1810924247": protocol.DeviceIOS,
@@ -48,10 +47,10 @@ func NewEditionFakerA() *EditionFakerA {
 	d.Punishable = true
 
 	d.MaxViolations = 1
-	d.trustDuration = 30 * player.TicksPerSecond
+	d.trustDuration = -1
 
-	d.FailBuffer = 2
-	d.MaxBuffer = 4
+	d.FailBuffer = 0
+	d.MaxBuffer = 1
 	return d
 }
 
@@ -66,44 +65,43 @@ func (d *EditionFakerA) HandleClientPacket(pk packet.Packet, p *player.Player) b
 	}
 
 	deviceOS := p.ClientData().DeviceOS
-		titleID := p.IdentityData().TitleID
+	titleID := p.IdentityData().TitleID
 
-		// Check if there's a titleID we know that is invalid/incompatiable with Minecraft: Bedrock Edition.
-		if clientType, ok := invalidTitleIDs[titleID]; ok {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("title_id", titleID)
-			data.Set("given_os", utils.Device(deviceOS))
-			data.Set("expected_os", fmt.Sprintf("None (client %s should not support MC:BE)", clientType))
-			d.Fail(p, data)
+	// Check if there's a titleID we know that is invalid/incompatiable with Minecraft: Bedrock Edition.
+	if clientType, ok := invalidTitleIDs[titleID]; ok {
+		data := orderedmap.NewOrderedMap[string, any]()
+		data.Set("titleID", titleID)
+		data.Set("givenOS", utils.Device(deviceOS))
+		data.Set("expectedOS", fmt.Sprintf("None (client %s should not support MC:BE)", clientType))
+		d.Fail(p, data)
+		return false
+	}
+
+	// 1904044383 is the title ID of the preview client in MC:BE. According to @GameParrot, the preview client
+	// can be found on Windows, iOS, and Xbox.
+	if titleID == "1904044383" && !slices.Contains(previewEditionClients, deviceOS) {
+		data := orderedmap.NewOrderedMap[string, any]()
+		data.Set("titleID", titleID)
+		data.Set("givenOS", utils.Device(deviceOS))
+		data.Set("expectedOS", "Windows/iOS/Xbox")
+		d.Fail(p, data)
+		return false
+	}
+
+	// Check that the title ID matches the expected device OS.
+	if expected, ok := knownTitleIDs[titleID]; ok && expected != deviceOS {
+		if titleID == "2044456598" || titleID == "1828326430" {
 			return false
 		}
-
-		// 1904044383 is the title ID of the preview client in MC:BE. According to @GameParrot, the preview client
-		// can be found on Windows, iOS, and Xbox.
-		if titleID == "1904044383" && !slices.Contains(previewEditionClients, deviceOS) {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("title_id", titleID)
-			data.Set("given_os", utils.Device(deviceOS))
-			data.Set("expected_os", "Windows/iOS/Xbox")
-			d.Fail(p, data)
-			return false
-		}
-
-		// Check that the title ID matches the expected device OS.
-		if expected, ok := knownTitleIDs[titleID]; ok && expected != deviceOS {
-			if titleID == "2044456598" || titleID == "1828326430" {
-				return false
-			}
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("title_id", titleID)
-			data.Set("given_os", utils.Device(deviceOS))
-			data.Set("expected_os", utils.Device(expected))
-			d.Fail(p, data)
-		} else if !ok {
-			p.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
-			p.Log().Warnf("unknown title ID %s with OS %v", titleID, deviceOS)
-		}
-
+		data := orderedmap.NewOrderedMap[string, any]()
+		data.Set("titleID", titleID)
+		data.Set("givenOS", utils.Device(deviceOS))
+		data.Set("expectedOS", utils.Device(expected))
+		d.Fail(p, data)
+	} else if !ok && titleID != "" {
+		p.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
+		p.Log().Warnf("unknown title ID %s with OS %v", titleID, deviceOS)
+	}
 
 	return true
 }

@@ -55,7 +55,12 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 		return
 	}
 
-	d.Violations += math32.Max(0, float32(d.trustDuration)-float32(p.ClientFrame-d.lastFlagged)) / float32(d.trustDuration)
+	if d.trustDuration != -1 {
+		d.Violations += math32.Max(0, float32(d.trustDuration)-float32(p.ClientFrame-d.lastFlagged)) / float32(d.trustDuration)
+	} else {
+		d.Violations++
+	}
+
 	d.lastFlagged = p.ClientFrame
 	if d.Violations >= 0.5 {
 		if p.ServerConn() != nil {
