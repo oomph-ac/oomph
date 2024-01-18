@@ -4,7 +4,6 @@ import (
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
-	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -22,11 +21,11 @@ func NewMovementC() *MovementC {
 	d.Description = "Checks if a player is jumping in the air.."
 	d.Punishable = true
 
-	d.MaxViolations = 30
-	d.trustDuration = 20 * player.TicksPerSecond
+	d.MaxViolations = 2
+	d.trustDuration = -1
 
 	d.FailBuffer = 2
-	d.MaxBuffer = 10
+	d.MaxBuffer = 3
 	return d
 }
 
@@ -39,29 +38,27 @@ func (d *MovementC) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	i, ok := pk.(*packet.PlayerAuthInput)
+	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return true
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	
-	if mDat.TicksSinceTeleport == -1 { // ethan halp
+	if mDat.TicksSinceTeleport == -1 {
 		return true
-	}
-	
-	if mDat.OffGroundTicks <= 10 {
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("off_ground_ticks", mDat.OffGroundTicks)
-		d.Fail(p, data)
 	}
 
 	// If the player is not jumping, we don't need to run this check.
-	if !utils.HasFlag(i.InputData, packet.InputFlagStartJumping) {
+	if !mDat.Jumping {
 		return true
 	}
 
+	// If the player has been off ground for at least 10 ticks and is jumping in the air, flag them.
+	if mDat.OffGroundTicks >= 10 {
+		d.Fail(p, orderedmap.NewOrderedMap[string, any]())
+		return true
+	}
 
-
+	d.Debuff(1.0)
 	return true
 }
