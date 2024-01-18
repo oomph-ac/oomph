@@ -109,16 +109,6 @@ func (o *Oomph) Start() {
 	}
 }
 
-// Accept returns a player selected from the channel.
-func (o *Oomph) Accept() (*player.Player, error) {
-	p, ok := <-o.players
-	if !ok {
-		return nil, fmt.Errorf("unable to accept player: channel closed")
-	}
-
-	return p, nil
-}
-
 // handleConn handles initates a connection between the client and the server, and handles packets from both.
 func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, remoteAddr string) {
 	sentryHub := sentry.CurrentHub().Clone()
