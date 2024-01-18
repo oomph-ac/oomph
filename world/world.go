@@ -29,6 +29,8 @@ type World struct {
 	chunks map[protocol.ChunkPos]*CachedChunk
 	id     uint64
 
+	lastCleanPos protocol.ChunkPos
+
 	sync.Mutex
 }
 
@@ -126,6 +128,11 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 	w.Lock()
 	defer w.Unlock()
+
+	if pos == w.lastCleanPos {
+		return
+	}
+	w.lastCleanPos = pos
 
 	for chunkPos, c := range w.chunks {
 		if chunkInRange(radius, chunkPos, pos) {
