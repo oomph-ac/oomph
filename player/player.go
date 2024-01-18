@@ -49,6 +49,9 @@ type Player struct {
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
+	// packetQueue is a queue of client packets that are to be processed by the server. This is only used
+	// in direct mode.
+	packetQueue []packet.Packet
 	// processMu is a mutex that is locked whenever packets need to be processed. It is used to
 	// prevent race conditions, and to maintain accuracy with anti-cheat.
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
@@ -77,8 +80,9 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		CombatMode:   AuthorityModeSemi,
 		MovementMode: AuthorityModeSemi,
 
-		conn:       conn,
-		serverConn: serverConn,
+		conn:        conn,
+		serverConn:  serverConn,
+		packetQueue: []packet.Packet{},
 
 		ClientTick:  0,
 		ClientFrame: 0,
@@ -102,6 +106,7 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 	go p.startTicking()
 	return p
 }
+
 // HandleFromClient handles a packet from the client.
 func (p *Player) HandleFromClient(pk packet.Packet) error {
 	p.processMu.Lock()
@@ -121,7 +126,12 @@ func (p *Player) HandleFromClient(pk packet.Packet) error {
 		return nil
 	}
 
-	return p.serverConn.WritePacket(pk)
+	if p.serverConn != nil {
+		return p.serverConn.WritePacket(pk)
+	}
+
+	p.packetQueue = append(p.packetQueue, pk)
+	return nil
 }
 
 // HandleFromServer handles a packet from the server.
