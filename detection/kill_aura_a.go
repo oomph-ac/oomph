@@ -54,11 +54,11 @@ func (d *KillAuraA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		currentTick := p.ClientFrame
 		tickDiff := currentTick - c.LastSwingTick
 		if tickDiff > 4 {
-			dat := orderedmap.NewOrderedMap[string, any]()
-			dat.Set("tick_diff", tickDiff)
-			dat.Set("current_tick", currentTick)
-			dat.Set("last_tick", c.LastSwingTick)
-			d.Fail(p, dat)
+			data := orderedmap.NewOrderedMap[string, any]()
+			data.Set("tick_diff", tickDiff)
+			data.Set("current_tick", currentTick)
+			data.Set("last_tick", c.LastSwingTick)
+			d.Fail(p, data)
 			return false
 		}
 	}
