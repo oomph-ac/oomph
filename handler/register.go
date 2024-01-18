@@ -1,6 +1,8 @@
 package handler
 
-import "github.com/oomph-ac/oomph/player"
+import (
+	"github.com/oomph-ac/oomph/player"
+)
 
 // RegisterHandlers registers all handlers to the player. They are registered
 // in order of priority, so that handlers registered first are called first.
