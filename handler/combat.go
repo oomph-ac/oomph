@@ -7,6 +7,7 @@ import (
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -33,6 +34,13 @@ type CombatHandler struct {
 	RaycastResults            []float32
 
 	LastSwingTick int64
+
+	Clicking bool
+	Clicks []int64
+	ClickDelay int64
+	LastClickTick int64
+	CPS int
+
 }
 
 func NewCombatHandler() *CombatHandler {
@@ -82,6 +90,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		point1 := game.ClosestPointToBBox(h.StartAttackPos, entityBB)
 		point2 := game.ClosestPointToBBox(h.EndAttackPos, entityBB)
 
+		h.click(p)
 		h.ClosestRawDistance = math32.Min(
 			point1.Sub(h.StartAttackPos).Len(),
 			point2.Sub(h.EndAttackPos).Len(),
@@ -102,9 +111,18 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		if pk.InputMode == packet.InputModeTouch {
 			return true
 		}
+
+		// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
+		if p.Conn().Protocol().ID() >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+			h.click(p)
+		}
 		h.calculatePointingResults(p)
 	case *packet.Animate:
 		h.LastSwingTick = p.ClientFrame
+	case *packet.LevelSoundEvent:
+		if p.Conn().Protocol().ID() < player.GameVersion1_20_10 && pk.SoundType == packet.SoundEventAttackNoDamage {
+			h.click(p)
+		}
 	}
 
 	return true
@@ -172,4 +190,26 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 			h.RaycastResults = append(h.RaycastResults, attackPos.Sub(result.Position()).Len())
 		}
 	}
+}
+
+// Click adds a click to the player's click history.
+func (h *CombatHandler) click(p *player.Player) {
+	currentTick := p.ClientTick
+
+	h.Clicking = true
+	if len(h.Clicks) > 0 {
+		h.ClickDelay = (currentTick - h.LastClickTick) * 50
+	} else {
+		h.ClickDelay = 0
+	}
+	h.Clicks = append(h.Clicks, currentTick)
+	var clicks []int64
+	for _, clickTick := range h.Clicks {
+		if currentTick-clickTick <= 20 {
+			clicks = append(clicks, clickTick)
+		}
+	}
+	h.LastClickTick = currentTick
+	h.Clicks = clicks
+	h.CPS = len(h.Clicks)
 }
