@@ -49,6 +49,7 @@ func (d *BadPacketA) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 		dat.Set("curr", i.Tick)
 		dat.Set("prev", d.prevFrame)
 		d.Fail(p, dat)
+		return false
 	}
 
 	d.prevFrame = i.Tick
