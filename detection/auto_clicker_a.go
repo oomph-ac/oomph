@@ -21,11 +21,11 @@ func NewAutoClickerA() *AutoClickerA {
 	d.Description = "Checks if a players cps is over a certain threshold."
 	d.Punishable = true
 
-	d.MaxViolations = 1
-	d.trustDuration = -1
+	d.MaxViolations = 20
+	d.trustDuration = 20 * player.TicksPerSecond
 
-	d.FailBuffer = 0
-	d.MaxBuffer = 1
+	d.FailBuffer = 2
+	d.MaxBuffer = 10
 	return d
 }
 
@@ -35,7 +35,7 @@ func (d *AutoClickerA) ID() string {
 
 func (d *AutoClickerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	c := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
-	if c.Clicking && c.CPS > 22 {
+	if c.Clicking && c.CPS > 20 {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("cps", c.CPS)
 		d.Fail(p, data)

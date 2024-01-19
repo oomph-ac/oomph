@@ -92,7 +92,7 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 		return
 	}
 
-	p.Log().Warnf("%s was removed from the server for usage of third-party modifications.", p.Conn().IdentityData().DisplayName)
+	p.Log().Warnf("%s was removed from the server for usage of third-party modifications (%s%s).", p.Conn().IdentityData().DisplayName, d.Type, d.SubType)
 	p.Disconnect(message)
 }
 
