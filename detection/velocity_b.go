@@ -1,7 +1,6 @@
 package detection
 
 import (
-	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
@@ -53,14 +52,14 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	xPct := (mDat.ClientMov.X() / mDat.Mov.X()) * 100
 	zPct := (mDat.ClientMov.Z() / mDat.Mov.Z()) * 100
 
-	if math32.Abs(xPct-100.0) > 0.1 {
+	if 100.0-xPct > 0.1 || xPct-100.0 > 5.0 {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("pct", game.Round32(xPct, 3))
 		d.Fail(p, data)
 		return true
 	}
 
-	if math32.Abs(zPct-100.0) > 0.1 {
+	if 100.0-zPct > 0.1 || zPct-100.0 > 5.0 {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("pct", game.Round32(zPct, 3))
 		d.Fail(p, data)
