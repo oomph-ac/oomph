@@ -37,7 +37,7 @@ type CombatHandler struct {
 
 func NewCombatHandler() *CombatHandler {
 	return &CombatHandler{
-		InterpolationStep: 1 / 20.0,
+		InterpolationStep: 1 / 10.0,
 	}
 }
 
@@ -75,7 +75,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		h.Phase = CombatPhaseTransaction
 		h.TargetedEntity = entity
 		h.StartAttackPos = movementHandler.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
-		h.EndAttackPos = movementHandler.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset}).Add(movementHandler.ClientMov)
+		h.EndAttackPos = movementHandler.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
 
 		// Calculate the closest raw point from the attack positions to the entity's bounding box.
 		entityBB := entity.Box(entity.Position).Grow(0.1)
@@ -135,7 +135,7 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 	startRotation := movementHandler.PrevRotation
 	endRotation := movementHandler.Rotation
 	rotationDelta := startRotation.Sub(endRotation)
-	if startRotation.Sub(endRotation).Len() > 180 {
+	if rotationDelta.Len() >= 180 {
 		return
 	}
 
@@ -154,12 +154,10 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 		attackRotation := startRotation.Add(rotationDelta.Mul(partialTicks))
 		entityPos := startEntityPos.Add(entityPosDelta.Mul(partialTicks))
 
-		if partialTicks == 1.0 {
-			attackPos = movementHandler.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
-		}
-
 		directionVector := game.DirectionVector(attackRotation.Z(), attackRotation.X())
 		entityBB := h.TargetedEntity.Box(entityPos).Grow(0.1)
+
+		attackPos = attackPos.Add(directionVector.Mul(0.1))
 
 		h.ClosestDirectionalResults = append(h.ClosestDirectionalResults, game.ClosestPointToBBoxDirectional(
 			attackPos,

@@ -54,7 +54,7 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		d.lastTime = curr
 	}()
 
-	if !p.Ready {
+	if !p.Ready || !p.Alive {
 		d.balance = 0
 		return true
 	}

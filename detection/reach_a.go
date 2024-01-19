@@ -3,6 +3,7 @@ package detection
 import (
 	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -25,8 +26,8 @@ func NewReachA() *ReachA {
 	d.MaxViolations = 15
 	d.trustDuration = 90 * player.TicksPerSecond
 
-	d.FailBuffer = 1.5
-	d.MaxBuffer = 4
+	d.FailBuffer = 1.01
+	d.MaxBuffer = 2.25
 	return d
 }
 
@@ -55,19 +56,30 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	// This calculates the average distance of all the raycast results.
-	minDist := float32(100)
+	total, count := float32(0), float32(0)
 	for _, result := range combatHandler.RaycastResults {
+		total += result
+		count++
+	}
+	avgDist := total / count
+
+	minDist := float32(100)
+	for _, result := range combatHandler.ClosestDirectionalResults {
 		minDist = math32.Min(minDist, result)
 	}
 
-	if minDist >= 3.01 {
+	if minDist > avgDist {
+		return true
+	}
+
+	if minDist > 3 {
 		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("distance", minDist)
+		data.Set("distance", game.Round32(avgDist, 3))
 		d.Fail(p, data)
 
 		return true
 	}
 
-	d.Debuff(0.005)
+	d.Debuff(0.001)
 	return true
 }
