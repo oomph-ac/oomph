@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"github.com/elliotchance/orderedmap/v2"
+	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -32,5 +34,12 @@ func (d *AutoClickerA) ID() string {
 }
 
 func (d *AutoClickerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
+	c := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
+	if c.Clicking && c.CPS > 22 {
+		data := orderedmap.NewOrderedMap[string, any]()
+		data.Set("cps", c.CPS)
+		d.Fail(p, data)
+		return false
+	}
 	return true
 }
