@@ -50,7 +50,7 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if p.ClientTick < 20 {
 		return true
 	}
-	
+
 	curr := time.Now()
 	timeDiff := float64(time.Since(d.lastTime).Microseconds()) / 1000
 
