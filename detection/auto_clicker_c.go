@@ -47,20 +47,20 @@ func (d *AutoClickerC) HandleClientPacket(pk packet.Packet, p *player.Player) bo
 	}
 	d.clickSamples = append(d.clickSamples, float64(c.ClickDelay))
 	if len(d.clickSamples) != 20 {
-		return false
+		return true
 	}
 
 	interpolatedCPS := 20 / math32.Min(0.05, float32(game.Mean(d.clickSamples)))
 	if interpolatedCPS < 10 {
 		d.clickSamples = make([]float64, 0, 20)
-		return false
+		return true
 	}
 
 	d.statSamples = append(d.statSamples, fmt.Sprintf("%v %v %v", game.Kurtosis(d.clickSamples), game.Skewness(d.clickSamples), float64(game.Outliers(d.clickSamples))))
 	d.clickSamples = make([]float64, 0, 20)
 
 	if len(d.statSamples) != 7 {
-		return false
+		return true
 	}
 
 	dupes := d.duplicates()
