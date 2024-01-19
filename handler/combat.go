@@ -65,9 +65,12 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
+
 		if dat.ActionType != protocol.UseItemOnEntityActionAttack {
 			return true
 		}
+
+		h.click(p)
 
 		entity := p.Handler(HandlerIDEntities).(*EntitiesHandler).Find(dat.TargetEntityRuntimeID)
 		if entity == nil {
@@ -90,17 +93,18 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		point1 := game.ClosestPointToBBox(h.StartAttackPos, entityBB)
 		point2 := game.ClosestPointToBBox(h.EndAttackPos, entityBB)
 
-		h.click(p)
 		h.ClosestRawDistance = math32.Min(
 			point1.Sub(h.StartAttackPos).Len(),
 			point2.Sub(h.EndAttackPos).Len(),
 		)
 	case *packet.PlayerAuthInput:
+		if p.Conn().Protocol().ID() >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+			h.click(p)
+		}
 		if h.Phase != CombatPhaseTransaction {
 			return true
 		}
 		h.Phase = CombatPhaseTicked
-
 		// The entity may have already been removed before we are able to do anything with it.
 		if h.TargetedEntity == nil {
 			h.Phase = CombatPhaseNone
@@ -112,10 +116,6 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		// Check if the player has swung their arm into the air, and if so handle it by registering it as a click.
-		if p.Conn().Protocol().ID() >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
-			h.click(p)
-		}
 		h.calculatePointingResults(p)
 	case *packet.Animate:
 		h.LastSwingTick = p.ClientFrame
