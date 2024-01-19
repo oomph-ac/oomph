@@ -256,15 +256,15 @@ func (p *Player) Disconnect(reason string) {
 func (p *Player) Close() error {
 	p.once.Do(func() {
 		p.Connected = false
-		// close(p.c)
+		close(p.c)
 
-		// p.conn.Close()
-		// p.conn = nil
+		p.conn.Close()
+		p.conn = nil
 
-		// if p.serverConn != nil {
-		// 	p.serverConn.Close()
-		// 	p.serverConn = nil
-		// }
+		if p.serverConn != nil {
+			p.serverConn.Close()
+			p.serverConn = nil
+		}
 		p.Closed = true
 
 		p.packetHandlers = nil
