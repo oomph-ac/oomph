@@ -46,7 +46,11 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if !ok {
 		return true
 	}
-
+	// Little hack so that timer doesn't flag when you first join.
+	if p.ClientTick < 20 {
+		return true
+	}
+	
 	curr := time.Now()
 	timeDiff := float64(time.Since(d.lastTime).Microseconds()) / 1000
 
