@@ -19,9 +19,12 @@ func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewTimerA())
 
 	p.RegisterDetection(NewBadPacketA())
+	p.RegisterDetection(NewBadPacketB())
+	p.RegisterDetection(NewBadPacketC())
 
 	p.RegisterDetection(NewAutoClickerA())
 	p.RegisterDetection(NewAutoClickerB())
+	p.RegisterDetection(NewAutoClickerC())
 
 	p.RegisterDetection(NewEditionFakerA())
 	p.RegisterDetection(NewEditionFakerB())
