@@ -2,6 +2,7 @@ package detection
 
 import (
 	"github.com/elliotchance/orderedmap/v2"
+	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -38,7 +39,7 @@ func (d *BadPacketB) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 	switch pk.(type) {
 	case *packet.MovePlayer:
 		s := d.tick - d.last
-		if s < 2 {
+		if s < 2 && !p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Immobile {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("speed", s)
 			d.Fail(p, data)
