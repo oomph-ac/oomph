@@ -50,7 +50,7 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 	}
 
 	ctx := event.C()
-	p.EventHandler().OnFlagged(ctx, p, d, extraData)
+	p.EventHandler().HandleFlag(ctx, p, d, extraData)
 	if ctx.Cancelled() {
 		return
 	}
@@ -87,7 +87,7 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 
 	ctx = event.C()
 	message := text.Colourf("<red><bold>Oomph detected usage of third-party modifications.</bold></red>")
-	p.EventHandler().OnPunishment(ctx, p, &message)
+	p.EventHandler().HandlePunishment(ctx, p, d, &message)
 	if ctx.Cancelled() {
 		return
 	}
