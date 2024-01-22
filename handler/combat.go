@@ -35,12 +35,11 @@ type CombatHandler struct {
 
 	LastSwingTick int64
 
-	Clicking bool
-	Clicks []int64
-	ClickDelay int64
+	Clicking      bool
+	Clicks        []int64
+	ClickDelay    int64
 	LastClickTick int64
-	CPS int
-
+	CPS           int
 }
 
 func NewCombatHandler() *CombatHandler {
@@ -64,7 +63,6 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		if !ok {
 			return true
 		}
-
 
 		if dat.ActionType != protocol.UseItemOnEntityActionAttack {
 			return true
@@ -101,10 +99,12 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		if p.Conn().Protocol().ID() >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 			h.click(p)
 		}
+
 		if h.Phase != CombatPhaseTransaction {
 			return true
 		}
 		h.Phase = CombatPhaseTicked
+
 		// The entity may have already been removed before we are able to do anything with it.
 		if h.TargetedEntity == nil {
 			h.Phase = CombatPhaseNone
