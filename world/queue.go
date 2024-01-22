@@ -1,7 +1,6 @@
 package world
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -37,7 +36,6 @@ func worker(id int) {
 		if matching != nil {
 			matching.Subscribe(req.w)
 			j.res <- true
-			fmt.Println("worker", id, "found matching chunk")
 			continue
 		}
 
@@ -45,7 +43,6 @@ func worker(id int) {
 		cached := NewCached(req.pos, req.c)
 		cached.Subscribe(req.w)
 		j.res <- true
-		fmt.Println("worker", id, "added chunk to cache")
 	}
 }
 
