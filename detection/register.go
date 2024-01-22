@@ -24,7 +24,7 @@ func RegisterDetections(p *player.Player) {
 
 	p.RegisterDetection(NewAutoClickerA())
 	p.RegisterDetection(NewAutoClickerB())
-	p.RegisterDetection(NewAutoClickerC())
+	//p.RegisterDetection(NewAutoClickerC())
 
 	p.RegisterDetection(NewEditionFakerA())
 	p.RegisterDetection(NewEditionFakerB())
