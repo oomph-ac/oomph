@@ -11,7 +11,6 @@ import (
 )
 
 func init() {
-	go handleQueue()
 	go clearCacheDuplicates()
 }
 
@@ -75,33 +74,6 @@ func clearCacheDuplicates() {
 	}
 }
 
-var queuedChunks = make(chan *AddChunkRequest, 128*128)
-
-func handleQueue() {
-	for {
-		req, ok := <-queuedChunks
-		if !ok {
-			panic(oerror.New("chunk queue closed"))
-		}
-
-		if req.w == nil {
-			continue
-		}
-
-		// Search for a chunk in cache that is equal to the chunk in the request. If a matching
-		// chunk is found, we add it to the world.
-		matching := cacheSearchMatch(req.pos, req.c)
-		if matching != nil {
-			matching.Subscribe(req.w)
-			continue
-		}
-
-		// Insert the chunk into the cache, and then add it to the world.
-		cached := NewCached(req.pos, req.c)
-		cached.Subscribe(req.w)
-	}
-}
-
 func InsertToCache(w *World, c *chunk.Chunk, pos protocol.ChunkPos) {
 	req := &AddChunkRequest{
 		w:   w,
@@ -112,7 +84,7 @@ func InsertToCache(w *World, c *chunk.Chunk, pos protocol.ChunkPos) {
 	select {
 	case queuedChunks <- req:
 		break
-	case <-time.After(time.Millisecond * 50):
+	case <-time.After(time.Second):
 		panic(oerror.New("chunk queue timed out"))
 	}
 }
