@@ -25,18 +25,18 @@ type Handler interface {
 
 // EventHandler is an interface that can be implemented to have the player handle certain events.
 type EventHandler interface {
-	// OnPunishment is called when a detection triggers a punishment for a player.
-	OnPunishment(ctx *event.Context, p *Player, message *string)
-	// OnFlagged is called when a detection flags a player.
-	OnFlagged(ctx *event.Context, p *Player, detection Handler, data *orderedmap.OrderedMap[string, any])
+	// HandlePunishment is called when a detection triggers a punishment for a player.
+	HandlePunishment(ctx *event.Context, p *Player, detection Handler, message *string)
+	// HandleFlag is called when a detection flags a player.
+	HandleFlag(ctx *event.Context, p *Player, detection Handler, data *orderedmap.OrderedMap[string, any])
 }
 
 // NopEventHandler is an event handler that does nothing.
 type NopEventHandler struct {
 }
 
-func (NopEventHandler) OnPunishment(ctx *event.Context, p *Player, message *string) {
+func (NopEventHandler) HandlePunishment(ctx *event.Context, p *Player, detection Handler, message *string) {
 }
 
-func (NopEventHandler) OnFlagged(ctx *event.Context, p *Player, detection Handler, data *orderedmap.OrderedMap[string, any]) {
+func (NopEventHandler) HandleFlag(ctx *event.Context, p *Player, detection Handler, data *orderedmap.OrderedMap[string, any]) {
 }
