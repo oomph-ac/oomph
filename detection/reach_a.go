@@ -1,8 +1,6 @@
 package detection
 
 import (
-	"fmt"
-
 	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
@@ -69,7 +67,6 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	deviation := avgDist - minDist
 
 	if avgDist >= 3.01 && deviation <= 0.15 {
-		p.Message(fmt.Sprintf("%v blocks", avgDist))
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("distance", game.Round32(avgDist, 3))
 		d.Fail(p, data)
