@@ -38,13 +38,16 @@ func (d *BadPacketC) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 	if !ok {
 		return true
 	}
+
 	dat, ok := i.TransactionData.(*protocol.UseItemOnEntityTransactionData)
 	if !ok {
 		return true
 	}
+
 	if dat.ActionType != protocol.UseItemOnEntityActionAttack {
 		return true
 	}
+
 	if p.ServerConn().GameData().EntityRuntimeID == dat.TargetEntityRuntimeID {
 		d.Fail(p, nil)
 		return false
