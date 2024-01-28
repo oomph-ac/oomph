@@ -1,8 +1,6 @@
 package world
 
 import (
-	"sync"
-
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/world"
@@ -10,6 +8,7 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sasha-s/go-deadlock"
 	"golang.org/x/exp/maps"
 )
 
@@ -31,7 +30,7 @@ type World struct {
 
 	lastCleanPos protocol.ChunkPos
 
-	sync.Mutex
+	deadlock.RWMutex
 }
 
 func NewWorld() *World {
@@ -61,26 +60,21 @@ func (w *World) RemoveChunk(pos protocol.ChunkPos) {
 // GetChunk returns a cached chunk at the position passed. The mutex is
 // not locked here because it is assumed that the caller has already locked
 // the mutex before calling this function.
-func (w *World) GetChunk(pos protocol.ChunkPos, lock bool) *CachedChunk {
-	if lock {
-		w.Lock()
-		defer w.Unlock()
-	}
+func (w *World) GetChunk(pos protocol.ChunkPos) *CachedChunk {
+	w.RLock()
+	defer w.RUnlock()
 
 	return w.chunks[pos]
 }
 
 // GetBlock returns the block at the position passed.
 func (w *World) GetBlock(blockPos cube.Pos) world.Block {
-	w.Lock()
-	defer w.Unlock()
-
 	if blockPos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
 
 	chunkPos := protocol.ChunkPos{int32(blockPos[0]) >> 4, int32(blockPos[2]) >> 4}
-	c := w.GetChunk(chunkPos, false)
+	c := w.GetChunk(chunkPos)
 	if c == nil {
 		return block.Air{}
 	}
@@ -90,10 +84,11 @@ func (w *World) GetBlock(blockPos cube.Pos) world.Block {
 		panic(oerror.New("world.GetBlock: GetChunk() returned an invalid chunk"))
 	}
 
+	// TODO: RWLock
 	c.Lock()
-	defer c.Unlock()
-
 	rid := c.Block(uint8(blockPos[0]), int16(blockPos[1]), uint8(blockPos[2]), 0)
+	c.Unlock()
+
 	b, ok := world.BlockByRuntimeID(rid)
 
 	if !ok {
@@ -104,16 +99,13 @@ func (w *World) GetBlock(blockPos cube.Pos) world.Block {
 
 // SetBlock sets the block at the position passed.
 func (w *World) SetBlock(pos cube.Pos, b world.Block) {
-	w.Lock()
-	defer w.Unlock()
-
 	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return
 	}
 
 	blockID := world.BlockRuntimeID(b)
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
-	c := w.GetChunk(chunkPos, false)
+	c := w.GetChunk(chunkPos)
 	if c == nil {
 		return
 	}

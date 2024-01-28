@@ -62,6 +62,8 @@ github.com/oomph-ac/dragonfly v0.0.0-20240109155902-19b3acc0e9c6 h1:+pBMj52jlD3B
 github.com/oomph-ac/dragonfly v0.0.0-20240109155902-19b3acc0e9c6/go.mod h1:AkiKzAuAbSE5XPLPS0Y1PesLzilK4Jn2ssBo7ht4aOc=
 github.com/oomph-ac/mv v0.0.0-20231214233016-18dbf72ec985 h1:h3z25ZQP7zB3Dp4YLWSZvQ9D7aF9YMZ/gwqmOUqcKFs=
 github.com/oomph-ac/mv v0.0.0-20231214233016-18dbf72ec985/go.mod h1:LesMogv9FxM75Rly+qZzM2G+p6+jkECy3Vlz/dYDl3s=
+github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5 h1:q2e307iGHPdTGp0hoxKjt1H5pDo6utceo3dQVK3I5XQ=
+github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5/go.mod h1:jvVRKCrJTQWu0XVbaOlby/2lO20uSCHEMzzplHXte1o=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pingcap/errors v0.11.4/go.mod h1:Oi8TUi2kEtXXLMJk9l1cGmz20kV3TaQ0usTwv5KuLY8=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
@@ -74,6 +76,8 @@ github.com/rs/cors v1.7.0 h1:+88SsELBHx5r+hZ8TCkggzSstaWNbDvThkVK8H6f9ik=
 github.com/rs/cors v1.7.0/go.mod h1:gFx+x8UowdsKA9AchylcLynDq+nNFfI8FkUZdN/jGCU=
 github.com/sandertv/go-raknet v1.12.1 h1:CXDfeXGaQD8kwlatlaAS1wQsMBLLGlDSH6upZv28Pss=
 github.com/sandertv/go-raknet v1.12.1/go.mod h1:Gx+WgZBMQ0V2UoouGoJ8Wj6CDrMBQ4SB2F/ggpl5/+Y=
+github.com/sasha-s/go-deadlock v0.3.1 h1:sqv7fDNShgjcaxkO0JNcOAlr8B9+cV5Ey/OB71efZx0=
+github.com/sasha-s/go-deadlock v0.3.1/go.mod h1:F73l+cr82YSh10GxyRI6qZiCgK64VaZjwesgfQ1/iLM=
 github.com/segmentio/fasthash v1.0.3 h1:EI9+KE1EwvMLBWwjpRDc+fEM+prwxDYbslddQGtrmhM=
 github.com/segmentio/fasthash v1.0.3/go.mod h1:waKX8l2N8yckOgmSsXJi7x1ZfdKZ4x7KRMzBtS3oedY=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=

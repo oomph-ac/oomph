@@ -7,6 +7,7 @@ import (
 
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sasha-s/go-deadlock"
 	"github.com/sirupsen/logrus"
 )
 
@@ -56,7 +57,7 @@ type Player struct {
 	// prevent race conditions, and to maintain accuracy with anti-cheat.
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
 	// being associated with.
-	processMu sync.Mutex
+	processMu deadlock.Mutex
 
 	// packetHandlers contains packet packetHandlers registered to the player.
 	packetHandlers []Handler

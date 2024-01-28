@@ -30,9 +30,11 @@ require (
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/oomph-ac/mv v0.0.0-20231214233016-18dbf72ec985 // indirect
+	github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/sandertv/go-raknet v1.12.1 // indirect
+	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.18.0 // indirect
