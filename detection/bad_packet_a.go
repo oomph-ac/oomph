@@ -44,7 +44,11 @@ func (d *BadPacketA) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 		return true
 	}
 
-	if d.prevFrame != 0 && i.Tick != d.prevFrame+1 {
+	defer func() {
+		d.prevFrame = i.Tick
+	}()
+
+	if d.prevFrame != 0 && (i.Tick-d.prevFrame > 2 || i.Tick < d.prevFrame) {
 		dat := orderedmap.NewOrderedMap[string, any]()
 		dat.Set("curr", i.Tick)
 		dat.Set("prev", d.prevFrame)
@@ -52,6 +56,5 @@ func (d *BadPacketA) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 		return true
 	}
 
-	d.prevFrame = i.Tick
 	return true
 }
