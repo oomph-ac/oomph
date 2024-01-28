@@ -196,10 +196,14 @@ func (p *Player) EventHandler() EventHandler {
 
 // SendRemoteEvent sends an Oomph event to the remote server.
 // TODO: Better way to do this. Please.
-func (p *Player) SendRemoteEvent(id string, data map[string]interface{}) {
-	enc, _ := json.Marshal(data)
+func (p *Player) SendRemoteEvent(e RemoteEvent) {
+	if p.serverConn == nil {
+		return
+	}
+
+	enc, _ := json.Marshal(e)
 	p.serverConn.WritePacket(&packet.ScriptMessage{
-		Identifier: id,
+		Identifier: e.ID(),
 		Data:       enc,
 	})
 }
