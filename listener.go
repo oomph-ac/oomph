@@ -8,6 +8,7 @@ import (
 	"github.com/oomph-ac/oomph/detection"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/simulation"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
 )
@@ -67,7 +68,7 @@ func (l listener) Accept() (session.Conn, error) {
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
 
-	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(movementSimulator)
+	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
 
 	l.o.players <- p
 	return p, err

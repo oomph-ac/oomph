@@ -172,7 +172,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		h.World.CleanChunks(h.ChunkRadius, chunkPos)
-		h.InLoadedChunk = (h.World.GetChunk(chunkPos, true) != nil)
+		h.InLoadedChunk = (h.World.GetChunk(chunkPos) != nil)
 	case *packet.RequestChunkRadius:
 		h.ChunkRadius = pk.ChunkRadius
 	}
@@ -235,7 +235,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			var cached *world.CachedChunk
 			var c *chunk.Chunk
 
-			if found := h.World.GetChunk(chunkPos, true); found != nil {
+			if found := h.World.GetChunk(chunkPos); found != nil {
 				cached = found
 				c = found.Chunk
 			} else {
