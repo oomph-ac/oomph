@@ -5,6 +5,7 @@ import (
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -44,6 +45,11 @@ func (d *BaseDetection) SetSettings(settings map[string]interface{}) {
 
 // Fail is called when the detection is triggered from adbnormal behavior.
 func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[string, any]) {
+	if extraData == nil {
+		extraData = orderedmap.NewOrderedMap[string, any]()
+	}
+	extraData.Set("latency", p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).StackLatency)
+
 	d.Buffer = math32.Min(d.Buffer+1, d.MaxBuffer)
 	if d.Buffer < d.FailBuffer {
 		return
