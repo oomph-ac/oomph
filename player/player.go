@@ -104,6 +104,10 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 		c:   make(chan bool),
 	}
 
+	if serverConn != nil {
+		p.GameMode = serverConn.GameData().PlayerGameMode
+	}
+
 	go p.startTicking()
 	return p
 }
