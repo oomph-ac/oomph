@@ -139,6 +139,8 @@ func (h *CombatHandler) Defer() {
 	if h.Phase == CombatPhaseTicked {
 		h.Phase = CombatPhaseNone
 	}
+
+	h.Clicking = false
 }
 
 func (h *CombatHandler) calculatePointingResults(p *player.Player) {
@@ -157,12 +159,14 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 		return
 	}
 
-	startDirection := game.DirectionVector(startRotation.Z(), startRotation.X())
-	endDirection := game.DirectionVector(endRotation.Z(), endRotation.X())
-
-	startEntityPos := h.TargetedEntity.PrevPosition
+	startEntityPos := h.TargetedEntity.Position
 	endEntityPos := h.TargetedEntity.Position
 	entityPosDelta := endEntityPos.Sub(startEntityPos)
+
+	adjustFactor := mgl32.Vec3{0.1, 0.1, 0.1}
+	adjustFactor[0] += math32.Abs(h.TargetedEntity.Velocity.X())
+	adjustFactor[1] += math32.Abs(h.TargetedEntity.Velocity.Y())
+	adjustFactor[2] += math32.Abs(h.TargetedEntity.Velocity.Z())
 
 	h.ClosestDirectionalResults = []float32{}
 	h.RaycastResults = []float32{}
@@ -173,17 +177,7 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 		entityPos := startEntityPos.Add(entityPosDelta.Mul(partialTicks))
 
 		directionVector := game.DirectionVector(attackRotation.Z(), attackRotation.X())
-		entityBB := h.TargetedEntity.Box(entityPos).Grow(0.1)
-
-		attackPos = attackPos.Add(directionVector.Mul(0.1))
-
-		h.ClosestDirectionalResults = append(h.ClosestDirectionalResults, game.ClosestPointToBBoxDirectional(
-			attackPos,
-			startDirection,
-			endDirection,
-			entityBB,
-			14.0,
-		).Sub(attackPos).Len())
+		entityBB := h.TargetedEntity.Box(entityPos).GrowVec3(adjustFactor)
 
 		result, ok := trace.BBoxIntercept(entityBB, attackPos, attackPos.Add(directionVector.Mul(14.0)))
 		if ok {
@@ -194,7 +188,7 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 
 // Click adds a click to the player's click history.
 func (h *CombatHandler) click(p *player.Player) {
-	currentTick := p.ClientTick
+	currentTick := p.ClientFrame
 
 	h.Clicking = true
 	if len(h.Clicks) > 0 {

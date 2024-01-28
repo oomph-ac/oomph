@@ -2,6 +2,7 @@ package detection
 
 import (
 	"github.com/elliotchance/orderedmap/v2"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -56,7 +57,7 @@ func (d *ReachB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	if combatHandler.ClosestRawDistance > 3 {
 		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("distance", combatHandler.ClosestRawDistance)
+		data.Set("distance", game.Round32(combatHandler.ClosestRawDistance, 3))
 		d.Fail(p, data)
 	}
 
