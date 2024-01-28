@@ -216,6 +216,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		localHub := sentry.CurrentHub().Clone()
 		localHub.ConfigureScope(func(scope *sentry.Scope) {
 			scope.SetTag("conn_type", "clientConn")
+			scope.SetTag("player", p.IdentityData().DisplayName)
 		})
 
 		defer func() {
@@ -250,6 +251,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		localHub := sentry.CurrentHub().Clone()
 		localHub.ConfigureScope(func(scope *sentry.Scope) {
 			scope.SetTag("conn_type", "serverConn")
+			scope.SetTag("player", p.IdentityData().DisplayName)
 		})
 
 		defer func() {
