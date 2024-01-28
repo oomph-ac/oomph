@@ -3,6 +3,7 @@ package oomph
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
+	"github.com/sasha-s/go-deadlock"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,6 +29,13 @@ func init() {
 
 	if err != nil {
 		panic("failed to init sentry: " + err.Error())
+	}
+
+	deadlock.Opts.Disable = true
+	if os.Getenv("OOMPH_DEBUG") == "true" {
+		deadlock.Opts.Disable = false
+		deadlock.Opts.DeadlockTimeout = time.Second * 10
+		deadlock.Opts.DisableLockOrderDetection = true
 	}
 }
 
