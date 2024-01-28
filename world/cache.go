@@ -2,12 +2,12 @@ package world
 
 import (
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sasha-s/go-deadlock"
 )
 
 func init() {
@@ -21,7 +21,7 @@ const (
 
 var chunkCache = map[protocol.ChunkPos]map[uint64]*CachedChunk{}
 var chunkIds = map[protocol.ChunkPos]uint64{}
-var cacheMu sync.Mutex
+var cacheMu deadlock.Mutex
 
 func lazyInitCache(pos protocol.ChunkPos) {
 	if chunkCache[pos] == nil {
@@ -91,7 +91,7 @@ func InsertToCache(w *World, c *chunk.Chunk, pos protocol.ChunkPos) {
 
 type CachedChunk struct {
 	*chunk.Chunk
-	sync.Mutex
+	deadlock.RWMutex
 
 	ID  uint64
 	Pos protocol.ChunkPos
@@ -142,10 +142,10 @@ func (c *CachedChunk) Unsubscribe(w *World) {
 }
 
 func (c *CachedChunk) InsertSubChunk(w *World, sub *chunk.SubChunk, index byte) {
-	c.Lock()
-	defer c.Unlock()
-
 	if len(c.Subscribers) == 1 {
+		c.Lock()
+		defer c.Unlock()
+
 		c.Sub()[index] = sub
 		return
 	}
@@ -160,9 +160,6 @@ func (c *CachedChunk) InsertSubChunk(w *World, sub *chunk.SubChunk, index byte) 
 // ActionSetBlock sets the block in a chunk. The SetBlockAction contains the block position
 // and the runtime ID of the block.
 func (c *CachedChunk) ActionSetBlock(w *World, a SetBlockAction) {
-	c.Lock()
-	defer c.Unlock()
-
 	// Verify that the action's block position is within range of the chunk.
 	actionChunkPos := protocol.ChunkPos{int32(a.BlockPos[0]) >> 4, int32(a.BlockPos[2]) >> 4}
 	if actionChunkPos != c.Pos {
@@ -173,6 +170,9 @@ func (c *CachedChunk) ActionSetBlock(w *World, a SetBlockAction) {
 		c.notifySubscriptionEdit(w, new)
 		return
 	}
+
+	c.Lock()
+	defer c.Unlock()
 
 	// There is only one viewer of this chunk, so we can just update the chunk directly.
 	if len(c.Subscribers) == 1 {
