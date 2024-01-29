@@ -158,9 +158,10 @@ func (s MovementSimulator) teleport(p *player.Player, mDat *handler.MovementHand
 	if !mDat.SmoothTeleport && mDat.TicksSinceTeleport == 0 {
 		mDat.Position = mDat.TeleportPos
 		mDat.Velocity = mgl32.Vec3{}
-		if mDat.OnGround {
+		if mDat.TeleportOnGround {
 			mDat.Velocity[1] = -0.002
 		}
+		mDat.OnGround = mDat.TeleportOnGround
 
 		mDat.TicksUntilNextJump = 0
 		s.jump(mDat)
