@@ -150,6 +150,11 @@ func (c *CachedChunk) InsertSubChunk(w *World, sub *chunk.SubChunk, index byte) 
 		return
 	}
 
+	// Check if the sub chunk is equal, and is equivilent - no need to do anything.
+	if int(index) < len(c.Sub()) && c.Sub()[index].Equals(sub) {
+		return
+	}
+
 	copiedChunk := *c.Chunk
 	newCached := NewCached(c.Pos, &copiedChunk)
 	newCached.Sub()[index] = sub
