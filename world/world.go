@@ -33,7 +33,7 @@ type World struct {
 	deadlock.RWMutex
 }
 
-func NewWorld() *World {
+func New() *World {
 	currentWorldId++
 	return &World{
 		chunks: make(map[protocol.ChunkPos]*CachedChunk),
@@ -84,13 +84,11 @@ func (w *World) GetBlock(blockPos cube.Pos) world.Block {
 		panic(oerror.New("world.GetBlock: GetChunk() returned an invalid chunk"))
 	}
 
-	// TODO: RWLock
-	c.Lock()
+	c.RLock()
 	rid := c.Block(uint8(blockPos[0]), int16(blockPos[1]), uint8(blockPos[2]), 0)
-	c.Unlock()
+	c.RUnlock()
 
 	b, ok := world.BlockByRuntimeID(rid)
-
 	if !ok {
 		return block.Air{}
 	}

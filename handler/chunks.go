@@ -24,7 +24,6 @@ import (
 const HandlerIDChunks = "oomph:chunks"
 
 type ChunksHandler struct {
-	World         *world.World
 	ChunkRadius   int32
 	InLoadedChunk bool
 
@@ -33,7 +32,6 @@ type ChunksHandler struct {
 
 func NewChunksHandler() *ChunksHandler {
 	return &ChunksHandler{
-		World:       world.NewWorld(),
 		ChunkRadius: -1,
 	}
 }
@@ -74,7 +72,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		// Find the replace position of the block. This will be used if the block at the current position
 		// is replacable (e.g: water, lava, air).
 		replacePos := utils.BlockToCubePos(dat.BlockPosition)
-		fb := h.World.GetBlock(replacePos)
+		fb := p.World.GetBlock(replacePos)
 
 		// If the block at the position is not replacable, we want to place the block on the side of the block.
 		if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
@@ -113,7 +111,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		// Set the block in the world.
-		h.World.SetBlock(replacePos, b)
+		p.World.SetBlock(replacePos, b)
 		return true
 	case *packet.PlayerAuthInput:
 		chunkPos := protocol.ChunkPos{
@@ -133,7 +131,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 						continue
 					}
 
-					h.World.SetBlock(cube.Pos{
+					p.World.SetBlock(cube.Pos{
 						int(action.BlockPos.X()),
 						int(action.BlockPos.Y()),
 						int(action.BlockPos.Z()),
@@ -161,7 +159,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 						continue
 					}
 
-					h.World.SetBlock(cube.Pos{
+					p.World.SetBlock(cube.Pos{
 						int(h.breakingBlockPos.X()),
 						int(h.breakingBlockPos.Y()),
 						int(h.breakingBlockPos.Z()),
@@ -171,8 +169,8 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			}
 		}
 
-		h.World.CleanChunks(h.ChunkRadius, chunkPos)
-		h.InLoadedChunk = (h.World.GetChunk(chunkPos) != nil)
+		p.World.CleanChunks(h.ChunkRadius, chunkPos)
+		h.InLoadedChunk = (p.World.GetChunk(chunkPos) != nil)
 	case *packet.RequestChunkRadius:
 		h.ChunkRadius = pk.ChunkRadius
 	}
@@ -191,7 +189,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			b = block.Air{}
 		}
 
-		h.World.SetBlock(cube.Pos{
+		p.World.SetBlock(cube.Pos{
 			int(pk.Position.X()),
 			int(pk.Position.Y()),
 			int(pk.Position.Z()),
@@ -213,7 +211,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		c.Compact()
-		world.InsertToCache(h.World, c, pk.Position)
+		world.InsertToCache(p.World, c, pk.Position)
 	case *packet.SubChunk:
 		if pk.CacheEnabled {
 			panic(oerror.New("subchunk caching not supported on oomph"))
@@ -235,15 +233,14 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			var cached *world.CachedChunk
 			var c *chunk.Chunk
 
-			if found := h.World.GetChunk(chunkPos); found != nil {
+			if found := p.World.GetChunk(chunkPos); found != nil {
 				cached = found
 				c = found.Chunk
+			} else if new, ok := newChunks[chunkPos]; !ok {
+				c = chunk.New(world.AirRuntimeID, dimensionFromNetworkID(pk.Dimension).Range())
+				newChunks[chunkPos] = c
 			} else {
-				if new, ok := newChunks[chunkPos]; !ok {
-					c = chunk.New(world.AirRuntimeID, dimensionFromNetworkID(pk.Dimension).Range())
-				} else {
-					c = new
-				}
+				c = new
 			}
 
 			var index byte
@@ -253,16 +250,15 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			}
 
 			if cached != nil {
-				cached.InsertSubChunk(h.World, sub, index)
-				return true
+				cached.InsertSubChunk(p.World, sub, index)
+				continue
 			}
 
 			c.Sub()[index] = sub
-			newChunks[chunkPos] = c
 		}
 
 		for pos, newC := range newChunks {
-			world.InsertToCache(h.World, newC, pos)
+			world.InsertToCache(p.World, newC, pos)
 		}
 	}
 
