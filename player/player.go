@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sasha-s/go-deadlock"
@@ -44,6 +45,8 @@ type Player struct {
 	ClientTick, ClientFrame int64
 	ServerTick              int64
 
+	World *world.World
+
 	// GameMode is the gamemode of the player. The player is exempt from movement predictions
 	// if they are not in survival or adventure mode.
 	GameMode int32
@@ -80,6 +83,8 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 		CombatMode:   AuthorityModeSemi,
 		MovementMode: AuthorityModeSemi,
+
+		World: world.New(),
 
 		conn:        conn,
 		serverConn:  serverConn,

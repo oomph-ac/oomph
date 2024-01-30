@@ -21,7 +21,7 @@ type MovementSimulator struct {
 
 func (s MovementSimulator) Simulate(p *player.Player) {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	w := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).World
+	w := p.World
 
 	if !s.Reliable(p) {
 		mDat.Velocity = mDat.ClientVel
@@ -140,7 +140,7 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	cDat := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler)
 
-	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox().Grow(1), false, false, cDat.World) {
+	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox().Grow(1), false, false, p.World) {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
 			return false
 		}

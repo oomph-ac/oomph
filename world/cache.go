@@ -144,9 +144,9 @@ func (c *CachedChunk) Unsubscribe(w *World) {
 func (c *CachedChunk) InsertSubChunk(w *World, sub *chunk.SubChunk, index byte) {
 	if len(c.Subscribers) == 1 {
 		c.Lock()
-		defer c.Unlock()
-
 		c.Sub()[index] = sub
+		c.Unlock()
+
 		return
 	}
 
