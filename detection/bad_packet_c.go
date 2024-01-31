@@ -48,7 +48,7 @@ func (d *BadPacketC) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 		return true
 	}
 
-	if p.ServerConn().GameData().EntityRuntimeID == dat.TargetEntityRuntimeID {
+	if p.RuntimeId == dat.TargetEntityRuntimeID {
 		d.Fail(p, nil)
 		return false
 	}
