@@ -272,6 +272,8 @@ func (p *Player) Close() error {
 		p.Connected = false
 		p.Closed = true
 
+		p.World.PurgeChunks()
+
 		p.conn.Close()
 		if p.serverConn != nil {
 			p.serverConn.Close()

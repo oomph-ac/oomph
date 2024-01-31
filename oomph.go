@@ -236,7 +236,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 		for {
 			pk, err := conn.ReadPacket()
-			if err != nil {
+			if err != nil && !p.Closed {
 				o.log.Errorf("error reading packet from client: %v", err)
 				return
 			}
