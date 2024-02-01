@@ -19,7 +19,7 @@ type Handler interface {
 	HandleServerPacket(pk packet.Packet, p *Player) bool
 	// OnTick is called every server tick.
 	OnTick(p *Player)
-	// Defer is called after all detections and handlers have been ran
+	// Defer is called after all detections and handlers have been ran.
 	Defer()
 }
 
@@ -29,6 +29,8 @@ type EventHandler interface {
 	HandlePunishment(ctx *event.Context, p *Player, detection Handler, message *string)
 	// HandleFlag is called when a detection flags a player.
 	HandleFlag(ctx *event.Context, p *Player, detection Handler, data *orderedmap.OrderedMap[string, any])
+	// HandleQuit is called when a player is closed.
+	HandleQuit(p *Player)
 }
 
 // NopEventHandler is an event handler that does nothing.
@@ -39,4 +41,7 @@ func (NopEventHandler) HandlePunishment(ctx *event.Context, p *Player, detection
 }
 
 func (NopEventHandler) HandleFlag(ctx *event.Context, p *Player, detection Handler, data *orderedmap.OrderedMap[string, any]) {
+}
+
+func (NopEventHandler) HandleQuit(p *Player) {
 }

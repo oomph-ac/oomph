@@ -272,6 +272,7 @@ func (p *Player) Close() error {
 		p.Connected = false
 		p.Closed = true
 
+		p.eventHandler.HandleQuit(p)
 		p.World.PurgeChunks()
 
 		p.conn.Close()
@@ -280,10 +281,12 @@ func (p *Player) Close() error {
 		}
 
 		p.packetHandlers = nil
+		p.eventHandler = nil
 		p.detections = nil
 
 		close(p.c)
 	})
+
 	return nil
 }
 
