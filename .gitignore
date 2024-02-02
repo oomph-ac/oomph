@@ -3,6 +3,7 @@ config.toml
 token.tok
 tests/*
 .oomph_prod/*
+.oomph_zeqa/*
 .direct_test/*
 .oomph_portal_prod/*
 survival_proxy/*

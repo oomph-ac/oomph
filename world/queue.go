@@ -5,7 +5,7 @@ import "runtime"
 const queueSize = 128 * 128
 
 func init() {
-	for i := 0; i < runtime.NumCPU()*4; i++ {
+	for i := 0; i < runtime.NumCPU(); i++ {
 		go worker(i)
 	}
 }
