@@ -29,6 +29,11 @@ func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) 
 	if _, ok := pk.(*packet.TickSync); ok {
 		h.Responded = true
 		p.Ready = true
+	} else if _, ok := pk.(*packet.PlayerAuthInput); ok && p.ServerTick%10 == 0 {
+		p.SendRemoteEvent(player.NewUpdateLatencyEvent(
+			p.Conn().Latency().Milliseconds()*2,
+			h.StackLatency,
+		))
 	}
 
 	return true
