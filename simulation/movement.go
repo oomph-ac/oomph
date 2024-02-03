@@ -86,11 +86,8 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 		}
 	}
 
-	inCobweb := false
 	b, inside := s.blockInside(mDat, w)
-	if inside {
-		inCobweb = utils.BlockName(b) == "minecraft:cobweb"
-	}
+	inCobweb := inside && utils.BlockName(b) == "minecraft:web"
 
 	if inCobweb {
 		mDat.Velocity[0] *= 0.25
@@ -289,13 +286,13 @@ func (MovementSimulator) moveRelative(mDat *handler.MovementHandler, fSpeed floa
 
 func (MovementSimulator) blockInside(mDat *handler.MovementHandler, w *world.World) (df_world.Block, bool) {
 	bb := mDat.BoundingBox()
-	for _, result := range utils.GetNearbyBlocks(bb, false, false, w) {
+	for _, result := range utils.GetNearbyBlocks(bb, false, true, w) {
 		pos := result.Position
 		block := result.Block
 		boxes := utils.BlockBoxes(block, pos, w)
 
 		for _, box := range boxes {
-			if box.IntersectsWith(bb) {
+			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
 				return block, true
 			}
 		}
