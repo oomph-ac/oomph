@@ -11,6 +11,10 @@ type FlaggedEvent struct {
 	Violations float32 `json:"violations"`
 }
 
+func (e *FlaggedEvent) ID() string {
+	return "oomph:flagged"
+}
+
 func NewFlaggedEvent(p *Player, t, st string, violations float32) *FlaggedEvent {
 	return &FlaggedEvent{
 		Player:     p.Conn().IdentityData().DisplayName,
@@ -20,6 +24,18 @@ func NewFlaggedEvent(p *Player, t, st string, violations float32) *FlaggedEvent 
 	}
 }
 
-func (e *FlaggedEvent) ID() string {
-	return "oomph:flagged"
+type UpdateLatencyEvent struct {
+	RaknetLatency int64 `json:"raknet"`
+	OomphLatency  int64 `json:"oomph"`
+}
+
+func (e *UpdateLatencyEvent) ID() string {
+	return "oomph:latency_report"
+}
+
+func NewUpdateLatencyEvent(raknet, oomph int64) *UpdateLatencyEvent {
+	return &UpdateLatencyEvent{
+		RaknetLatency: raknet,
+		OomphLatency:  oomph,
+	}
 }
