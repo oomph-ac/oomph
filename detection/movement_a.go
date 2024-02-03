@@ -30,8 +30,8 @@ func NewMovementA() *MovementA {
 	d.MaxViolations = 30
 	d.trustDuration = 20 * player.TicksPerSecond
 
-	d.FailBuffer = 3
-	d.MaxBuffer = 10
+	d.FailBuffer = 5
+	d.MaxBuffer = 7
 	return d
 }
 
@@ -56,7 +56,7 @@ func (d *MovementA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 
 	dev := math32.Abs(mDat.ClientPosition.Y() - mDat.Position.Y())
 	if dev < movementAThreshold {
-		d.Debuff(0.5)
+		d.Debuff(1)
 		return true
 	}
 

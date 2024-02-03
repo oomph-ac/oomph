@@ -12,7 +12,7 @@ import (
 const (
 	DetectionIDMovementB  = "oomph:movement_b"
 	movementBThreshold    = 0.01
-	movementBMaxThreshold = 0.1
+	movementBMaxThreshold = 0.3
 )
 
 type MovementB struct {
@@ -30,8 +30,8 @@ func NewMovementB() *MovementB {
 	d.MaxViolations = 30
 	d.trustDuration = 20 * player.TicksPerSecond
 
-	d.FailBuffer = 3
-	d.MaxBuffer = 10
+	d.FailBuffer = 5
+	d.MaxBuffer = 7
 	return d
 }
 
@@ -58,7 +58,7 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	zDev := math32.Abs(mDat.ClientPosition.Z() - mDat.Position.Z())
 
 	if xDev < movementBThreshold || zDev < movementBThreshold {
-		d.Debuff(0.5)
+		d.Debuff(1)
 		return true
 	}
 
@@ -69,10 +69,7 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 
 	// If the deviation is higher than the max threshold, we should punish the player for each time
 	// their movement exceeds the threshold.
-	for x := xDev; x >= movementBMaxThreshold; x -= movementBMaxThreshold {
-		d.Fail(p, data)
-	}
-	for z := zDev; z >= movementBMaxThreshold; z -= movementBMaxThreshold {
+	for hz := math32.Max(xDev, zDev); hz >= movementBMaxThreshold; hz -= movementBMaxThreshold {
 		d.Fail(p, data)
 	}
 

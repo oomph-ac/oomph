@@ -34,7 +34,7 @@ type MovementHandler struct {
 	VerticallyCollided     bool
 	HorizontallyCollided   bool
 
-	OnGround bool
+	OnGround       bool
 	OffGroundTicks int64
 
 	KnownInsideBlock bool
@@ -154,6 +154,16 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 
 			h.Width = width.(float32)
 			h.Height = height.(float32)
+
+			f, ok := pk.EntityMetadata[entity.DataKeyFlags]
+			if !ok {
+				return
+			}
+
+			flags := f.(int64)
+			h.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
+			h.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
+			h.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
 		})
 	case *packet.UpdateAttributes:
 		if pk.EntityRuntimeID != p.RuntimeId {
