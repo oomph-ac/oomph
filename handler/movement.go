@@ -165,6 +165,23 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			h.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
 			h.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
 		})
+	case *packet.UpdateAbilities:
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			for _, l := range pk.AbilityData.Layers {
+				h.NoClip = utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip)
+				h.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying) || h.NoClip
+				mayFly := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
+
+				if h.ToggledFly {
+					// If the player toggled flight, but the server did not allow it, we longer trust
+					// their flight status. This is done to ensure players that have permission to fly
+					// are able to do so w/o any movement corrections, but players that do not have permission
+					// to do so aren't able to bypass movement predictions with it.
+					h.TrustFlyStatus = h.Flying || mayFly
+				}
+				h.ToggledFly = false
+			}
+		})
 	case *packet.UpdateAttributes:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
