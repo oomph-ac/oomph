@@ -9,7 +9,11 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const DetectionIDMovementB = "oomph:movement_b"
+const (
+	DetectionIDMovementB  = "oomph:movement_b"
+	movementBThreshold    = 0.01
+	movementBMaxThreshold = 0.1
+)
 
 type MovementB struct {
 	BaseDetection
@@ -53,7 +57,7 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	xDev := math32.Abs(mDat.ClientPosition.X() - mDat.Position.X())
 	zDev := math32.Abs(mDat.ClientPosition.Z() - mDat.Position.Z())
 
-	if xDev < 0.01 || zDev < 0.01 {
+	if xDev < movementBThreshold || zDev < movementBThreshold {
 		d.Debuff(0.5)
 		return true
 	}
@@ -62,5 +66,15 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	data.Set("xDiff", game.Round32(xDev, 3))
 	data.Set("zDiff", game.Round32(zDev, 3))
 	d.Fail(p, data)
+
+	// If the deviation is higher than the max threshold, we should punish the player for each time
+	// their movement exceeds the threshold.
+	for x := xDev; x >= movementBMaxThreshold; x -= movementBMaxThreshold {
+		d.Fail(p, data)
+	}
+	for z := zDev; z >= movementBMaxThreshold; z -= movementBMaxThreshold {
+		d.Fail(p, data)
+	}
+
 	return true
 }
