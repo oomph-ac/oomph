@@ -141,6 +141,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
 		}
+		pk.Tick = 0 // prevent rewind
 
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
 			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
@@ -186,6 +187,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
 		}
+		pk.Tick = 0 // prevent rewind
 
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
 			h.handleAttribute("minecraft:movement", pk.Attributes, func(attr protocol.Attribute) {
@@ -208,6 +210,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
 		}
+		pk.Tick = 0 // prevent rewind
 
 		// All other modes should be capable of teleporting the player.
 		if pk.Mode == packet.MoveModeRotation {
