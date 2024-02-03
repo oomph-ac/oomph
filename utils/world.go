@@ -657,15 +657,15 @@ func BlockClimbable(b world.Block) bool {
 	switch b.(type) {
 	case block.Ladder:
 		return true
-		// TODO: Add vines here.
 	}
 
 	switch BlockName(b) {
-	case "minecraft:vine":
+	case "minecraft:vine", "minecraft:cave_vines", "minecraft:cave_vines_body_with_berries", "minecraft:cave_vines_head_with_berries",
+		"minecraft:twisting_vines", "minecraft:weeping_vines":
 		return true
+	default:
+		return false
 	}
-
-	return false
 }
 
 // BoxesIntersect returns wether or not the first given box intersects with
