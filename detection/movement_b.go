@@ -50,7 +50,7 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 {
+	if mDat.StepClipOffset > 0 || mDat.TicksSinceTeleport == 0 {
 		return true
 	}
 
@@ -69,7 +69,9 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 
 	// If the deviation is higher than the max threshold, we should punish the player for each time
 	// their movement exceeds the threshold.
-	for hz := math32.Max(xDev, zDev); hz >= movementBMaxThreshold; hz -= movementBMaxThreshold {
+	count := float32(0)
+	for hz := math32.Max(xDev, zDev); hz >= movementBMaxThreshold && count <= d.MaxViolations; hz -= movementBMaxThreshold {
+		count++
 		d.Fail(p, data)
 	}
 
