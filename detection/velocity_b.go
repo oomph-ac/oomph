@@ -25,7 +25,7 @@ func NewVelocityB() *VelocityB {
 	d.MaxViolations = 20
 	d.trustDuration = 60 * player.TicksPerSecond
 
-	d.FailBuffer = 2
+	d.FailBuffer = 5
 	d.MaxBuffer = 10
 	return d
 }
@@ -59,6 +59,6 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	d.Debuff(0.1)
+	d.Debuff(1.0)
 	return true
 }
