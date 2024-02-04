@@ -349,10 +349,15 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/8.0, 1)}
 	case "minecraft:daylight_detector", "minecraft:daylight_detector_inverted":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 3.0/8.0, 1)}
-	case "minecraft:bamboo_sapling":
+	case "minecraft:bamboo_sapling", "minecraft:bamboo":
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)} // HACK.
+	case "minecraft:vine", "minecraft:cave_vines", "minecraft:cave_vines_body_with_berries", "minecraft:cave_vines_head_with_berries",
+		"minecraft:twisting_vines", "minecraft:weeping_vines":
 		return []cube.BBox{}
-	case "minecraft:vine":
-		return []cube.BBox{}
+	case "minecraft:flower_pot":
+		return []cube.BBox{cube.Box(0, 0, 0, 13/16.0, 3/8.0, 13/16.0)}
+	case "minecraft:black_candle":
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	}
 
 	dfBoxes := b.Model().BBox(df_cube.Pos{
