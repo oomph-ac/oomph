@@ -258,6 +258,11 @@ func (p *Player) Log() *logrus.Logger {
 	return p.log
 }
 
+// SetLog sets the player's logger.
+func (p *Player) SetLog(log *logrus.Logger) {
+	p.log = log
+}
+
 // Disconnect disconnects the player with the given reason.
 func (p *Player) Disconnect(reason string) {
 	p.conn.WritePacket(&packet.Disconnect{

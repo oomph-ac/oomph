@@ -34,7 +34,7 @@ func init() {
 	deadlock.Opts.Disable = true
 	if os.Getenv("OOMPH_DEBUG") == "true" {
 		deadlock.Opts.Disable = false
-		deadlock.Opts.DeadlockTimeout = time.Second * 10
+		deadlock.Opts.DeadlockTimeout = time.Second * 5
 		deadlock.Opts.DisableLockOrderDetection = true
 	}
 }
