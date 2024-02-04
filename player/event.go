@@ -1,5 +1,11 @@
 package player
 
+var EventIds = []string{
+	"oomph:flagged",
+	"oomph:latency_report",
+	"oomph:authentication", // In gophertunnel fork.
+}
+
 type RemoteEvent interface {
 	ID() string
 }

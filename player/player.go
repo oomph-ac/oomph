@@ -2,9 +2,11 @@ package player
 
 import (
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -124,6 +126,10 @@ func (p *Player) HandleFromClient(pk packet.Packet) error {
 
 	if p.Closed {
 		return nil
+	}
+
+	if s, ok := pk.(*packet.ScriptMessage); ok && strings.Contains(s.Identifier, "oomph:") {
+		panic(oerror.New("malicious payload detected"))
 	}
 
 	cancel := false
