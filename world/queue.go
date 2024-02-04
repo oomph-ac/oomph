@@ -2,15 +2,13 @@ package world
 
 import "runtime"
 
-const queueSize = 128 * 128
-
 func init() {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go worker(i)
 	}
 }
 
-var queuedChunks = make(chan *AddChunkRequest, queueSize)
+var queuedChunks = make(chan *AddChunkRequest)
 
 func worker(id int) {
 	for req := range queuedChunks {
