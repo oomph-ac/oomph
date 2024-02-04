@@ -171,7 +171,11 @@ func (c *CachedChunk) ActionSetBlock(w *World, a SetBlockAction) {
 		panic(oerror.New("action chunk pos does not match cached chunk pos"))
 	}
 
-	if new, ok := c.Transactions[a]; ok {
+	c.RLock()
+	new, ok := c.Transactions[a]
+	c.RUnlock()
+
+	if ok {
 		c.notifySubscriptionEdit(w, new)
 		return
 	}
