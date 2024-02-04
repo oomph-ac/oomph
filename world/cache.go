@@ -41,16 +41,23 @@ func clearCacheDuplicates() {
 				// If the cached chunk no longer has any subscribers, we can remove it from the cache.
 				if len(cached.Subscribers) == 0 {
 					delete(cacheMap, cached.ID)
+					continue
 				}
 
 				// Check transaction list, and remove any unused or nil chunks.
-				cached.Lock()
+				cached.txMu.Lock()
 				for k, linkedC := range cached.Transactions {
 					if linkedC == nil || len(linkedC.Subscribers) == 0 {
 						delete(cached.Transactions, k)
+						continue
+					}
+
+					found, ok := chunkCache[linkedC.Pos][linkedC.ID]
+					if !ok || !found.Equals(linkedC.Chunk) {
+						delete(cached.Transactions, k)
 					}
 				}
-				cached.Unlock()
+				cached.txMu.Unlock()
 
 				// Check for duplicate chunks in the cache.
 				for _, other := range cacheMap {
@@ -84,7 +91,7 @@ func InsertToCache(w *World, c *chunk.Chunk, pos protocol.ChunkPos) {
 	select {
 	case queuedChunks <- req:
 		break
-	case <-time.After(time.Second):
+	case <-time.After(time.Second * 10):
 		panic(oerror.New("chunk queue timed out"))
 	}
 }
@@ -97,7 +104,10 @@ type CachedChunk struct {
 	Pos protocol.ChunkPos
 
 	Transactions map[SetBlockAction]*CachedChunk
-	Subscribers  map[uint64]*World
+	txMu         deadlock.RWMutex
+
+	Subscribers map[uint64]*World
+	sMu         deadlock.RWMutex
 }
 
 // NewCached creates and returns a new cached chunk.
@@ -122,16 +132,16 @@ func NewCached(pos protocol.ChunkPos, c *chunk.Chunk) *CachedChunk {
 }
 
 func (c *CachedChunk) Subscribe(w *World) {
-	c.Lock()
-	defer c.Unlock()
+	c.sMu.Lock()
+	defer c.sMu.Unlock()
 
 	w.AddChunk(c)
 	c.Subscribers[w.id] = w
 }
 
 func (c *CachedChunk) Unsubscribe(w *World) {
-	c.Lock()
-	defer c.Unlock()
+	c.sMu.Lock()
+	defer c.sMu.Unlock()
 
 	if _, ok := c.Subscribers[w.id]; !ok {
 		panic(oerror.New("cannot unsubscribe from chunk whilst not subscribed"))
@@ -171,29 +181,37 @@ func (c *CachedChunk) ActionSetBlock(w *World, a SetBlockAction) {
 		panic(oerror.New("action chunk pos does not match cached chunk pos"))
 	}
 
-	c.RLock()
+	c.txMu.RLock()
 	new, ok := c.Transactions[a]
-	c.RUnlock()
+	c.txMu.RUnlock()
 
 	if ok {
 		c.notifySubscriptionEdit(w, new)
 		return
 	}
 
-	c.Lock()
-	defer c.Unlock()
-
 	// There is only one viewer of this chunk, so we can just update the chunk directly.
 	if len(c.Subscribers) == 1 {
+		c.Lock()
 		c.SetBlock(uint8(a.BlockPos[0]), int16(a.BlockPos[1]), uint8(a.BlockPos[2]), 0, a.BlockRuntimeId)
+		c.Unlock()
+
 		return
 	}
 
+	c.Lock()
 	copiedChunk := *c.Chunk
+	c.Unlock()
+
 	newCached := NewCached(c.Pos, &copiedChunk)
 	newCached.SetBlock(uint8(a.BlockPos[0]), int16(a.BlockPos[1]), uint8(a.BlockPos[2]), 0, a.BlockRuntimeId)
 
+	// TODO: Fix this ugly shitty code.
+	c.notifySubscriptionEdit(w, newCached)
+
+	c.txMu.Lock()
 	c.Transactions[a] = newCached
+	c.txMu.Unlock()
 }
 
 func (c *CachedChunk) notifySubscriptionEdit(w *World, new *CachedChunk) {
