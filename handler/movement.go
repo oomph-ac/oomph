@@ -212,11 +212,6 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 		pk.Tick = 0 // prevent rewind
 
-		// All other modes should be capable of teleporting the player.
-		if pk.Mode == packet.MoveModeRotation {
-			return true
-		}
-
 		// Wait for the client to acknowledge the teleport.
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
 			h.teleport(pk.Position.Sub(mgl32.Vec3{0, 1.62}), pk.OnGround, pk.Mode == packet.MoveModeNormal)
