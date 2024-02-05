@@ -2,9 +2,11 @@ package player
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -70,6 +72,20 @@ func (p *Player) Latency() time.Duration {
 
 // WritePacket will call minecraft.Conn.WritePacket and process the packet with oomph.
 func (p *Player) WritePacket(pk packet.Packet) error {
+	defer func() {
+		if err := recover(); err != nil {
+			p.log.Errorf("ReadPacket() panic: %v", err)
+			hub := sentry.CurrentHub().Clone()
+			hub.ConfigureScope(func(scope *sentry.Scope) {
+				scope.SetTag("conn_type", "serverDirect")
+				scope.SetTag("player", p.IdentityData().DisplayName)
+			})
+
+			hub.Recover(oerror.New(fmt.Sprintf("%v", err)))
+			hub.Flush(time.Second * 5)
+		}
+	}()
+
 	if p.conn == nil {
 		return oerror.New("conn is nil in session")
 	}
@@ -80,6 +96,20 @@ func (p *Player) WritePacket(pk packet.Packet) error {
 
 // ReadPacket will call minecraft.Conn.ReadPacket and process the packet with oomph.
 func (p *Player) ReadPacket() (pk packet.Packet, err error) {
+	defer func() {
+		if err := recover(); err != nil {
+			p.log.Errorf("ReadPacket() panic: %v", err)
+			hub := sentry.CurrentHub().Clone()
+			hub.ConfigureScope(func(scope *sentry.Scope) {
+				scope.SetTag("conn_type", "clientDirect")
+				scope.SetTag("player", p.IdentityData().DisplayName)
+			})
+
+			hub.Recover(oerror.New(fmt.Sprintf("%v", err)))
+			hub.Flush(time.Second * 5)
+		}
+	}()
+
 	if p.conn == nil {
 		return pk, oerror.New("conn is nil in session")
 	}
