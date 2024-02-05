@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -48,7 +49,7 @@ func (d *BadPacketA) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 		d.prevFrame = i.Tick
 	}()
 
-	if d.prevFrame != 0 && (i.Tick-d.prevFrame > 2 || i.Tick < d.prevFrame) {
+	if d.prevFrame != 0 && math32.Abs(float32(i.Tick-d.prevFrame)) >= 10 {
 		dat := orderedmap.NewOrderedMap[string, any]()
 		dat.Set("curr", i.Tick)
 		dat.Set("prev", d.prevFrame)
