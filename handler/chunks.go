@@ -147,11 +147,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 						continue
 					}
 
-					if *h.breakingBlockPos == action.BlockPos {
-						continue
-					}
-
-					panic(oerror.New("invalid block action recieved [1]"))
+					h.breakingBlockPos = &action.BlockPos
 				case protocol.PlayerActionAbortBreak:
 					h.breakingBlockPos = nil
 				case protocol.PlayerActionStopBreak:
