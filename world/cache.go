@@ -110,8 +110,9 @@ type CachedChunk struct {
 	sMu         deadlock.RWMutex
 }
 
-// NewCached creates and returns a new cached chunk.
-func NewCached(pos protocol.ChunkPos, c *chunk.Chunk) *CachedChunk {
+// NewChunk creates and runs a callable function on a new CachedChunk. The function is called with the
+// new CachedChunk as an argument, allowing for the chunk to be modified before it is added to the cache.
+func NewChunk(pos protocol.ChunkPos, c *chunk.Chunk, modFunc func(*CachedChunk)) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 
@@ -127,8 +128,8 @@ func NewCached(pos protocol.ChunkPos, c *chunk.Chunk) *CachedChunk {
 		Subscribers:  make(map[uint64]*World),
 	}
 
+	modFunc(cached)
 	chunkCache[pos][id] = cached
-	return cached
 }
 
 func (c *CachedChunk) Subscribe(w *World) {
@@ -142,10 +143,6 @@ func (c *CachedChunk) Subscribe(w *World) {
 func (c *CachedChunk) Unsubscribe(w *World) {
 	c.sMu.Lock()
 	defer c.sMu.Unlock()
-
-	if _, ok := c.Subscribers[w.id]; !ok {
-		panic(oerror.New("cannot unsubscribe from chunk whilst not subscribed"))
-	}
 
 	w.RemoveChunk(c.Pos)
 	delete(c.Subscribers, w.id)
@@ -166,10 +163,10 @@ func (c *CachedChunk) InsertSubChunk(w *World, sub *chunk.SubChunk, index byte) 
 	}
 
 	copiedChunk := *c.Chunk
-	newCached := NewCached(c.Pos, &copiedChunk)
-	newCached.Sub()[index] = sub
-
-	c.notifySubscriptionEdit(w, newCached)
+	NewChunk(c.Pos, &copiedChunk, func(new *CachedChunk) {
+		new.Sub()[index] = sub
+		c.notifySubscriptionEdit(w, new)
+	})
 }
 
 // ActionSetBlock sets the block in a chunk. The SetBlockAction contains the block position
@@ -203,15 +200,14 @@ func (c *CachedChunk) ActionSetBlock(w *World, a SetBlockAction) {
 	copiedChunk := *c.Chunk
 	c.Unlock()
 
-	newCached := NewCached(c.Pos, &copiedChunk)
-	newCached.SetBlock(uint8(a.BlockPos[0]), int16(a.BlockPos[1]), uint8(a.BlockPos[2]), 0, a.BlockRuntimeId)
+	NewChunk(c.Pos, &copiedChunk, func(new *CachedChunk) {
+		new.SetBlock(uint8(a.BlockPos[0]), int16(a.BlockPos[1]), uint8(a.BlockPos[2]), 0, a.BlockRuntimeId)
+		c.notifySubscriptionEdit(w, new)
 
-	// TODO: Fix this ugly shitty code.
-	c.notifySubscriptionEdit(w, newCached)
-
-	c.txMu.Lock()
-	c.Transactions[a] = newCached
-	c.txMu.Unlock()
+		c.txMu.Lock()
+		c.Transactions[a] = new
+		c.txMu.Unlock()
+	})
 }
 
 func (c *CachedChunk) notifySubscriptionEdit(w *World, new *CachedChunk) {

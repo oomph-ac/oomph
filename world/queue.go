@@ -26,7 +26,8 @@ func worker(id int) {
 		}
 
 		// Insert the chunk into the cache, and then add it to the world.
-		cached := NewCached(req.pos, req.c)
-		cached.Subscribe(req.w)
+		NewChunk(req.pos, req.c, func(new *CachedChunk) {
+			new.Subscribe(req.w)
+		})
 	}
 }
