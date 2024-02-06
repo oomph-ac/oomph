@@ -49,7 +49,8 @@ func (d *BadPacketA) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 		d.prevFrame = i.Tick
 	}()
 
-	if d.prevFrame != 0 && math32.Abs(float32(i.Tick-d.prevFrame)) >= 10 {
+	diff := math32.Abs(float32(i.Tick) - float32(d.prevFrame))
+	if d.prevFrame != 0 && diff > 2 {
 		dat := orderedmap.NewOrderedMap[string, any]()
 		dat.Set("curr", i.Tick)
 		dat.Set("prev", d.prevFrame)
