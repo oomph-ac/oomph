@@ -168,11 +168,12 @@ func (s MovementSimulator) teleport(p *player.Player, mDat *handler.MovementHand
 		delta := mDat.TeleportPos.Sub(mDat.Position)
 		if mDat.TicksSinceTeleport < 2 {
 			mDat.Position = mDat.Position.Add(delta.Mul(1.0 / float32(3-mDat.TicksSinceTeleport)))
-			return true
+		} else {
+			mDat.Position = mDat.TeleportPos
+			mDat.OnGround = mDat.TeleportOnGround
 		}
 
-		mDat.Position = mDat.TeleportPos
-		mDat.OnGround = mDat.TeleportOnGround
+		return true
 	}
 
 	return false

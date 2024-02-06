@@ -22,6 +22,11 @@ type AcknowledgementHandler struct {
 	// Playstation is set to true if the client is a Playstation client.
 	Playstation bool
 
+	// Ticked is true if the player was ticked.
+	Ticked bool
+	// NonResponsiveTicks is the amount of ticks the client has not responded to the server.
+	NonResponsiveTicks int64
+
 	// AckMap is a map of timestamps associated with a list of callbacks.
 	// The callbacks are called when NetworkStackLatency is received from the client.
 	AckMap map[int64][]func()
@@ -47,6 +52,8 @@ func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.
 		a.Refresh()
 	case *packet.NetworkStackLatency:
 		return !a.Execute(pk.Timestamp)
+	case *packet.PlayerAuthInput:
+		a.Ticked = true
 	}
 
 	return true
@@ -62,9 +69,10 @@ func (a *AcknowledgementHandler) OnTick(p *player.Player) {
 	}
 
 	a.Refresh()
+	a.Validate(p)
 }
 
-func (*AcknowledgementHandler) Defer() {
+func (a *AcknowledgementHandler) Defer() {
 }
 
 // AddCallback adds a callback to AckMap.
@@ -83,6 +91,23 @@ func (a *AcknowledgementHandler) Execute(timestamp int64) bool {
 		timestamp /= AckDivider
 	}
 	return a.tryExecute(timestamp)
+}
+
+func (a *AcknowledgementHandler) Validate(p *player.Player) {
+	if !a.Ticked {
+		return
+	}
+	a.Ticked = false
+
+	if len(a.AckMap) == 0 {
+		a.NonResponsiveTicks = 0
+		return
+	}
+
+	a.NonResponsiveTicks++
+	if a.NonResponsiveTicks > 200 {
+		p.Disconnect("Network timeout.")
+	}
 }
 
 // Refresh updates the AcknowledgementHandler's current timestamp with a random value.
