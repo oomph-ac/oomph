@@ -200,7 +200,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		})
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID != p.RuntimeId {
-			return true
+			return false
 		}
 
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
