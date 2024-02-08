@@ -4,6 +4,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -54,12 +55,12 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		// position before the entity is moved.
 		if p.CombatMode == player.AuthorityModeSemi {
 			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
+				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
 			})
 			return true
 		}
 
-		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
+		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.RuntimeId {
 			return true
@@ -69,12 +70,12 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		// position before the entity is moved.
 		if p.CombatMode == player.AuthorityModeSemi {
 			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
+				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
 			})
 			return true
 		}
 
-		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position)
+		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID == p.RuntimeId {
 			return true
@@ -136,7 +137,7 @@ func (h *EntitiesHandler) Find(rid uint64) *entity.Entity {
 }
 
 // moveEntity moves an entity to the given position.
-func (h *EntitiesHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
+func (h *EntitiesHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3, teleport bool) {
 	e := h.Find(rid)
 	if e == nil {
 		return
@@ -148,6 +149,7 @@ func (h *EntitiesHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3) {
 
 	e.RecievePosition(entity.HistoricalPosition{
 		Position: pos,
+		Teleport: teleport,
 		Tick:     tick,
 	})
 }

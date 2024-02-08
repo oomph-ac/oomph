@@ -6,6 +6,7 @@ import "github.com/go-gl/mathgl/mgl32"
 // TODO: Add more fields (such as teleport).
 type HistoricalPosition struct {
 	Position mgl32.Vec3
+	Teleport bool
 	Tick     int64
 }
 

@@ -75,6 +75,10 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
+		if entity.TicksSinceTeleport <= 10 {
+			return true
+		}
+
 		movementHandler := p.Handler(HandlerIDMovement).(*MovementHandler)
 		h.AttackOffset = float32(1.62)
 		if movementHandler.Sneaking {

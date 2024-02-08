@@ -26,6 +26,7 @@ type Entity struct {
 	PositionHistory []HistoricalPosition
 
 	InterpolationTicks int
+	TicksSinceTeleport int
 
 	Width  float32
 	Height float32
@@ -61,6 +62,10 @@ func (e *Entity) RecievePosition(hp HistoricalPosition) {
 	e.InterpolationTicks = EntityMobInterpolationTicks
 	if e.IsPlayer {
 		e.InterpolationTicks = EntityPlayerInterpolationTicks
+	}
+
+	if hp.Teleport {
+		e.TicksSinceTeleport = 0
 	}
 }
 
@@ -102,4 +107,5 @@ func (e *Entity) Tick(tick int64) {
 		Position: pos,
 		Tick:     tick,
 	})
+	e.TicksSinceTeleport++
 }
