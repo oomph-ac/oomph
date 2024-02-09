@@ -15,6 +15,7 @@ const DetectionIDEditionFakerA = "oomph:edition_faker_a"
 
 type EditionFakerA struct {
 	BaseDetection
+	run bool
 }
 
 var knownTitleIDs = map[string]protocol.DeviceOS{
@@ -51,6 +52,7 @@ func NewEditionFakerA() *EditionFakerA {
 
 	d.FailBuffer = 0
 	d.MaxBuffer = 1
+	d.run = true
 	return d
 }
 
@@ -59,10 +61,15 @@ func (d *EditionFakerA) ID() string {
 }
 
 func (d *EditionFakerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	_, ok := pk.(*packet.TickSync)
+	if !d.run {
+		return true
+	}
+
+	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return true
 	}
+	d.run = false
 
 	deviceOS := p.ClientData().DeviceOS
 	titleID := p.IdentityData().TitleID

@@ -33,6 +33,8 @@ type AcknowledgementHandler struct {
 	// CurrentTimestamp is the current timestamp for acks, which is refreshed every server tick
 	// where the connections are flushed.
 	CurrentTimestamp int64
+
+	initalized bool
 }
 
 func NewAcknowledgementHandler() *AcknowledgementHandler {
@@ -47,13 +49,16 @@ func (AcknowledgementHandler) ID() string {
 
 func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
-	case *packet.TickSync:
-		a.Playstation = p.Conn().ClientData().DeviceOS == protocol.DeviceOrbis
-		a.Refresh()
 	case *packet.NetworkStackLatency:
 		return !a.Execute(pk.Timestamp)
 	case *packet.PlayerAuthInput:
 		a.Ticked = true
+
+		if !a.initalized {
+			a.Playstation = p.Conn().ClientData().DeviceOS == protocol.DeviceOrbis
+			a.Refresh()
+			a.initalized = true
+		}
 	}
 
 	return true
@@ -153,6 +158,7 @@ func (a *AcknowledgementHandler) tryExecute(timestamp int64) bool {
 		return false
 	}
 
+	a.NonResponsiveTicks = 0
 	for _, callable := range callables {
 		callable()
 	}
