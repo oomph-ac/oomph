@@ -26,10 +26,7 @@ func (LatencyHandler) ID() string {
 }
 
 func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	if _, ok := pk.(*packet.TickSync); ok {
-		h.Responded = true
-		p.Ready = true
-	} else if _, ok := pk.(*packet.PlayerAuthInput); ok && p.ServerTick%10 == 0 {
+	if _, ok := pk.(*packet.PlayerAuthInput); ok && p.ServerTick%5 == 0 {
 		p.SendRemoteEvent(player.NewUpdateLatencyEvent(
 			p.Conn().Latency().Milliseconds()*2,
 			h.StackLatency,
@@ -40,6 +37,16 @@ func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) 
 }
 
 func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
+	if p.Ready {
+		return true
+	}
+
+	switch pk.(type) {
+	case *packet.LevelChunk, *packet.SubChunk:
+		p.Ready = true
+		h.Responded = true
+	}
+
 	return true
 }
 
