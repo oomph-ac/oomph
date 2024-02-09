@@ -12,6 +12,7 @@ const DetectionIDEditionFakerB = "oomph:edition_faker_b"
 
 type EditionFakerB struct {
 	BaseDetection
+	run bool
 }
 
 var defaultInputModes = map[protocol.DeviceOS]int{
@@ -33,6 +34,7 @@ func NewEditionFakerB() *EditionFakerB {
 
 	d.FailBuffer = 0
 	d.MaxBuffer = 1
+	d.run = true
 	return d
 }
 
@@ -41,10 +43,15 @@ func (d *EditionFakerB) ID() string {
 }
 
 func (d *EditionFakerB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	_, ok := pk.(*packet.TickSync)
+	if !d.run {
+		return true
+	}
+
+	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return true
 	}
+	d.run = false
 
 	// Check that the default input mode of the client matches the expected input mode.
 	if defaultInputMode, ok := defaultInputModes[p.ClientData().DeviceOS]; ok && defaultInputMode != p.ClientData().DefaultInputMode {
