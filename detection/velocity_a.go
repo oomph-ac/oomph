@@ -1,7 +1,6 @@
 package detection
 
 import (
-	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
@@ -46,12 +45,12 @@ func (d *VelocityA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || mDat.Mov.Y() < 0.05 || mDat.TicksSinceTeleport <= 3 {
+	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || mDat.Mov.Y() < 0.05 || mDat.TicksSinceTeleport <= 20 {
 		return true
 	}
 
 	pct := (mDat.ClientMov.Y() / mDat.Mov.Y()) * 100
-	if math32.Abs(pct-100.0) <= 0.1 {
+	if pct >= 99.99 || pct <= 110 {
 		d.Debuff(0.1)
 		return true
 	}
