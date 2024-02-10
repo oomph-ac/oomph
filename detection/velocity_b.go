@@ -45,7 +45,7 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || mDat.Mov.Y() < 0.05 || mDat.TicksSinceTeleport <= 3 {
+	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || (mDat.Mov.X() < 0.05 && mDat.Mov.Z() < 0.05) || mDat.TicksSinceTeleport <= 20 {
 		return true
 	}
 
