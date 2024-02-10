@@ -113,6 +113,9 @@ func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
 
 	if serverConn != nil {
 		p.GameMode = serverConn.GameData().PlayerGameMode
+		if p.GameMode == 5 {
+			p.GameMode = serverConn.GameData().WorldGameMode
+		}
 	}
 
 	go p.startTicking()
