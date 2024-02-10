@@ -69,7 +69,7 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 
 	d.lastFlagged = p.ClientFrame
 	if d.Violations >= 0.5 {
-		p.SendRemoteEvent(player.NewFlaggedEvent(p, d.Type, d.SubType, d.Violations))
+		p.SendRemoteEvent(player.NewFlaggedEvent(p, d.Type, d.SubType, d.Violations, OrderedMapToString(*extraData)))
 		p.Log().Warnf("%s flagged %s (%s) <x%f> %s", p.Conn().IdentityData().DisplayName, d.Type, d.SubType, game.Round32(d.Violations, 2), OrderedMapToString(*extraData))
 	}
 

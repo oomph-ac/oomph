@@ -12,7 +12,7 @@ func OrderedMapToString(data orderedmap.OrderedMap[string, any]) string {
 	count := data.Len()
 	for _, key := range data.Keys() {
 		v, _ := data.Get(key)
-		dataString += fmt.Sprintf("%s: %v", key, v)
+		dataString += fmt.Sprintf("%s=%v", key, v)
 
 		count--
 		if count > 0 {
