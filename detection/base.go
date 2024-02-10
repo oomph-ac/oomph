@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"fmt"
+
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
@@ -48,7 +50,7 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 	if extraData == nil {
 		extraData = orderedmap.NewOrderedMap[string, any]()
 	}
-	extraData.Set("latency", p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).StackLatency)
+	extraData.Set("latency", fmt.Sprintf("%vms", p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).StackLatency))
 
 	d.Buffer = math32.Min(d.Buffer+1, d.MaxBuffer)
 	if d.Buffer < d.FailBuffer {
