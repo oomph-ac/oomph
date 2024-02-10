@@ -197,7 +197,7 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 	}
 
 	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) && !mDat.Flying &&
-		!mDat.NoClip && p.Alive && cDat.InLoadedChunk && mDat.Position.Y() > -106
+		!mDat.NoClip && p.Alive && cDat.InLoadedChunk && mDat.Position.Y() >= -64
 }
 
 func (s MovementSimulator) teleport(p *player.Player, mDat *handler.MovementHandler) bool {
