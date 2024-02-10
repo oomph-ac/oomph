@@ -16,12 +16,18 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+const (
+	SimulationNormal = iota + 1
+	SimulationAccountingGhostBlock
+)
+
 type MovementSimulator struct {
 }
 
 func (s MovementSimulator) Simulate(p *player.Player) {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	w := p.World
+	mDat.Scenarios = nil
+	mDat.Scenarios = []handler.MovementScenario{}
 
 	if !s.Reliable(p) {
 		mDat.Velocity = mDat.ClientVel
@@ -29,6 +35,7 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 		mDat.Position = mDat.ClientPosition
 		mDat.Mov = mDat.ClientMov
 		mDat.OnGround = true
+		mDat.Scenarios = append(mDat.Scenarios, mDat.MovementScenario)
 		return
 	}
 
@@ -36,6 +43,48 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	if !p.Ready {
 		p.Disconnect(game.ErrorNotReady)
 		return
+	}
+
+	for i := SimulationNormal; i <= SimulationAccountingGhostBlock; i++ {
+		s.doActualSimulation(p, i)
+	}
+
+	var sc handler.MovementScenario
+	minDev := float32(math32.MaxFloat32 - 1)
+	for _, s := range mDat.Scenarios {
+		dev := s.Position.Sub(mDat.ClientPosition).LenSqr()
+		if dev < minDev {
+			minDev = dev
+			sc = s
+		}
+	}
+
+	mDat.MovementScenario = sc
+}
+
+func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
+	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+	w := p.World
+
+	oldS := mDat.MovementScenario
+	defer func() {
+		mDat.Scenarios = append(mDat.Scenarios, handler.MovementScenario{
+			Position:             mDat.Position,
+			Velocity:             mDat.Velocity,
+			OnGround:             mDat.OnGround,
+			OffGroundTicks:       mDat.OffGroundTicks,
+			CollisionX:           mDat.CollisionX,
+			CollisionZ:           mDat.CollisionZ,
+			VerticallyCollided:   mDat.VerticallyCollided,
+			HorizontallyCollided: mDat.HorizontallyCollided,
+			KnownInsideBlock:     mDat.KnownInsideBlock,
+		})
+		mDat.MovementScenario = oldS
+	}()
+
+	if run == SimulationAccountingGhostBlock {
+		w.SearchWithGhost(true)
+		defer w.SearchWithGhost(false)
 	}
 
 	if mDat.Immobile {
@@ -148,7 +197,7 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 	}
 
 	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) && !mDat.Flying &&
-		!mDat.NoClip && p.Alive && cDat.InLoadedChunk
+		!mDat.NoClip && p.Alive && cDat.InLoadedChunk && mDat.Position.Y() > -106
 }
 
 func (s MovementSimulator) teleport(p *player.Player, mDat *handler.MovementHandler) bool {

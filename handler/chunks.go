@@ -27,12 +27,16 @@ type ChunksHandler struct {
 	ChunkRadius   int32
 	InLoadedChunk bool
 
+	placedBlocks map[cube.Pos]df_world.Block
+
 	breakingBlockPos *protocol.BlockPos
+	initalized       bool
 }
 
 func NewChunksHandler() *ChunksHandler {
 	return &ChunksHandler{
-		ChunkRadius: -1,
+		ChunkRadius:  512,
+		placedBlocks: map[cube.Pos]df_world.Block{},
 	}
 }
 
@@ -52,13 +56,17 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		i, ok := df_world.ItemByRuntimeID(dat.HeldItem.Stack.NetworkID, int16(dat.HeldItem.Stack.MetadataValue))
-		if !ok {
+		// No item in hand.
+		if dat.HeldItem.Stack.NetworkID == 0 {
 			return true
 		}
 
-		// Determine if the item can be placed as a block.
-		b, ok := i.(df_world.Block)
+		// BlockRuntimeIDs should be positive.
+		if dat.HeldItem.Stack.BlockRuntimeID < 0 {
+			return true
+		}
+
+		b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID))
 		if !ok {
 			return true
 		}
@@ -106,8 +114,14 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		// Set the block in the world.
 		p.World.SetBlock(replacePos, b)
+		h.placedBlocks[replacePos] = b
 		return true
 	case *packet.PlayerAuthInput:
+		if !h.initalized {
+			h.ChunkRadius = int32(p.Conn().ChunkRadius())
+			h.initalized = true
+		}
+
 		chunkPos := protocol.ChunkPos{
 			int32(math32.Floor(pk.Position.X())) >> 4,
 			int32(math32.Floor(pk.Position.Z())) >> 4,
@@ -179,11 +193,25 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			b = block.Air{}
 		}
 
-		p.World.SetBlock(cube.Pos{
-			int(pk.Position.X()),
-			int(pk.Position.Y()),
-			int(pk.Position.Z()),
-		}, b)
+		pos := cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
+		isAir := utils.BlockName(b) == "minecraft:air"
+
+		if placed, ok := h.placedBlocks[pos]; ok && isAir {
+			p.World.MarkGhostBlock(pos, placed)
+		} else if !ok {
+			p.World.UnmarkGhostBlock(pos)
+		}
+		delete(h.placedBlocks, pos)
+
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			pos := cube.Pos{
+				int(pk.Position.X()),
+				int(pk.Position.Y()),
+				int(pk.Position.Z()),
+			}
+
+			p.World.SetBlock(pos, b)
+		})
 	case *packet.LevelChunk:
 		// Check if this LevelChunk packet is compatiable with oomph's handling.
 		if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {

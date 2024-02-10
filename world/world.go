@@ -28,6 +28,9 @@ type World struct {
 	chunks map[protocol.ChunkPos]*CachedChunk
 	id     uint64
 
+	ghostBlocks     map[cube.Pos]world.Block
+	searchWithGhost bool
+
 	lastCleanPos protocol.ChunkPos
 
 	deadlock.RWMutex
@@ -36,9 +39,15 @@ type World struct {
 func New() *World {
 	currentWorldId++
 	return &World{
-		chunks: make(map[protocol.ChunkPos]*CachedChunk),
-		id:     currentWorldId,
+		chunks:      make(map[protocol.ChunkPos]*CachedChunk),
+		ghostBlocks: make(map[cube.Pos]world.Block),
+		id:          currentWorldId,
 	}
+}
+
+// SearchWithGhost sets wether the world should search for ghost blocks or not while calling GetBlock.
+func (w *World) SearchWithGhost(search bool) {
+	w.searchWithGhost = search
 }
 
 // AddChunk adds a chunk to the world.
@@ -69,6 +78,10 @@ func (w *World) GetChunk(pos protocol.ChunkPos) *CachedChunk {
 
 // GetBlock returns the block at the position passed.
 func (w *World) GetBlock(blockPos cube.Pos) world.Block {
+	if b, ok := w.ghostBlocks[blockPos]; ok && w.searchWithGhost {
+		return b
+	}
+
 	if blockPos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
@@ -112,6 +125,25 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 		BlockPos:       pos,
 		BlockRuntimeId: blockID,
 	})
+}
+
+// MarkGhostBlock marks a block as a ghost block at the position passed.
+func (w *World) MarkGhostBlock(pos cube.Pos, b world.Block) {
+	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
+		return
+	}
+
+	w.ghostBlocks[pos] = b
+}
+
+// RemoveGhostBlock removes a ghost block at the position passed.
+func (w *World) RemoveGhostBlock(pos cube.Pos) {
+	delete(w.ghostBlocks, pos)
+}
+
+// UnmarkGhostBLock unmarks a ghost block at the position passed.
+func (w *World) UnmarkGhostBlock(pos cube.Pos) {
+	delete(w.ghostBlocks, pos)
 }
 
 // CleanChunks cleans up the chunks in respect to the given chunk radius and chunk position.

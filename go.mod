@@ -6,13 +6,13 @@ toolchain go1.21.2
 
 require (
 	github.com/chewxy/math32 v1.10.1
-	github.com/df-mc/dragonfly v0.9.13-0.20240207160743-f25a0df5bb3f
+	github.com/df-mc/dragonfly v0.9.13-0.20240209111632-1cb1df2a7b7a
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-echarts/statsview v0.3.4
 	github.com/go-gl/mathgl v1.1.0
-	github.com/oomph-ac/mv v0.0.0-20231214233016-18dbf72ec985
+	github.com/oomph-ac/mv v0.0.0-20240210123432-1cb78e0dd37d
 	github.com/sandertv/gophertunnel v1.35.0
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
@@ -25,7 +25,7 @@ require (
 	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.12 // indirect
-	github.com/go-echarts/go-echarts/v2 v2.2.3 // indirect
+	github.com/go-echarts/go-echarts/v2 v2.3.3 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -34,7 +34,7 @@ require (
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/petermattis/goid v0.0.0-20231207134359-e60b3f734c67 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
-	github.com/rs/cors v1.7.0 // indirect
+	github.com/rs/cors v1.10.1 // indirect
 	github.com/sandertv/go-raknet v1.12.1 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
@@ -48,8 +48,8 @@ require (
 	google.golang.org/protobuf v1.32.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.35.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240208183107-bf57ea43d871
+replace github.com/sandertv/gophertunnel v1.35.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240210012800-073ea43d2569
 
-replace github.com/df-mc/dragonfly v0.9.13-0.20240207160743-f25a0df5bb3f => github.com/oomph-ac/dragonfly v0.0.0-20240207223737-96dfd1fafe9e
+replace github.com/df-mc/dragonfly v0.9.13-0.20240209111632-1cb1df2a7b7a => github.com/oomph-ac/dragonfly v0.0.0-20240207223737-96dfd1fafe9e
 
 replace github.com/sandertv/go-raknet v1.12.1 => github.com/tedacmc/tedac-raknet v0.0.4

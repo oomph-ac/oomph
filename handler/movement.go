@@ -14,12 +14,29 @@ import (
 
 const HandlerIDMovement = "oomph:movement"
 
+type MovementScenario struct {
+	Position mgl32.Vec3
+	Velocity mgl32.Vec3
+
+	OffGroundTicks int64
+	OnGround       bool
+
+	CollisionX, CollisionZ bool
+	VerticallyCollided     bool
+	HorizontallyCollided   bool
+
+	KnownInsideBlock bool
+}
+
 type MovementHandler struct {
+	MovementScenario
+	Scenarios []MovementScenario
+
 	Width  float32
 	Height float32
 
-	Position, PrevPosition             mgl32.Vec3
-	Velocity, PrevVelocity             mgl32.Vec3
+	PrevPosition                       mgl32.Vec3
+	PrevVelocity                       mgl32.Vec3
 	ClientPosition, PrevClientPosition mgl32.Vec3
 	ClientVel, PrevClientVel           mgl32.Vec3
 	Mov, ClientMov                     mgl32.Vec3
@@ -29,15 +46,6 @@ type MovementHandler struct {
 
 	ForwardImpulse float32
 	LeftImpulse    float32
-
-	CollisionX, CollisionZ bool
-	VerticallyCollided     bool
-	HorizontallyCollided   bool
-
-	OnGround       bool
-	OffGroundTicks int64
-
-	KnownInsideBlock bool
 
 	Sneaking        bool
 	SneakKeyPressed bool
@@ -239,9 +247,13 @@ func (*MovementHandler) OnTick(p *player.Player) {
 
 func (h *MovementHandler) Defer() {
 	if h.mode == player.AuthorityModeSemi {
-		h.Velocity = h.ClientVel
-		h.Position = h.ClientPosition
+		h.Reset()
 	}
+}
+
+func (h *MovementHandler) Reset() {
+	h.Velocity = h.ClientVel
+	h.Position = h.ClientPosition
 }
 
 func (h *MovementHandler) Simulate(s Simulator) {
