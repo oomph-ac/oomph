@@ -252,6 +252,15 @@ func (h *MovementHandler) Defer() {
 }
 
 func (h *MovementHandler) Reset() {
+	tpTicks := 0
+	if h.SmoothTeleport {
+		tpTicks = 3
+	}
+
+	if h.TicksSinceTeleport <= tpTicks {
+		return
+	}
+
 	h.Velocity = h.ClientVel
 	h.Position = h.ClientPosition
 }

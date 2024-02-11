@@ -11,7 +11,7 @@ import (
 
 const (
 	DetectionIDMovementB  = "oomph:movement_b"
-	movementBThreshold    = 0.01
+	movementBThreshold    = 0.03
 	movementBMaxThreshold = 0.3
 )
 
@@ -28,10 +28,10 @@ func NewMovementB() *MovementB {
 	d.Punishable = true
 
 	d.MaxViolations = 30
-	d.trustDuration = 20 * player.TicksPerSecond
+	d.trustDuration = 10 * player.TicksPerSecond
 
-	d.FailBuffer = 10
-	d.MaxBuffer = 11
+	d.FailBuffer = 5
+	d.MaxBuffer = 10
 	return d
 }
 
@@ -50,15 +50,15 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.TicksSinceTeleport <= 20 {
+	if mDat.StepClipOffset > 0 || mDat.TicksSinceTeleport <= 20 || mDat.HorizontallyCollided {
 		return true
 	}
 
 	xDev := math32.Abs(mDat.ClientPosition.X() - mDat.Position.X())
 	zDev := math32.Abs(mDat.ClientPosition.Z() - mDat.Position.Z())
 
-	if xDev < movementBThreshold || zDev < movementBThreshold {
-		d.Debuff(1)
+	if xDev < movementBThreshold && zDev < movementBThreshold {
+		d.Debuff(0.1)
 		return true
 	}
 
