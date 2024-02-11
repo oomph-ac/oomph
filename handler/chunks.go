@@ -227,14 +227,15 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		if err != nil {
 			c = chunk.New(world.AirRuntimeID, df_world.Overworld.Range())
 		}
-
 		c.Compact()
-		world.InsertToCache(p.World, c, pk.Position)
+
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			world.InsertToCache(p.World, c, pk.Position)
+		})
 	case *packet.SubChunk:
 		if pk.CacheEnabled {
 			panic(oerror.New("subchunk caching not supported on oomph"))
 		}
-
 		var newChunks = map[protocol.ChunkPos]*chunk.Chunk{}
 
 		for _, entry := range pk.SubChunkEntries {
@@ -268,16 +269,20 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			}
 
 			if cached != nil {
-				cached.InsertSubChunk(p.World, sub, index)
+				p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+					cached.InsertSubChunk(p.World, sub, index)
+				})
 				continue
 			}
 
 			c.Sub()[index] = sub
 		}
 
-		for pos, newC := range newChunks {
-			world.InsertToCache(p.World, newC, pos)
-		}
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			for pos, newC := range newChunks {
+				world.InsertToCache(p.World, newC, pos)
+			}
+		})
 	}
 
 	return true

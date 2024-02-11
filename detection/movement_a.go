@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	DetectionIDMovementA  = "oomph:movement_a"
-	movementAThreshold    = 0.01
-	movementAMaxThreshold = 0.2
+	DetectionIDMovementA = "oomph:movement_a"
+	movementAThreshold   = 0.03
 )
 
 type MovementA struct {
@@ -28,10 +27,10 @@ func NewMovementA() *MovementA {
 	d.Punishable = true
 
 	d.MaxViolations = 30
-	d.trustDuration = 20 * player.TicksPerSecond
+	d.trustDuration = 10 * player.TicksPerSecond
 
-	d.FailBuffer = 10
-	d.MaxBuffer = 11
+	d.FailBuffer = 5
+	d.MaxBuffer = 10
 	return d
 }
 
@@ -50,13 +49,13 @@ func (d *MovementA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.OnGround || mDat.TicksSinceTeleport <= 20 {
+	if mDat.StepClipOffset > 0 || mDat.OnGround {
 		return true
 	}
 
 	dev := math32.Abs(mDat.ClientPosition.Y() - mDat.Position.Y())
 	if dev < movementAThreshold {
-		d.Debuff(1)
+		d.Debuff(0.1)
 		return true
 	}
 
