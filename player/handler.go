@@ -23,6 +23,19 @@ type Handler interface {
 	Defer()
 }
 
+// NopHandler is a handler that does nothing.
+type NopHandler struct{}
+
+func (NopHandler) ID() string { return "" }
+
+func (NopHandler) HandleClientPacket(packet.Packet, *Player) bool { return true }
+
+func (NopHandler) HandleServerPacket(packet.Packet, *Player) bool { return true }
+
+func (NopHandler) OnTick(*Player) {}
+
+func (NopHandler) Defer() {}
+
 // EventHandler is an interface that can be implemented to have the player handle certain events.
 type EventHandler interface {
 	// HandlePunishment is called when a detection triggers a punishment for a player.
@@ -34,14 +47,11 @@ type EventHandler interface {
 }
 
 // NopEventHandler is an event handler that does nothing.
-type NopEventHandler struct {
+type NopEventHandler struct{}
+
+func (NopEventHandler) HandlePunishment(*event.Context, *Player, Handler, *string) {}
+
+func (NopEventHandler) HandleFlag(*event.Context, *Player, Handler, *orderedmap.OrderedMap[string, any]) {
 }
 
-func (NopEventHandler) HandlePunishment(ctx *event.Context, p *Player, detection Handler, message *string) {
-}
-
-func (NopEventHandler) HandleFlag(ctx *event.Context, p *Player, detection Handler, data *orderedmap.OrderedMap[string, any]) {
-}
-
-func (NopEventHandler) HandleQuit(p *Player) {
-}
+func (NopEventHandler) HandleQuit(*Player) {}
