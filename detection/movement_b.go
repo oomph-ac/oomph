@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	DetectionIDMovementB  = "oomph:movement_b"
-	movementBThreshold    = 0.03
-	movementBMaxThreshold = 0.3
+	DetectionIDMovementB = "oomph:movement_b"
+	movementBThreshold   = 0.03
 )
 
 type MovementB struct {
@@ -50,14 +49,19 @@ func (d *MovementB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.TicksSinceTeleport <= 20 || mDat.HorizontallyCollided {
+	if mDat.StepClipOffset > 0 || mDat.TicksSinceTeleport <= 20 {
 		return true
 	}
 
 	xDev := math32.Abs(mDat.ClientPosition.X() - mDat.Position.X())
 	zDev := math32.Abs(mDat.ClientPosition.Z() - mDat.Position.Z())
 
-	if xDev < movementBThreshold && zDev < movementBThreshold {
+	var threshold float32 = movementBThreshold
+	if mDat.HorizontallyCollided {
+		threshold = 0.2
+	}
+
+	if xDev < threshold && zDev < threshold {
 		d.Debuff(0.1)
 		return true
 	}

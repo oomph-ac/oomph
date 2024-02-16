@@ -365,8 +365,8 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	}, nil)
 
 	var boxes []cube.BBox
-	for _, b := range dfBoxes {
-		boxes = append(boxes, game.DFBoxToCubeBox(b))
+	for _, bb := range dfBoxes {
+		boxes = append(boxes, game.DFBoxToCubeBox(bb))
 	}
 
 	return boxes
