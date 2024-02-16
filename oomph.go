@@ -73,6 +73,16 @@ func New(log *logrus.Logger, s OomphSettings) *Oomph {
 // Addresses should be formatted in the following format: "ip:port" (ex: "127.0.0.1:19132").
 // If you're using dragonfly, use Listen instead of Start.
 func (o *Oomph) Start() {
+	defer func() {
+		if r := recover(); r != nil {
+			hub := sentry.CurrentHub().Clone()
+			hub.Scope().SetTag("func", "oomph.Start()")
+			hub.Recover(oerror.New(fmt.Sprintf("%v", r)))
+
+			sentry.Flush(time.Second * 5)
+		}
+	}()
+
 	s := o.settings
 
 	var statusProvider minecraft.ServerStatusProvider
