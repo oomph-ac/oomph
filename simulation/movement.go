@@ -66,6 +66,10 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	w := p.World
 
+	if run == SimulationAccountingGhostBlock && !w.HasGhostBlocks() {
+		return
+	}
+
 	oldS := mDat.MovementScenario
 	defer func() {
 		mDat.Scenarios = append(mDat.Scenarios, handler.MovementScenario{
@@ -161,7 +165,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	if _, isAir := blockUnder.(block.Air); isAir {
 		b := w.GetBlock(cube.PosFromVec3(mDat.Position).Side(cube.FaceDown))
 		n := utils.BlockName(b)
-		if utils.IsFence(n) || utils.IsWall(n) || strings.Contains(n, "fence_gate") {
+		if utils.IsFence(b) || utils.IsWall(n) || strings.Contains(n, "fence") {
 			blockUnder = b
 		}
 	}
@@ -464,8 +468,8 @@ func (MovementSimulator) collideWithBoxes(bb cube.BBox, vel mgl32.Vec3, list []c
 }
 
 func (s MovementSimulator) checkCollisions(mDat *handler.MovementHandler, old mgl32.Vec3, climb bool, blockUnder df_world.Block) {
-	mDat.CollisionX = mDat.Velocity.X() != old.X()
-	mDat.CollisionZ = mDat.Velocity.Z() != old.Z()
+	mDat.CollisionX = !mgl32.FloatEqualThreshold(mDat.Velocity.X(), old.X(), 1e-5)
+	mDat.CollisionZ = !mgl32.FloatEqualThreshold(mDat.Velocity.Z(), old.Z(), 1e-5)
 	mDat.HorizontallyCollided = mDat.CollisionX || mDat.CollisionZ
 
 	mDat.VerticallyCollided = mDat.Velocity.Y() != old.Y()

@@ -50,6 +50,11 @@ func (w *World) SearchWithGhost(search bool) {
 	w.searchWithGhost = search
 }
 
+// HasGhostBlocks returns true if the world has ghost blocks.
+func (w *World) HasGhostBlocks() bool {
+	return len(w.ghostBlocks) > 0
+}
+
 // AddChunk adds a chunk to the world.
 func (w *World) AddChunk(c *CachedChunk) {
 	w.Lock()

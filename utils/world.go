@@ -84,15 +84,16 @@ func IsWall(n string) bool {
 }
 
 // IsFence returns true if the given block is a fence.
-func IsFence(n string) bool {
-	switch n {
-	case "minecraft:oak_fence", "minecraft:spruce_fence", "minecraft:birch_fence", "minecraft:jungle_fence",
-		"minecraft:acacia_fence", "minecraft:dark_oak_fence", "minecraft:mangrove_fence", "minecraft:cherry_fence",
-		"minecraft:crimson_fence", "minecraft:warped_fence":
+func IsFence(b world.Block) bool {
+	if _, ok := b.Model().(model.Fence); ok {
 		return true
-	default:
-		return false
 	}
+
+	if _, ok := b.Model().(model.FenceGate); ok {
+		return true
+	}
+
+	return false
 }
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
@@ -114,7 +115,8 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		"minecraft:mossy_cobblestone_stairs", "minecraft:normal_stone_stairs", "minecraft:red_nether_brick_stairs", "minecraft:smooth_quartz_stairs",
 		"minecraft:oak_stairs", "minecraft:stone_stairs", "minecraft:brick_stairs", "minecraft:stone_brick_stairs", "minecraft:nether_brick_stairs",
 		"minecraft:sandstone_stairs", "minecraft:spruce_stairs", "minecraft:birch_stairs", "minecraft:jungle_stairs", "minecraft:quartz_stairs",
-		"minecraft:acacia_stairs", "minecraft:dark_oak_stairs", "minecraft:red_sandstone_stairs", "minecraft:purpur_stairs":
+		"minecraft:acacia_stairs", "minecraft:dark_oak_stairs", "minecraft:red_sandstone_stairs", "minecraft:purpur_stairs", "minecraft:mangrove_stairs",
+		"minecraft:deepslate_brick_stairs":
 		var bbs = []cube.BBox{}
 		bbs = append(bbs, cube.Box(0, 0, 0, 1, 0.5, 1))
 
@@ -125,7 +127,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		oppositeFace := face.Opposite()
 
 		if upsideDown {
-			break
+			return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 		}
 
 		// HACK: Since EncodeBlock() will sometimes return the wrong direction due to the world being passed
@@ -358,6 +360,8 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 13/16.0, 3/8.0, 13/16.0)}
 	case "minecraft:black_candle":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
+	case "minecraft:tallgrass":
+		return []cube.BBox{}
 	}
 
 	dfBoxes := b.Model().BBox(df_cube.Pos{
@@ -381,7 +385,8 @@ func IsStair(n string) bool {
 		"minecraft:mossy_cobblestone_stairs", "minecraft:normal_stone_stairs", "minecraft:red_nether_brick_stairs", "minecraft:smooth_quartz_stairs",
 		"minecraft:oak_stairs", "minecraft:stone_stairs", "minecraft:brick_stairs", "minecraft:stone_brick_stairs", "minecraft:nether_brick_stairs",
 		"minecraft:sandstone_stairs", "minecraft:spruce_stairs", "minecraft:birch_stairs", "minecraft:jungle_stairs", "minecraft:quartz_stairs",
-		"minecraft:acacia_stairs", "minecraft:dark_oak_stairs", "minecraft:red_sandstone_stairs", "minecraft:purpur_stairs":
+		"minecraft:acacia_stairs", "minecraft:dark_oak_stairs", "minecraft:red_sandstone_stairs", "minecraft:purpur_stairs", "minecraft:mangrove_stairs",
+		"minecraft:deepslate_brick_stairs":
 		return true
 	default:
 		return false
@@ -549,7 +554,7 @@ func WallConnectionCompatiable(b world.Block) bool {
 		"minecraft:leaves2", "minecraft:mangrove_leaves":
 		return false
 	default:
-		if IsFence(n) {
+		if IsFence(b) {
 			return false
 		}
 
