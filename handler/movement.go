@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
@@ -257,12 +258,14 @@ func (h *MovementHandler) Reset() {
 		tpTicks = 3
 	}
 
-	if h.TicksSinceTeleport <= tpTicks {
+	dev := h.Position.Sub(h.ClientPosition)
+	if math32.Abs(dev.X()) < 0.03 && math32.Abs(dev.Y()) < 0.03 && math32.Abs(dev.Z()) < 0.03 && h.HorizontallyCollided && h.TicksSinceTeleport <= tpTicks && h.StepClipOffset == 0 {
 		return
 	}
 
 	h.Velocity = h.ClientVel
 	h.Position = h.ClientPosition
+	h.PrevPosition = h.PrevClientPosition
 }
 
 func (h *MovementHandler) Simulate(s Simulator) {
@@ -280,7 +283,7 @@ func (h *MovementHandler) BoundingBox() cube.BBox {
 		pos.X()+(h.Width/2),
 		pos.Y()+h.Height,
 		pos.Z()+(h.Width/2),
-	)
+	).Grow(-0.001)
 }
 
 func (h *MovementHandler) handleAttribute(n string, list []protocol.Attribute, f func(protocol.Attribute)) {
