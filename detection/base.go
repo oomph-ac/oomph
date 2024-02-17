@@ -57,16 +57,18 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 		return
 	}
 
-	ctx := event.C()
-	p.EventHandler().HandleFlag(ctx, p, d, extraData)
-	if ctx.Cancelled() {
-		return
-	}
-
+	oldVl := d.Violations
 	if d.trustDuration != -1 {
 		d.Violations += math32.Max(0, float32(d.trustDuration)-float32(p.ClientFrame-d.lastFlagged)) / float32(d.trustDuration)
 	} else {
 		d.Violations++
+	}
+
+	ctx := event.C()
+	p.EventHandler().HandleFlag(ctx, p, d, extraData)
+	if ctx.Cancelled() {
+		d.Violations = oldVl
+		return
 	}
 
 	d.lastFlagged = p.ClientFrame

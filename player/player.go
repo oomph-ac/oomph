@@ -46,6 +46,7 @@ type Player struct {
 	// ClientFrame is the simulation frame of the client, sent in PlayerAuthInput.
 	ClientTick, ClientFrame int64
 	ServerTick              int64
+	LastServerTick          time.Time
 
 	World *world.World
 
@@ -330,6 +331,7 @@ func (p *Player) tick() bool {
 		return false
 	}
 
+	p.LastServerTick = time.Now()
 	p.ServerTick++
 
 	// Tick all the handlers.

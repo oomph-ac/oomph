@@ -42,6 +42,7 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if p.MovementMode != player.AuthorityModeSemi {
 		return true
 	}
+
 	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
 		return true
@@ -72,14 +73,14 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if d.balance <= -150 {
 		d.Fail(p, orderedmap.NewOrderedMap[string, any]())
 		d.balance = 0
-		return false
+		return true
 	}
 
 	// This can occur if a user is attempting to use negative timer to increase their balance to a high amount,
 	// to then use a high amount of timer after a period of time to bypass the check.
-	if d.balance > 500 && p.ClientTick > p.ServerTick+1 {
+	/* if d.balance > 500 && p.ClientTick > p.ServerTick+1 {
 		d.balance = 0
-	}
+	} */
 
 	return true
 }
