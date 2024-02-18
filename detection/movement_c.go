@@ -7,7 +7,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const DetectionIDMovementC = "oomph:movement_b"
+const DetectionIDMovementC = "oomph:movement_c"
 
 type MovementC struct {
 	BaseDetection
