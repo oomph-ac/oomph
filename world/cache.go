@@ -1,7 +1,6 @@
 package world
 
 import (
-	"runtime"
 	"time"
 
 	"github.com/df-mc/dragonfly/server/world/chunk"
@@ -31,7 +30,7 @@ func lazyInitCache(pos protocol.ChunkPos) {
 }
 
 func clearCacheDuplicates() {
-	lastGC := time.Now()
+	//lastGC := time.Now()
 	for {
 		time.Sleep(clearDuplicateDuration)
 
@@ -74,10 +73,10 @@ func clearCacheDuplicates() {
 
 		// Run a garbage collection every 5 seconds, this is because memory cannot be freed
 		// manually in Go, so we have to rely on the garbage collector to do it for us.
-		if time.Since(lastGC) >= clearDuplicateGCDuration {
+		/* if time.Since(lastGC) >= clearDuplicateGCDuration {
 			runtime.GC()
 			lastGC = time.Now()
-		}
+		} */
 	}
 }
 
