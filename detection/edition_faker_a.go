@@ -105,7 +105,7 @@ func (d *EditionFakerA) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		data.Set("givenOS", utils.Device(deviceOS))
 		data.Set("expectedOS", utils.Device(expected))
 		d.Fail(p, data)
-	} else if !ok && titleID != "" {
+	} else if !ok && titleID != "" && titleID != "1904044383" {
 		p.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
 		p.Log().Warnf("unknown title ID %s with OS %v", titleID, deviceOS)
 	}
