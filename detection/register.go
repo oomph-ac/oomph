@@ -28,4 +28,6 @@ func RegisterDetections(p *player.Player) {
 
 	p.RegisterDetection(NewEditionFakerA())
 	p.RegisterDetection(NewEditionFakerB())
+
+	p.RegisterDetection(NewToolboxA())
 }

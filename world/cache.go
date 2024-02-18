@@ -39,6 +39,7 @@ func clearCacheDuplicates() {
 			for _, cached := range cacheMap {
 				// If the cached chunk no longer has any subscribers, we can remove it from the cache.
 				if len(cached.Subscribers) == 0 {
+					//C.freeMem(unsafe.Pointer(cached.Chunk))
 					delete(cacheMap, cached.ID)
 					continue
 				}

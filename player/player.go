@@ -279,6 +279,11 @@ func (p *Player) Disconnect(reason string) {
 		Message: reason,
 	})
 	p.conn.Flush()
+
+	p.conn.Close()
+	if p.serverConn != nil {
+		p.serverConn.Close()
+	}
 }
 
 // Close closes the player.
