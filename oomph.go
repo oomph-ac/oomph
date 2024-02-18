@@ -3,6 +3,7 @@ package oomph
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -156,7 +157,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	if err != nil {
 		conn.WritePacket(&packet.Disconnect{
-			Message: err.Error(),
+			Message: unwrapNetError(err),
 		})
 		conn.Close()
 
@@ -175,7 +176,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	go func() {
 		if err := conn.StartGame(data); err != nil {
 			conn.WritePacket(&packet.Disconnect{
-				Message: err.Error(),
+				Message: unwrapNetError(err),
 			})
 			success = false
 		}
@@ -185,7 +186,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	go func() {
 		if err := serverConn.DoSpawn(); err != nil {
 			conn.WritePacket(&packet.Disconnect{
-				Message: err.Error(),
+				Message: unwrapNetError(err),
 			})
 			success = false
 		}
@@ -311,4 +312,12 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	g.Wait()
 	p.Close()
+}
+
+func unwrapNetError(err error) string {
+	if netErr, ok := err.(*net.OpError); ok {
+		return netErr.Err.Error()
+	}
+
+	return err.Error()
 }
