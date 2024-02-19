@@ -69,15 +69,21 @@ func (*AcknowledgementHandler) HandleServerPacket(pk packet.Packet, p *player.Pl
 }
 
 func (a *AcknowledgementHandler) OnTick(p *player.Player) {
+	a.Validate(p)
+	if !p.ReadBatchMode() {
+		a.Flush(p)
+	}
+}
+
+func (a *AcknowledgementHandler) Defer() {
+}
+
+func (a *AcknowledgementHandler) Flush(p *player.Player) {
 	if pk := a.CreatePacket(); pk != nil {
 		p.Conn().WritePacket(pk)
 	}
 
 	a.Refresh()
-	a.Validate(p)
-}
-
-func (a *AcknowledgementHandler) Defer() {
 }
 
 // AddCallback adds a callback to AckMap.
