@@ -57,7 +57,7 @@ require (
 	google.golang.org/protobuf v1.32.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.35.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240219022953-4825b2b1951b
+replace github.com/sandertv/gophertunnel v1.35.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240219031042-fda52b6b0578
 
 replace github.com/df-mc/dragonfly v0.9.13-0.20240209111632-1cb1df2a7b7a => github.com/oomph-ac/dragonfly v0.0.0-20240207223737-96dfd1fafe9e
 
