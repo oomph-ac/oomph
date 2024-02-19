@@ -236,6 +236,32 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
 	p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).ReportType = o.settings.LatencyReportType
 
+	p.ClientPkFunc = func(pks []packet.Packet) error {
+		p.ProcessMu.Lock()
+		defer p.ProcessMu.Unlock()
+
+		if err := p.DefaultHandleFromClient(pks); err != nil {
+			return err
+		}
+		return serverConn.Flush()
+	}
+
+	p.ServerPkFunc = func(pks []packet.Packet) error {
+		p.ProcessMu.Lock()
+		defer p.ProcessMu.Unlock()
+
+		if err := p.DefaultHandleFromServer(pks); err != nil {
+			return err
+		}
+
+		// UGLY HACK: This is to prevent import cycles w/ Player->Handler and Handler->Player.
+		// TODO: Refactor this to be more elegant?
+		if o.settings.ReadBatchMode {
+			p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler).Flush(p)
+		}
+		return conn.Flush()
+	}
+
 	select {
 	case o.players <- p:
 		break
@@ -288,19 +314,13 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			}
 
 			if err != nil && !p.Closed {
-				o.log.Errorf("error reading packet from client: %v", err)
+				o.log.Errorf("error reading packets from client: %v", err)
 				return
 			}
 
-			for _, pk := range pks {
-				if err := p.HandleFromClient(pk); err != nil {
-					o.log.Errorf("error handling packet from client: %v", err)
-					return
-				}
-			}
-
-			if o.settings.ReadBatchMode {
-				serverConn.Flush()
+			if err := p.ClientPkFunc(pks); err != nil {
+				o.log.Errorf("error handling packets from client: %v", err)
+				return
 			}
 		}
 	}()
@@ -347,29 +367,13 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 					return
 				}
 
-				o.log.Errorf("error reading packet from server: %v", err)
+				o.log.Errorf("error reading packets from server: %v", err)
 				return
 			}
 
-			for _, pk := range pks {
-				if d, ok := pk.(*packet.Disconnect); ok {
-					conn.WritePacket(d)
-					conn.Flush()
-					p.Close()
-
-					return
-				}
-
-				if err := p.HandleFromServer(pk); err != nil {
-					o.log.Errorf("error handling packet from server: %v", err)
-					return
-				}
-			}
-
-			// Flush the conn instantly after reading the batch + flush acknowledgement handler.
-			if o.settings.ReadBatchMode {
-				p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler).Flush(p)
-				conn.Flush()
+			if err := p.ServerPkFunc(pks); err != nil {
+				o.log.Errorf("error handling packets from server: %v", err)
+				return
 			}
 		}
 	}()
