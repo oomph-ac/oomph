@@ -220,10 +220,18 @@ func (c *CachedChunk) notifySubscriptionEdit(w *World, new *CachedChunk) {
 		return
 	}
 
+	c.sMu.RLock()
+	subscribers := make([]*World, 0, len(c.Subscribers))
 	for _, sub := range c.Subscribers {
+		subscribers = append(subscribers, sub)
+	}
+	c.sMu.RUnlock()
+
+	for _, sub := range subscribers {
 		c.Unsubscribe(sub)
 		new.Subscribe(sub)
 	}
+	subscribers = nil
 }
 
 func cacheSearchMatch(pos protocol.ChunkPos, c *chunk.Chunk) *CachedChunk {
