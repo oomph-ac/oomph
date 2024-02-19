@@ -31,6 +31,9 @@ type Player struct {
 	Alive bool
 	Ready bool
 
+	ClientPkFunc func([]packet.Packet) error
+	ServerPkFunc func([]packet.Packet) error
+
 	// combatMode and movementMode are the authority modes of the player. They are used to determine
 	// how certain actions should be handled.
 	CombatMode   AuthorityMode
@@ -59,11 +62,11 @@ type Player struct {
 	// packetQueue is a queue of client packets that are to be processed by the server. This is only used
 	// in direct mode.
 	packetQueue []packet.Packet
-	// processMu is a mutex that is locked whenever packets need to be processed. It is used to
+	// ProcessMu is a mutex that is locked whenever packets need to be processed. It is used to
 	// prevent race conditions, and to maintain accuracy with anti-cheat.
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
 	// being associated with.
-	processMu deadlock.Mutex
+	ProcessMu deadlock.Mutex
 
 	// packetHandlers contains packet packetHandlers registered to the player.
 	packetHandlers []Handler
@@ -123,60 +126,65 @@ func New(log *logrus.Logger, readingBatches bool, conn, serverConn *minecraft.Co
 		}
 	}
 
+	p.ClientPkFunc = p.DefaultHandleFromClient
+	p.ServerPkFunc = p.DefaultHandleFromServer
+
 	go p.startTicking()
 	return p
 }
 
-// HandleFromClient handles a packet from the client.
-func (p *Player) HandleFromClient(pk packet.Packet) error {
-	p.processMu.Lock()
-	defer p.processMu.Unlock()
-
+// DefaultHandleFromClient handles a packet from the client.
+func (p *Player) DefaultHandleFromClient(pks []packet.Packet) error {
 	if p.Closed {
 		return nil
 	}
 
-	if s, ok := pk.(*packet.ScriptMessage); ok && strings.Contains(s.Identifier, "oomph:") {
-		panic(oerror.New("malicious payload detected"))
+	for _, pk := range pks {
+		if s, ok := pk.(*packet.ScriptMessage); ok && strings.Contains(s.Identifier, "oomph:") {
+			panic(oerror.New("malicious payload detected"))
+		}
+
+		cancel := false
+		for _, h := range p.packetHandlers {
+			cancel = cancel || !h.HandleClientPacket(pk, p)
+			defer h.Defer()
+		}
+
+		if !p.RunDetections(pk) || cancel {
+			continue
+		}
+
+		if p.serverConn != nil {
+			p.serverConn.WritePacket(pk)
+		}
+		p.packetQueue = append(p.packetQueue, pk)
 	}
 
-	cancel := false
-	for _, h := range p.packetHandlers {
-		cancel = cancel || !h.HandleClientPacket(pk, p)
-		defer h.Defer()
-	}
-
-	if !p.RunDetections(pk) || cancel {
-		return nil
-	}
-
-	if p.serverConn != nil {
-		return p.serverConn.WritePacket(pk)
-	}
-
-	p.packetQueue = append(p.packetQueue, pk)
 	return nil
 }
 
-// HandleFromServer handles a packet from the server.
-func (p *Player) HandleFromServer(pk packet.Packet) error {
-	p.processMu.Lock()
-	defer p.processMu.Unlock()
-
+// DefaultHandleFromServer handles a packet from the server.
+func (p *Player) DefaultHandleFromServer(pks []packet.Packet) error {
 	if p.Closed {
 		return nil
 	}
 
-	cancel := false
-	for _, h := range p.packetHandlers {
-		cancel = cancel || !h.HandleServerPacket(pk, p)
+	for _, pk := range pks {
+		cancel := false
+		for _, h := range p.packetHandlers {
+			cancel = cancel || !h.HandleServerPacket(pk, p)
+		}
+
+		if cancel {
+			continue
+		}
+
+		if err := p.conn.WritePacket(pk); err != nil {
+			return err
+		}
 	}
 
-	if cancel {
-		return nil
-	}
-
-	return p.conn.WritePacket(pk)
+	return nil
 }
 
 // RegisterHandler registers a handler to the player.
@@ -301,6 +309,9 @@ func (p *Player) Close() error {
 		p.Connected = false
 		p.Closed = true
 
+		p.ClientPkFunc = nil
+		p.ServerPkFunc = nil
+
 		p.eventHandler.HandleQuit(p)
 		p.World.PurgeChunks()
 
@@ -338,8 +349,8 @@ func (p *Player) startTicking() {
 
 // tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
 func (p *Player) tick() bool {
-	p.processMu.Lock()
-	defer p.processMu.Unlock()
+	p.ProcessMu.Lock()
+	defer p.ProcessMu.Unlock()
 
 	if p.Closed {
 		return false
