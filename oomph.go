@@ -17,7 +17,9 @@ import (
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/resource"
 	"github.com/sandertv/gophertunnel/minecraft/text"
 	"github.com/sasha-s/go-deadlock"
 	"github.com/sirupsen/logrus"
@@ -56,8 +58,9 @@ type OomphSettings struct {
 
 	StatusProvider *minecraft.ServerStatusProvider
 
-	ResourcePath string
-	RequirePacks bool
+	ResourcePath             string
+	RequirePacks             bool
+	FetchRemoteResourcePacks bool
 
 	Protocols []minecraft.Protocol
 }
@@ -100,10 +103,28 @@ func (o *Oomph) Start() {
 		statusProvider = *s.StatusProvider
 	}
 
+	var resourcePacks []*resource.Pack
+	if s.FetchRemoteResourcePacks {
+		resourcePackFetch, err := minecraft.Dialer{
+			ClientData:   login.ClientData{DefaultInputMode: 2, CurrentInputMode: 2, DeviceOS: 1, ServerAddress: s.RemoteAddress}, // fill in some missing client data
+			IdentityData: login.IdentityData{DisplayName: "OomphPackFetch", XUID: "0"},
+			IPAddress:    "0.0.0.0:0",
+		}.Dial("raknet", s.RemoteAddress)
+		if err != nil {
+			o.log.Errorf("unable to fetch resource packs: %v", err)
+			resourcePacks = utils.ResourcePacks(s.ResourcePath) // default to resource pack folder if fetching packs from the remote server fails
+		} else {
+			resourcePacks = resourcePackFetch.ResourcePacks()
+			resourcePackFetch.Close()
+		}
+	} else {
+		resourcePacks = utils.ResourcePacks(s.ResourcePath)
+	}
+
 	l, err := minecraft.ListenConfig{
 		StatusProvider:         statusProvider,
 		AuthenticationDisabled: !s.Authentication,
-		ResourcePacks:          utils.ResourcePacks(s.ResourcePath),
+		ResourcePacks:          resourcePacks,
 		TexturePacksRequired:   s.RequirePacks,
 		AcceptedProtocols:      s.Protocols,
 		FlushRate:              -1,
