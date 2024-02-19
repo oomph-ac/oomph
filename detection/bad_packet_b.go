@@ -39,7 +39,7 @@ func (d *BadPacketB) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 	switch pk.(type) {
 	case *packet.MovePlayer:
 		s := d.tick - d.last
-		if s < 2 && !p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Immobile {
+		if s < 2 && !p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Immobile && p.Ready {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("speed", s)
 			d.Fail(p, data)

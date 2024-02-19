@@ -10,6 +10,7 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/simulation"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -69,6 +70,20 @@ func (l listener) Accept() (session.Conn, error) {
 	detection.RegisterDetections(p)
 
 	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
+
+	p.ClientPkFunc = func(pks []packet.Packet) error {
+		p.ProcessMu.Lock()
+		defer p.ProcessMu.Unlock()
+
+		return p.DefaultHandleFromClient(pks)
+	}
+
+	p.ServerPkFunc = func(pks []packet.Packet) error {
+		p.ProcessMu.Lock()
+		defer p.ProcessMu.Unlock()
+
+		return p.DefaultHandleFromServer(pks)
+	}
 
 	l.o.players <- p
 	return p, err

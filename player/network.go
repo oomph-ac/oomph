@@ -90,8 +90,7 @@ func (p *Player) WritePacket(pk packet.Packet) error {
 		return oerror.New("conn is nil in session")
 	}
 
-	p.HandleFromServer(pk)
-	return nil
+	return p.ServerPkFunc([]packet.Packet{pk})
 }
 
 // ReadPacket will call minecraft.Conn.ReadPacket and process the packet with oomph.
@@ -125,7 +124,10 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 	if err != nil {
 		return pk, err
 	}
-	p.HandleFromClient(pk)
+
+	if err := p.ClientPkFunc([]packet.Packet{pk}); err != nil {
+		return pk, err
+	}
 
 	// Check if the packet queue is empty. If it is not, return the first packet in the queue.
 	if len(p.packetQueue) == 0 {
