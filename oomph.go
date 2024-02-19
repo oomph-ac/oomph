@@ -54,7 +54,8 @@ type OomphSettings struct {
 	RemoteAddress  string
 	Authentication bool
 
-	ReadBatchMode bool
+	ReadBatchMode     bool
+	LatencyReportType handler.LatencyReportType
 
 	StatusProvider *minecraft.ServerStatusProvider
 
@@ -231,7 +232,9 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	p := player.New(o.log, o.settings.ReadBatchMode, conn, serverConn)
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
+
 	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
+	p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).ReportType = o.settings.LatencyReportType
 
 	select {
 	case o.players <- p:
