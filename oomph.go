@@ -52,6 +52,8 @@ type OomphSettings struct {
 	RemoteAddress  string
 	Authentication bool
 
+	ReadBatchMode bool
+
 	StatusProvider *minecraft.ServerStatusProvider
 
 	ResourcePath string
@@ -108,6 +110,8 @@ func (o *Oomph) Start() {
 
 		AllowInvalidPackets: false,
 		AllowUnknownPackets: true,
+
+		ReadBatches: s.ReadBatchMode,
 	}.Listen("raknet", s.LocalAddress)
 
 	if err != nil {
@@ -153,6 +157,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		DisconnectOnUnknownPackets: false,
 		DisconnectOnInvalidPackets: true,
 		IPAddress:                  conn.RemoteAddr().String(),
+
+		ReadBatches: o.settings.ReadBatchMode,
 	}.Dial("raknet", remoteAddr)
 
 	if err != nil {
@@ -176,7 +182,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	go func() {
 		if err := conn.StartGame(data); err != nil {
 			conn.WritePacket(&packet.Disconnect{
-				Message: unwrapNetError(err),
+				Message: "startGame(): " + unwrapNetError(err),
 			})
 			success = false
 		}
@@ -186,7 +192,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	go func() {
 		if err := serverConn.DoSpawn(); err != nil {
 			conn.WritePacket(&packet.Disconnect{
-				Message: unwrapNetError(err),
+				Message: "doSpawn(): " + unwrapNetError(err),
 			})
 			success = false
 		}
@@ -201,7 +207,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		return
 	}
 
-	p := player.New(o.log, conn, serverConn)
+	p := player.New(o.log, o.settings.ReadBatchMode, conn, serverConn)
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
 	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
@@ -246,15 +252,31 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		defer g.Done()
 
 		for {
-			pk, err := conn.ReadPacket()
+			var pks []packet.Packet
+			var err error
+
+			if o.settings.ReadBatchMode {
+				pks, err = conn.ReadBatch()
+			} else if pk, err2 := conn.ReadPacket(); err2 == nil {
+				pks = []packet.Packet{pk}
+			} else {
+				err = err2
+			}
+
 			if err != nil && !p.Closed {
 				o.log.Errorf("error reading packet from client: %v", err)
 				return
 			}
 
-			if err := p.HandleFromClient(pk); err != nil {
-				o.log.Errorf("error handling packet from client: %v", err)
-				return
+			for _, pk := range pks {
+				if err := p.HandleFromClient(pk); err != nil {
+					o.log.Errorf("error handling packet from client: %v", err)
+					return
+				}
+			}
+
+			if o.settings.ReadBatchMode {
+				serverConn.Flush()
 			}
 		}
 	}()
@@ -281,7 +303,17 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		defer g.Done()
 
 		for {
-			pk, err := serverConn.ReadPacket()
+			var pks []packet.Packet
+			var err error
+
+			if o.settings.ReadBatchMode {
+				pks, err = serverConn.ReadBatch()
+			} else if pk, err2 := serverConn.ReadPacket(); err2 == nil {
+				pks = []packet.Packet{pk}
+			} else {
+				err = err2
+			}
+
 			if err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					conn.WritePacket(&packet.Disconnect{
@@ -295,17 +327,25 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			if d, ok := pk.(*packet.Disconnect); ok {
-				conn.WritePacket(d)
-				conn.Flush()
-				p.Close()
+			for _, pk := range pks {
+				if d, ok := pk.(*packet.Disconnect); ok {
+					conn.WritePacket(d)
+					conn.Flush()
+					p.Close()
 
-				return
+					return
+				}
+
+				if err := p.HandleFromServer(pk); err != nil {
+					o.log.Errorf("error handling packet from server: %v", err)
+					return
+				}
 			}
 
-			if err := p.HandleFromServer(pk); err != nil {
-				o.log.Errorf("error handling packet from server: %v", err)
-				return
+			// Flush the conn instantly after reading the batch + flush acknowledgement handler.
+			if o.settings.ReadBatchMode {
+				p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler).Flush(p)
+				conn.Flush()
 			}
 		}
 	}()

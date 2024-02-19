@@ -75,12 +75,16 @@ type Player struct {
 
 	log *logrus.Logger
 
+	// readingBatches is true if Oomph has been configured to read batches of packets from the client instead
+	// of reading them one by one.
+	readingBatches bool
+
 	c    chan bool
 	once sync.Once
 }
 
 // New creates and returns a new Player instance.
-func New(log *logrus.Logger, conn, serverConn *minecraft.Conn) *Player {
+func New(log *logrus.Logger, readingBatches bool, conn, serverConn *minecraft.Conn) *Player {
 	p := &Player{
 		Connected: true,
 
@@ -286,6 +290,11 @@ func (p *Player) Disconnect(reason string) {
 	}
 }
 
+// ReadBatchMode returns true if the player is configured to read batches of packets from the client.
+func (p *Player) ReadBatchMode() bool {
+	return p.readingBatches
+}
+
 // Close closes the player.
 func (p *Player) Close() error {
 	p.once.Do(func() {
@@ -347,6 +356,11 @@ func (p *Player) tick() bool {
 	// Tick all the detections.
 	for _, d := range p.detections {
 		d.OnTick(p)
+	}
+
+	// We don't need to flush here, because Oomph will flush the connection after every batch read.
+	if p.readingBatches {
+		return true
 	}
 
 	// Flush all the packets for the client to receive.

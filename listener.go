@@ -62,7 +62,7 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 
-	p := player.New(logrus.New(), c.(*minecraft.Conn), nil)
+	p := player.New(logrus.New(), false, c.(*minecraft.Conn), nil)
 	p.RuntimeId = 1
 
 	handler.RegisterHandlers(p)
