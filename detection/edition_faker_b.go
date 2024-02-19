@@ -19,6 +19,10 @@ var defaultInputModes = map[protocol.DeviceOS]int{
 	protocol.DeviceWin10:   packet.InputModeMouse,
 	protocol.DeviceAndroid: packet.InputModeTouch,
 	protocol.DeviceIOS:     packet.InputModeTouch,
+	protocol.DeviceFireOS:  packet.InputModeTouch,
+	protocol.DeviceXBOX:    packet.InputModeGamePad,
+	protocol.DeviceOrbis:   packet.InputModeGamePad,
+	protocol.DeviceNX:      packet.InputModeGamePad,
 }
 
 func NewEditionFakerB() *EditionFakerB {
