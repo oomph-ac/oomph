@@ -77,6 +77,8 @@ github.com/oomph-ac/dragonfly v0.0.0-20240207223737-96dfd1fafe9e h1:VU9JdgbDZ39w
 github.com/oomph-ac/dragonfly v0.0.0-20240207223737-96dfd1fafe9e/go.mod h1:Ebuz+qq3GTew+n0aDOZKuFyre/jPznDErbv8zQW6Heo=
 github.com/oomph-ac/gophertunnel v0.0.0-20240210012800-073ea43d2569 h1:tZliAy6NMCLt89qMBDQ4IAsr/EVTdZUxsF5/x63h1+k=
 github.com/oomph-ac/gophertunnel v0.0.0-20240210012800-073ea43d2569/go.mod h1:FFeHZzSOXe1LAEVTwwarCIsbzLVDdDhEfJ5WcSpqWnA=
+github.com/oomph-ac/gophertunnel v0.0.0-20240219022953-4825b2b1951b h1:EwT7eyMO0Gget5rjz2Apdq/jlhFe63IqpQ0n28fvMjw=
+github.com/oomph-ac/gophertunnel v0.0.0-20240219022953-4825b2b1951b/go.mod h1:FFeHZzSOXe1LAEVTwwarCIsbzLVDdDhEfJ5WcSpqWnA=
 github.com/oomph-ac/mv v0.0.0-20240210123432-1cb78e0dd37d h1:o/y+ACx72GrnviQKCn48g61m+Eawxb7m9WautuJ5mBc=
 github.com/oomph-ac/mv v0.0.0-20240210123432-1cb78e0dd37d/go.mod h1:QYLCOPIpWVWCJI2/yRDAj8KdMSN7c3bStwNInqdMBNs=
 github.com/petermattis/fastcgo v0.0.0-20170816164731-e33892440abb h1:NO9wJiBhQI0rgcuo5m4QLVe2lFDZxiI7OuQmFlScFC0=

@@ -9,10 +9,18 @@ import (
 
 const HandlerIDLatency = "oomph:latency"
 
+type LatencyReportType int
+
+const (
+	LatencyReportRaknet LatencyReportType = iota
+	LatencyReportGameStack
+)
+
 // LatencyHandler updates the latency and client tick of the player, which is used for synchronization.
 type LatencyHandler struct {
 	StackLatency      int64
 	LatencyUpdateTick int64
+	ReportType        LatencyReportType
 
 	Responded bool
 }
@@ -27,9 +35,14 @@ func (LatencyHandler) ID() string {
 
 func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if _, ok := pk.(*packet.PlayerAuthInput); ok && p.ServerTick%5 == 0 {
+		latency := p.Conn().Latency().Milliseconds() * 2
+		if h.ReportType == LatencyReportGameStack {
+			latency = h.StackLatency
+		}
+
 		p.SendRemoteEvent(player.NewUpdateLatencyEvent(
-			p.Conn().Latency().Milliseconds()*2,
-			h.StackLatency,
+			latency,
+			-1, // deprecated
 		))
 	}
 
