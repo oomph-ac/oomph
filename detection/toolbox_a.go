@@ -57,11 +57,11 @@ func (d *ToolboxA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if deviceModel == "" { // empty string if linux
 		return true
 	}
+
 	if strings.Split(deviceModel, " ")[0] != strings.ToUpper(strings.Split(deviceModel, " ")[0]) { // i checked vanilla android client jni code and false positive is impossible without 3rd party software
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("DeviceModel", p.Conn().ClientData().DeviceModel)
 		d.Fail(p, data)
-		return false
 	}
 	return true
 }
