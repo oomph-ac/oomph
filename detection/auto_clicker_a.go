@@ -39,7 +39,7 @@ func (d *AutoClickerA) HandleClientPacket(pk packet.Packet, p *player.Player) bo
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("cps", c.CPS)
 		d.Fail(p, data)
-		return false
 	}
+
 	return true
 }

@@ -72,8 +72,8 @@ func (d *AutoClickerC) HandleClientPacket(pk packet.Packet, p *player.Player) bo
 		data.Set("cps", c.CPS)
 		d.Fail(p, data)
 		d.statSamples = make([]string, 0, 10)
-		return false
 	}
+
 	return true
 }
 
