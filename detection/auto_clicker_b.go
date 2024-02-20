@@ -44,12 +44,13 @@ func (d *AutoClickerB) HandleClientPacket(pk packet.Packet, p *player.Player) bo
 	if len(d.samples) != 20 {
 		return true
 	}
+
 	if !slices.Contains(d.samples, 0) && c.CPS >= 18 {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("cps", c.CPS)
 		d.Fail(p, data)
-		return false
 	}
+
 	d.samples = d.samples[:0]
 	return true
 }
