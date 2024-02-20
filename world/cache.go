@@ -7,6 +7,7 @@ import (
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sasha-s/go-deadlock"
+	"golang.org/x/exp/maps"
 )
 
 func init() {
@@ -221,10 +222,7 @@ func (c *CachedChunk) notifySubscriptionEdit(w *World, new *CachedChunk) {
 	}
 
 	c.sMu.RLock()
-	subscribers := make([]*World, 0, len(c.Subscribers))
-	for _, sub := range c.Subscribers {
-		subscribers = append(subscribers, sub)
-	}
+	subscribers := maps.Values(c.Subscribers)
 	c.sMu.RUnlock()
 
 	for _, sub := range subscribers {
