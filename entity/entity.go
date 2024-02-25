@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	EntityPlayerInterpolationTicks = 4
+	EntityPlayerInterpolationTicks = 3
 	EntityMobInterpolationTicks    = 6
 )
 
@@ -15,7 +15,7 @@ type Entity struct {
 	Position, PrevPosition mgl32.Vec3
 	// RecvPosition is the position of the entity recieved by the client. It
 	// is used as the end point for interpolation.
-	RecvPosition mgl32.Vec3
+	RecvPosition, PrevRecvPosition mgl32.Vec3
 
 	// Velocity is the current position of the entity subtracted by the
 	Velocity, PrevVelocity mgl32.Vec3
@@ -58,7 +58,9 @@ func New(pos, vel mgl32.Vec3, historySize int, isPlayer bool) *Entity {
 
 // RecievePosition updates the position of the entity, and adds the previous position to the position history.
 func (e *Entity) RecievePosition(hp HistoricalPosition) {
+	e.PrevRecvPosition = e.RecvPosition
 	e.RecvPosition = hp.Position
+
 	e.InterpolationTicks = EntityMobInterpolationTicks
 	if e.IsPlayer {
 		e.InterpolationTicks = EntityPlayerInterpolationTicks

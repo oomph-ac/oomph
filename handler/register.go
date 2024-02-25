@@ -15,8 +15,8 @@ func RegisterHandlers(p *player.Player) {
 	p.RegisterHandler(NewChunksHandler())
 	p.RegisterHandler(NewMovementHandler())
 
-	p.RegisterHandler(NewCombatHandler())
 	p.RegisterHandler(NewEntityHandler())
+	p.RegisterHandler(NewCombatHandler())
 
 	acks := NewAcknowledgementHandler()
 	acks.LegacyMode = p.Conn().Protocol().ID() <= player.GameVersion1_20_0

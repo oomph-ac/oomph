@@ -2,8 +2,6 @@ package detection
 
 import (
 	"github.com/chewxy/math32"
-	"github.com/elliotchance/orderedmap/v2"
-	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -23,11 +21,11 @@ func NewReachA() *ReachA {
 	d.Description = "Detects if a player's attack range exceeds 3 blocks."
 	d.Punishable = true
 
-	d.MaxViolations = 20
-	d.trustDuration = 90 * player.TicksPerSecond
+	d.MaxViolations = 10
+	d.trustDuration = 60 * player.TicksPerSecond
 
 	d.FailBuffer = 1.01
-	d.MaxBuffer = 2.25
+	d.MaxBuffer = 1.5
 	return d
 }
 
@@ -51,26 +49,19 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	// If even a single raycast fails, we shouldn't rely on the results.
-	if len(combatHandler.RaycastResults) != 10 {
+	if len(combatHandler.RaycastResults) == 0 {
 		return true
 	}
 
-	total, count := float32(0), float32(0)
-	minDist := float32(14)
+	var minDist, maxDist float32 = 14, -1
 	for _, result := range combatHandler.RaycastResults {
-		total += result
-		count++
 		minDist = math32.Min(minDist, result)
+		maxDist = math32.Max(maxDist, result)
 	}
-	avgDist := total / count
-	deviation := avgDist - minDist
 
-	if avgDist >= 3.01 && deviation <= 0.15 {
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("distance", game.Round32(avgDist, 3))
-		d.Fail(p, data)
-
+	if minDist > 2.9 && maxDist > 3 {
+		p.Log().Infof("ReachA: min=%f max=%f", minDist, maxDist)
+		d.Fail(p, nil)
 		return true
 	}
 
