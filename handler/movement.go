@@ -41,6 +41,7 @@ type MovementHandler struct {
 	ClientPosition, PrevClientPosition mgl32.Vec3
 	ClientVel, PrevClientVel           mgl32.Vec3
 	Mov, ClientMov                     mgl32.Vec3
+	PrevMov, PrevClientMov             mgl32.Vec3
 
 	// Rotation vectors are formatted as {pitch, headYaw, yaw}
 	Rotation, PrevRotation mgl32.Vec3
@@ -114,6 +115,8 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Update the client's own position.
 	h.PrevClientPosition = h.ClientPosition
 	h.ClientPosition = input.Position.Sub(mgl32.Vec3{0, 1.62})
+
+	h.PrevClientMov = h.ClientMov
 	h.ClientMov = h.ClientPosition.Sub(h.PrevClientPosition)
 
 	// Update the client's own velocity.

@@ -10,6 +10,7 @@ import (
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/text"
 	"github.com/sasha-s/go-deadlock"
 	"github.com/sirupsen/logrus"
 )
@@ -268,10 +269,10 @@ func (p *Player) RunDetections(pk packet.Packet) bool {
 }
 
 // Message sends a message to the player.
-func (p *Player) Message(msg string) {
+func (p *Player) Message(msg string, args ...interface{}) {
 	p.conn.WritePacket(&packet.Text{
 		TextType: packet.TextTypeChat,
-		Message:  msg,
+		Message:  "§l§eoomph§7§r » " + text.Colourf(msg, args...),
 	})
 }
 

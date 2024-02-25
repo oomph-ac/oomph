@@ -118,7 +118,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		return true
 	case *packet.PlayerAuthInput:
 		if !h.initalized {
-			h.ChunkRadius = int32(p.Conn().ChunkRadius())
+			h.ChunkRadius = int32(p.Conn().ChunkRadius()) + 4
 			h.initalized = true
 		}
 
@@ -176,7 +176,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		p.World.CleanChunks(h.ChunkRadius, chunkPos)
 		h.InLoadedChunk = (p.World.GetChunk(chunkPos) != nil)
 	case *packet.RequestChunkRadius:
-		h.ChunkRadius = pk.ChunkRadius
+		h.ChunkRadius = pk.ChunkRadius + 4
 	}
 
 	return true
@@ -185,7 +185,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.ChunkRadiusUpdated:
-		h.ChunkRadius = pk.ChunkRadius
+		h.ChunkRadius = pk.ChunkRadius + 4
 	case *packet.UpdateBlock:
 		b, ok := df_world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 		if !ok {

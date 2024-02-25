@@ -40,30 +40,35 @@ func ClosestPointToBBox(origin mgl32.Vec3, bb cube.BBox) mgl32.Vec3 {
 }
 
 // ClosestPointToBBoxDirectional returns the shortest point from a given origin to a given bounding box, in a given direction.
-func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb cube.BBox, distance float32) mgl32.Vec3 {
+func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb cube.BBox, distance float32) (mgl32.Vec3, bool) {
 	point1 := origin.Add(startLook.Mul(distance))
 	point2 := origin.Add(endLook.Mul(distance))
 
-	rayResult, hit := trace.BBoxIntercept(bb, origin, point1)
-	if hit {
-		point1 = rayResult.Position()
+	rayResult1, hit1 := trace.BBoxIntercept(bb, origin, point1)
+	if hit1 {
+		point1 = rayResult1.Position()
 	} else {
 		point1 = ClosestPointToBBox(point1, bb)
 	}
 
-	rayResult, hit = trace.BBoxIntercept(bb, origin, point2)
-	if hit {
-		point2 = rayResult.Position()
+	rayResult2, hit2 := trace.BBoxIntercept(bb, origin, point2)
+	if hit2 {
+		point2 = rayResult2.Position()
 	} else {
 		point2 = ClosestPointToBBox(point2, bb)
 	}
 
 	if point1 == point2 {
-		return point1
+		// Here, there is no possible way that any point between the two rays can intersect with the bounding box.
+		if !hit1 && !hit2 {
+			return mgl32.Vec3{}, false
+		}
+
+		return point1, true
 	}
 
 	possibleBB := cube.Box(point1.X(), point1.Y(), point1.Z(), point2.X(), point2.Y(), point2.Z())
-	return ClosestPointToBBox(origin, possibleBB)
+	return ClosestPointToBBox(origin, possibleBB), true
 }
 
 // AABBFromDFBox converts a dragonfly bounding box to a float32-cube bounding box.

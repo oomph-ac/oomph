@@ -26,12 +26,15 @@ type CombatHandler struct {
 
 	InterpolationStep float32
 	AttackOffset      float32
-	StartAttackPos    mgl32.Vec3
-	EndAttackPos      mgl32.Vec3
 
-	ClosestRawDistance        float32
-	ClosestDirectionalResults []float32
-	RaycastResults            []float32
+	StartAttackPos mgl32.Vec3
+	EndAttackPos   mgl32.Vec3
+
+	StartEntityPos mgl32.Vec3
+	EndEntityPos   mgl32.Vec3
+
+	ClosestRawDistance float32
+	RaycastResults     []float32
 
 	LastSwingTick int64
 
@@ -75,34 +78,48 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		if entity.TicksSinceTeleport <= 20 || !entity.IsPlayer {
+		if entity.TicksSinceTeleport <= 20 {
 			return true
 		}
 
-		movementHandler := p.Handler(HandlerIDMovement).(*MovementHandler)
-		if movementHandler.TicksSinceTeleport <= 20 {
+		mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
+		if mDat.TicksSinceTeleport <= 20 {
 			return true
 		}
 
 		h.AttackOffset = float32(1.62)
-		if movementHandler.Sneaking {
+		if mDat.Sneaking {
 			h.AttackOffset = 1.54
 		}
 
 		h.Phase = CombatPhaseTransaction
 		h.TargetedEntity = entity
-		h.StartAttackPos = movementHandler.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
-		h.EndAttackPos = movementHandler.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+
+		h.StartAttackPos = mDat.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+		h.EndAttackPos = mDat.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+
+		h.StartEntityPos = entity.PrevPosition
+		h.EndEntityPos = entity.Position
 
 		// Calculate the closest raw point from the attack positions to the entity's bounding box.
-		entityBB := entity.Box(entity.Position).Grow(0.1)
-		point1 := game.ClosestPointToBBox(h.StartAttackPos, entityBB)
-		point2 := game.ClosestPointToBBox(h.EndAttackPos, entityBB)
+		bb1 := entity.Box(entity.PrevPosition).Grow(0.1)
+		bb2 := entity.Box(entity.Position).Grow(0.1)
 
-		h.ClosestRawDistance = math32.Min(
+		point1 := game.ClosestPointToBBox(h.StartAttackPos, bb1)
+		point2 := game.ClosestPointToBBox(h.EndAttackPos, bb1)
+		point3 := game.ClosestPointToBBox(h.StartAttackPos, bb2)
+		point4 := game.ClosestPointToBBox(h.EndAttackPos, bb2)
+
+		close1 := math32.Min(
 			point1.Sub(h.StartAttackPos).Len(),
 			point2.Sub(h.EndAttackPos).Len(),
 		)
+		close2 := math32.Min(
+			point3.Sub(h.StartAttackPos).Len(),
+			point4.Sub(h.EndAttackPos).Len(),
+		)
+
+		h.ClosestRawDistance = math32.Min(close1, close2)
 	case *packet.PlayerAuthInput:
 		if p.Conn().Protocol().ID() >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 			h.click(p)
@@ -123,7 +140,6 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		if pk.InputMode == packet.InputModeTouch {
 			return true
 		}
-
 		h.calculatePointingResults(p)
 	case *packet.Animate:
 		h.LastSwingTick = p.ClientFrame
@@ -152,46 +168,49 @@ func (h *CombatHandler) Defer() {
 }
 
 func (h *CombatHandler) calculatePointingResults(p *player.Player) {
-	movementHandler := p.Handler(HandlerIDMovement).(*MovementHandler)
+	mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
 	attackPosDelta := h.EndAttackPos.Sub(h.StartAttackPos)
+	entityPosDelta := h.EndEntityPos.Sub(h.StartEntityPos)
 
-	if movementHandler.TicksSinceTeleport == 0 {
-		h.StartAttackPos = movementHandler.TeleportPos.Add(mgl32.Vec3{0, h.AttackOffset})
-		h.EndAttackPos = movementHandler.TeleportPos.Add(mgl32.Vec3{0, h.AttackOffset})
-	}
-
-	startRotation := movementHandler.PrevRotation
-	endRotation := movementHandler.Rotation
-	rotationDelta := startRotation.Sub(endRotation)
+	startRotation := mDat.PrevRotation
+	endRotation := mDat.Rotation
+	rotationDelta := endRotation.Sub(startRotation)
 	if rotationDelta.Len() >= 180 {
 		return
 	}
 
-	startEntityPos := h.TargetedEntity.Position
-	endEntityPos := h.TargetedEntity.Position
-	entityPosDelta := endEntityPos.Sub(startEntityPos)
+	altEntityStartPos := h.TargetedEntity.PrevPosition
+	altEntityEndPos := h.TargetedEntity.Position
+	altEntityPosDelta := altEntityEndPos.Sub(altEntityStartPos)
 
-	adjustFactor := mgl32.Vec3{0.1, 0.1, 0.1}
-	adjustFactor[0] += math32.Abs(h.TargetedEntity.Velocity.X())
-	adjustFactor[1] += math32.Abs(h.TargetedEntity.Velocity.Y())
-	adjustFactor[2] += math32.Abs(h.TargetedEntity.Velocity.Z())
+	/* altStartAttackPos := mDat.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+	altEndAttackPos := mDat.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+	altAttackPosDelta := altEndAttackPos.Sub(altStartAttackPos) */
 
-	h.ClosestDirectionalResults = []float32{}
-	h.RaycastResults = []float32{}
-
+	h.RaycastResults = make([]float32, 0, 20)
 	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
-		attackRotation := startRotation.Add(rotationDelta.Mul(partialTicks))
-		entityPos := startEntityPos.Add(entityPosDelta.Mul(partialTicks))
+		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
+		bb := h.TargetedEntity.Box(entityPos).Grow(0.1)
 
-		directionVector := game.DirectionVector(attackRotation.Z(), attackRotation.X())
-		entityBB := h.TargetedEntity.Box(entityPos).GrowVec3(adjustFactor)
+		rotation := startRotation.Add(rotationDelta.Mul(partialTicks))
+		directionVec := game.DirectionVector(rotation.Z(), rotation.X()).Mul(14)
 
-		result, ok := trace.BBoxIntercept(entityBB, attackPos, attackPos.Add(directionVector.Mul(14.0)))
+		result, ok := trace.BBoxIntercept(bb, attackPos, attackPos.Add(directionVec))
+		if ok {
+			h.RaycastResults = append(h.RaycastResults, attackPos.Sub(result.Position()).Len())
+		}
+
+		// An extra raycast is ran here with the current entity position, as the client may have ticked
+		// the entity to a new position while the frame logic was running (where attacks are done).
+		entityPos = altEntityStartPos.Add(altEntityPosDelta.Mul(partialTicks))
+		bb = h.TargetedEntity.Box(entityPos).Grow(0.1)
+		result, ok = trace.BBoxIntercept(bb, attackPos, attackPos.Add(directionVec))
 		if ok {
 			h.RaycastResults = append(h.RaycastResults, attackPos.Sub(result.Position()).Len())
 		}
 	}
+
 }
 
 // Click adds a click to the player's click history.

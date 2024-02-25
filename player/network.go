@@ -74,7 +74,7 @@ func (p *Player) Latency() time.Duration {
 func (p *Player) WritePacket(pk packet.Packet) error {
 	defer func() {
 		if err := recover(); err != nil {
-			p.log.Errorf("ReadPacket() panic: %v", err)
+			p.log.Errorf("WritePacket() panic: %v", err)
 			hub := sentry.CurrentHub().Clone()
 			hub.ConfigureScope(func(scope *sentry.Scope) {
 				scope.SetTag("conn_type", "serverDirect")

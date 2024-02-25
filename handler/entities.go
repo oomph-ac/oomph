@@ -32,7 +32,7 @@ func (h *EntitiesHandler) ID() string {
 
 func (h *EntitiesHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if _, ok := pk.(*packet.PlayerAuthInput); ok && p.CombatMode == player.AuthorityModeSemi {
-		h.tickEntities(p.ServerTick)
+		h.tickEntities(p.ClientFrame)
 	}
 
 	return true
@@ -77,7 +77,8 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 
 		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
 	case *packet.SetActorMotion:
-		if pk.EntityRuntimeID == p.RuntimeId {
+		return pk.EntityRuntimeID == p.RuntimeId
+		/* if pk.EntityRuntimeID == p.RuntimeId {
 			return true
 		}
 
@@ -88,7 +89,7 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
 			entity.RecvVelocity = pk.Velocity
-		})
+		}) */
 	case *packet.SetActorData:
 		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
 		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
