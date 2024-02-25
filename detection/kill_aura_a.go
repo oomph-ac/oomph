@@ -22,11 +22,11 @@ func NewKillAuraA() *KillAuraA {
 	d.Description = "Detects if a player is attacking without swinging their arm"
 	d.Punishable = true
 
-	d.MaxViolations = 15
-	d.trustDuration = 60 * player.TicksPerSecond
+	d.MaxViolations = 1
+	d.trustDuration = -1
 
-	d.FailBuffer = 1.5
-	d.MaxBuffer = 4
+	d.FailBuffer = 1
+	d.MaxBuffer = 1
 	return d
 }
 
@@ -47,7 +47,7 @@ func (d *KillAuraA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	if data, ok := tpk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 		currentTick := p.ClientFrame
 		tickDiff := currentTick - c.LastSwingTick
-		if tickDiff >= 10 {
+		if tickDiff > 10 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("tick_diff", tickDiff)
 			data.Set("current_tick", currentTick)
