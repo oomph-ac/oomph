@@ -38,10 +38,13 @@ func (d *BadPacketB) ID() string {
 func (d *BadPacketB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk.(type) {
 	case *packet.MovePlayer:
-		s := d.tick - d.last
-		if s < 2 && !p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Immobile && p.Ready {
+		speed := d.tick - d.last
+		mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+		cDat := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler)
+
+		if speed < 2 && !mDat.Immobile && cDat.InLoadedChunk {
 			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("speed", s)
+			data.Set("speed", speed)
 			d.Fail(p, data)
 			return false
 		}
