@@ -68,6 +68,7 @@ func (e *Entity) RecievePosition(hp HistoricalPosition) {
 
 	if hp.Teleport {
 		e.TicksSinceTeleport = 0
+		e.InterpolationTicks = 1
 	}
 }
 
