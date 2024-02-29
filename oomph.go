@@ -243,7 +243,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		if err := p.DefaultHandleFromClient(pks); err != nil {
 			return err
 		}
-		return serverConn.Flush()
+
+		if o.settings.ReadBatchMode {
+			return serverConn.Flush()
+		}
+		return nil
 	}
 
 	p.ServerPkFunc = func(pks []packet.Packet) error {
@@ -258,8 +262,10 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		// TODO: Refactor this to be more elegant?
 		if o.settings.ReadBatchMode {
 			p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler).Flush(p)
+			return conn.Flush()
 		}
-		return conn.Flush()
+
+		return nil
 	}
 
 	select {
