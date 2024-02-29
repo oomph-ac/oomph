@@ -16,7 +16,7 @@ func init() {
 
 const (
 	clearDuplicateDuration   = time.Second
-	clearDuplicateGCDuration = time.Second * 5
+	clearDuplicateGCDuration = time.Second * 15
 )
 
 var chunkCache = map[protocol.ChunkPos]map[uint64]*CachedChunk{}
