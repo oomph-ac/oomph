@@ -7,11 +7,12 @@ import (
 )
 
 func init() {
-	if runtime.NumCPU() <= 2 {
-		logrus.Warn("insufficient CPU count, performance may be impacted")
+	workers := runtime.NumCPU()
+	if workers > 4 {
+		workers = 4
 	}
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < workers; i++ {
 		go worker(i)
 	}
 }
