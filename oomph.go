@@ -27,7 +27,20 @@ import (
 
 func init() {
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn: "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
+		Dsn:           "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
+		EnableTracing: os.Getenv("SENTRY_TRACE") == "true",
+		TracesSampler: sentry.TracesSampler(func(ctx sentry.SamplingContext) float64 {
+			if ctx.Span.Name != "oomph:handle_client" && ctx.Span.Name != "oomph:handle_server" && ctx.Span.Name != "oomph:tick" {
+				return 0.0
+			}
+
+			delta := time.Since(ctx.Span.StartTime).Milliseconds()
+			if delta >= 10 {
+				return 1.0
+			}
+
+			return 0.0
+		}),
 	})
 
 	if err != nil {

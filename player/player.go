@@ -1,11 +1,14 @@
 package player
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -52,11 +55,15 @@ type Player struct {
 	ServerTick              int64
 	LastServerTick          time.Time
 
+	// World is the world of the player.
 	World *world.World
 
 	// GameMode is the gamemode of the player. The player is exempt from movement predictions
 	// if they are not in survival or adventure mode.
 	GameMode int32
+
+	// SentryTransaction is the transaction that is used to monitor performance of packet handling.
+	SentryTransaction *sentry.Span
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
@@ -140,25 +147,18 @@ func (p *Player) DefaultHandleFromClient(pks []packet.Packet) error {
 		return nil
 	}
 
+	p.SentryTransaction = sentry.StartTransaction(
+		context.Background(),
+		"oomph:handle_client",
+		sentry.WithOpName("p.ClientPkFunc"),
+		sentry.WithDescription("Handling packets from the client"),
+	)
+	defer p.SentryTransaction.Finish()
+
 	for _, pk := range pks {
-		if s, ok := pk.(*packet.ScriptMessage); ok && strings.Contains(s.Identifier, "oomph:") {
-			panic(oerror.New("malicious payload detected"))
+		if err := p.handleOneFromClient(pk); err != nil {
+			return err
 		}
-
-		cancel := false
-		for _, h := range p.packetHandlers {
-			cancel = cancel || !h.HandleClientPacket(pk, p)
-			defer h.Defer()
-		}
-
-		if !p.RunDetections(pk) || cancel {
-			continue
-		}
-
-		if p.serverConn != nil {
-			p.serverConn.WritePacket(pk)
-		}
-		p.packetQueue = append(p.packetQueue, pk)
 	}
 
 	return nil
@@ -170,22 +170,63 @@ func (p *Player) DefaultHandleFromServer(pks []packet.Packet) error {
 		return nil
 	}
 
+	p.SentryTransaction = sentry.StartTransaction(
+		context.Background(),
+		"oomph:handle_server",
+		sentry.WithOpName("p.ServerPkFunc"),
+		sentry.WithDescription("Handling packets from the server"),
+	)
+	defer p.SentryTransaction.Finish()
+
 	for _, pk := range pks {
-		cancel := false
-		for _, h := range p.packetHandlers {
-			cancel = cancel || !h.HandleServerPacket(pk, p)
-		}
-
-		if cancel {
-			continue
-		}
-
-		if err := p.conn.WritePacket(pk); err != nil {
+		if err := p.handleOneFromServer(pk); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (p *Player) handleOneFromClient(pk packet.Packet) error {
+	span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("p.handleOneFromClient(%T)", pk))
+	defer span.Finish()
+
+	if s, ok := pk.(*packet.ScriptMessage); ok && strings.Contains(s.Identifier, "oomph:") {
+		panic(oerror.New("malicious payload detected"))
+	}
+
+	cancel := false
+	for _, h := range p.packetHandlers {
+		cancel = cancel || !h.HandleClientPacket(pk, p)
+		defer h.Defer()
+	}
+
+	if !p.RunDetections(pk) || cancel {
+		return nil
+	}
+
+	if p.serverConn != nil {
+		return p.serverConn.WritePacket(pk)
+	}
+
+	p.packetQueue = append(p.packetQueue, pk)
+	return nil
+}
+
+func (p *Player) handleOneFromServer(pk packet.Packet) error {
+	span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("p.handleOneFromServer(%T)", pk))
+	defer span.Finish()
+
+	cancel := false
+	for _, h := range p.packetHandlers {
+		cancel = cancel || !h.HandleServerPacket(pk, p)
+	}
+
+	if cancel {
+		return nil
+	}
+
+	return p.conn.WritePacket(pk)
 }
 
 // RegisterHandler registers a handler to the player.
