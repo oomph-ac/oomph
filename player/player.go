@@ -391,6 +391,9 @@ func (p *Player) startTicking() {
 
 // tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
 func (p *Player) tick() bool {
+	span := sentry.StartSpan(p.SentryTransaction.Context(), "p.tick()")
+	defer span.Finish()
+
 	p.ProcessMu.Lock()
 	defer p.ProcessMu.Unlock()
 
@@ -403,7 +406,9 @@ func (p *Player) tick() bool {
 
 	// Tick all the handlers.
 	for _, h := range p.packetHandlers {
+		subSpan := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("%T.OnTick()", h))
 		h.OnTick(p)
+		subSpan.Finish()
 	}
 
 	// Tick all the detections.
