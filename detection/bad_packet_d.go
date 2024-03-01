@@ -33,6 +33,10 @@ func (d *BadPacketD) ID() string {
 }
 
 func (d *BadPacketD) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
+	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
+		return true
+	}
+
 	i, ok := pk.(*packet.InventoryTransaction)
 	if !ok {
 		return true
