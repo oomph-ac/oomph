@@ -27,6 +27,8 @@ const (
 
 const TicksPerSecond = 20
 
+const targetedProcessingDelay = 10 * time.Millisecond
+
 type Player struct {
 	// Connected is true if the player is connected to Oomph.
 	Connected bool
@@ -153,7 +155,14 @@ func (p *Player) DefaultHandleFromClient(pks []packet.Packet) error {
 		sentry.WithOpName("p.ClientPkFunc"),
 		sentry.WithDescription("Handling packets from the client"),
 	)
-	defer p.SentryTransaction.Finish()
+	defer func() {
+		p.SentryTransaction.Status = sentry.SpanStatusOK
+		if time.Since(p.SentryTransaction.StartTime) >= targetedProcessingDelay {
+			p.SentryTransaction.Status = sentry.SpanStatusDeadlineExceeded
+		}
+
+		p.SentryTransaction.Finish()
+	}()
 
 	for _, pk := range pks {
 		if err := p.handleOneFromClient(pk); err != nil {
@@ -176,7 +185,14 @@ func (p *Player) DefaultHandleFromServer(pks []packet.Packet) error {
 		sentry.WithOpName("p.ServerPkFunc"),
 		sentry.WithDescription("Handling packets from the server"),
 	)
-	defer p.SentryTransaction.Finish()
+	defer func() {
+		p.SentryTransaction.Status = sentry.SpanStatusOK
+		if time.Since(p.SentryTransaction.StartTime) >= targetedProcessingDelay {
+			p.SentryTransaction.Status = sentry.SpanStatusDeadlineExceeded
+		}
+
+		p.SentryTransaction.Finish()
+	}()
 
 	for _, pk := range pks {
 		if err := p.handleOneFromServer(pk); err != nil {
@@ -391,8 +407,21 @@ func (p *Player) startTicking() {
 
 // tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
 func (p *Player) tick() bool {
-	span := sentry.StartSpan(p.SentryTransaction.Context(), "p.tick()")
-	defer span.Finish()
+	p.SentryTransaction = sentry.StartTransaction(
+		context.Background(),
+		"oomph:tick",
+		sentry.WithOpName("p.tick()"),
+		sentry.WithDescription("Ticking the player"),
+	)
+
+	defer func() {
+		p.SentryTransaction.Status = sentry.SpanStatusOK
+		if time.Since(p.SentryTransaction.StartTime) >= targetedProcessingDelay {
+			p.SentryTransaction.Status = sentry.SpanStatusDeadlineExceeded
+		}
+
+		p.SentryTransaction.Finish()
+	}()
 
 	p.ProcessMu.Lock()
 	defer p.ProcessMu.Unlock()
