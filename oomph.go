@@ -31,7 +31,7 @@ func init() {
 		EnableTracing:      os.Getenv("SENTRY_TRACE") == "true",
 		ProfilesSampleRate: 1.0,
 		TracesSampler: sentry.TracesSampler(func(ctx sentry.SamplingContext) float64 {
-			return 0.002
+			return 0.03
 		}),
 	})
 
