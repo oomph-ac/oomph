@@ -230,7 +230,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		c.Compact()
 
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			world.InsertToCache(p.World, c, pk.Position)
+			p.World.AddChunk(pk.Position, c)
 		})
 	case *packet.SubChunk:
 		if pk.CacheEnabled {
@@ -249,12 +249,12 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 				pk.Position[2] + int32(entry.Offset[2]),
 			}
 
-			var cached *world.CachedChunk
 			var c *chunk.Chunk
+			var isNewChunk bool = true
 
-			if found := p.World.GetChunk(chunkPos); found != nil {
-				cached = found
-				c = found.Chunk
+			if existing := p.World.GetChunk(chunkPos); existing != nil {
+				c = existing
+				isNewChunk = false
 			} else if new, ok := newChunks[chunkPos]; !ok {
 				c = chunk.New(world.AirRuntimeID, dimensionFromNetworkID(pk.Dimension).Range())
 				newChunks[chunkPos] = c
@@ -268,19 +268,19 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 				panic(err)
 			}
 
-			if cached != nil {
-				p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-					cached.InsertSubChunk(p.World, sub, index)
-				})
+			if isNewChunk {
+				c.Sub()[index] = sub
 				continue
 			}
 
-			c.Sub()[index] = sub
+			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+				c.Sub()[index] = sub
+			})
 		}
 
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
 			for pos, newC := range newChunks {
-				world.InsertToCache(p.World, newC, pos)
+				p.World.AddChunk(pos, newC)
 			}
 		})
 	}

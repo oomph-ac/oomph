@@ -25,7 +25,7 @@ func init() {
 var currentWorldId uint64
 
 type World struct {
-	chunks map[protocol.ChunkPos]*CachedChunk
+	chunks map[protocol.ChunkPos]*chunk.Chunk
 	id     uint64
 
 	ghostBlocks     map[cube.Pos]world.Block
@@ -39,7 +39,7 @@ type World struct {
 func New() *World {
 	currentWorldId++
 	return &World{
-		chunks:      make(map[protocol.ChunkPos]*CachedChunk),
+		chunks:      make(map[protocol.ChunkPos]*chunk.Chunk),
 		ghostBlocks: make(map[cube.Pos]world.Block),
 		id:          currentWorldId,
 	}
@@ -56,11 +56,11 @@ func (w *World) HasGhostBlocks() bool {
 }
 
 // AddChunk adds a chunk to the world.
-func (w *World) AddChunk(c *CachedChunk) {
+func (w *World) AddChunk(pos protocol.ChunkPos, c *chunk.Chunk) {
 	w.Lock()
 	defer w.Unlock()
 
-	w.chunks[c.Pos] = c
+	w.chunks[pos] = c
 }
 
 // RemoveChunk removes a chunk from the world.
@@ -74,7 +74,7 @@ func (w *World) RemoveChunk(pos protocol.ChunkPos) {
 // GetChunk returns a cached chunk at the position passed. The mutex is
 // not locked here because it is assumed that the caller has already locked
 // the mutex before calling this function.
-func (w *World) GetChunk(pos protocol.ChunkPos) *CachedChunk {
+func (w *World) GetChunk(pos protocol.ChunkPos) *chunk.Chunk {
 	w.RLock()
 	defer w.RUnlock()
 
@@ -83,7 +83,11 @@ func (w *World) GetChunk(pos protocol.ChunkPos) *CachedChunk {
 
 // GetBlock returns the block at the position passed.
 func (w *World) GetBlock(blockPos cube.Pos) world.Block {
-	if b, ok := w.ghostBlocks[blockPos]; ok && w.searchWithGhost {
+	w.RLock()
+	b, ok := w.ghostBlocks[blockPos]
+	w.RUnlock()
+
+	if ok && w.searchWithGhost {
 		return b
 	}
 
@@ -96,17 +100,9 @@ func (w *World) GetBlock(blockPos cube.Pos) world.Block {
 	if c == nil {
 		return block.Air{}
 	}
-
-	// Validate that the block position is within the chunk.
-	if c.Pos.X() != (int32(blockPos[0])>>4) || c.Pos.Z() != (int32(blockPos[2])>>4) {
-		panic(oerror.New("world.GetBlock: GetChunk() returned an invalid chunk"))
-	}
-
-	c.RLock()
 	rid := c.Block(uint8(blockPos[0]), int16(blockPos[1]), uint8(blockPos[2]), 0)
-	c.RUnlock()
 
-	b, ok := world.BlockByRuntimeID(rid)
+	b, ok = world.BlockByRuntimeID(rid)
 	if !ok {
 		return block.Air{}
 	}
@@ -126,10 +122,8 @@ func (w *World) SetBlock(pos cube.Pos, b world.Block) {
 		return
 	}
 
-	c.ActionSetBlock(w, SetBlockAction{
-		BlockPos:       pos,
-		BlockRuntimeId: blockID,
-	})
+	// TODO: Implement layers properly.
+	c.SetBlock(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0, blockID)
 }
 
 // MarkGhostBlock marks a block as a ghost block at the position passed.
@@ -161,25 +155,17 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 	}
 	w.lastCleanPos = pos
 
-	for chunkPos, c := range w.chunks {
+	for chunkPos := range w.chunks {
 		if chunkInRange(radius, chunkPos, pos) {
 			continue
 		}
 
-		// We have to temporarily unlock the world mutex here to avoid a deadlock when *CachedChunk.Unsubscribe is called
-		// This is so ugly holy shit kill me.
-		w.Unlock()
-		c.Unsubscribe(w)
-		w.Lock()
+		delete(w.chunks, chunkPos)
 	}
 }
 
 // PurgeChunks removes all chunks from the world.
 func (w *World) PurgeChunks() {
-	for _, c := range w.chunks {
-		c.Unsubscribe(w)
-	}
-
 	maps.Clear(w.chunks)
 }
 
