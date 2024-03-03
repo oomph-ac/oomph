@@ -41,6 +41,12 @@ func (p *Player) SetServerConn(conn *minecraft.Conn) {
 	if p.GameMode == 5 {
 		p.GameMode = conn.GameData().WorldGameMode
 	}
+
+	p.RuntimeId = conn.GameData().EntityRuntimeID
+	p.UniqueId = conn.GameData().EntityUniqueID
+	p.ClientRuntimeId = conn.GameData().EntityRuntimeID
+	p.ClientUniqueId = conn.GameData().EntityUniqueID
+	p.IDModified = false
 }
 
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
