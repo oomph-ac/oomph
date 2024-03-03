@@ -97,7 +97,7 @@ type Player struct {
 }
 
 // New creates and returns a new Player instance.
-func New(log *logrus.Logger, readingBatches bool, conn, serverConn *minecraft.Conn) *Player {
+func New(log *logrus.Logger, readingBatches bool, conn *minecraft.Conn) *Player {
 	p := &Player{
 		Connected: true,
 
@@ -107,7 +107,6 @@ func New(log *logrus.Logger, readingBatches bool, conn, serverConn *minecraft.Co
 		World: world.New(),
 
 		conn:        conn,
-		serverConn:  serverConn,
 		packetQueue: []packet.Packet{},
 
 		ClientTick:  0,
@@ -127,13 +126,6 @@ func New(log *logrus.Logger, readingBatches bool, conn, serverConn *minecraft.Co
 
 		log: log,
 		c:   make(chan bool),
-	}
-
-	if serverConn != nil {
-		p.GameMode = serverConn.GameData().PlayerGameMode
-		if p.GameMode == 5 {
-			p.GameMode = serverConn.GameData().WorldGameMode
-		}
 	}
 
 	p.ClientPkFunc = p.DefaultHandleFromClient
@@ -430,8 +422,14 @@ func (p *Player) tick() bool {
 		return false
 	}
 
+	delta := time.Since(p.LastServerTick).Milliseconds()
 	p.LastServerTick = time.Now()
-	p.ServerTick++
+
+	if delta >= 100 {
+		p.ServerTick += (delta / 50) - 1
+	} else {
+		p.ServerTick++
+	}
 
 	// Tick all the handlers.
 	for _, h := range p.packetHandlers {

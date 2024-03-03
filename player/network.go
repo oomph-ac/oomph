@@ -28,6 +28,21 @@ func (p *Player) ServerConn() *minecraft.Conn {
 	return p.serverConn
 }
 
+// SetConn sets the connection to the client.
+func (p *Player) SetConn(conn *minecraft.Conn) {
+	p.conn = conn
+}
+
+// SetServerConn sets the connection to the server.
+func (p *Player) SetServerConn(conn *minecraft.Conn) {
+	p.serverConn = conn
+
+	p.GameMode = conn.GameData().PlayerGameMode
+	if p.GameMode == 5 {
+		p.GameMode = conn.GameData().WorldGameMode
+	}
+}
+
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
 func (p *Player) ChunkRadius() int {
 	return p.conn.ChunkRadius()

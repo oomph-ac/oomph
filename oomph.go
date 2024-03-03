@@ -165,6 +165,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		scope.SetTag("func", "oomph.handleConn()")
 	})
 
+	p := player.New(o.log, o.settings.ReadBatchMode, conn)
+	handler.RegisterHandlers(p)
+	detection.RegisterDetections(p)
+
+	defer p.Close()
 	defer func() {
 		if err := recover(); err != nil {
 			o.log.Errorf("oomph.handleConn() panic: %v", err)
@@ -202,6 +207,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
 
+	p.SetServerConn(serverConn)
+
 	var g sync.WaitGroup
 	g.Add(2)
 
@@ -233,10 +240,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		serverConn.Close()
 		return
 	}
-
-	p := player.New(o.log, o.settings.ReadBatchMode, conn, serverConn)
-	handler.RegisterHandlers(p)
-	detection.RegisterDetections(p)
 
 	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
 	p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).ReportType = o.settings.LatencyReportType
@@ -278,7 +281,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		break
 	case <-time.After(time.Second * 3):
 		conn.WritePacket(&packet.Disconnect{
-			Message: "oomph timed out",
+			Message: "Oomph timed out: please try re-logging.",
 		})
 		conn.Close()
 		p.Close()
@@ -398,7 +401,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	}()
 
 	g.Wait()
-	p.Close()
 }
 
 func unwrapNetError(err error) string {
