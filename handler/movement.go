@@ -94,7 +94,11 @@ type MovementHandler struct {
 }
 
 func NewMovementHandler() *MovementHandler {
-	return &MovementHandler{}
+	return &MovementHandler{
+		// TODO: Do we initally trust the fly status or not? In PocketMine at least,
+		// the server doesn't seem to send back the UpdateAbillites packet.
+		TrustFlyStatus: true,
+	}
 }
 
 func (MovementHandler) ID() string {
@@ -336,6 +340,16 @@ func (h *MovementHandler) knockback(kb mgl32.Vec3) {
 func (h *MovementHandler) updateMovementStates(p *player.Player, pk *packet.PlayerAuthInput) {
 	h.ForwardImpulse = pk.MoveVector.Y() * 0.98
 	h.LeftImpulse = pk.MoveVector.X() * 0.98
+
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartFlying) {
+		h.ToggledFly = true
+		if h.TrustFlyStatus {
+			h.Flying = true
+		}
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopFlying) {
+		h.Flying = false
+		h.ToggledFly = false
+	}
 
 	startFlag, stopFlag := utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting), utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting)
 	needsSpeedAdjustment := false
