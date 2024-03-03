@@ -31,6 +31,8 @@ func NewTimerA() *TimerA {
 
 	d.FailBuffer = 0
 	d.MaxBuffer = 1
+
+	d.lastTime = time.Now()
 	return d
 }
 
@@ -45,10 +47,6 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	_, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
-		return true
-	}
-	// Little hack so that timer doesn't flag when you first join.
-	if p.ClientTick < 20 {
 		return true
 	}
 
@@ -78,9 +76,9 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	// This can occur if a user is attempting to use negative timer to increase their balance to a high amount,
 	// to then use a high amount of timer after a period of time to bypass the check.
-	/* if d.balance > 500 && p.ClientTick > p.ServerTick+1 {
+	if d.balance > 500 && p.ClientTick > p.ServerTick+1 {
 		d.balance = 0
-	} */
+	}
 
 	return true
 }
