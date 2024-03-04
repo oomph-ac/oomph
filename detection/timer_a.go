@@ -3,7 +3,6 @@ package detection
 import (
 	"time"
 
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -67,9 +66,10 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	d.balance += timeDiff - 50
-	if d.balance <= -150 {
-		d.Fail(p, orderedmap.NewOrderedMap[string, any]())
+	tickDelta := 1000 / float64(p.Tps)
+	d.balance += timeDiff - tickDelta
+	if d.balance <= -(tickDelta * 3) {
+		d.Fail(p, nil)
 		d.balance = 0
 		return true
 	}
