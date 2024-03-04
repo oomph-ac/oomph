@@ -26,19 +26,6 @@ import (
 )
 
 func init() {
-	err := sentry.Init(sentry.ClientOptions{
-		Dsn:                "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
-		EnableTracing:      os.Getenv("SENTRY_TRACE") == "true",
-		ProfilesSampleRate: 1.0,
-		TracesSampler: sentry.TracesSampler(func(ctx sentry.SamplingContext) float64 {
-			return 0.03
-		}),
-	})
-
-	if err != nil {
-		panic("failed to init sentry: " + err.Error())
-	}
-
 	deadlock.Opts.Disable = true
 	if os.Getenv("DEADLOCK_DEBUG") == "true" {
 		deadlock.Opts.Disable = false
@@ -69,6 +56,8 @@ type OomphSettings struct {
 	FetchRemoteResourcePacks bool
 
 	Protocols []minecraft.Protocol
+
+	SentryOpts *sentry.ClientOptions
 }
 
 // New creates and returns a new Oomph instance.
@@ -96,6 +85,20 @@ func (o *Oomph) Start() {
 	}()
 
 	s := o.settings
+	if s.SentryOpts == nil {
+		s.SentryOpts = &sentry.ClientOptions{
+			Dsn:                "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
+			EnableTracing:      os.Getenv("SENTRY_TRACE") == "true",
+			ProfilesSampleRate: 1.0,
+			TracesSampler: sentry.TracesSampler(func(ctx sentry.SamplingContext) float64 {
+				return 0.03
+			}),
+		}
+	}
+
+	if err := sentry.Init(*s.SentryOpts); err != nil {
+		panic("failed to init sentry: " + err.Error())
+	}
 
 	var statusProvider minecraft.ServerStatusProvider
 	if s.StatusProvider == nil {
