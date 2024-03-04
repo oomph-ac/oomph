@@ -3,6 +3,7 @@ package handler
 import (
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -54,10 +55,25 @@ func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) 
 		return true
 	}
 
-	switch pk.(type) {
+	switch pk := pk.(type) {
 	case *packet.LevelChunk, *packet.SubChunk:
 		p.Ready = true
 		h.Responded = true
+	case *packet.LevelEvent:
+		// TODO: Also account for LevelEventSimTimeStep
+		if pk.EventType != packet.LevelEventSimTimeScale {
+			return true
+		}
+
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			scale := pk.Position.X()
+			if mgl32.FloatEqualThreshold(scale, 1, 1e-5) {
+				p.Tps = 20.0
+				return
+			}
+
+			p.Tps *= scale
+		})
 	}
 
 	return true
