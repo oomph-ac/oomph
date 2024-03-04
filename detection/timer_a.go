@@ -76,7 +76,7 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	// This can occur if a user is attempting to use negative timer to increase their balance to a high amount,
 	// to then use a high amount of timer after a period of time to bypass the check.
-	if d.balance > 500 && p.ClientTick > p.ServerTick+1 {
+	if d.balance > 500 && p.ClientTick > p.ServerTick+5 && time.Since(p.LastServerTick).Milliseconds() < 100 {
 		d.balance = 0
 	}
 

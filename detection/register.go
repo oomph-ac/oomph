@@ -23,7 +23,6 @@ func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewBadPacketA())
 	p.RegisterDetection(NewBadPacketB())
 	p.RegisterDetection(NewBadPacketC())
-	p.RegisterDetection(NewBadPacketD())
 
 	p.RegisterDetection(NewAutoClickerA())
 	p.RegisterDetection(NewAutoClickerB())
