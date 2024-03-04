@@ -111,6 +111,11 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 		return true
 	}
 
+	p.Conn().WritePacket(&packet.LevelEvent{
+		EventType: packet.LevelEventSimTimeScale,
+		Position:  mgl32.Vec3{1},
+	})
+
 	h.mode = p.MovementMode
 
 	// Update client tick and simulation frame.
