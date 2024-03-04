@@ -55,6 +55,7 @@ type Player struct {
 	// ClientFrame is the simulation frame of the client, sent in PlayerAuthInput.
 	ClientTick, ClientFrame int64
 	ServerTick              int64
+	Tps                     float32
 	LastServerTick          time.Time
 
 	// World is the world of the player.
@@ -112,6 +113,7 @@ func New(log *logrus.Logger, readingBatches bool, conn *minecraft.Conn) *Player 
 		ClientTick:  0,
 		ClientFrame: 0,
 		ServerTick:  0,
+		Tps:         20.0,
 
 		RuntimeId:       conn.GameData().EntityRuntimeID,
 		ClientRuntimeId: conn.GameData().EntityRuntimeID,
