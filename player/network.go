@@ -107,6 +107,10 @@ func (p *Player) WritePacket(pk packet.Packet) error {
 		}
 	}()
 
+	if p.Closed || p.ServerPkFunc == nil {
+		return oerror.New("oomph player was closed")
+	}
+
 	if p.conn == nil {
 		return oerror.New("conn is nil in session")
 	}
@@ -129,6 +133,10 @@ func (p *Player) ReadPacket() (pk packet.Packet, err error) {
 			hub.Flush(time.Second * 5)
 		}
 	}()
+
+	if p.Closed || p.ClientPkFunc == nil {
+		return nil, oerror.New("oomph player was closed")
+	}
 
 	if p.conn == nil {
 		return pk, oerror.New("conn is nil in session")
