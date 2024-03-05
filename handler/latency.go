@@ -51,14 +51,16 @@ func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) 
 }
 
 func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
-	if p.Ready {
-		return true
-	}
-
 	switch pk := pk.(type) {
 	case *packet.LevelChunk, *packet.SubChunk:
-		p.Ready = true
+		if p.Ready {
+			return true
+		}
+
 		h.Responded = true
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
+			p.Ready = true
+		})
 	case *packet.LevelEvent:
 		// TODO: Also account for LevelEventSimTimeStep
 		if pk.EventType != packet.LevelEventSimTimeScale {
