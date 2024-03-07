@@ -24,15 +24,23 @@ require (
 	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.12 // indirect
+	github.com/disgoorg/disgo v0.17.2 // indirect
+	github.com/disgoorg/json v1.1.0 // indirect
+	github.com/disgoorg/snowflake/v2 v2.0.1 // indirect
+	github.com/go-echarts/go-echarts/v2 v2.2.3 // indirect
+	github.com/go-echarts/statsview v0.3.4 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/klauspost/compress v1.17.6 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/petermattis/goid v0.0.0-20231207134359-e60b3f734c67 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/sandertv/go-raknet v1.12.1 // indirect
+	github.com/sasha-s/go-csync v0.0.0-20240107134140-fcbab37b09ad // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/crypto v0.19.0 // indirect

@@ -126,6 +126,8 @@ func New(log *logrus.Logger, readingBatches bool, conn *minecraft.Conn) *Player 
 
 		eventHandler: &NopEventHandler{},
 
+		readingBatches: readingBatches,
+
 		log: log,
 		c:   make(chan bool),
 	}
