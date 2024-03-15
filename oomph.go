@@ -334,8 +334,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				err = err2
 			}
 
-			if err != nil && !p.Closed {
-				o.log.Errorf("error reading packets from client: %v", err)
+			if err != nil {
 				return
 			}
 
@@ -389,10 +388,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 						Message: disconnect.Error(),
 					})
 					listener.Disconnect(conn, disconnect.Error())
-					return
 				}
 
-				o.log.Errorf("error reading packets from server: %v", err)
 				return
 			}
 
