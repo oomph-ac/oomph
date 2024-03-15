@@ -7,9 +7,11 @@ toolchain go1.21.2
 require (
 	github.com/chewxy/math32 v1.10.1
 	github.com/df-mc/dragonfly v0.9.14
+	github.com/disgoorg/disgo v0.17.2
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/getsentry/sentry-go v0.27.0
+	github.com/go-echarts/statsview v0.3.4
 	github.com/go-gl/mathgl v1.1.0
 	github.com/oomph-ac/mv v0.0.0-20240210123432-1cb78e0dd37d
 	github.com/sandertv/gophertunnel v1.36.0
@@ -24,11 +26,9 @@ require (
 	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.13 // indirect
-	github.com/disgoorg/disgo v0.17.2 // indirect
 	github.com/disgoorg/json v1.1.0 // indirect
 	github.com/disgoorg/snowflake/v2 v2.0.1 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.2.3 // indirect
-	github.com/go-echarts/statsview v0.3.4 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -56,6 +56,6 @@ require (
 
 replace github.com/sandertv/gophertunnel v1.36.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240314224747-3cc8fc453ac5
 
-replace github.com/df-mc/dragonfly v0.9.13-0.20240209111632-1cb1df2a7b7a => github.com/oomph-ac/dragonfly v0.0.0-20240207223737-96dfd1fafe9e
+replace github.com/df-mc/dragonfly v0.9.14 => github.com/restartfu/dragonfly v0.0.0-20240314153757-f282190b3ff8
 
 replace github.com/sandertv/go-raknet v1.12.1 => github.com/gameparrot/tedac-raknet v0.0.1
