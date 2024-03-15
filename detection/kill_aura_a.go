@@ -47,6 +47,7 @@ func (d *KillAuraA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	if data, ok := tpk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 		currentTick := p.ClientFrame
 		tickDiff := currentTick - c.LastSwingTick
+		p.Message("diff=%v", tickDiff)
 		if tickDiff > 10 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("tick_diff", tickDiff)
