@@ -315,7 +315,9 @@ func (p *Player) UnregisterDetection(id string) {
 func (p *Player) RunDetections(pk packet.Packet) bool {
 	cancel := false
 	for _, d := range p.detections {
+		span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("%T.Run()", d))
 		cancel = cancel || !d.HandleClientPacket(pk, p)
+		span.Finish()
 	}
 
 	return !cancel
