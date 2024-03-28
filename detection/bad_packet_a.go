@@ -54,3 +54,11 @@ func (d *BadPacketA) HandleClientPacket(pk packet.Packet, p *player.Player) bool
 	d.prevFrame = i.Tick
 	return true
 }
+
+func (d *BadPacketA) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
+	if _, ok := pk.(*packet.Respawn); ok {
+		d.prevFrame = 0
+	}
+
+	return true
+}
