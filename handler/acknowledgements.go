@@ -55,7 +55,7 @@ func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.
 		a.Ticked = true
 
 		if !a.initalized {
-			a.Playstation = p.Conn().ClientData().DeviceOS == protocol.DeviceOrbis
+			a.Playstation = p.ClientDat.DeviceOS == protocol.DeviceOrbis
 			a.Refresh()
 			a.initalized = true
 		}
@@ -79,10 +79,13 @@ func (a *AcknowledgementHandler) Defer() {
 }
 
 func (a *AcknowledgementHandler) Flush(p *player.Player) {
-	if pk := a.CreatePacket(); pk != nil {
-		p.Conn().WritePacket(pk)
+	if p.MState.IsReplay {
+		return
 	}
 
+	if pk := a.CreatePacket(); pk != nil {
+		p.SendPacketToClient(pk)
+	}
 	a.Refresh()
 }
 
@@ -101,6 +104,7 @@ func (a *AcknowledgementHandler) Execute(timestamp int64) bool {
 	if !a.Playstation {
 		timestamp /= AckDivider
 	}
+
 	return a.tryExecute(timestamp)
 }
 

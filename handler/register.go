@@ -19,6 +19,6 @@ func RegisterHandlers(p *player.Player) {
 	p.RegisterHandler(NewCombatHandler())
 
 	acks := NewAcknowledgementHandler()
-	acks.LegacyMode = p.Conn().Protocol().ID() <= player.GameVersion1_20_0
+	acks.LegacyMode = p.Version <= player.GameVersion1_20_0
 	p.RegisterHandler(acks)
 }

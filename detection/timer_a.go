@@ -31,7 +31,8 @@ func NewTimerA() *TimerA {
 	d.FailBuffer = 0
 	d.MaxBuffer = 1
 
-	d.lastTime = time.Now()
+	d.lastTime = time.Unix(0, 0)
+
 	return d
 }
 
@@ -49,7 +50,7 @@ func (d *TimerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	curr := time.Now()
+	curr := p.Time()
 	timeDiff := float64(time.Since(d.lastTime).Microseconds()) / 1000
 
 	defer func() {

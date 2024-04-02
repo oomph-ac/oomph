@@ -24,7 +24,7 @@ func (e *FlaggedEvent) ID() string {
 
 func NewFlaggedEvent(p *Player, t, st string, violations float32, extraData string) *FlaggedEvent {
 	return &FlaggedEvent{
-		Player:     p.Conn().IdentityData().DisplayName,
+		Player:     p.IdentityDat.DisplayName,
 		Detection:  t,
 		Type:       st,
 		Violations: violations,

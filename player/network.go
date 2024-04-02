@@ -2,16 +2,12 @@ package player
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"time"
 
-	"github.com/getsentry/sentry-go"
-	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 func VersionInRange(version int, min int, max int) bool {
@@ -30,11 +26,24 @@ func (p *Player) ServerConn() *minecraft.Conn {
 
 // SetConn sets the connection to the client.
 func (p *Player) SetConn(conn *minecraft.Conn) {
+	modified := p.conn != nil
 	p.conn = conn
+
+	p.RuntimeId = conn.GameData().EntityRuntimeID
+	p.ClientRuntimeId = conn.GameData().EntityRuntimeID
+	p.UniqueId = conn.GameData().EntityUniqueID
+	p.ClientUniqueId = conn.GameData().EntityUniqueID
+	p.IDModified = modified
+
+	p.ClientDat = conn.ClientData()
+	p.IdentityDat = conn.IdentityData()
+	p.GameDat = conn.GameData()
+	p.Version = conn.Protocol().ID()
 }
 
 // SetServerConn sets the connection to the server.
 func (p *Player) SetServerConn(conn *minecraft.Conn) {
+	modified := p.serverConn != nil
 	p.serverConn = conn
 
 	p.GameMode = conn.GameData().PlayerGameMode
@@ -46,7 +55,9 @@ func (p *Player) SetServerConn(conn *minecraft.Conn) {
 	p.UniqueId = conn.GameData().EntityUniqueID
 	p.ClientRuntimeId = conn.GameData().EntityRuntimeID
 	p.ClientUniqueId = conn.GameData().EntityUniqueID
-	p.IDModified = false
+	p.IDModified = modified
+
+	p.GameDat = conn.GameData()
 }
 
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
@@ -89,83 +100,6 @@ func (p *Player) RemoteAddr() net.Addr {
 // Latency returns the current latency measured over the conn.
 func (p *Player) Latency() time.Duration {
 	return p.conn.Latency()
-}
-
-// WritePacket will call minecraft.Conn.WritePacket and process the packet with oomph.
-func (p *Player) WritePacket(pk packet.Packet) error {
-	defer func() {
-		if err := recover(); err != nil {
-			p.log.Errorf("WritePacket() panic: %v", err)
-			hub := sentry.CurrentHub().Clone()
-			hub.ConfigureScope(func(scope *sentry.Scope) {
-				scope.SetTag("conn_type", "serverDirect")
-				scope.SetTag("player", p.IdentityData().DisplayName)
-			})
-
-			hub.Recover(oerror.New(fmt.Sprintf("%v", err)))
-			hub.Flush(time.Second * 5)
-		}
-	}()
-
-	if p.Closed || p.ServerPkFunc == nil {
-		return oerror.New("oomph player was closed")
-	}
-
-	if p.conn == nil {
-		return oerror.New("conn is nil in session")
-	}
-
-	return p.ServerPkFunc([]packet.Packet{pk})
-}
-
-// ReadPacket will call minecraft.Conn.ReadPacket and process the packet with oomph.
-func (p *Player) ReadPacket() (pk packet.Packet, err error) {
-	defer func() {
-		if err := recover(); err != nil {
-			p.log.Errorf("ReadPacket() panic: %v", err)
-			hub := sentry.CurrentHub().Clone()
-			hub.ConfigureScope(func(scope *sentry.Scope) {
-				scope.SetTag("conn_type", "clientDirect")
-				scope.SetTag("player", p.IdentityData().DisplayName)
-			})
-
-			hub.Recover(oerror.New(fmt.Sprintf("%v", err)))
-			hub.Flush(time.Second * 5)
-		}
-	}()
-
-	if p.Closed || p.ClientPkFunc == nil {
-		return nil, oerror.New("oomph player was closed")
-	}
-
-	if p.conn == nil {
-		return pk, oerror.New("conn is nil in session")
-	}
-
-	// Oomph wants to send a packet to the server here.
-	if len(p.packetQueue) > 0 {
-		pk = p.packetQueue[0]
-		p.packetQueue = p.packetQueue[1:]
-		return pk, nil
-	}
-
-	pk, err = p.conn.ReadPacket()
-	if err != nil {
-		return pk, err
-	}
-
-	if err := p.ClientPkFunc([]packet.Packet{pk}); err != nil {
-		return pk, err
-	}
-
-	// Check if the packet queue is empty. If it is not, return the first packet in the queue.
-	if len(p.packetQueue) == 0 {
-		return p.ReadPacket()
-	}
-
-	pk = p.packetQueue[0]
-	p.packetQueue = p.packetQueue[1:]
-	return pk, nil
 }
 
 // StartGameContext starts the game for the conn with a context to cancel it.

@@ -2,16 +2,17 @@ package oomph
 
 import (
 	"errors"
+	"time"
 
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/oomph-ac/oomph/detection"
 	"github.com/oomph-ac/oomph/handler"
-	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/simulation"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sirupsen/logrus"
+
+	osession "github.com/oomph-ac/oomph/session"
 )
 
 // listener is a Dragonfly listener implementation for direct Oomph.
@@ -31,6 +32,7 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 			TexturePacksRequired:   requirePacks,
 			AcceptedProtocols:      protocols,
 			FlushRate:              -1,
+			ReadBatches:            true,
 		}.Listen("raknet", o.settings.RemoteAddress)
 		if err != nil {
 			return nil, err
@@ -47,12 +49,12 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 
 // Accept accepts an incoming player into the server. It blocks until a player connects to the server.
 // Accept returns an error if the Server is no longer available.
-func (o *Oomph) Accept() (*player.Player, error) {
-	p, ok := <-o.players
+func (o *Oomph) Accept() (*osession.Session, error) {
+	s, ok := <-o.sessions
 	if !ok {
 		return nil, errors.New("could not accept player: oomph stopped")
 	}
-	return p, nil
+	return s, nil
 }
 
 // Accept blocks until the next connection is established and returns it. An error is returned if the Listener was
@@ -63,7 +65,15 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 
-	p := player.New(logrus.New(), false, c.(*minecraft.Conn))
+	s := osession.New(l.o.log, osession.SessionState{
+		IsReplay:    false,
+		IsRecording: false,
+		DirectMode:  true,
+		CurrentTime: time.Now(),
+	})
+
+	p := s.Player
+	p.SetConn(c.(*minecraft.Conn))
 	p.RuntimeId = 1
 
 	handler.RegisterHandlers(p)
@@ -85,18 +95,18 @@ func (l listener) Accept() (session.Conn, error) {
 		return p.DefaultHandleFromServer(pks)
 	}
 
-	l.o.players <- p
-	return p, err
+	l.o.sessions <- s
+	return s, err
 }
 
 // Disconnect disconnects a connection from the Listener with a reason.
 func (l listener) Disconnect(conn session.Conn, reason string) error {
-	return l.Listener.Disconnect(conn.(*player.Player).Conn(), reason)
+	return l.Listener.Disconnect(conn.(*osession.Session).Conn(), reason)
 }
 
 // Close closes the Listener.
 func (l listener) Close() error {
 	_ = l.Listener.Close()
-	close(l.o.players)
+	close(l.o.sessions)
 	return nil
 }

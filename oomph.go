@@ -10,9 +10,10 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/detection"
+	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/oerror"
-	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/session"
 	"github.com/oomph-ac/oomph/simulation"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -35,8 +36,8 @@ func init() {
 }
 
 type Oomph struct {
-	log     *logrus.Logger
-	players chan *player.Player
+	log      *logrus.Logger
+	sessions chan *session.Session
 
 	settings OomphSettings
 }
@@ -46,7 +47,6 @@ type OomphSettings struct {
 	RemoteAddress  string
 	Authentication bool
 
-	ReadBatchMode     bool
 	LatencyReportType handler.LatencyReportType
 
 	StatusProvider *minecraft.ServerStatusProvider
@@ -57,14 +57,15 @@ type OomphSettings struct {
 
 	Protocols []minecraft.Protocol
 
-	SentryOpts *sentry.ClientOptions
+	EnableSentry bool
+	SentryOpts   *sentry.ClientOptions
 }
 
 // New creates and returns a new Oomph instance.
 func New(log *logrus.Logger, s OomphSettings) *Oomph {
 	return &Oomph{
-		log:     log,
-		players: make(chan *player.Player),
+		log:      log,
+		sessions: make(chan *session.Session),
 
 		settings: s,
 	}
@@ -96,8 +97,12 @@ func (o *Oomph) Start() {
 		}
 	}
 
-	if err := sentry.Init(*s.SentryOpts); err != nil {
-		panic("failed to init sentry: " + err.Error())
+	if s.EnableSentry {
+		if err := sentry.Init(*s.SentryOpts); err != nil {
+			panic("failed to init sentry: " + err.Error())
+		} else {
+			o.log.Info("Sentry initialized")
+		}
 	}
 
 	var statusProvider minecraft.ServerStatusProvider
@@ -141,7 +146,7 @@ func (o *Oomph) Start() {
 		AllowInvalidPackets: false,
 		AllowUnknownPackets: true,
 
-		ReadBatches: s.ReadBatchMode,
+		ReadBatches: true,
 	}.Listen("raknet", s.LocalAddress)
 
 	if err != nil {
@@ -168,11 +173,21 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		scope.SetTag("func", "oomph.handleConn()")
 	})
 
-	p := player.New(o.log, o.settings.ReadBatchMode, conn)
+	s := session.New(o.log, session.SessionState{
+		IsReplay:    false,
+		IsRecording: false,
+		DirectMode:  false,
+
+		CurrentTime: time.Now(),
+	})
+
+	p := s.Player
+	p.SetConn(conn)
+
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
 
-	defer p.Close()
+	defer s.Close()
 	defer func() {
 		if err := recover(); err != nil {
 			o.log.Errorf("oomph.handleConn() panic: %v", err)
@@ -193,18 +208,24 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		DisconnectOnInvalidPackets: true,
 		IPAddress:                  conn.RemoteAddr().String(),
 
-		ReadBatches: o.settings.ReadBatchMode,
+		ReadBatches: true,
 	}.Dial("raknet", remoteAddr)
 
 	if err != nil {
+		msg := unwrapNetError(err)
+		if msg == "context deadline exceeded" {
+			msg = "Proxy unable to reach server (no response)"
+		}
+
 		conn.WritePacket(&packet.Disconnect{
-			Message: unwrapNetError(err),
+			Message: msg,
 		})
 		conn.Close()
 
 		o.log.Errorf("unable to reach server: %v", err)
 		return
 	}
+	p.SetServerConn(serverConn)
 
 	data := serverConn.GameData()
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
@@ -247,47 +268,14 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
 	p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).ReportType = o.settings.LatencyReportType
 
-	p.ClientPkFunc = func(pks []packet.Packet) error {
-		p.ProcessMu.Lock()
-		defer p.ProcessMu.Unlock()
-
-		if err := p.DefaultHandleFromClient(pks); err != nil {
-			return err
-		}
-
-		if o.settings.ReadBatchMode {
-			return serverConn.Flush()
-		}
-		return nil
-	}
-
-	p.ServerPkFunc = func(pks []packet.Packet) error {
-		p.ProcessMu.Lock()
-		defer p.ProcessMu.Unlock()
-
-		if err := p.DefaultHandleFromServer(pks); err != nil {
-			return err
-		}
-
-		// UGLY HACK: This is to prevent import cycles w/ Player->Handler and Handler->Player.
-		// TODO: Refactor this to be more elegant?
-		if o.settings.ReadBatchMode {
-			p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler).Flush(p)
-			return conn.Flush()
-		}
-
-		return nil
-	}
-
 	select {
-	case o.players <- p:
+	case o.sessions <- s:
 		break
 	case <-time.After(time.Second * 3):
 		conn.WritePacket(&packet.Disconnect{
 			Message: "Oomph timed out: please try re-logging.",
 		})
-		conn.Close()
-		p.Close()
+		s.Close()
 
 		hub := sentry.CurrentHub().Clone()
 		hub.CaptureMessage("Oomph timed out accepting player into channel")
@@ -300,7 +288,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		localHub := sentry.CurrentHub().Clone()
 		localHub.ConfigureScope(func(scope *sentry.Scope) {
 			scope.SetTag("conn_type", "clientConn")
-			scope.SetTag("player", p.IdentityData().DisplayName)
+			scope.SetTag("player", p.IdentityDat.DisplayName)
 		})
 
 		defer func() {
@@ -323,22 +311,18 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			var pks []packet.Packet
-			var err error
-
-			if o.settings.ReadBatchMode {
-				pks, err = conn.ReadBatch()
-			} else if pk, err2 := conn.ReadPacket(); err2 == nil {
-				pks = []packet.Packet{pk}
-			} else {
-				err = err2
-			}
-
+			pks, err := conn.ReadBatch()
 			if err != nil {
 				return
 			}
 
-			if err := p.ClientPkFunc(pks); err != nil {
+			ev := event.PacketEvent{
+				Packets: pks,
+				Server:  false,
+			}
+			ev.EvTime = time.Now().UnixNano()
+
+			if err := s.QueueEvent(ev); err != nil {
 				o.log.Errorf("error handling packets from client: %v", err)
 				return
 			}
@@ -348,7 +332,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		localHub := sentry.CurrentHub().Clone()
 		localHub.ConfigureScope(func(scope *sentry.Scope) {
 			scope.SetTag("conn_type", "serverConn")
-			scope.SetTag("player", p.IdentityData().DisplayName)
+			scope.SetTag("player", p.IdentityDat.DisplayName)
 		})
 
 		defer func() {
@@ -371,17 +355,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			var pks []packet.Packet
-			var err error
-
-			if o.settings.ReadBatchMode {
-				pks, err = serverConn.ReadBatch()
-			} else if pk, err2 := serverConn.ReadPacket(); err2 == nil {
-				pks = []packet.Packet{pk}
-			} else {
-				err = err2
-			}
-
+			pks, err := serverConn.ReadBatch()
 			if err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					conn.WritePacket(&packet.Disconnect{
@@ -393,7 +367,13 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			if err := p.ServerPkFunc(pks); err != nil {
+			ev := event.PacketEvent{
+				Packets: pks,
+				Server:  true,
+			}
+			ev.EvTime = time.Now().UnixNano()
+
+			if err := s.QueueEvent(ev); err != nil {
 				o.log.Errorf("error handling packets from server: %v", err)
 				return
 			}
