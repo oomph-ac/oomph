@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
 	"github.com/sasha-s/go-deadlock"
@@ -30,6 +32,8 @@ const TicksPerSecond = 20
 const targetedProcessingDelay = 10 * time.Millisecond
 
 type Player struct {
+	MState MonitoringState
+
 	// Connected is true if the player is connected to Oomph.
 	Connected bool
 	Closed    bool
@@ -37,8 +41,17 @@ type Player struct {
 	Alive bool
 	Ready bool
 
-	ClientPkFunc func([]packet.Packet) error
-	ServerPkFunc func([]packet.Packet) error
+	CloseChan chan bool
+	CloseFunc sync.Once
+
+	ClientPkFunc   func([]packet.Packet) error
+	ServerPkFunc   func([]packet.Packet) error
+	LocalEventFunc func(event.Event)
+
+	ClientDat   login.ClientData
+	IdentityDat login.IdentityData
+	GameDat     minecraft.GameData
+	Version     int32
 
 	// combatMode and movementMode are the authority modes of the player. They are used to determine
 	// how certain actions should be handled.
@@ -70,9 +83,9 @@ type Player struct {
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
-	// packetQueue is a queue of client packets that are to be processed by the server. This is only used
+	// PacketQueue is a queue of client packets that are to be processed by the server. This is only used
 	// in direct mode.
-	packetQueue []packet.Packet
+	PacketQueue []packet.Packet
 	// ProcessMu is a mutex that is locked whenever packets need to be processed. It is used to
 	// prevent race conditions, and to maintain accuracy with anti-cheat.
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
@@ -92,14 +105,13 @@ type Player struct {
 	// readingBatches is true if Oomph has been configured to read batches of packets from the client instead
 	// of reading them one by one.
 	readingBatches bool
-
-	c    chan bool
-	once sync.Once
 }
 
 // New creates and returns a new Player instance.
-func New(log *logrus.Logger, readingBatches bool, conn *minecraft.Conn) *Player {
+func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Player {
 	p := &Player{
+		MState: mState,
+
 		Connected: true,
 
 		CombatMode:   AuthorityModeSemi,
@@ -107,19 +119,13 @@ func New(log *logrus.Logger, readingBatches bool, conn *minecraft.Conn) *Player 
 
 		World: world.New(),
 
-		conn:        conn,
-		packetQueue: []packet.Packet{},
+		PacketQueue: []packet.Packet{},
 
-		ClientTick:  0,
-		ClientFrame: 0,
-		ServerTick:  0,
-		Tps:         20.0,
-
-		RuntimeId:       conn.GameData().EntityRuntimeID,
-		ClientRuntimeId: conn.GameData().EntityRuntimeID,
-		UniqueId:        conn.GameData().EntityUniqueID,
-		ClientUniqueId:  conn.GameData().EntityUniqueID,
-		IDModified:      false,
+		ClientTick:     0,
+		ClientFrame:    0,
+		ServerTick:     0,
+		LastServerTick: time.Now(),
+		Tps:            20.0,
 
 		packetHandlers: []Handler{},
 		detections:     []Handler{},
@@ -128,15 +134,53 @@ func New(log *logrus.Logger, readingBatches bool, conn *minecraft.Conn) *Player 
 
 		readingBatches: readingBatches,
 
-		log: log,
-		c:   make(chan bool),
+		log:       log,
+		CloseChan: make(chan bool),
 	}
 
 	p.ClientPkFunc = p.DefaultHandleFromClient
 	p.ServerPkFunc = p.DefaultHandleFromServer
 
-	go p.startTicking()
 	return p
+}
+
+// SetTime sets the current time of the player.
+func (p *Player) SetTime(t time.Time) {
+	p.MState.CurrentTime = t
+}
+
+// Time returns the current time of the player.
+func (p *Player) Time() time.Time {
+	if !p.MState.IsReplay {
+		return time.Now()
+	}
+
+	return p.MState.CurrentTime
+}
+
+// SendPacketToClient sends a packet to the client.
+func (p *Player) SendPacketToClient(pk packet.Packet) error {
+	if p.MState.IsReplay {
+		return nil
+	}
+
+	if p.conn == nil {
+		return oerror.New("player connection is nil")
+	}
+	return p.conn.WritePacket(pk)
+}
+
+// SendPacketToServer sends a packet to the server.
+func (p *Player) SendPacketToServer(pk packet.Packet) error {
+	if p.MState.IsReplay {
+		return nil
+	}
+
+	if p.serverConn == nil {
+		// Don't return an error here, because the server connection may be nil if direct mode is used.
+		return nil
+	}
+	return p.serverConn.WritePacket(pk)
 }
 
 // DefaultHandleFromClient handles a packet from the client.
@@ -218,10 +262,10 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 	}
 
 	if p.serverConn != nil {
-		return p.serverConn.WritePacket(pk)
+		return p.SendPacketToServer(pk)
 	}
 
-	p.packetQueue = append(p.packetQueue, pk)
+	p.PacketQueue = append(p.PacketQueue, pk)
 	return nil
 }
 
@@ -238,7 +282,7 @@ func (p *Player) handleOneFromServer(pk packet.Packet) error {
 		return nil
 	}
 
-	return p.conn.WritePacket(pk)
+	return p.SendPacketToClient(pk)
 }
 
 // RegisterHandler registers a handler to the player.
@@ -287,7 +331,7 @@ func (p *Player) SendRemoteEvent(e RemoteEvent) {
 	}
 
 	enc, _ := json.Marshal(e)
-	p.serverConn.WritePacket(&packet.ScriptMessage{
+	p.SendPacketToServer(&packet.ScriptMessage{
 		Identifier: e.ID(),
 		Data:       enc,
 	})
@@ -310,6 +354,11 @@ func (p *Player) UnregisterDetection(id string) {
 	}
 }
 
+// Detections returns all the detections registered to the player.
+func (p *Player) Detections() []Handler {
+	return p.detections
+}
+
 // RunDetections runs all the detections registered to the player. It returns false
 // if the detection determines that the packet given should be dropped.
 func (p *Player) RunDetections(pk packet.Packet) bool {
@@ -325,7 +374,7 @@ func (p *Player) RunDetections(pk packet.Packet) bool {
 
 // Message sends a message to the player.
 func (p *Player) Message(msg string, args ...interface{}) {
-	p.conn.WritePacket(&packet.Text{
+	p.SendPacketToClient(&packet.Text{
 		TextType: packet.TextTypeChat,
 		Message:  "§l§eoomph§7§r » " + text.Colourf(msg, args...),
 	})
@@ -343,12 +392,15 @@ func (p *Player) SetLog(log *logrus.Logger) {
 
 // Disconnect disconnects the player with the given reason.
 func (p *Player) Disconnect(reason string) {
-	p.conn.WritePacket(&packet.Disconnect{
+	if p.MState.IsReplay {
+		return
+	}
+
+	p.SendPacketToClient(&packet.Disconnect{
 		Message: reason,
 	})
-	p.conn.Flush()
-
 	p.conn.Close()
+
 	if p.serverConn != nil {
 		p.serverConn.Close()
 	}
@@ -361,7 +413,7 @@ func (p *Player) ReadBatchMode() bool {
 
 // Close closes the player.
 func (p *Player) Close() error {
-	p.once.Do(func() {
+	p.CloseFunc.Do(func() {
 		p.Connected = false
 		p.Closed = true
 
@@ -371,40 +423,21 @@ func (p *Player) Close() error {
 		p.eventHandler.HandleQuit(p)
 		p.World.PurgeChunks()
 
-		p.conn.Close()
-		if p.serverConn != nil {
-			p.serverConn.Close()
+		if !p.MState.IsReplay {
+			p.conn.Close()
+			if p.serverConn != nil {
+				p.serverConn.Close()
+			}
 		}
 
-		p.packetHandlers = nil
-		p.eventHandler = nil
-		p.detections = nil
-
-		close(p.c)
+		close(p.CloseChan)
 	})
 
 	return nil
 }
 
-// startTicking starts the player's tick loop.
-func (p *Player) startTicking() {
-	t := time.NewTicker(time.Millisecond * 50)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-p.c:
-			return
-		case <-t.C:
-			if !p.tick() {
-				return
-			}
-		}
-	}
-}
-
 // tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
-func (p *Player) tick() bool {
+func (p *Player) Tick() bool {
 	p.SentryTransaction = sentry.StartTransaction(
 		context.Background(),
 		"oomph:tick",
@@ -429,7 +462,7 @@ func (p *Player) tick() bool {
 	}
 
 	delta := time.Since(p.LastServerTick).Milliseconds()
-	p.LastServerTick = time.Now()
+	p.LastServerTick = p.Time()
 
 	if delta >= 100 {
 		p.ServerTick += (delta / 50) - 1
@@ -450,7 +483,7 @@ func (p *Player) tick() bool {
 	}
 
 	// We don't need to flush here, because Oomph will flush the connection after every batch read.
-	if p.readingBatches {
+	if p.readingBatches || p.MState.IsReplay {
 		return true
 	}
 

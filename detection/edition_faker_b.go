@@ -58,9 +58,9 @@ func (d *EditionFakerB) HandleClientPacket(pk packet.Packet, p *player.Player) b
 	d.run = false
 
 	// Check that the default input mode of the client matches the expected input mode.
-	if defaultInputMode, ok := defaultInputModes[p.ClientData().DeviceOS]; ok && defaultInputMode != p.ClientData().DefaultInputMode {
+	if defaultInputMode, ok := defaultInputModes[p.ClientDat.DeviceOS]; ok && defaultInputMode != p.ClientDat.DefaultInputMode {
 		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("defaultMode", utils.InputMode(p.ClientData().DefaultInputMode))
+		data.Set("defaultMode", utils.InputMode(p.ClientDat.DefaultInputMode))
 		data.Set("expectedMode", utils.InputMode(defaultInputMode))
 		d.Fail(p, data)
 		return false

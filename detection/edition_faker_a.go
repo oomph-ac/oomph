@@ -71,8 +71,8 @@ func (d *EditionFakerA) HandleClientPacket(pk packet.Packet, p *player.Player) b
 	}
 	d.run = false
 
-	deviceOS := p.ClientData().DeviceOS
-	titleID := p.IdentityData().TitleID
+	deviceOS := p.ClientDat.DeviceOS
+	titleID := p.IdentityDat.TitleID
 
 	// Check if there's a titleID we know that is invalid/incompatiable with Minecraft: Bedrock Edition.
 	if clientType, ok := invalidTitleIDs[titleID]; ok {

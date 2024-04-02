@@ -49,7 +49,7 @@ func (d *ToolboxA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 	d.run = false
 
-	deviceOS := p.Conn().ClientData().DeviceOS
+	deviceOS := p.ClientDat.DeviceOS
 	deviceModel := p.Conn().ClientData().DeviceModel
 	if deviceOS != 1 { // only run on android
 		return true
