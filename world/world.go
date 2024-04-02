@@ -81,6 +81,14 @@ func (w *World) GetChunk(pos protocol.ChunkPos) *chunk.Chunk {
 	return w.chunks[pos]
 }
 
+// GetAllChunks returns all chunks in the world.
+func (w *World) GetAllChunks() map[protocol.ChunkPos]*chunk.Chunk {
+	w.RLock()
+	defer w.RUnlock()
+
+	return w.chunks
+}
+
 // GetBlock returns the block at the position passed.
 func (w *World) GetBlock(blockPos cube.Pos) world.Block {
 	w.RLock()

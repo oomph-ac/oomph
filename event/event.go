@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
+	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/internal"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -109,6 +111,44 @@ func Decode(dat []byte, other ...any) (Event, error) {
 		ev := AckEvent{}
 		err := json.Unmarshal(dat[1:], &ev)
 		return ev, err
+	case EventIDAddChunk:
+		evDat := map[string]interface{}{}
+		if err := json.Unmarshal(dat[1:], &evDat); err != nil {
+			return nil, err
+		}
+
+		ev := AddChunkEvent{}
+		ev.EvTime = int64(evDat["EvTime"].(float64))
+
+		ev.Position = evDat["Position"].(protocol.ChunkPos)
+		ev.Range = evDat["Range"].(cube.Range)
+
+		// Decode the chunk data.
+		serialized := chunk.SerialisedData{}
+		biomes, err := base64.StdEncoding.DecodeString(evDat["Biomes"].(string))
+		if err != nil {
+			return nil, oerror.New("error decoding base64 biomes: %v", err)
+		}
+		serialized.Biomes = biomes
+
+		subs := evDat["SubChunks"].([]interface{})
+		serialized.SubChunks = make([][]byte, 0, len(subs))
+		for _, sub := range subs {
+			sub := sub.(string)
+			b64dec, err := base64.StdEncoding.DecodeString(sub)
+			if err != nil {
+				return nil, oerror.New("error decoding base64 sub chunk: %v", err)
+			}
+			serialized.SubChunks = append(serialized.SubChunks, b64dec)
+		}
+
+		c, err := chunk.DiskDecode(serialized, ev.Range)
+		if err != nil {
+			return nil, oerror.New("error decoding chunk: %v", err)
+		}
+		ev.Chunk = c
+
+		return ev, nil
 	default:
 		return nil, oerror.New("unknown event: %d", id)
 	}
@@ -119,4 +159,5 @@ const (
 	EventIDPackets
 	EventIDServerTick
 	EventIDAck
+	EventIDAddChunk
 )
