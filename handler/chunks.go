@@ -118,7 +118,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		return true
 	case *packet.PlayerAuthInput:
 		if !h.initalized {
-			h.ChunkRadius = int32(p.Conn().ChunkRadius()) + 4
+			h.ChunkRadius = int32(p.GameDat.ChunkRadius) + 4
 			h.initalized = true
 		}
 

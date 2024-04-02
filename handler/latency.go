@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"time"
-
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -35,6 +33,10 @@ func (LatencyHandler) ID() string {
 }
 
 func (h *LatencyHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
+	if p.MState.IsReplay {
+		return true
+	}
+
 	if _, ok := pk.(*packet.PlayerAuthInput); ok && p.ServerTick%5 == 0 {
 		latency := p.Conn().Latency().Milliseconds() * 2
 		if h.ReportType == LatencyReportGameStack {
@@ -91,11 +93,11 @@ func (h *LatencyHandler) OnTick(p *player.Player) {
 	}
 	h.Responded = false
 
-	currentTime := time.Now()
+	currentTime := p.Time()
 	currentTick := p.ServerTick
 
 	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-		h.StackLatency = time.Since(currentTime).Milliseconds()
+		h.StackLatency = p.Time().Sub(currentTime).Milliseconds()
 		p.ClientTick = currentTick
 
 		h.LatencyUpdateTick = currentTick + 10

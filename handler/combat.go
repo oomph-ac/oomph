@@ -121,7 +121,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		h.ClosestRawDistance = math32.Min(close1, close2)
 	case *packet.PlayerAuthInput:
-		if p.Conn().Protocol().ID() >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+		if p.Version >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 			h.click(p)
 		}
 
@@ -144,7 +144,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 	case *packet.Animate:
 		h.LastSwingTick = p.ClientFrame
 	case *packet.LevelSoundEvent:
-		if p.Conn().Protocol().ID() < player.GameVersion1_20_10 && pk.SoundType == packet.SoundEventAttackNoDamage {
+		if p.Version < player.GameVersion1_20_10 && pk.SoundType == packet.SoundEventAttackNoDamage {
 			h.click(p)
 		}
 	}

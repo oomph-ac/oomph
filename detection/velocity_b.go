@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"fmt"
+
 	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
@@ -26,8 +28,8 @@ func NewVelocityB() *VelocityB {
 	d.MaxViolations = 20
 	d.trustDuration = 60 * player.TicksPerSecond
 
-	d.FailBuffer = 5
-	d.MaxBuffer = 10
+	d.FailBuffer = 4
+	d.MaxBuffer = 8
 	return d
 }
 
@@ -46,7 +48,7 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || (mDat.Mov.X() < 0.05 && mDat.Mov.Z() < 0.05) || mDat.TicksSinceTeleport <= 20 {
+	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || (mDat.Mov.X() < 0.005 && mDat.Mov.Z() < 0.005) || mDat.TicksSinceTeleport <= 20 {
 		return true
 	}
 
@@ -58,6 +60,7 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
+	fmt.Println(pct)
 	d.Debuff(1.0)
 	return true
 }
