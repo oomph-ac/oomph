@@ -1,8 +1,6 @@
 package detection
 
 import (
-	"fmt"
-
 	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
@@ -52,7 +50,24 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	pct := math32.Hypot(mDat.ClientMov.X(), mDat.ClientMov.Z()) / math32.Hypot(mDat.Mov.X(), mDat.Mov.Z()) * 100
+	if math32.Max(math32.Abs(mDat.Mov.X()), math32.Abs(mDat.Mov.Z())) < 0.03 {
+		return true
+	}
+
+	maxIsX := math32.Abs(mDat.Mov.X()) > math32.Abs(mDat.Mov.Z())
+	if maxIsX {
+		pct := math32.Abs(mDat.ClientMov.X()) / math32.Abs(mDat.Mov.X()) * 100
+		if pct < 99.25 || pct > 150 {
+			data := orderedmap.NewOrderedMap[string, any]()
+			data.Set("pct", game.Round32(pct, 3))
+			d.Fail(p, data)
+		}
+
+		d.Debuff(1.0)
+		return true
+	}
+
+	pct := math32.Abs(mDat.ClientMov.Z()) / math32.Abs(mDat.Mov.Z()) * 100
 	if pct < 99.25 || pct > 150 {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("pct", game.Round32(pct, 3))
@@ -60,7 +75,6 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	fmt.Println(pct)
 	d.Debuff(1.0)
 	return true
 }

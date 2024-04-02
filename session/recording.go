@@ -9,6 +9,7 @@ import (
 
 	"github.com/disgoorg/json"
 	"github.com/oomph-ac/oomph/event"
+	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -39,6 +40,29 @@ func (s *Session) StartRecording() {
 
 	s.State.IsRecording = true
 	go s.handleRecording()
+
+	// Add all the chunks currently in the world into the recording.
+	for pos, c := range s.Player.World.GetAllChunks() {
+		ev := event.AddChunkEvent{
+			Chunk: c,
+		}
+		ev.EvTime = time.Now().UnixNano()
+		ev.Position = pos
+		ev.Range = c.Range()
+		ev.Chunk = c
+
+		// Add the chunk to the recording.
+		s.eventQueue <- ev
+	}
+
+	// Update the ACK handler.
+	ackHandler := s.Player.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler)
+	ev := event.AckEvent{
+		RefreshedTimestmap: ackHandler.CurrentTimestamp,
+		SendTimestamp:      ackHandler.CurrentTimestamp,
+	}
+	ev.EvTime = time.Now().UnixNano()
+	s.eventQueue <- ev
 }
 
 func (s *Session) StopRecording() {

@@ -176,6 +176,13 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 
 		s.Player.Tick()
 		s.Player.ServerTick = ev.Tick
+	case event.AddChunkEvent:
+		// This shouldn't be processed in an active session.
+		if !s.State.IsReplay {
+			return nil
+		}
+
+		s.Player.World.AddChunk(ev.Position, ev.Chunk)
 	}
 
 	if s.Player.Closed {
