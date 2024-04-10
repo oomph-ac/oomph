@@ -12,6 +12,7 @@ import (
 	"github.com/oomph-ac/oomph/detection"
 	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/handler"
+	_ "github.com/oomph-ac/oomph/handler/ackfunc"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/session"
 	"github.com/oomph-ac/oomph/simulation"

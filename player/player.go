@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -44,9 +43,8 @@ type Player struct {
 	CloseChan chan bool
 	CloseFunc sync.Once
 
-	ClientPkFunc   func([]packet.Packet) error
-	ServerPkFunc   func([]packet.Packet) error
-	LocalEventFunc func(event.Event)
+	ClientPkFunc func([]packet.Packet) error
+	ServerPkFunc func([]packet.Packet) error
 
 	ClientDat   login.ClientData
 	IdentityDat login.IdentityData

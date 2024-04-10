@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -29,9 +30,10 @@ func (h *GamemodeHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 	}
 
 	// Wait for the client to acknowledge the gamemode change.
-	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-		p.GameMode = gm.GameType
-	})
+	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		ack.AckPlayerUpdateGamemode,
+		gm.GameType,
+	))
 	return true
 }
 

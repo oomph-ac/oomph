@@ -1,12 +1,12 @@
 package event
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"bytes"
 
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world/chunk"
-	"github.com/oomph-ac/oomph/oerror"
+	"github.com/oomph-ac/oomph/internal"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
@@ -23,25 +23,28 @@ func (e AddChunkEvent) ID() byte {
 }
 
 func (e AddChunkEvent) Encode() []byte {
-	dat := map[string]interface{}{}
-	dat["EvTime"] = e.EvTime
-	dat["Position"] = e.Position
-	dat["Range"] = e.Range
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer internal.BufferPool.Put(buf)
+
+	WriteEventHeader(e, buf)
+	utils.WriteLInt32(buf, e.Position.X())
+	utils.WriteLInt32(buf, e.Position.Z())
+
+	utils.WriteLInt64(buf, int64(e.Range[0]))
+	utils.WriteLInt64(buf, int64(e.Range[1]))
 
 	// Encode the chunk.
 	serialized := chunk.Encode(e.Chunk, chunk.DiskEncoding)
-	subs := make([]string, len(serialized.SubChunks))
-	for i, sub := range serialized.SubChunks {
-		subs[i] = base64.StdEncoding.EncodeToString(sub)
+
+	utils.WriteLInt32(buf, int32(len(serialized.SubChunks)))
+	for _, sub := range serialized.SubChunks {
+		utils.WriteLInt32(buf, int32(len(sub)))
+		buf.Write(sub)
 	}
 
-	dat["SubChunks"] = subs
-	dat["Biomes"] = base64.StdEncoding.EncodeToString(serialized.Biomes)
+	utils.WriteLInt32(buf, int32(len(serialized.Biomes)))
+	buf.Write(serialized.Biomes)
 
-	enc, err := json.Marshal(dat)
-	if err != nil {
-		panic(oerror.New("error encoding event: " + err.Error()))
-	}
-
-	return append([]byte{e.ID()}, enc...)
+	return buf.Bytes()
 }
