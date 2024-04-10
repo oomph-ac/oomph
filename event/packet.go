@@ -2,12 +2,10 @@ package event
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
+	"encoding/binary"
 
 	"github.com/oomph-ac/oomph/internal"
-	"github.com/oomph-ac/oomph/oerror"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -23,33 +21,28 @@ func (PacketEvent) ID() byte {
 }
 
 func (ev PacketEvent) Encode() []byte {
-	dat := map[string]interface{}{
-		"EvTime": ev.Time(),
-		"Server": ev.Server,
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer internal.BufferPool.Put(buf)
+
+	WriteEventHeader(ev, buf)
+
+	// Write the server flag to the buffer
+	if ev.Server {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
 	}
 
-	pks := []string{}
+	// Write the number of packets to the buffer
+	binary.Write(buf, binary.LittleEndian, uint32(len(ev.Packets)))
+
+	// Write each packet to the buffer
 	for _, pk := range ev.Packets {
-		buf := internal.BufferPool.Get().(*bytes.Buffer)
-		buf.Reset()
-
-		header := &packet.Header{}
-		header.PacketID = pk.ID()
-		header.Write(buf)
-
-		pk.Marshal(protocol.NewWriter(buf, 0))
-		pks = append(pks, base64.StdEncoding.EncodeToString(buf.Bytes()))
-
-		internal.BufferPool.Put(buf)
+		dat := utils.EncodePacketToBytes(pk)
+		binary.Write(buf, binary.LittleEndian, uint32(len(dat)))
+		buf.Write(dat)
 	}
 
-	dat["Packets"] = pks
-
-	enc, err := json.Marshal(dat)
-	if err != nil {
-		panic(oerror.New("unable to encode packet event: " + err.Error()))
-	}
-
-	// Append the event ID to the start of the encoded event.
-	return append([]byte{EventIDPackets}, enc...)
+	return buf.Bytes()
 }

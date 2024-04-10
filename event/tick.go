@@ -1,5 +1,12 @@
 package event
 
+import (
+	"bytes"
+
+	"github.com/oomph-ac/oomph/internal"
+	"github.com/oomph-ac/oomph/utils"
+)
+
 type TickEvent struct {
 	NopEvent
 
@@ -11,5 +18,12 @@ func (TickEvent) ID() byte {
 }
 
 func (ev TickEvent) Encode() []byte {
-	return DefaultEncode(ev)
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer internal.BufferPool.Put(buf)
+
+	WriteEventHeader(ev, buf)
+	utils.WriteLInt64(buf, ev.Tick)
+
+	return buf.Bytes()
 }

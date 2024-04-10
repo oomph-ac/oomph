@@ -2,6 +2,7 @@ package utils
 
 import (
 	"math"
+	_ "unsafe"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"

@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -54,13 +55,17 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the
 		// position before the entity is moved.
 		if p.CombatMode == player.AuthorityModeSemi {
-			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
-			})
+			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+				ack.AckEntityUpdatePosition,
+				pk.EntityRuntimeID,
+				p.ServerTick,
+				pk.Position,
+				utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport),
+			))
 			return true
 		}
 
-		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
+		h.MoveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID == p.RuntimeId {
 			return true
@@ -69,13 +74,17 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the
 		// position before the entity is moved.
 		if p.CombatMode == player.AuthorityModeSemi {
-			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-				h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
-			})
+			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+				ack.AckEntityUpdatePosition,
+				pk.EntityRuntimeID,
+				p.ServerTick,
+				pk.Position,
+				pk.Mode == packet.MoveModeTeleport,
+			))
 			return true
 		}
 
-		h.moveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
+		h.MoveEntity(pk.EntityRuntimeID, p.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
 	case *packet.SetActorMotion:
 		return pk.EntityRuntimeID == p.RuntimeId
 		/* if pk.EntityRuntimeID == p.RuntimeId {
@@ -137,8 +146,8 @@ func (h *EntitiesHandler) Find(rid uint64) *entity.Entity {
 	return h.Entities[rid]
 }
 
-// moveEntity moves an entity to the given position.
-func (h *EntitiesHandler) moveEntity(rid uint64, tick int64, pos mgl32.Vec3, teleport bool) {
+// MoveEntity moves an entity to the given position.
+func (h *EntitiesHandler) MoveEntity(rid uint64, tick int64, pos mgl32.Vec3, teleport bool) {
 	e := h.Find(rid)
 	if e == nil {
 		return
