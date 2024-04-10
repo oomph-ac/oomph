@@ -3,6 +3,7 @@ package handler
 import (
 	"math/rand"
 
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -29,7 +30,7 @@ type AcknowledgementHandler struct {
 
 	// AckMap is a map of timestamps associated with a list of callbacks.
 	// The callbacks are called when NetworkStackLatency is received from the client.
-	AckMap map[int64][]func()
+	AckMap map[int64][]ack.Acknowledgement
 	// CurrentTimestamp is the current timestamp for acks, which is refreshed every server tick
 	// where the connections are flushed.
 	CurrentTimestamp int64
@@ -39,7 +40,7 @@ type AcknowledgementHandler struct {
 
 func NewAcknowledgementHandler() *AcknowledgementHandler {
 	return &AcknowledgementHandler{
-		AckMap: make(map[int64][]func()),
+		AckMap: make(map[int64][]ack.Acknowledgement),
 	}
 }
 
@@ -50,7 +51,7 @@ func (AcknowledgementHandler) ID() string {
 func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.NetworkStackLatency:
-		return !a.Execute(pk.Timestamp)
+		return !a.Execute(p, pk.Timestamp)
 	case *packet.PlayerAuthInput:
 		a.Ticked = true
 
@@ -90,14 +91,14 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 }
 
 // AddCallback adds a callback to AckMap.
-func (a *AcknowledgementHandler) AddCallback(callback func()) {
-	a.AckMap[a.CurrentTimestamp] = append(a.AckMap[a.CurrentTimestamp], callback)
+func (a *AcknowledgementHandler) AddCallback(v ack.Acknowledgement) {
+	a.AckMap[a.CurrentTimestamp] = append(a.AckMap[a.CurrentTimestamp], v)
 }
 
 // Execute takes a timestamp, and looks for callbacks associated with it.
-func (a *AcknowledgementHandler) Execute(timestamp int64) bool {
+func (a *AcknowledgementHandler) Execute(p *player.Player, timestamp int64) bool {
 	if a.LegacyMode {
-		return a.tryExecute(timestamp)
+		return a.tryExecute(p, timestamp)
 	}
 
 	timestamp /= AckDivider
@@ -105,7 +106,7 @@ func (a *AcknowledgementHandler) Execute(timestamp int64) bool {
 		timestamp /= AckDivider
 	}
 
-	return a.tryExecute(timestamp)
+	return a.tryExecute(p, timestamp)
 }
 
 func (a *AcknowledgementHandler) Validate(p *player.Player) {
@@ -162,15 +163,15 @@ func (a *AcknowledgementHandler) CreatePacket() *packet.NetworkStackLatency {
 }
 
 // tryExecute takes a timestamp, and looks for callbacks associated with it.
-func (a *AcknowledgementHandler) tryExecute(timestamp int64) bool {
-	callables, ok := a.AckMap[timestamp]
+func (a *AcknowledgementHandler) tryExecute(p *player.Player, timestamp int64) bool {
+	acks, ok := a.AckMap[timestamp]
 	if !ok {
 		return false
 	}
 
 	a.NonResponsiveTicks = 0
-	for _, callable := range callables {
-		callable()
+	for _, acked := range acks {
+		acked.Run(p)
 	}
 
 	delete(a.AckMap, timestamp)

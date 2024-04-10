@@ -13,10 +13,9 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/oerror"
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
-	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -203,15 +202,11 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 		delete(h.placedBlocks, pos)
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			pos := cube.Pos{
-				int(pk.Position.X()),
-				int(pk.Position.Y()),
-				int(pk.Position.Z()),
-			}
-
-			p.World.SetBlock(pos, b)
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckWorldSetBlock,
+			pos,
+			b,
+		))
 	case *packet.LevelChunk:
 		// Check if this LevelChunk packet is compatiable with oomph's handling.
 		if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
@@ -222,67 +217,19 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		// Decode the chunk data, and remove any uneccessary data via. Compact().
-		c, err := chunk.NetworkDecode(world.AirRuntimeID, pk.RawPayload, int(pk.SubChunkCount), df_world.Overworld.Range())
-		if err != nil {
-			c = chunk.New(world.AirRuntimeID, df_world.Overworld.Range())
-		}
-		c.Compact()
-
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			p.World.AddChunk(pk.Position, c)
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckWorldUpdateChunks,
+			pk,
+		))
 	case *packet.SubChunk:
-		if pk.CacheEnabled {
-			panic(oerror.New("subchunk caching not supported on oomph"))
-		}
-		var newChunks = map[protocol.ChunkPos]*chunk.Chunk{}
-
-		for _, entry := range pk.SubChunkEntries {
-			// Do not handle sub-chunk responses that returned an error.
-			if entry.Result != protocol.SubChunkResultSuccess {
-				continue
-			}
-
-			chunkPos := protocol.ChunkPos{
-				pk.Position[0] + int32(entry.Offset[0]),
-				pk.Position[2] + int32(entry.Offset[2]),
-			}
-
-			var c *chunk.Chunk
-			var isNewChunk bool = true
-
-			if existing := p.World.GetChunk(chunkPos); existing != nil {
-				c = existing
-				isNewChunk = false
-			} else if new, ok := newChunks[chunkPos]; !ok {
-				c = chunk.New(world.AirRuntimeID, dimensionFromNetworkID(pk.Dimension).Range())
-				newChunks[chunkPos] = c
-			} else {
-				c = new
-			}
-
-			var index byte
-			sub, err := chunk_subChunkDecode(bytes.NewBuffer(entry.RawPayload), c, &index, chunk.NetworkEncoding)
-			if err != nil {
-				panic(err)
-			}
-
-			if isNewChunk {
-				c.Sub()[index] = sub
-				continue
-			}
-
-			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-				c.Sub()[index] = sub
-			})
+		if p.MovementMode == player.AuthorityModeNone {
+			return true
 		}
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			for pos, newC := range newChunks {
-				p.World.AddChunk(pos, newC)
-			}
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckWorldUpdateChunks,
+			pk,
+		))
 	}
 
 	return true
@@ -292,17 +239,6 @@ func (h *ChunksHandler) OnTick(p *player.Player) {
 }
 
 func (h *ChunksHandler) Defer() {
-}
-
-// dimensionFromNetworkID returns a world.Dimension from the network id.
-func dimensionFromNetworkID(id int32) df_world.Dimension {
-	if id == 1 {
-		return df_world.Nether
-	}
-	if id == 2 {
-		return df_world.End
-	}
-	return df_world.Overworld
 }
 
 // noinspection ALL

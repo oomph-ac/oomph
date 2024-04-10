@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -60,24 +60,19 @@ func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) 
 		}
 
 		h.Responded = true
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			p.Ready = true
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerInitalized,
+		))
 	case *packet.LevelEvent:
 		// TODO: Also account for LevelEventSimTimeStep
 		if pk.EventType != packet.LevelEventSimTimeScale {
 			return true
 		}
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			scale := pk.Position.X()
-			if mgl32.FloatEqualThreshold(scale, 1, 1e-5) {
-				p.Tps = 20.0
-				return
-			}
-
-			p.Tps *= scale
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerUpdateSimulationRate,
+			pk.Position.X(),
+		))
 	}
 
 	return true
@@ -96,13 +91,11 @@ func (h *LatencyHandler) OnTick(p *player.Player) {
 	currentTime := p.Time()
 	currentTick := p.ServerTick
 
-	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-		h.StackLatency = p.Time().Sub(currentTime).Milliseconds()
-		p.ClientTick = currentTick
-
-		h.LatencyUpdateTick = currentTick + 10
-		h.Responded = true
-	})
+	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		ack.AckPlayerUpdateLatency,
+		currentTime,
+		currentTick,
+	))
 }
 
 func (*LatencyHandler) Defer() {

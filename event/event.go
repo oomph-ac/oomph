@@ -2,17 +2,17 @@ package event
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
+	"encoding/binary"
 
-	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/internal"
 	"github.com/oomph-ac/oomph/oerror"
-	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+const EventsVersion = "2-dev"
 
 type Event interface {
 	ID() byte
@@ -29,124 +29,122 @@ func (n NopEvent) Time() int64 {
 	return n.EvTime
 }
 
-func DefaultEncode(ev Event) []byte {
-	enc, err := json.Marshal(ev)
-	if err != nil {
-		panic(oerror.New("error encoding event: " + err.Error()))
-	}
-
-	return append([]byte{ev.ID()}, enc...)
+func WriteEventHeader(ev Event, buf *bytes.Buffer) {
+	binary.Write(buf, binary.LittleEndian, uint64(ev.ID()))
+	binary.Write(buf, binary.LittleEndian, uint64(ev.Time()))
 }
 
-func Decode(dat []byte, other ...any) (Event, error) {
-	id := dat[0]
+func DecodeEvents(dat []byte) ([]Event, error) {
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	buf.Write(dat)
+	defer internal.BufferPool.Put(buf)
+
+	events := []Event{}
+	for buf.Len() > 0 {
+		ev, err := DecodeEvent(buf)
+		if err != nil {
+			return events, oerror.New("error decoding event: %v", err)
+		}
+
+		events = append(events, ev)
+	}
+
+	return events, nil
+}
+
+func DecodeEvent(buf *bytes.Buffer) (Event, error) {
+	rawID := binary.LittleEndian.Uint64(buf.Next(8))
+	id := byte(rawID)
+	t := int64(binary.LittleEndian.Uint64(buf.Next(8)))
+
+	var err error
 	switch id {
 	case EventIDPackets:
-		if len(other) < 1 {
-			return nil, oerror.New("protocol required for decoding packet event")
-		}
-		proto := other[0].(minecraft.Protocol)
+		ev := PacketEvent{}
+		ev.EvTime = t
 
-		dec := internal.MapPool.Get().(map[string]interface{})
-		defer internal.MapPool.Put(dec)
-
-		// Reset the map.
-		for k := range dec {
-			delete(dec, k)
-		}
-
-		err := json.Unmarshal(dat[1:], &dec)
+		srvByte, err := buf.ReadByte()
 		if err != nil {
-			return nil, err
+			return nil, oerror.New("error reading server flag from PacketEvent: %v", err)
 		}
+		ev.Server = srvByte == 1
 
-		ev := PacketEvent{
-			Server: dec["Server"].(bool),
-		}
-		ev.EvTime = int64(dec["EvTime"].(float64))
+		pkCount := binary.LittleEndian.Uint32(buf.Next(4))
+		ev.Packets = make([]packet.Packet, 0, pkCount)
 
-		packetPool := proto.Packets(!ev.Server)
+		for i := uint32(0); i < pkCount; i++ {
+			pkLen := int(binary.LittleEndian.Uint32(buf.Next(4)))
+			pk, err := utils.DecodePacketFromBytes(buf.Next(pkLen), ev.Server)
 
-		pks := dec["Packets"].([]interface{})
-		ev.Packets = make([]packet.Packet, 0, len(pks))
-		for _, encPk := range pks {
-			encPk := encPk.(string)
-			b64dec, err := base64.StdEncoding.DecodeString(encPk)
 			if err != nil {
-				return nil, oerror.New("error decoding base64 packet: %v", err)
-			}
-
-			buf := internal.BufferPool.Get().(*bytes.Buffer)
-			buf.Reset()
-			buf.Write(b64dec)
-
-			h := &packet.Header{}
-			if err = h.Read(buf); err != nil {
-				return nil, oerror.New("error reading packet header: %v", err)
-			}
-
-			pkFunc, ok := packetPool[h.PacketID]
-			if !ok {
-				ev.Packets = append(ev.Packets, &packet.Unknown{})
-				continue
-			}
-
-			pk := pkFunc()
-			pk.Marshal(protocol.NewReader(buf, 0, false))
-
-			if buf.Len() != 0 {
-				panic(oerror.New("packet buffer not empty after reading packet: %d", buf.Len()))
+				return nil, oerror.New("error decoding packet from PacketEvent: %v", err)
 			}
 
 			ev.Packets = append(ev.Packets, pk)
-			internal.BufferPool.Put(buf)
 		}
 
 		return ev, nil
 	case EventIDServerTick:
 		ev := TickEvent{}
-		err := json.Unmarshal(dat[1:], &ev)
+		ev.EvTime = t
+		ev.Tick = utils.LInt64(buf.Next(8))
 		return ev, err
-	case EventIDAck:
-		ev := AckEvent{}
-		err := json.Unmarshal(dat[1:], &ev)
+	case EventIDAckRefresh:
+		ev := AckRefreshEvent{}
+		ev.EvTime = t
+		ev.SendTimestamp = utils.LInt64(buf.Next(8))
+		ev.RefreshedTimestmap = utils.LInt64(buf.Next(8))
+		return ev, err
+	case EventIDAckInsert:
+		ev := AckInsertEvent{}
+		ev.EvTime = t
+		ev.Timestamp = utils.LInt64(buf.Next(8))
+
+		ackCount := int(utils.LInt32(buf.Next(4)))
+		ev.Acks = make([]ack.Acknowledgement, ackCount)
+
+		b1 := internal.BufferPool.Get().(*bytes.Buffer)
+		b1.Reset()
+		defer internal.BufferPool.Put(b1)
+
+		for i := 0; i < ackCount; i++ {
+			ackLen := int(utils.LInt32(buf.Next(4)))
+			b1.Write(buf.Next(ackLen))
+
+			a := ack.Decode(b1)
+			ev.Acks[i] = a
+
+			b1.Reset()
+		}
+
 		return ev, err
 	case EventIDAddChunk:
-		evDat := map[string]interface{}{}
-		if err := json.Unmarshal(dat[1:], &evDat); err != nil {
-			return nil, err
-		}
-
 		ev := AddChunkEvent{}
-		ev.EvTime = int64(evDat["EvTime"].(float64))
+		ev.EvTime = t
 
-		ev.Position = evDat["Position"].(protocol.ChunkPos)
-		ev.Range = evDat["Range"].(cube.Range)
+		ev.Position[0] = utils.LInt32(buf.Next(4))
+		ev.Position[1] = utils.LInt32(buf.Next(4))
 
-		// Decode the chunk data.
+		ev.Range[0] = int(utils.LInt64(buf.Next(8)))
+		ev.Range[1] = int(utils.LInt64(buf.Next(8)))
+
 		serialized := chunk.SerialisedData{}
-		biomes, err := base64.StdEncoding.DecodeString(evDat["Biomes"].(string))
-		if err != nil {
-			return nil, oerror.New("error decoding base64 biomes: %v", err)
-		}
-		serialized.Biomes = biomes
+		subCount := int(utils.LInt32(buf.Next(4)))
+		serialized.SubChunks = make([][]byte, subCount)
 
-		subs := evDat["SubChunks"].([]interface{})
-		serialized.SubChunks = make([][]byte, 0, len(subs))
-		for _, sub := range subs {
-			sub := sub.(string)
-			b64dec, err := base64.StdEncoding.DecodeString(sub)
-			if err != nil {
-				return nil, oerror.New("error decoding base64 sub chunk: %v", err)
-			}
-			serialized.SubChunks = append(serialized.SubChunks, b64dec)
+		for i := 0; i < subCount; i++ {
+			subLen := int(utils.LInt32(buf.Next(4)))
+			serialized.SubChunks[i] = buf.Next(subLen)
 		}
 
-		c, err := chunk.DiskDecode(serialized, ev.Range)
+		biomeLen := int(utils.LInt32(buf.Next(4)))
+		serialized.Biomes = buf.Next(biomeLen)
+
+		ev.Chunk, err = chunk.DiskDecode(serialized, ev.Range)
 		if err != nil {
-			return nil, oerror.New("error decoding chunk: %v", err)
+			return nil, oerror.New("error decoding chunk from AddChunkEvent: %v", err)
 		}
-		ev.Chunk = c
 
 		return ev, nil
 	default:
@@ -158,6 +156,7 @@ const (
 	_ = iota
 	EventIDPackets
 	EventIDServerTick
-	EventIDAck
+	EventIDAckRefresh
+	EventIDAckInsert
 	EventIDAddChunk
 )

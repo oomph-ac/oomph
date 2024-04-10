@@ -1,6 +1,7 @@
 package session
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/oomph-ac/oomph/event"
@@ -93,7 +94,7 @@ func New(log *logrus.Logger, s SessionState) *Session {
 			}
 
 			ackHandler := p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler)
-			ev := event.AckEvent{
+			ev := event.AckRefreshEvent{
 				SendTimestamp: ackHandler.CurrentTimestamp,
 			}
 			ackHandler.Flush(p)
@@ -156,7 +157,7 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 			return s.Player.ServerPkFunc(ev.Packets)
 		}
 		return s.Player.ClientPkFunc(ev.Packets)
-	case event.AckEvent:
+	case event.AckRefreshEvent:
 		// This shouldn't be processed in an active session.
 		if !s.State.IsReplay {
 			return nil
@@ -168,6 +169,15 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 			delete(ackHandler.AckMap, ackHandler.CurrentTimestamp)
 		}
 		ackHandler.CurrentTimestamp = ev.RefreshedTimestmap
+	case event.AckInsertEvent:
+		// This shouldn't be processed in an active session.
+		if !s.State.IsReplay {
+			return nil
+		}
+
+		ackHandler := s.Player.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler)
+		ackHandler.AckMap[ev.Timestamp] = ev.Acks
+		fmt.Println("added acks for", ev.Timestamp)
 	case event.TickEvent:
 		// This shouldn't be processed in an active session.
 		if !s.State.IsReplay {
@@ -182,6 +192,7 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 			return nil
 		}
 
+		fmt.Println("adding chunk", ev.Position)
 		s.Player.World.AddChunk(ev.Position, ev.Chunk)
 	}
 
@@ -205,9 +216,9 @@ func (s *Session) startTicking() {
 		select {
 		case <-t.C:
 			ackHandler := s.Player.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler)
-			var ackEv *event.AckEvent
+			var ackEv *event.AckRefreshEvent
 			if s.State.DirectMode {
-				ackEv = &event.AckEvent{
+				ackEv = &event.AckRefreshEvent{
 					SendTimestamp: ackHandler.CurrentTimestamp,
 				}
 				ackEv.EvTime = time.Now().UnixNano()

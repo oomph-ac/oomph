@@ -4,8 +4,8 @@ import (
 	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -160,69 +160,34 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 		pk.Tick = 0 // prevent rewind
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
-			height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
-			if !widthExists {
-				width = h.Width
-			}
-			if !heightExists {
-				height = h.Height
-			}
-
-			h.Width = width.(float32)
-			h.Height = height.(float32)
-
-			f, ok := pk.EntityMetadata[entity.DataKeyFlags]
-			if !ok {
-				return
-			}
-
-			flags := f.(int64)
-			h.Sprinting = utils.HasDataFlag(entity.DataFlagSprinting, flags)
-			h.Sneaking = utils.HasDataFlag(entity.DataFlagSneaking, flags)
-			h.Immobile = utils.HasDataFlag(entity.DataFlagImmobile, flags)
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerUpdateActorData,
+			pk.EntityMetadata,
+		))
 	case *packet.UpdateAbilities:
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			for _, l := range pk.AbilityData.Layers {
-				h.NoClip = utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip)
-				h.Flying = utils.HasFlag(uint64(l.Values), protocol.AbilityFlying) || h.NoClip
-				mayFly := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
-
-				if h.ToggledFly {
-					// If the player toggled flight, but the server did not allow it, we longer trust
-					// their flight status. This is done to ensure players that have permission to fly
-					// are able to do so w/o any movement corrections, but players that do not have permission
-					// to do so aren't able to bypass movement predictions with it.
-					h.TrustFlyStatus = h.Flying || mayFly
-				}
-				h.ToggledFly = false
-			}
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerUpdateAbilities,
+			pk.AbilityData.Layers,
+		))
 	case *packet.UpdateAttributes:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
 		}
 		pk.Tick = 0 // prevent rewind
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			h.handleAttribute("minecraft:movement", pk.Attributes, func(attr protocol.Attribute) {
-				h.HasServerSpeed = true
-				h.MovementSpeed = float32(attr.Value)
-			})
-			h.handleAttribute("minecraft:health", pk.Attributes, func(attr protocol.Attribute) {
-				p.Alive = attr.Value > 0
-			})
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerUpdateAttributes,
+			pk.Attributes,
+		))
 	case *packet.SetActorMotion:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return false
 		}
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			h.knockback(pk.Velocity)
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerUpdateKnockback,
+			pk.Velocity,
+		))
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
@@ -230,9 +195,12 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		pk.Tick = 0 // prevent rewind
 
 		// Wait for the client to acknowledge the teleport.
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			h.teleport(pk.Position.Sub(mgl32.Vec3{0, 1.62}), pk.OnGround, pk.Mode == packet.MoveModeNormal)
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerTeleport,
+			pk.Position.Sub(mgl32.Vec3{0, 1.62}),
+			pk.OnGround,
+			pk.Mode == packet.MoveModeNormal,
+		))
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			return true
@@ -243,9 +211,12 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 
 		// Wait for the client to acknowledge the teleport.
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(func() {
-			h.teleport(pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround), false)
-		})
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			ack.AckPlayerTeleport,
+			pk.Position,
+			utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround),
+			false,
+		))
 	}
 
 	return true
@@ -294,7 +265,7 @@ func (h *MovementHandler) BoundingBox() cube.BBox {
 	).Grow(-0.001)
 }
 
-func (h *MovementHandler) handleAttribute(n string, list []protocol.Attribute, f func(protocol.Attribute)) {
+func (h *MovementHandler) HandleAttribute(n string, list []protocol.Attribute, f func(protocol.Attribute)) {
 	for _, attr := range list {
 		if attr.Name == n {
 			f(attr)
@@ -323,16 +294,16 @@ func (h *MovementHandler) calculateClientSpeed(p *player.Player) (speed float32)
 	return
 }
 
-// teleport sets the teleport position of the player.
-func (h *MovementHandler) teleport(pos mgl32.Vec3, ground, smooth bool) {
+// Teleport sets the Teleport position of the player.
+func (h *MovementHandler) Teleport(pos mgl32.Vec3, ground, smooth bool) {
 	h.TeleportPos = pos
 	h.TeleportOnGround = ground
 	h.SmoothTeleport = smooth
 	h.TicksSinceTeleport = -1
 }
 
-// knockback sets the knockback of the player.
-func (h *MovementHandler) knockback(kb mgl32.Vec3) {
+// SetKnockback sets the knockback of the player.
+func (h *MovementHandler) SetKnockback(kb mgl32.Vec3) {
 	h.Knockback = kb
 	h.TicksSinceKnockback = -1
 }
