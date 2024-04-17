@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/chewxy/math32"
@@ -10,6 +12,7 @@ import (
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
 )
@@ -35,6 +38,80 @@ type BaseDetection struct {
 	lastFlagged int64
 }
 
+func Encode(buf *bytes.Buffer, d player.Handler) {
+	utils.WriteLInt32(buf, int32(len(d.ID())))
+	buf.WriteString(d.ID())
+
+	enc, err := json.Marshal(d)
+	if err != nil {
+		panic(err)
+	}
+
+	utils.WriteLInt32(buf, int32(len(enc)))
+	buf.Write(enc)
+}
+
+func Decode(buf *bytes.Buffer) player.Handler {
+	len := utils.LInt32(buf.Next(4))
+	id := string(buf.Next(int(len)))
+
+	var t player.Handler
+	switch id {
+	case DetectionIDAutoClickerA:
+		t = &AutoClickerA{}
+	case DetectionIDAutoClickerB:
+		t = &AutoClickerB{}
+	case DetectionIDAutoClickerC:
+		t = &AutoClickerC{}
+	case DetectionIDBadPacketA:
+		t = &BadPacketA{}
+	case DetectionIDBadPacketB:
+		t = &BadPacketB{}
+	case DetectionIDBadPacketC:
+		t = &BadPacketC{}
+	case DetectionIDEditionFakerA:
+		t = &EditionFakerA{}
+	case DetectionIDEditionFakerB:
+		t = &EditionFakerB{}
+	case DetectionIDHitboxA:
+		t = &HitboxA{}
+	case DetectionIDKillAuraA:
+		t = &KillAuraA{}
+	case DetectionIDMovementA:
+		t = &MovementA{}
+	case DetectionIDMovementB:
+		t = &MovementB{}
+	case DetectionIDMovementC:
+		t = &MovementC{}
+	case DetectionIDReachA:
+		t = &ReachA{}
+	case DetectionIDReachB:
+		t = &ReachB{}
+	case DetectionIDServerNukeA:
+		t = &ServerNukeA{}
+	case DetectionIDServerNukeB:
+		t = &ServerNukeB{}
+	case DetectionIDTimerA:
+		t = &TimerA{}
+	case DetectionIDToolboxA:
+		t = &ToolboxA{}
+	case DetectionIDVelocityA:
+		t = &VelocityA{}
+	case DetectionIDVelocityB:
+		t = &VelocityB{}
+	default:
+		panic(oerror.New("unknown detection ID: %s", id))
+	}
+
+	len = utils.LInt32(buf.Next(4))
+	err := json.Unmarshal(buf.Next(int(len)), t)
+	if err != nil {
+		panic(err)
+	}
+
+	return t
+}
+
 // ID returns the ID of the detection.
 func (d *BaseDetection) ID() string {
 	panic(oerror.New("detection.ID() not implemented"))
@@ -58,7 +135,7 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 	}
 
 	oldVl := d.Violations
-	if d.trustDuration != -1 {
+	if d.trustDuration > 0 {
 		d.Violations += math32.Max(0, float32(d.trustDuration)-float32(p.ClientFrame-d.lastFlagged)) / float32(d.trustDuration)
 	} else {
 		d.Violations++

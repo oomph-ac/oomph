@@ -1,7 +1,6 @@
 package session
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/oomph-ac/oomph/event"
@@ -29,6 +28,8 @@ type SessionState struct {
 	IsRecording bool
 	// RecordingFile is the file that the events will be recorded to.
 	RecordingFile string
+	// RecordingDuration is the duration of the recording in server ticks,
+	RecordingDuration int64
 
 	// IsReplay is true if the current session is a replay of a previous session.
 	IsReplay bool
@@ -177,7 +178,6 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 
 		ackHandler := s.Player.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler)
 		ackHandler.AckMap[ev.Timestamp] = ev.Acks
-		fmt.Println("added acks for", ev.Timestamp)
 	case event.TickEvent:
 		// This shouldn't be processed in an active session.
 		if !s.State.IsReplay {
@@ -192,7 +192,6 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 			return nil
 		}
 
-		fmt.Println("adding chunk", ev.Position)
 		s.Player.World.AddChunk(ev.Position, ev.Chunk)
 	}
 
@@ -235,6 +234,14 @@ func (s *Session) startTicking() {
 				ackEv.RefreshedTimestmap = ackHandler.CurrentTimestamp
 				s.QueueEvent(ackEv)
 			}
+
+			if s.State.IsRecording && s.Player.ServerTick >= s.State.RecordingDuration {
+				s.StopRecording()
+			}
+		case f := <-s.Player.RunChan:
+			s.Player.ProcessMu.Lock()
+			f()
+			s.Player.ProcessMu.Unlock()
 		case <-s.Player.CloseChan:
 			return
 		}

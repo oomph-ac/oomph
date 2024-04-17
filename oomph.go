@@ -33,6 +33,7 @@ func init() {
 		deadlock.Opts.Disable = false
 		deadlock.Opts.DeadlockTimeout = time.Second * 5
 		deadlock.Opts.DisableLockOrderDetection = true
+		deadlock.Opts.PrintAllCurrentGoroutines = true
 	}
 }
 

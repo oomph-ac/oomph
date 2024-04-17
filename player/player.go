@@ -43,6 +43,8 @@ type Player struct {
 	CloseChan chan bool
 	CloseFunc sync.Once
 
+	RunChan chan func()
+
 	ClientPkFunc func([]packet.Packet) error
 	ServerPkFunc func([]packet.Packet) error
 
@@ -125,6 +127,9 @@ func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Playe
 		LastServerTick: time.Now(),
 		Tps:            20.0,
 
+		CloseChan: make(chan bool),
+		RunChan:   make(chan func(), 32),
+
 		packetHandlers: []Handler{},
 		detections:     []Handler{},
 
@@ -132,14 +137,18 @@ func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Playe
 
 		readingBatches: readingBatches,
 
-		log:       log,
-		CloseChan: make(chan bool),
+		log: log,
 	}
 
 	p.ClientPkFunc = p.DefaultHandleFromClient
 	p.ServerPkFunc = p.DefaultHandleFromServer
 
 	return p
+}
+
+// RunWhenFree runs a function when the player is free to do so.
+func (p *Player) RunWhenFree(f func()) {
+	p.RunChan <- f
 }
 
 // SetTime sets the current time of the player.
@@ -252,10 +261,14 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 	cancel := false
 	for _, h := range p.packetHandlers {
 		cancel = cancel || !h.HandleClientPacket(pk, p)
-		defer h.Defer()
 	}
 
-	if !p.RunDetections(pk) || cancel {
+	det := p.RunDetections(pk)
+	for _, h := range p.packetHandlers {
+		h.Defer()
+	}
+
+	if !det || cancel {
 		return nil
 	}
 
@@ -286,6 +299,21 @@ func (p *Player) handleOneFromServer(pk packet.Packet) error {
 // RegisterHandler registers a handler to the player.
 func (p *Player) RegisterHandler(h Handler) {
 	p.packetHandlers = append(p.packetHandlers, h)
+}
+
+// ReplaceHandler replaces a handler in the player.
+func (p *Player) ReplaceHandler(id string, h Handler) {
+	for i, otherH := range p.packetHandlers {
+		if otherH.ID() != id {
+			continue
+		}
+
+		p.packetHandlers[i] = nil
+		p.packetHandlers[i] = h
+		return
+	}
+
+	panic(oerror.New("handler %s not found", id))
 }
 
 // UnregisterHandler unregisters a handler from the player.
@@ -414,9 +442,6 @@ func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
 		p.Connected = false
 		p.Closed = true
-
-		p.ClientPkFunc = nil
-		p.ServerPkFunc = nil
 
 		p.eventHandler.HandleQuit(p)
 		p.World.PurgeChunks()

@@ -2,7 +2,6 @@ package ack
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"time"
 
@@ -54,12 +53,14 @@ func Decode(buf *bytes.Buffer) Acknowledgement {
 		a.Data = append(a.Data, pk)
 	case AckEntityUpdatePosition:
 		// OPTS: uint64, int64, mgl32.Vec3, bool
-		var eid uint64
-		binary.Read(buf, binary.LittleEndian, eid)
-
+		eid := uint64(utils.LInt64(buf.Next(8)))
 		tick := utils.LInt64(buf.Next(8))
 		pos := utils.ReadVec32(buf.Next(12))
-		onGround := utils.Bool(buf.Next(1))
+		onGround := false
+		if buf.Len() > 0 {
+			// ??????? what the fuck
+			onGround = utils.Bool(buf.Next(1))
+		}
 
 		a.Data = append(a.Data, eid, tick, pos, onGround)
 	case AckPlayerInitalized:
@@ -131,5 +132,6 @@ func Decode(buf *bytes.Buffer) Acknowledgement {
 		panic(oerror.New("acknowledgement id %d not found", a.ID))
 	}
 
+	a.f = FuncMap[a.ID]
 	return a
 }
