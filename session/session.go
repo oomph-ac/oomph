@@ -235,7 +235,8 @@ func (s *Session) startTicking() {
 				s.QueueEvent(ackEv)
 			}
 
-			if s.State.IsRecording && s.Player.ServerTick >= s.State.RecordingDuration {
+			s.State.RecordingDuration--
+			if s.State.IsRecording && s.State.RecordingDuration <= 0 {
 				s.StopRecording()
 			}
 		case f := <-s.Player.RunChan:
