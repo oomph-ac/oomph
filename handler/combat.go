@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"bytes"
+
 	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -49,6 +52,62 @@ func NewCombatHandler() *CombatHandler {
 	return &CombatHandler{
 		InterpolationStep: 1 / 10.0,
 	}
+}
+
+func DecodeCombatHandler(buf *bytes.Buffer) CombatHandler {
+	h := CombatHandler{}
+	h.Phase, _ = buf.ReadByte()
+	h.InterpolationStep = utils.LFloat32(buf.Next(4))
+	h.AttackOffset = utils.LFloat32(buf.Next(4))
+	h.StartAttackPos = utils.ReadVec32(buf.Next(12))
+	h.EndAttackPos = utils.ReadVec32(buf.Next(12))
+	h.StartEntityPos = utils.ReadVec32(buf.Next(12))
+	h.EndEntityPos = utils.ReadVec32(buf.Next(12))
+	h.ClosestRawDistance = utils.LFloat32(buf.Next(4))
+	rCount := utils.LInt32(buf.Next(4))
+	h.RaycastResults = make([]float32, rCount)
+	for i := int32(0); i < rCount; i++ {
+		h.RaycastResults[i] = utils.LFloat32(buf.Next(4))
+	}
+	h.LastSwingTick = utils.LInt64(buf.Next(8))
+	h.Clicking = utils.Bool(buf.Next(1))
+	cCount := utils.LInt32(buf.Next(4))
+	h.Clicks = make([]int64, cCount)
+	for i := int32(0); i < cCount; i++ {
+		h.Clicks[i] = utils.LInt64(buf.Next(8))
+	}
+	h.ClickDelay = utils.LInt64(buf.Next(8))
+	h.LastClickTick = utils.LInt64(buf.Next(8))
+	h.CPS = int(utils.LInt32(buf.Next(4)))
+
+	if buf.Len() != 0 {
+		panic(oerror.New("unexpected %d bytes left in buffer", buf.Len()))
+	}
+	return h
+}
+
+func (h *CombatHandler) Encode(buf *bytes.Buffer) {
+	buf.WriteByte(h.Phase)
+	utils.WriteLFloat32(buf, h.InterpolationStep)
+	utils.WriteLFloat32(buf, h.AttackOffset)
+	utils.WriteVec32(buf, h.StartAttackPos)
+	utils.WriteVec32(buf, h.EndAttackPos)
+	utils.WriteVec32(buf, h.StartEntityPos)
+	utils.WriteVec32(buf, h.EndEntityPos)
+	utils.WriteLFloat32(buf, h.ClosestRawDistance)
+	utils.WriteLInt32(buf, int32(len(h.RaycastResults)))
+	for _, result := range h.RaycastResults {
+		utils.WriteLFloat32(buf, result)
+	}
+	utils.WriteLInt64(buf, h.LastSwingTick)
+	utils.WriteBool(buf, h.Clicking)
+	utils.WriteLInt32(buf, int32(len(h.Clicks)))
+	for _, click := range h.Clicks {
+		utils.WriteLInt64(buf, click)
+	}
+	utils.WriteLInt64(buf, h.ClickDelay)
+	utils.WriteLInt64(buf, h.LastClickTick)
+	utils.WriteLInt32(buf, int32(h.CPS))
 }
 
 func (h *CombatHandler) ID() string {

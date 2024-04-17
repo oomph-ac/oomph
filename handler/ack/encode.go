@@ -2,7 +2,6 @@ package ack
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"time"
 
@@ -52,12 +51,9 @@ func Encode(a Acknowledgement) []byte {
 		buf.Write(enc)
 	case AckEntityUpdatePosition:
 		// OPTS: uint64, int64, mgl32.Vec3, bool
-		binary.Write(buf, binary.LittleEndian, a.Data[0].(uint64))
+		utils.WriteLInt64(buf, int64(a.Data[0].(uint64)))
 		utils.WriteLInt32(buf, int32(a.Data[1].(int64)))
-
-		pos := a.Data[2].(mgl32.Vec3)
-		utils.WriteVec32(buf, pos)
-
+		utils.WriteVec32(buf, a.Data[2].(mgl32.Vec3))
 		utils.WriteBool(buf, a.Data[3].(bool))
 	case AckPlayerInitalized:
 		// OPTS: n/a
