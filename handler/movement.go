@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -78,17 +81,11 @@ type MovementHandler struct {
 	ToggledFly     bool
 	TrustFlyStatus bool
 
-	// MovementSpeed is the current movement speed of the player.
-	MovementSpeed float32
-	AirSpeed      float32
-	// HasServerSpeed is false when the client does an action that changes their movement speed, but
-	// has not recieved data from the server if their speed was actually modified. It is set to true when
-	// the client acknowledges the change in speed.
-	HasServerSpeed bool
-	// ClientPredictsSpeed is set manually by the end-user, and is set to truew
+	MovementSpeed       float32
+	AirSpeed            float32
+	HasServerSpeed      bool
 	ClientPredictsSpeed bool
 
-	// s is the simulator that will be used for movement simulations. It can be set via. UseSimulator()
 	s    Simulator
 	mode player.AuthorityMode
 }
@@ -99,6 +96,173 @@ func NewMovementHandler() *MovementHandler {
 		// the server doesn't seem to send back the UpdateAbillites packet.
 		TrustFlyStatus: true,
 	}
+}
+
+func DecodeMovementHandler(buf *bytes.Buffer) MovementHandler {
+	h := MovementHandler{}
+	h.Width = utils.LFloat32(buf.Next(4))
+	h.Height = utils.LFloat32(buf.Next(4))
+
+	// Read current scenario data
+	h.Position = utils.ReadVec32(buf.Next(12))
+	h.Velocity = utils.ReadVec32(buf.Next(12))
+	h.OffGroundTicks = utils.LInt64(buf.Next(8))
+	h.OnGround = utils.Bool(buf.Next(1))
+	h.CollisionX = utils.Bool(buf.Next(1))
+	h.CollisionZ = utils.Bool(buf.Next(1))
+	h.VerticallyCollided = utils.Bool(buf.Next(1))
+	h.HorizontallyCollided = utils.Bool(buf.Next(1))
+	h.KnownInsideBlock = utils.Bool(buf.Next(1))
+
+	// Read positions and velocities
+	h.PrevPosition = utils.ReadVec32(buf.Next(12))
+	h.PrevVelocity = utils.ReadVec32(buf.Next(12))
+	h.ClientPosition = utils.ReadVec32(buf.Next(12))
+	h.PrevClientPosition = utils.ReadVec32(buf.Next(12))
+	h.ClientVel = utils.ReadVec32(buf.Next(12))
+	h.PrevClientVel = utils.ReadVec32(buf.Next(12))
+	h.Mov = utils.ReadVec32(buf.Next(12))
+	h.ClientMov = utils.ReadVec32(buf.Next(12))
+	h.PrevMov = utils.ReadVec32(buf.Next(12))
+	h.PrevClientMov = utils.ReadVec32(buf.Next(12))
+
+	// Read rotations
+	h.Rotation = utils.ReadVec32(buf.Next(12))
+	h.PrevRotation = utils.ReadVec32(buf.Next(12))
+
+	// Read impulses
+	h.ForwardImpulse = utils.LFloat32(buf.Next(4))
+	h.LeftImpulse = utils.LFloat32(buf.Next(4))
+
+	// Read sneaking/sprinting
+	h.Sneaking = utils.Bool(buf.Next(1))
+	h.SneakKeyPressed = utils.Bool(buf.Next(1))
+	h.Sprinting = utils.Bool(buf.Next(1))
+	h.SprintKeyPressed = utils.Bool(buf.Next(1))
+
+	// Read gravity/step clip offset
+	h.Gravity = utils.LFloat32(buf.Next(4))
+	h.StepClipOffset = utils.LFloat32(buf.Next(4))
+
+	// Read jumping states
+	h.Jumping = utils.Bool(buf.Next(1))
+	h.JumpKeyPressed = utils.Bool(buf.Next(1))
+	h.JumpHeight = utils.LFloat32(buf.Next(4))
+	h.TicksUntilNextJump = int(utils.LInt32(buf.Next(4)))
+
+	// Read knockback
+	h.Knockback = utils.ReadVec32(buf.Next(12))
+	h.TicksSinceKnockback = int(utils.LInt32(buf.Next(4)))
+
+	// Read teleport states
+	h.TeleportPos = utils.ReadVec32(buf.Next(12))
+	h.SmoothTeleport = utils.Bool(buf.Next(1))
+	h.TeleportOnGround = utils.Bool(buf.Next(1))
+	h.TicksSinceTeleport = int(utils.LInt32(buf.Next(4)))
+
+	// Read no clip/immobile
+	h.NoClip = utils.Bool(buf.Next(1))
+	h.Immobile = utils.Bool(buf.Next(1))
+
+	// Read flying states
+	h.Flying = utils.Bool(buf.Next(1))
+	h.ToggledFly = utils.Bool(buf.Next(1))
+	h.TrustFlyStatus = utils.Bool(buf.Next(1))
+
+	// Read speed states
+	h.MovementSpeed = utils.LFloat32(buf.Next(4))
+	h.AirSpeed = utils.LFloat32(buf.Next(4))
+	h.HasServerSpeed = utils.Bool(buf.Next(1))
+	h.ClientPredictsSpeed = utils.Bool(buf.Next(1))
+
+	// Read authority mode
+	h.mode = player.AuthorityMode(utils.LInt32(buf.Next(4)))
+
+	if buf.Len() != 0 {
+		panic(fmt.Sprintf("unexpected %d bytes left in movement handler buffer", buf.Len()))
+	}
+	return h
+}
+
+func (h *MovementHandler) Encode(buf *bytes.Buffer) {
+	// Write width/height
+	utils.WriteLFloat32(buf, h.Width)
+	utils.WriteLFloat32(buf, h.Height)
+
+	// Write current scenario data
+	utils.WriteVec32(buf, h.Position)
+	utils.WriteVec32(buf, h.Velocity)
+	utils.WriteLInt64(buf, h.OffGroundTicks)
+	utils.WriteBool(buf, h.OnGround)
+	utils.WriteBool(buf, h.CollisionX)
+	utils.WriteBool(buf, h.CollisionZ)
+	utils.WriteBool(buf, h.VerticallyCollided)
+	utils.WriteBool(buf, h.HorizontallyCollided)
+	utils.WriteBool(buf, h.KnownInsideBlock)
+
+	// Write position/velocity
+	utils.WriteVec32(buf, h.PrevPosition)
+	utils.WriteVec32(buf, h.PrevVelocity)
+	utils.WriteVec32(buf, h.ClientPosition)
+	utils.WriteVec32(buf, h.PrevClientPosition)
+	utils.WriteVec32(buf, h.ClientVel)
+	utils.WriteVec32(buf, h.PrevClientVel)
+	utils.WriteVec32(buf, h.Mov)
+	utils.WriteVec32(buf, h.ClientMov)
+	utils.WriteVec32(buf, h.PrevMov)
+	utils.WriteVec32(buf, h.PrevClientMov)
+
+	// Write rotation
+	utils.WriteVec32(buf, h.Rotation)
+	utils.WriteVec32(buf, h.PrevRotation)
+
+	// Write impulses (WASD)
+	utils.WriteLFloat32(buf, h.ForwardImpulse)
+	utils.WriteLFloat32(buf, h.LeftImpulse)
+
+	// Write sneaking/sprinting
+	utils.WriteBool(buf, h.Sneaking)
+	utils.WriteBool(buf, h.SneakKeyPressed)
+	utils.WriteBool(buf, h.Sprinting)
+	utils.WriteBool(buf, h.SprintKeyPressed)
+
+	// Write gravity/step clip offset
+	utils.WriteLFloat32(buf, h.Gravity)
+	utils.WriteLFloat32(buf, h.StepClipOffset)
+
+	// Write jumping states
+	utils.WriteBool(buf, h.Jumping)
+	utils.WriteBool(buf, h.JumpKeyPressed)
+	utils.WriteLFloat32(buf, h.JumpHeight)
+	utils.WriteLInt32(buf, int32(h.TicksUntilNextJump))
+
+	// Write knockback
+	utils.WriteVec32(buf, h.Knockback)
+	utils.WriteLInt32(buf, int32(h.TicksSinceKnockback))
+
+	// Write teleport states
+	utils.WriteVec32(buf, h.TeleportPos)
+	utils.WriteBool(buf, h.SmoothTeleport)
+	utils.WriteBool(buf, h.TeleportOnGround)
+	utils.WriteLInt32(buf, int32(h.TicksSinceTeleport))
+
+	// Write no clip/immobile
+	utils.WriteBool(buf, h.NoClip)
+	utils.WriteBool(buf, h.Immobile)
+
+	// Write flying states
+	utils.WriteBool(buf, h.Flying)
+	utils.WriteBool(buf, h.ToggledFly)
+	utils.WriteBool(buf, h.TrustFlyStatus)
+
+	// Write speed states
+	utils.WriteLFloat32(buf, h.MovementSpeed)
+	utils.WriteLFloat32(buf, h.AirSpeed)
+	utils.WriteBool(buf, h.HasServerSpeed)
+	utils.WriteBool(buf, h.ClientPredictsSpeed)
+
+	// Write authority mode
+	utils.WriteLInt32(buf, int32(h.mode))
 }
 
 func (MovementHandler) ID() string {

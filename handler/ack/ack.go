@@ -50,5 +50,9 @@ func New(id AckID, data ...interface{}) Acknowledgement {
 }
 
 func (a Acknowledgement) Run(p *player.Player) {
+	if a.f == nil {
+		panic(oerror.New("acknowledgement id %d has no callback", a.ID))
+	}
+
 	a.f(p, a.Data...)
 }

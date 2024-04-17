@@ -1,7 +1,9 @@
 package session
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -9,10 +11,15 @@ import (
 	"time"
 
 	"github.com/disgoorg/json"
+	"github.com/oomph-ac/oomph/detection"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/handler"
 	_ "github.com/oomph-ac/oomph/handler/ackfunc"
+	"github.com/oomph-ac/oomph/internal"
 	"github.com/oomph-ac/oomph/oerror"
+	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 )
@@ -25,13 +32,32 @@ type Recording struct {
 	ClientDat   login.ClientData
 	IdentityDat login.IdentityData
 	GameDat     minecraft.GameData
-	Protocol    int
+
+	Protocol int
+
+	PlayerData struct {
+		ClientTick  int64
+		ClientFrame int64
+		ServerTick  int64
+		Tps         float32
+		GameMode    int32
+
+		Connected bool
+		Ready     bool
+		Alive     bool
+
+		MovementHandler handler.MovementHandler
+		CombatHandler   handler.CombatHandler
+
+		Detections []player.Handler
+	}
+	Entities map[uint64]*entity.Entity
 
 	Events []event.Event
 }
 
-func (s *Session) StartRecording() {
-	if s.State.IsRecording {
+func (s *Session) StartRecording(duration int64) {
+	if s.State.IsRecording || s.Player.Closed || !s.Player.Connected {
 		return
 	}
 
@@ -41,6 +67,11 @@ func (s *Session) StartRecording() {
 	}
 
 	s.State.IsRecording = true
+	s.State.RecordingDuration = duration
+	s.Player.RunWhenFree(s.actuallyStartRecording)
+}
+
+func (s *Session) actuallyStartRecording() {
 	go s.handleRecording()
 
 	// Add all the chunks currently in the world into the recording.
@@ -85,7 +116,7 @@ func (s *Session) StopRecording() {
 	select {
 	case s.stopRecording <- struct{}{}:
 		break
-	case <-time.After(time.Second * 5):
+	case <-time.After(time.Second * 5): // uh oh what the fuck happened here
 		panic(oerror.New("unable to stop recording"))
 	}
 }
@@ -120,7 +151,52 @@ func (s *Session) handleRecording() {
 	// Encode the version of the player into the header of the recording.
 	f.WriteString(fmt.Sprintf("%d\n", s.Player.Version))
 
-	// Little description hack lol.
+	// Encode the tick data, gamemode, and other states of the player into the header of the recording.
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	utils.WriteLInt64(buf, s.Player.ClientTick)
+	utils.WriteLInt64(buf, s.Player.ClientFrame)
+	utils.WriteLInt64(buf, s.Player.ServerTick)
+	utils.WriteLFloat32(buf, s.Player.Tps)
+	utils.WriteLInt32(buf, s.Player.GameMode)
+	utils.WriteBool(buf, s.Player.Connected)
+	utils.WriteBool(buf, s.Player.Ready)
+	utils.WriteBool(buf, s.Player.Alive)
+	f.WriteString(base64.StdEncoding.EncodeToString(buf.Bytes()))
+	f.WriteString("\n")
+
+	// Encode the movement data into the header of the recording.
+	buf.Reset()
+	s.Player.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Encode(buf)
+	f.WriteString(base64.StdEncoding.EncodeToString(buf.Bytes()))
+	f.WriteString("\n")
+
+	// Encode the combat data into the header of the recording.
+	buf.Reset()
+	s.Player.Handler(handler.HandlerIDCombat).(*handler.CombatHandler).Encode(buf)
+	f.WriteString(base64.StdEncoding.EncodeToString(buf.Bytes()))
+	f.WriteString("\n")
+
+	// Encode all the entities on the player's perspective into the header of the recording.
+	buf.Reset()
+	for eid, e := range s.Player.Handler(handler.HandlerIDEntities).(*handler.EntitiesHandler).Entities {
+		binary.Write(buf, binary.LittleEndian, eid)
+		e.Encode(buf)
+	}
+	f.WriteString(base64.StdEncoding.EncodeToString(buf.Bytes()))
+	f.WriteString("\n")
+
+	// Encode all the detections into the recording.
+	buf.Reset()
+	detections := s.Player.Detections()
+	utils.WriteLInt32(buf, int32(len(detections)))
+	for _, d := range detections {
+		detection.Encode(buf, d)
+	}
+	f.WriteString(base64.StdEncoding.EncodeToString(buf.Bytes()))
+	f.WriteString("\n")
+
+	// Little notice to where the events start.
 	f.WriteString(StartRecDescription)
 
 	for {
@@ -201,6 +277,75 @@ func DecodeRecording(file string) (*Recording, error) {
 	rec.ClientDat = clientDat
 	rec.IdentityDat = identityDat
 	rec.GameDat = gameDat
+
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer internal.BufferPool.Put(buf)
+
+	b64dec, err = base64.StdEncoding.DecodeString(header[5])
+	if err != nil {
+		return nil, oerror.New("unable to decode player data: " + err.Error())
+	}
+	buf.Write(b64dec)
+
+	rec.PlayerData.ClientTick = utils.LInt64(buf.Next(8))
+	rec.PlayerData.ClientFrame = utils.LInt64(buf.Next(8))
+	rec.PlayerData.ServerTick = utils.LInt64(buf.Next(8))
+	rec.PlayerData.Tps = utils.LFloat32(buf.Next(4))
+	rec.PlayerData.GameMode = utils.LInt32(buf.Next(4))
+	rec.PlayerData.Connected = utils.Bool(buf.Next(1))
+	rec.PlayerData.Ready = utils.Bool(buf.Next(1))
+	rec.PlayerData.Alive = utils.Bool(buf.Next(1))
+
+	// Decode the movement handler.
+	b64dec, err = base64.StdEncoding.DecodeString(header[6])
+	if err != nil {
+		return nil, oerror.New("unable to decode movement handler: " + err.Error())
+	}
+
+	buf.Reset()
+	buf.Write(b64dec)
+	rec.PlayerData.MovementHandler = handler.DecodeMovementHandler(buf)
+
+	// Decode the combat handler.
+	b64dec, err = base64.StdEncoding.DecodeString(header[7])
+	if err != nil {
+		return nil, oerror.New("unable to decode combat handler: " + err.Error())
+	}
+
+	buf.Reset()
+	buf.Write(b64dec)
+	rec.PlayerData.CombatHandler = handler.DecodeCombatHandler(buf)
+
+	// Decode the entities.
+	b64dec, err = base64.StdEncoding.DecodeString(header[8])
+	if err != nil {
+		return nil, oerror.New("unable to decode entities: " + err.Error())
+	}
+	rec.Entities = make(map[uint64]*entity.Entity)
+
+	buf.Reset()
+	buf.Write(b64dec)
+	for buf.Len() > 0 {
+		eid := binary.LittleEndian.Uint64(buf.Next(8))
+		e := entity.Decode(buf)
+		rec.Entities[eid] = e
+	}
+
+	// Decode the detections.
+	b64dec, err = base64.StdEncoding.DecodeString(header[9])
+	if err != nil {
+		return nil, oerror.New("unable to decode detections: " + err.Error())
+	}
+
+	buf.Reset()
+	buf.Write(b64dec)
+	detections := int(utils.LInt32(buf.Next(4)))
+
+	for i := 0; i < detections; i++ {
+		d := detection.Decode(buf)
+		rec.PlayerData.Detections = append(rec.PlayerData.Detections, d)
+	}
 
 	// Remove the header from the recording.
 	rec.Events, err = event.DecodeEvents([]byte(events))

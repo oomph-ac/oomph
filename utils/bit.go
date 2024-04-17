@@ -7,6 +7,7 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/oerror"
 )
 
 // HasFlag returns whether given flags include the given bitflag.
@@ -93,13 +94,21 @@ func LFloat64(b []byte) float64 {
 // WriteBool writes a boolean to the given bytes.
 func WriteBool(b *bytes.Buffer, v bool) {
 	if v {
-		_ = b.WriteByte(1)
-	} else {
-		_ = b.WriteByte(0)
+		b.WriteByte(1)
+		return
 	}
+
+	b.WriteByte(0)
 }
 
 // Bool returns a boolean from the given bytes.
 func Bool(b []byte) bool {
-	return b[0] == 1
+	v := b[0]
+	if v == 0 {
+		return false
+	} else if v == 1 {
+		return true
+	} else {
+		panic(oerror.New("unexpected non-boolean value in byte buffer %v", v))
+	}
 }
