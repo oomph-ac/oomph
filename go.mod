@@ -8,16 +8,17 @@ require (
 	github.com/chewxy/math32 v1.10.1
 	github.com/df-mc/dragonfly v0.9.14
 	github.com/disgoorg/disgo v0.17.2
+	github.com/disgoorg/json v1.1.0
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-echarts/statsview v0.3.4
 	github.com/go-gl/mathgl v1.1.0
-	github.com/oomph-ac/mv v0.0.0-20240210123432-1cb78e0dd37d
+	github.com/oomph-ac/mv v0.0.0-20240418000052-966d17d56c2c
 	github.com/sandertv/gophertunnel v1.36.0
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/exp v0.0.0-20240314144324-c7f7c6466f7f
+	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
 )
 
 require (
@@ -26,7 +27,6 @@ require (
 	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.13 // indirect
-	github.com/disgoorg/json v1.1.0 // indirect
 	github.com/disgoorg/snowflake/v2 v2.0.1 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.2.3 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
@@ -54,7 +54,7 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.36.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240314224747-3cc8fc453ac5
+replace github.com/sandertv/gophertunnel v1.36.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240420040852-e172e80ee83a
 
 replace github.com/df-mc/dragonfly v0.9.14 => github.com/restartfu/dragonfly v0.0.0-20240314153757-f282190b3ff8
 

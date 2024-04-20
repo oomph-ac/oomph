@@ -72,6 +72,7 @@ func (s *Session) StartRecording(duration int64) {
 }
 
 func (s *Session) actuallyStartRecording() {
+	s.log.Infof("recording started for %s", s.Player.IdentityDat.DisplayName)
 	go s.handleRecording()
 
 	// Add all the chunks currently in the world into the recording.
@@ -119,6 +120,8 @@ func (s *Session) StopRecording() {
 	case <-time.After(time.Second * 5): // uh oh what the fuck happened here
 		panic(oerror.New("unable to stop recording"))
 	}
+
+	s.log.Infof("recording ended for %s", s.Player.IdentityDat.DisplayName)
 }
 
 func (s *Session) handleRecording() {
@@ -270,9 +273,9 @@ func DecodeRecording(file string) (*Recording, error) {
 		return nil, oerror.New("unable to get protocol version: " + err.Error())
 	}
 
-	if rec.Protocol != int(minecraft.DefaultProtocol.ID()) {
+	/* if rec.Protocol != int(minecraft.DefaultProtocol.ID()) {
 		return nil, oerror.New("outdated protocol version: " + fmt.Sprint(rec.Protocol))
-	}
+	} */
 
 	rec.ClientDat = clientDat
 	rec.IdentityDat = identityDat
