@@ -324,12 +324,12 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 		pk.Tick = 0 // prevent rewind
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerUpdateActorData,
 			pk.EntityMetadata,
 		))
 	case *packet.UpdateAbilities:
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerUpdateAbilities,
 			pk.AbilityData.Layers,
 		))
@@ -339,7 +339,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 		pk.Tick = 0 // prevent rewind
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerUpdateAttributes,
 			pk.Attributes,
 		))
@@ -348,7 +348,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			return false
 		}
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerUpdateKnockback,
 			pk.Velocity,
 		))
@@ -359,7 +359,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		pk.Tick = 0 // prevent rewind
 
 		// Wait for the client to acknowledge the teleport.
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerTeleport,
 			pk.Position.Sub(mgl32.Vec3{0, 1.62}),
 			pk.OnGround,
@@ -375,7 +375,7 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 
 		// Wait for the client to acknowledge the teleport.
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerTeleport,
 			pk.Position,
 			utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround),
