@@ -46,7 +46,7 @@ func WorldUpdateChunks(p *player.Player, opts ...interface{}) {
 	var newChunks = map[protocol.ChunkPos]*chunk.Chunk{}
 
 	for _, entry := range spk.SubChunkEntries {
-		if entry.Result != protocol.SubChunkResultSuccess {
+		if entry.Result != protocol.SubChunkResultSuccess && entry.Result != protocol.SubChunkResultSuccessAllAir {
 			continue
 		}
 
@@ -56,7 +56,9 @@ func WorldUpdateChunks(p *player.Player, opts ...interface{}) {
 		}
 
 		var c *chunk.Chunk
-		if existing := p.World.GetChunk(chunkPos); existing != nil {
+		if entry.Result == protocol.SubChunkResultSuccessAllAir {
+			c = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
+		} else if existing := p.World.GetChunk(chunkPos); existing != nil {
 			c = existing
 		} else if new, ok := newChunks[chunkPos]; ok {
 			c = new

@@ -202,7 +202,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 		delete(h.placedBlocks, pos)
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckWorldSetBlock,
 			pos,
 			b,
@@ -217,7 +217,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckWorldUpdateChunks,
 			pk,
 		))
@@ -226,7 +226,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckWorldUpdateChunks,
 			pk,
 		))

@@ -97,7 +97,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	}
 
 	// If a teleport was able to be handled, do not continue with the simulation.
-	if s.teleport(p, mDat) {
+	if s.teleport(mDat) {
 		return
 	}
 
@@ -200,11 +200,15 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 		}
 	}
 
-	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) && !mDat.Flying &&
-		!mDat.NoClip && p.Alive && cDat.InLoadedChunk && mDat.Position.Y() >= -64
+	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) &&
+		!mDat.Flying &&
+		!mDat.NoClip &&
+		p.Alive &&
+		cDat.InLoadedChunk &&
+		mDat.Position.Y() >= -64
 }
 
-func (s MovementSimulator) teleport(p *player.Player, mDat *handler.MovementHandler) bool {
+func (s MovementSimulator) teleport(mDat *handler.MovementHandler) bool {
 	if !mDat.SmoothTeleport && mDat.TicksSinceTeleport == 0 {
 		mDat.Position = mDat.TeleportPos
 		mDat.Velocity = mgl32.Vec3{}

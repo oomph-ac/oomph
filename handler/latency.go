@@ -60,7 +60,7 @@ func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) 
 		}
 
 		h.Responded = true
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerInitalized,
 		))
 	case *packet.LevelEvent:
@@ -69,7 +69,7 @@ func (h *LatencyHandler) HandleServerPacket(pk packet.Packet, p *player.Player) 
 			return true
 		}
 
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerUpdateSimulationRate,
 			pk.Position.X(),
 		))
@@ -91,7 +91,7 @@ func (h *LatencyHandler) OnTick(p *player.Player) {
 	currentTime := p.Time()
 	currentTick := p.ServerTick
 
-	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 		ack.AckPlayerUpdateLatency,
 		currentTime,
 		currentTick,

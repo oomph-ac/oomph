@@ -49,10 +49,6 @@ func (d *MovementA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.OnGround {
-		return true
-	}
-
 	dev := math32.Abs(mDat.ClientPosition.Y() - mDat.Position.Y())
 	if dev < movementAThreshold {
 		d.Debuff(0.1)

@@ -90,8 +90,13 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 	a.Refresh()
 }
 
-// AddCallback adds a callback to AckMap.
-func (a *AcknowledgementHandler) AddCallback(v ack.Acknowledgement) {
+// Add adds an acknowledgement to AckMap.
+func (a *AcknowledgementHandler) Add(v ack.Acknowledgement) {
+	if a.AckMap[a.CurrentTimestamp] == nil {
+		a.AckMap[a.CurrentTimestamp] = []ack.Acknowledgement{v}
+		return
+	}
+
 	a.AckMap[a.CurrentTimestamp] = append(a.AckMap[a.CurrentTimestamp], v)
 }
 
@@ -121,7 +126,7 @@ func (a *AcknowledgementHandler) Validate(p *player.Player) {
 	}
 
 	a.NonResponsiveTicks++
-	if a.NonResponsiveTicks > 200 {
+	if a.NonResponsiveTicks >= 300 {
 		p.Disconnect("Network timeout.")
 	}
 }

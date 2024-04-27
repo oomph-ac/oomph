@@ -55,7 +55,7 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the
 		// position before the entity is moved.
 		if p.CombatMode == player.AuthorityModeSemi {
-			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 				ack.AckEntityUpdatePosition,
 				pk.EntityRuntimeID,
 				p.ServerTick,
@@ -74,7 +74,7 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		// If the authority mode is set to AuthorityModeSemi, we need to wait for the client to acknowledge the
 		// position before the entity is moved.
 		if p.CombatMode == player.AuthorityModeSemi {
-			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 				ack.AckEntityUpdatePosition,
 				pk.EntityRuntimeID,
 				p.ServerTick,
