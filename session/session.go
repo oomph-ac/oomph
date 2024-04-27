@@ -169,6 +169,7 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 			ackHandler.AckMap[ev.SendTimestamp] = ackHandler.AckMap[ackHandler.CurrentTimestamp]
 			delete(ackHandler.AckMap, ackHandler.CurrentTimestamp)
 		}
+
 		ackHandler.CurrentTimestamp = ev.RefreshedTimestmap
 	case event.AckInsertEvent:
 		// This shouldn't be processed in an active session.

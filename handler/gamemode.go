@@ -30,7 +30,7 @@ func (h *GamemodeHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 	}
 
 	// Wait for the client to acknowledge the gamemode change.
-	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).AddCallback(ack.New(
+	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 		ack.AckPlayerUpdateGamemode,
 		gm.GameType,
 	))

@@ -232,7 +232,6 @@ func DecodeRecording(file string) (*Recording, error) {
 
 	rec := &Recording{}
 	rec.Version = header[0]
-	fmt.Println(rec.Version)
 
 	if rec.Version != event.EventsVersion {
 		return nil, oerror.New("unsupported recording version: " + rec.Version)
