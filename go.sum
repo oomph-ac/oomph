@@ -22,6 +22,8 @@ github.com/df-mc/worldupgrader v1.0.12 h1:Ry6XkcwclSMfRPdiwcfSFRWqTkVglu0u3oLd0X
 github.com/df-mc/worldupgrader v1.0.12/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
 github.com/df-mc/worldupgrader v1.0.13 h1:97oSr83cHvU2j7iA7iPG6e+wWoGRCQ15c0H1U3q+bVM=
 github.com/df-mc/worldupgrader v1.0.13/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
+github.com/df-mc/worldupgrader v1.0.14 h1:pDt4Pk5OwOBshJjATP8zbY/8cuGGO3JVrCEkmNe/fBQ=
+github.com/df-mc/worldupgrader v1.0.14/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
 github.com/disgoorg/disgo v0.17.2 h1:RxiLq8guMtk+9tArFwve02iya2APQ9yZVtV30ySKNtw=
 github.com/disgoorg/disgo v0.17.2/go.mod h1:8r3h9fXSz7BbACxLPsPbtB6LX8gaQFUETgPKV/0gAKQ=
 github.com/disgoorg/json v1.1.0 h1:7xigHvomlVA9PQw9bMGO02PHGJJPqvX5AnwlYg/Tnys=
@@ -96,6 +98,8 @@ github.com/oomph-ac/gophertunnel v0.0.0-20240420040852-e172e80ee83a h1:1/HyIUqBW
 github.com/oomph-ac/gophertunnel v0.0.0-20240420040852-e172e80ee83a/go.mod h1:FFeHZzSOXe1LAEVTwwarCIsbzLVDdDhEfJ5WcSpqWnA=
 github.com/oomph-ac/gophertunnel v0.0.0-20240420151033-e21d2ebf47e3 h1:sP4oL2JZhD/cfj79OQnon7oEmfRHpowBbFgsL5cVQJ0=
 github.com/oomph-ac/gophertunnel v0.0.0-20240420151033-e21d2ebf47e3/go.mod h1:LL3TNbW9TSidU217cSpN3tnXZ1DXdUp07DKmXQ7mQYs=
+github.com/oomph-ac/gophertunnel v0.0.0-20240429165140-e313c99b6ecf h1:H+z976bCC2krqpFfLp+D1cDkEna7gOBlZgkqclS0pgw=
+github.com/oomph-ac/gophertunnel v0.0.0-20240429165140-e313c99b6ecf/go.mod h1:LL3TNbW9TSidU217cSpN3tnXZ1DXdUp07DKmXQ7mQYs=
 github.com/oomph-ac/mv v0.0.0-20240210123432-1cb78e0dd37d h1:o/y+ACx72GrnviQKCn48g61m+Eawxb7m9WautuJ5mBc=
 github.com/oomph-ac/mv v0.0.0-20240210123432-1cb78e0dd37d/go.mod h1:QYLCOPIpWVWCJI2/yRDAj8KdMSN7c3bStwNInqdMBNs=
 github.com/oomph-ac/mv v0.0.0-20240417205309-0b44fb02a8a9 h1:ruxwKLCC6kGKGhdEAOFw+K7G3VhmiCtRuc06btp0Hdk=
@@ -149,6 +153,8 @@ github.com/sandertv/gophertunnel v1.36.0 h1:VF2znM3FFUkPqOVnOeH0KgM5iI167AzSB2oq
 github.com/sandertv/gophertunnel v1.36.0/go.mod h1:4El8ZfEpUmOMIJhPt5SCc1PyLNiuQ2+grWczrBvSGVs=
 github.com/sandertv/gophertunnel v1.36.1 h1:Ak078sWePrvhh1U8ylP/92W1muIISkjbII2sHCLHajM=
 github.com/sandertv/gophertunnel v1.36.1/go.mod h1:4El8ZfEpUmOMIJhPt5SCc1PyLNiuQ2+grWczrBvSGVs=
+github.com/sandertv/gophertunnel v1.37.0 h1:yPzOp4W1GahLjtxldXa5K25saJK/XG7SiyEt6oMjm0I=
+github.com/sandertv/gophertunnel v1.37.0/go.mod h1:4El8ZfEpUmOMIJhPt5SCc1PyLNiuQ2+grWczrBvSGVs=
 github.com/sasha-s/go-csync v0.0.0-20240107134140-fcbab37b09ad h1:qIQkSlF5vAUHxEmTbaqt1hkJ/t6skqEGYiMag343ucI=
 github.com/sasha-s/go-csync v0.0.0-20240107134140-fcbab37b09ad/go.mod h1:/pA7k3zsXKdjjAiUhB5CjuKib9KJGCaLvZwtxGC8U0s=
 github.com/sasha-s/go-deadlock v0.3.1 h1:sqv7fDNShgjcaxkO0JNcOAlr8B9+cV5Ey/OB71efZx0=
