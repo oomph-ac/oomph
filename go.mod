@@ -15,7 +15,7 @@ require (
 	github.com/go-echarts/statsview v0.3.4
 	github.com/go-gl/mathgl v1.1.0
 	github.com/oomph-ac/mv v0.0.0-20240422040945-74533a2d8e5a
-	github.com/sandertv/gophertunnel v1.36.1
+	github.com/sandertv/gophertunnel v1.37.0
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
@@ -26,7 +26,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
-	github.com/df-mc/worldupgrader v1.0.13 // indirect
+	github.com/df-mc/worldupgrader v1.0.14 // indirect
 	github.com/disgoorg/snowflake/v2 v2.0.1 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.2.3 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
@@ -54,8 +54,6 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.36.1 => github.com/oomph-ac/gophertunnel v0.0.0-20240420151033-e21d2ebf47e3
-
-replace github.com/df-mc/dragonfly v0.9.14 => github.com/restartfu/dragonfly v0.0.0-20240314153757-f282190b3ff8
+replace github.com/sandertv/gophertunnel v1.37.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240429165140-e313c99b6ecf
 
 replace github.com/sandertv/go-raknet v1.13.0 => github.com/gameparrot/tedac-raknet v0.0.1
