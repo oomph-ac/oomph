@@ -217,18 +217,26 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
+		// NOTE: The reason we have to make a clone of the packet here is because multiversion implementations will downgrade the packet
+		// and Oomph, instead of using the regular chunk packet sent by the server, will use the one modified by the multiversion implementation
+		// since it is a pointer.
+		cpk := *pk
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckWorldUpdateChunks,
-			pk,
+			&cpk,
 		))
 	case *packet.SubChunk:
 		if p.MovementMode == player.AuthorityModeNone {
 			return true
 		}
 
+		// NOTE: The reason we have to make a clone of the packet here is because multiversion implementations will downgrade the packet
+		// and Oomph, instead of using the regular chunk packet sent by the server, will use the one modified by the multiversion implementation
+		// since it is a pointer.
+		cpk := *pk
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckWorldUpdateChunks,
-			pk,
+			&cpk,
 		))
 	}
 
