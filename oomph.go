@@ -38,20 +38,21 @@ func init() {
 }
 
 type Oomph struct {
-	log      *logrus.Logger
-	sessions chan *session.Session
+	Log *logrus.Logger
 
 	settings OomphSettings
+	sessions chan *session.Session
 }
 
 type OomphSettings struct {
+	Logger         *logrus.Logger
+	StatusProvider *minecraft.ServerStatusProvider
+
 	LocalAddress   string
 	RemoteAddress  string
 	Authentication bool
 
 	LatencyReportType handler.LatencyReportType
-
-	StatusProvider *minecraft.ServerStatusProvider
 
 	ResourcePath             string
 	RequirePacks             bool
@@ -64,9 +65,9 @@ type OomphSettings struct {
 }
 
 // New creates and returns a new Oomph instance.
-func New(log *logrus.Logger, s OomphSettings) *Oomph {
+func New(s OomphSettings) *Oomph {
 	return &Oomph{
-		log:      log,
+		Log:      s.Logger,
 		sessions: make(chan *session.Session),
 
 		settings: s,
@@ -103,7 +104,7 @@ func (o *Oomph) Start() {
 		if err := sentry.Init(*s.SentryOpts); err != nil {
 			panic("failed to init sentry: " + err.Error())
 		} else {
-			o.log.Info("Sentry initialized")
+			o.Log.Info("Sentry initialized")
 		}
 	}
 
@@ -111,7 +112,7 @@ func (o *Oomph) Start() {
 	if s.StatusProvider == nil {
 		p, err := minecraft.NewForeignStatusProvider(s.RemoteAddress)
 		if err != nil {
-			o.log.Errorf("unable to make status provider: %v", err)
+			o.Log.Errorf("unable to make status provider: %v", err)
 		}
 
 		statusProvider = p
@@ -127,7 +128,7 @@ func (o *Oomph) Start() {
 			IPAddress:    "0.0.0.0:0",
 		}.Dial("raknet", s.RemoteAddress)
 		if err != nil {
-			o.log.Errorf("unable to fetch resource packs: %v", err)
+			o.Log.Errorf("unable to fetch resource packs: %v", err)
 			resourcePacks = utils.ResourcePacks(s.ResourcePath) // default to resource pack folder if fetching packs from the remote server fails
 		} else {
 			resourcePacks = resourcePackFetch.ResourcePacks()
@@ -152,12 +153,12 @@ func (o *Oomph) Start() {
 	}.Listen("raknet", s.LocalAddress)
 
 	if err != nil {
-		o.log.Errorf("unable to start oomph: %v", err)
+		o.Log.Errorf("unable to start oomph: %v", err)
 		return
 	}
 
 	defer l.Close()
-	o.log.Printf("Oomph is now listening on %v and directing connections to %v!\n", s.LocalAddress, s.RemoteAddress)
+	o.Log.Printf("Oomph is now listening on %v and directing connections to %v!\n", s.LocalAddress, s.RemoteAddress)
 	for {
 		c, err := l.Accept()
 		if err != nil {
@@ -175,7 +176,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		scope.SetTag("func", "oomph.handleConn()")
 	})
 
-	s := session.New(o.log, session.SessionState{
+	s := session.New(o.Log, session.SessionState{
 		IsReplay:    false,
 		IsRecording: false,
 		DirectMode:  false,
@@ -192,7 +193,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	defer s.Close()
 	defer func() {
 		if err := recover(); err != nil {
-			o.log.Errorf("oomph.handleConn() panic: %v", err)
+			o.Log.Errorf("oomph.handleConn() panic: %v", err)
 			sentryHub.Recover(oerror.New(fmt.Sprintf("%v", err)))
 			sentryHub.Flush(time.Second * 5)
 		}
@@ -224,7 +225,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		})
 		conn.Close()
 
-		o.log.Errorf("unable to reach server: %v", err)
+		o.Log.Errorf("unable to reach server: %v", err)
 		return
 	}
 	p.SetServerConn(serverConn)
@@ -295,7 +296,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 		defer func() {
 			if err := recover(); err != nil {
-				o.log.Errorf("handleConn() panic: %v", err)
+				o.Log.Errorf("handleConn() panic: %v", err)
 				localHub.Recover(oerror.New(fmt.Sprintf("%v", err)))
 				localHub.Flush(time.Second * 5)
 
@@ -325,7 +326,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			ev.EvTime = time.Now().UnixNano()
 
 			if err := s.QueueEvent(ev); err != nil {
-				o.log.Errorf("error handling packets from client: %v", err)
+				o.Log.Errorf("error handling packets from client: %v", err)
 				return
 			}
 		}
@@ -339,7 +340,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 		defer func() {
 			if err := recover(); err != nil {
-				o.log.Errorf("handleConn() panic: %v", err)
+				o.Log.Errorf("handleConn() panic: %v", err)
 				localHub.Recover(err)
 				localHub.Flush(time.Second * 5)
 
@@ -376,7 +377,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			ev.EvTime = time.Now().UnixNano()
 
 			if err := s.QueueEvent(ev); err != nil {
-				o.log.Errorf("error handling packets from server: %v", err)
+				o.Log.Errorf("error handling packets from server: %v", err)
 				return
 			}
 		}
@@ -387,6 +388,10 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 func unwrapNetError(err error) string {
 	if netErr, ok := err.(*net.OpError); ok {
+		if nErr, ok := netErr.Err.(*net.OpError); ok {
+			return unwrapNetError(nErr)
+		}
+
 		return netErr.Err.Error()
 	}
 

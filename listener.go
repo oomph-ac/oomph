@@ -65,7 +65,7 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 
-	s := osession.New(l.o.log, osession.SessionState{
+	s := osession.New(l.o.Log, osession.SessionState{
 		IsReplay:    false,
 		IsRecording: false,
 		DirectMode:  true,
