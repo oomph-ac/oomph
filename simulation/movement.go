@@ -198,7 +198,7 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	cDat := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler)
 
-	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox().Grow(1), false, false, p.World) {
+	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox().Grow(1), false, true, p.World) {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
 			return false
 		}
