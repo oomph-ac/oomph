@@ -26,7 +26,7 @@ func NewMovementA() *MovementA {
 	d.Description = "Checks for deviation between server simulated movement and client movement vertically."
 	d.Punishable = true
 
-	d.MaxViolations = 30
+	d.MaxViolations = 20
 	d.trustDuration = 10 * player.TicksPerSecond
 
 	d.FailBuffer = 5
@@ -49,6 +49,10 @@ func (d *MovementA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+	if mDat.StepClipOffset > 0 || mDat.OnGround {
+		return true
+	}
+
 	dev := math32.Abs(mDat.ClientPosition.Y() - mDat.Position.Y())
 	if dev < movementAThreshold {
 		d.Debuff(0.1)
