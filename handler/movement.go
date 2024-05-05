@@ -426,7 +426,7 @@ func (h *MovementHandler) BoundingBox() cube.BBox {
 		pos.X()+(h.Width/2),
 		pos.Y()+h.Height,
 		pos.Z()+(h.Width/2),
-	).Grow(-0.001)
+	).GrowVec3(mgl32.Vec3{-0.001, 0, -0.001})
 }
 
 func (h *MovementHandler) HandleAttribute(n string, list []protocol.Attribute, f func(protocol.Attribute)) {
