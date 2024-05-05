@@ -26,7 +26,7 @@ func NewMovementB() *MovementB {
 	d.Description = "Checks for deviation between server simulated movement and client movement horizontally."
 	d.Punishable = true
 
-	d.MaxViolations = 30
+	d.MaxViolations = 20
 	d.trustDuration = 10 * player.TicksPerSecond
 
 	d.FailBuffer = 5

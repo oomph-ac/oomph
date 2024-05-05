@@ -14,7 +14,7 @@ require (
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-echarts/statsview v0.3.4
 	github.com/go-gl/mathgl v1.1.0
-	github.com/oomph-ac/mv v0.0.0-20240504215235-b1a0a3296538
+	github.com/oomph-ac/mv v0.0.0-20240505011453-33a667ecc6d9
 	github.com/sandertv/gophertunnel v1.37.0
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
