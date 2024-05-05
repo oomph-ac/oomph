@@ -139,8 +139,16 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 		}
 	}
 
-	b, inside := s.blockInside(mDat, w)
-	inCobweb := inside && utils.BlockName(b) == "minecraft:web"
+	blocksInside, inside := s.blocksInside(mDat, w)
+	inCobweb := false
+	if inside {
+		for _, b := range blocksInside {
+			if utils.BlockName(b) == "minecraft:web" {
+				inCobweb = true
+				break
+			}
+		}
+	}
 
 	if inCobweb {
 		mDat.Velocity[0] *= 0.25
@@ -342,8 +350,10 @@ func (MovementSimulator) moveRelative(mDat *handler.MovementHandler, fSpeed floa
 	mDat.Velocity[2] += ms*v2 + mf*v3
 }
 
-func (MovementSimulator) blockInside(mDat *handler.MovementHandler, w *world.World) (df_world.Block, bool) {
+func (MovementSimulator) blocksInside(mDat *handler.MovementHandler, w *world.World) ([]df_world.Block, bool) {
 	bb := mDat.BoundingBox()
+	blocks := []df_world.Block{}
+
 	for _, result := range utils.GetNearbyBlocks(bb, false, true, w) {
 		pos := result.Position
 		block := result.Block
@@ -351,12 +361,12 @@ func (MovementSimulator) blockInside(mDat *handler.MovementHandler, w *world.Wor
 
 		for _, box := range boxes {
 			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
-				return block, true
+				blocks = append(blocks, block)
 			}
 		}
 	}
 
-	return nil, false
+	return blocks, len(blocks) > 0
 }
 
 func (MovementSimulator) avoidEdge(mDat *handler.MovementHandler, w *world.World) {
