@@ -97,9 +97,16 @@ func (d *EditionFakerA) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 	// Check that the title ID matches the expected device OS.
 	if expected, ok := knownTitleIDs[titleID]; ok && expected != deviceOS {
+		// Exempt Playstation and XBOX devices from this check, since they need proxy workarounds to connect to external servers.
 		if titleID == "2044456598" || titleID == "1828326430" {
-			return false
+			return true
 		}
+
+		// Ugly & shitty hack for BedrockTogether - why do console versions need external solutions to join servers anyway?
+		if titleID == "1739947436" && (deviceOS == protocol.DeviceOrbis || deviceOS == protocol.DeviceXBOX) {
+			return true
+		}
+
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("titleID", titleID)
 		data.Set("givenOS", utils.Device(deviceOS))

@@ -363,6 +363,20 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:tallgrass":
 		return []cube.BBox{}
+	case "minecraft:acacia_trapdoor", "minecraft:birch_trapdoor", "minecraft:dark_oak_trapdoor", "minecraft:jungle_trapdoor", "minecraft:spruce_trapdoor",
+		"minecraft:trapdoor", "minecraft:iron_trapdoor", "minecraft:wooden_trapdoor":
+		_, dat := b.EncodeBlock()
+
+		box := cube.Box(0, 0, 0, 1, 0.1825, 1) // PM is wrong??
+		if dat["open_bit"].(bool) {
+			return []cube.BBox{}
+		}
+
+		if dat["upside_down_bit"].(bool) {
+			box = cube.Box(0, 0.8175, 0, 1, 1, 1)
+		}
+
+		return []cube.BBox{box}
 	}
 
 	dfBoxes := b.Model().BBox(df_cube.Pos{
