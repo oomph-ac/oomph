@@ -50,71 +50,13 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
-		dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
-		if !ok {
-			return true
+		h.tryPlaceBlock(p, pk, false)
+
+		// If there are ghost blocks in the world, account for scenarios where the player will
+		// place a block on top of a ghost block, etc.
+		if p.World.HasGhostBlocks() {
+			h.tryPlaceBlock(p, pk, true)
 		}
-
-		// No item in hand.
-		if dat.HeldItem.Stack.NetworkID == 0 {
-			return true
-		}
-
-		// BlockRuntimeIDs should be positive.
-		if dat.HeldItem.Stack.BlockRuntimeID < 0 {
-			return true
-		}
-
-		b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID))
-		if !ok {
-			return true
-		}
-
-		// Find the replace position of the block. This will be used if the block at the current position
-		// is replacable (e.g: water, lava, air).
-		replacePos := utils.BlockToCubePos(dat.BlockPosition)
-		fb := p.World.GetBlock(replacePos)
-
-		// If the block at the position is not replacable, we want to place the block on the side of the block.
-		if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
-			replacePos = replacePos.Side(cube.Face(dat.BlockFace))
-		}
-
-		// Make a list of BBoxes the block will occupy.
-		bx := b.Model().BBox(df_cube.Pos(replacePos), nil)
-		boxes := make([]cube.BBox, 0)
-		for _, bxx := range bx {
-			// Don't continue if the block isn't 1x1x1.
-			// TODO: Implement placements for these blocks properly.
-			if bxx.Width() != 1 || bxx.Height() != 1 || bxx.Length() != 1 {
-				return true
-			}
-
-			boxes = append(boxes, game.DFBoxToCubeBox(bxx).Translate(mgl32.Vec3{
-				float32(replacePos.X()),
-				float32(replacePos.Y()),
-				float32(replacePos.Z()),
-			}))
-		}
-
-		// Get the player's AABB and translate it to the position of the player. Then check if it intersects
-		// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-		movHandler := p.Handler(HandlerIDMovement).(*MovementHandler)
-		if cube.AnyIntersections(boxes, movHandler.BoundingBox()) {
-			return true
-		}
-
-		entHandler := p.Handler(HandlerIDEntities).(*EntitiesHandler)
-		for _, e := range entHandler.Entities {
-			if cube.AnyIntersections(boxes, e.Box(e.Position)) {
-				return true
-			}
-		}
-
-		// Set the block in the world.
-		p.World.SetBlock(replacePos, b)
-		h.placedBlocks[replacePos] = b
-		return true
 	case *packet.PlayerAuthInput:
 		if !h.initalized {
 			h.ChunkRadius = int32(p.GameDat.ChunkRadius) + 4
