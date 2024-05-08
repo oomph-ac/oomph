@@ -249,6 +249,82 @@ func (h *ChunksHandler) OnTick(p *player.Player) {
 func (h *ChunksHandler) Defer() {
 }
 
+func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTransaction, ghost bool) {
+	if ghost {
+		p.World.SearchWithGhost(true)
+		defer p.World.SearchWithGhost(false)
+	}
+
+	dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
+	if !ok {
+		return
+	}
+
+	// No item in hand.
+	if dat.HeldItem.Stack.NetworkID == 0 {
+		return
+	}
+
+	// BlockRuntimeIDs should be positive.
+	if dat.HeldItem.Stack.BlockRuntimeID < 0 {
+		return
+	}
+
+	b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID))
+	if !ok {
+		return
+	}
+
+	// Find the replace position of the block. This will be used if the block at the current position
+	// is replacable (e.g: water, lava, air).
+	replacePos := utils.BlockToCubePos(dat.BlockPosition)
+	fb := p.World.GetBlock(replacePos)
+
+	// If the block at the position is not replacable, we want to place the block on the side of the block.
+	if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
+		replacePos = replacePos.Side(cube.Face(dat.BlockFace))
+	}
+
+	// Make a list of BBoxes the block will occupy.
+	bx := b.Model().BBox(df_cube.Pos(replacePos), nil)
+	boxes := make([]cube.BBox, 0)
+	for _, bxx := range bx {
+		// Don't continue if the block isn't 1x1x1.
+		// TODO: Implement placements for these blocks properly.
+		if bxx.Width() != 1 || bxx.Height() != 1 || bxx.Length() != 1 {
+			return
+		}
+
+		boxes = append(boxes, game.DFBoxToCubeBox(bxx).Translate(mgl32.Vec3{
+			float32(replacePos.X()),
+			float32(replacePos.Y()),
+			float32(replacePos.Z()),
+		}))
+	}
+
+	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
+	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
+	movHandler := p.Handler(HandlerIDMovement).(*MovementHandler)
+	if cube.AnyIntersections(boxes, movHandler.BoundingBox()) {
+		return
+	}
+
+	entHandler := p.Handler(HandlerIDEntities).(*EntitiesHandler)
+	for _, e := range entHandler.Entities {
+		if cube.AnyIntersections(boxes, e.Box(e.Position)) {
+			return
+		}
+	}
+
+	if ghost {
+		p.World.MarkGhostBlock(replacePos, b)
+		return
+	}
+
+	p.World.SetBlock(replacePos, b)
+	h.placedBlocks[replacePos] = b
+}
+
 // noinspection ALL
 //
 //go:linkname chunk_subChunkDecode github.com/df-mc/dragonfly/server/world/chunk.decodeSubChunk
