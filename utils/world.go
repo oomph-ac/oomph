@@ -367,12 +367,12 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		"minecraft:trapdoor", "minecraft:iron_trapdoor", "minecraft:wooden_trapdoor":
 		_, dat := b.EncodeBlock()
 
-		box := cube.Box(0, 0, 0, 1, 0.1825, 1) // PM is wrong??
-		if dat["open_bit"].(bool) {
+		box := cube.Box(0, 0, 0, 1, 0.1825, 1) // PM and DF is wrong??
+		if dat["open_bit"].(uint8) > 0 {
 			return []cube.BBox{}
 		}
 
-		if dat["upside_down_bit"].(bool) {
+		if dat["upside_down_bit"].(uint8) > 0 {
 			box = cube.Box(0, 0.8175, 0, 1, 1, 1)
 		}
 
