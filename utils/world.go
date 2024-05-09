@@ -368,8 +368,10 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		_, dat := b.EncodeBlock()
 
 		box := cube.Box(0, 0, 0, 1, 0.1825, 1) // PM and DF is wrong??
-		if dat["open_bit"].(uint8) > 0 {
-			return []cube.BBox{}
+		if u, ok := dat["open_bit"].(uint8); ok && u > 0 {
+			break
+		} else if b, ok := dat["open_bit"].(bool); ok && b {
+			break
 		}
 
 		if dat["upside_down_bit"].(uint8) > 0 {
