@@ -374,8 +374,14 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 			break
 		}
 
-		if dat["upside_down_bit"].(bool) {
-			box = cube.Box(0, 0.8175, 0, 1, 1, 1)
+		if upsidedown, ok := dat["upside_down_bit"].(bool); ok {
+			if upsidedown {
+				box = cube.Box(0, 0.8175, 0, 1, 1, 1)
+			}
+		} else if upsidedown, ok := dat["upside_down_bit"].(uint8); ok {
+			if upsidedown > 0 {
+				box = cube.Box(0, 0.8175, 0, 1, 1, 1)
+			}
 		}
 
 		return []cube.BBox{box}
