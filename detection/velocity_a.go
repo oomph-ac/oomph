@@ -45,12 +45,12 @@ func (d *VelocityA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || mDat.Mov.Y() < 0.05 || mDat.TicksSinceTeleport <= 20 {
+	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || mDat.Mov.Y() < 0.03 || mDat.TicksSinceTeleport <= 20 {
 		return true
 	}
 
 	pct := (mDat.ClientMov.Y() / mDat.Mov.Y()) * 100
-	if pct >= 99.99 || pct <= 110 {
+	if pct >= 99.99 && pct <= 110 {
 		d.Debuff(0.1)
 		return true
 	}
