@@ -89,6 +89,10 @@ func (o *Oomph) Start() {
 	}()
 
 	s := o.settings
+	if !s.Authentication {
+		o.Log.Warn("XBOX authentication is disabled.")
+	}
+
 	if s.SentryOpts == nil {
 		s.SentryOpts = &sentry.ClientOptions{
 			Dsn:                "https://06f2165840f341138a676b52eacad19c@o1409396.ingest.sentry.io/6747367",
