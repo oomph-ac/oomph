@@ -49,7 +49,7 @@ func (d *MovementA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.StepClipOffset > 0 || mDat.OnGround {
+	if mDat.StepClipOffset > 0 || mDat.OnGround || mDat.OutgoingCorrections > 0 {
 		return true
 	}
 

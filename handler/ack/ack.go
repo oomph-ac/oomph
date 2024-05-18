@@ -24,6 +24,8 @@ const (
 	AckPlayerUpdateAttributes // OK
 	AckPlayerUpdateKnockback  // OK
 	AckPlayerTeleport         // OK
+
+	AckPlayerRecieveCorrection // OK
 )
 
 var FuncMap = map[AckID]AckFunc{}

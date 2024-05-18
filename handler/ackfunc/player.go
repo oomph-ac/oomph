@@ -118,3 +118,10 @@ func PlayerTeleport(p *player.Player, data ...interface{}) {
 		data[2].(bool),       // Smooth
 	)
 }
+
+// OPTS: n/a
+func PlayerRecieveCorrection(p *player.Player, data ...interface{}) {
+	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+	mDat.OutgoingCorrections--
+	mDat.RecievedCorrection = true
+}
