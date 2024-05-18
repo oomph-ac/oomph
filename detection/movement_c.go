@@ -44,12 +44,7 @@ func (d *MovementC) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.TicksSinceTeleport == -1 {
-		return true
-	}
-
-	// If the player is not jumping, we don't need to run this check.
-	if !mDat.Jumping {
+	if mDat.TicksSinceTeleport == -1 || !mDat.Jumping || mDat.OutgoingCorrections > 0 {
 		return true
 	}
 

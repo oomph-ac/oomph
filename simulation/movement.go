@@ -10,6 +10,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/oomph-ac/oomph/world"
@@ -60,6 +61,32 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	}
 
 	mDat.MovementScenario = sc
+
+	// If the position between the server and client deviates more than the correction threshold
+	// in a tick, correct their movement, and don't accept any client movement until
+	// the position has been syncrohnised.
+	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold {
+		s.correctMovement(p, mDat)
+	}
+}
+
+func (s MovementSimulator) correctMovement(p *player.Player, mDat *handler.MovementHandler) {
+	if mDat.StepClipOffset > 0 {
+		return
+	}
+
+	mDat.OutgoingCorrections++
+	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
+		PredictionType: packet.PredictionTypePlayer,
+		Position:       mDat.Position.Add(mgl32.Vec3{0, 1.6201}),
+		Delta:          mDat.Velocity,
+		OnGround:       mDat.OnGround,
+		Tick:           uint64(p.ClientFrame),
+	})
+
+	p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler).Add(ack.New(
+		ack.AckPlayerRecieveCorrection,
+	))
 }
 
 func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
