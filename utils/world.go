@@ -303,32 +303,49 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	case "minecraft:cobblestone_wall", "minecraft:blackstone_wall", "minecraft:polished_blackstone_wall",
 		"minecraft:cobbled_deepslate_wall", "minecraft:polished_blackstone_brick_wall", "minecraft:deepslate_tile_wall",
 		"minecraft:mud_brick_wall", "minecraft:polished_deepslate_wall", "minecraft:deepslate_brick_wall":
-		connectWest, connectEast, connectNorth, connectSouth := CheckWallConnections(b, sblocks)
+		var connectedEast bool = false
+		var connectedWest bool = false
+		var connectedNorth bool = false
+		var connectedSouth bool = false
 
-		var inset float32 = 0.25
-		wallModel := b.Model().(model.Wall)
-		post := wallModel.Post
-
-		if !post && ((connectNorth && connectSouth && !connectWest && !connectEast) || (connectWest && connectEast && !connectNorth && !connectSouth)) {
-			inset = 0.3125
+		_, dat := b.EncodeBlock()
+		if east, ok := dat["wall_connection_type_east"].(string); ok && east != "none" {
+			connectedEast = true
+		}
+		if west, ok := dat["wall_connection_type_west"].(string); ok && west != "none" {
+			connectedWest = true
+		}
+		if north, ok := dat["wall_connection_type_north"].(string); ok && north != "none" {
+			connectedNorth = true
+		}
+		if south, ok := dat["wall_connection_type_south"].(string); ok && south != "none" {
+			connectedSouth = true
 		}
 
-		min, max := mgl32.Vec3{}, mgl32.Vec3{1, 1.5, 1}
-		if !connectNorth {
-			min[2] += inset
+		isPost := (dat["wall_post_bit"].(uint8)) > 0
+		nonPostCond1 := connectedEast && connectedWest && !connectedNorth && !connectedSouth
+		nonPostCond2 := !connectedEast && !connectedWest && connectedNorth && connectedSouth
+
+		inset := float32(0.25)
+		if !isPost && (nonPostCond1 || nonPostCond2) {
+			inset = float32(0.3125)
 		}
 
-		if !connectSouth {
-			max[2] -= inset
+		bb := cube.Box(0, 0, 0, 1, 1.5, 1)
+		if !connectedNorth {
+			bb = bb.ExtendTowards(cube.FaceNorth, -inset)
 		}
-		if !connectWest {
-			min[0] += inset
+		if !connectedSouth {
+			bb = bb.ExtendTowards(cube.FaceSouth, -inset)
 		}
-		if !connectEast {
-			max[0] -= inset
+		if !connectedEast {
+			bb = bb.ExtendTowards(cube.FaceEast, -inset)
+		}
+		if !connectedWest {
+			bb = bb.ExtendTowards(cube.FaceWest, -inset)
 		}
 
-		return []cube.BBox{cube.Box(min.X(), min.Y(), min.Z(), max.X(), max.Y(), max.Z())}
+		return []cube.BBox{bb}
 	case "minecraft:snow_layer":
 		_, dat := b.EncodeBlock()
 		height, ok := dat["height"]
@@ -530,35 +547,6 @@ func FenceConnectionCompatiable(b world.Block) bool {
 
 		return true
 	}
-}
-
-// CheckWallConnections checks for connections on the x and z axis the wall may have.
-func CheckWallConnections(b world.Block, sblocks map[cube.Face]world.Block) (bool, bool, bool, bool) {
-	// Connections on the X-axis.
-	wb, connectWest := sblocks[cube.FaceWest]
-	eb, connectEast := sblocks[cube.FaceEast]
-
-	// Check if the block can connect with the wall.
-	if connectWest && !WallConnectionCompatiable(wb) {
-		connectWest = false
-	}
-	if connectEast && !WallConnectionCompatiable(eb) {
-		connectEast = false
-	}
-
-	// Connections on the Z-axis.
-	nb, connectNorth := sblocks[cube.FaceNorth]
-	sb, connectSouth := sblocks[cube.FaceSouth]
-
-	// Check if the block can connect with the wall.
-	if connectNorth && !WallConnectionCompatiable(nb) {
-		connectNorth = false
-	}
-	if connectSouth && !WallConnectionCompatiable(sb) {
-		connectSouth = false
-	}
-
-	return connectWest, connectEast, connectNorth, connectSouth
 }
 
 // WallConnectionCompatiable returns true if the given block is compatiable to conenct to a wall.

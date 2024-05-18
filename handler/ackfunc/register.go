@@ -20,4 +20,6 @@ func init() {
 	ack.FuncMap[ack.AckPlayerUpdateAttributes] = PlayerUpdateAttributes
 	ack.FuncMap[ack.AckPlayerUpdateKnockback] = PlayerUpdateKnockback
 	ack.FuncMap[ack.AckPlayerTeleport] = PlayerTeleport
+
+	ack.FuncMap[ack.AckPlayerRecieveCorrection] = PlayerRecieveCorrection
 }

@@ -36,6 +36,11 @@ type MovementHandler struct {
 	MovementScenario
 	Scenarios []MovementScenario
 
+	OutgoingCorrections int32
+	RecievedCorrection  bool
+
+	CorrectionThreshold float32
+
 	Width  float32
 	Height float32
 
@@ -94,7 +99,8 @@ func NewMovementHandler() *MovementHandler {
 	return &MovementHandler{
 		// TODO: Do we initally trust the fly status or not? In PocketMine at least,
 		// the server doesn't seem to send back the UpdateAbillites packet.
-		TrustFlyStatus: true,
+		TrustFlyStatus:      true,
+		CorrectionThreshold: 0.3,
 	}
 }
 
@@ -311,8 +317,15 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	}
 
 	// Run the movement simulation.
-	h.s.Simulate(p)
+	if p.MovementMode != player.AuthorityModeNone {
+		h.s.Simulate(p)
+	}
 	h.TicksUntilNextJump--
+
+	if p.MovementMode == player.AuthorityModeComplete || (p.MovementMode == player.AuthorityModeSemi && h.OutgoingCorrections > 0) {
+		input.Position = h.Position.Add(mgl32.Vec3{0, 1.62})
+	}
+
 	return true
 }
 
@@ -390,12 +403,19 @@ func (*MovementHandler) OnTick(p *player.Player) {
 }
 
 func (h *MovementHandler) Defer() {
-	if h.mode == player.AuthorityModeSemi {
+	if h.mode == player.AuthorityModeSemi && h.OutgoingCorrections == 0 {
 		h.Reset()
 	}
 }
 
 func (h *MovementHandler) Reset() {
+	recv := h.RecievedCorrection
+	h.RecievedCorrection = false
+
+	if recv {
+		return
+	}
+
 	tpTicks := 0
 	if h.SmoothTeleport {
 		tpTicks = 3
