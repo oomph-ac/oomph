@@ -381,23 +381,21 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	case "minecraft:tallgrass":
 		return []cube.BBox{}
 	case "minecraft:acacia_trapdoor", "minecraft:birch_trapdoor", "minecraft:dark_oak_trapdoor", "minecraft:jungle_trapdoor", "minecraft:spruce_trapdoor",
-		"minecraft:trapdoor", "minecraft:iron_trapdoor", "minecraft:wooden_trapdoor":
-		_, dat := b.EncodeBlock()
+		"minecraft:trapdoor", "minecraft:iron_trapdoor", "minecraft:wooden_trapdoor", "minecraft:mangrove_trapdoor", "minecraft:cherry_trapdoor":
+		model := b.Model().(model.Trapdoor)
+		bb := cube.Box(0, 0, 0, 1, 1, 1)
+		trim := float32(0.8175)
 
-		box := cube.Box(0, 0, 0, 1, 0.1825, 1) // PM and DF is wrong??
-		if u, ok := dat["open_bit"].(uint8); ok && u > 0 {
-			break
-		} else if b, ok := dat["open_bit"].(bool); ok && b {
-			break
+		if model.Open {
+			return []cube.BBox{bb.ExtendTowards(cube.Face(model.Facing.Face()), -trim)}
 		}
 
-		if upsidedown, ok := dat["upside_down_bit"].(bool); ok && upsidedown {
-			box = cube.Box(0, 0.8175, 0, 1, 1, 1)
-		} else if upsidedown, ok := dat["upside_down_bit"].(uint8); ok && upsidedown > 0 {
-			box = cube.Box(0, 0.8175, 0, 1, 1, 1)
+		trimFace := cube.FaceDown
+		if model.Top {
+			trimFace = cube.FaceUp
 		}
 
-		return []cube.BBox{box}
+		return []cube.BBox{bb.ExtendTowards(trimFace, trim)}
 	}
 
 	dfBoxes := b.Model().BBox(df_cube.Pos{
