@@ -536,6 +536,11 @@ func (h *MovementHandler) updateMovementStates(p *player.Player, pk *packet.Play
 	h.JumpKeyPressed = utils.HasFlag(pk.InputData, packet.InputFlagJumping)
 	h.JumpHeight = game.DefaultJumpHeight
 
+	// Jump timer resets if the jump button is not held down.
+	if !h.JumpKeyPressed {
+		h.TicksUntilNextJump = 0
+	}
+
 	// If a speed adjustment is needed, calculate the new speed of the client.
 	if needsSpeedAdjustment {
 		h.MovementSpeed = h.calculateClientSpeed(p)
