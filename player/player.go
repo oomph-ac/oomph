@@ -272,6 +272,7 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 		return nil
 	}
 
+	// If we are not using direct mode.
 	if p.serverConn != nil {
 		return p.SendPacketToServer(pk)
 	}

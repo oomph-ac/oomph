@@ -119,13 +119,13 @@ func (s *Session) ReadPacket() (pk packet.Packet, err error) {
 		return pk, nil
 	}
 
-	pks, err := s.Conn().ReadBatch()
+	pk, err = s.Conn().ReadPacket()
 	if err != nil {
 		return pk, err
 	}
 
 	ev := event.PacketEvent{
-		Packets: pks,
+		Packets: []packet.Packet{pk},
 		Server:  false,
 	}
 	ev.EvTime = time.Now().UnixNano()
@@ -135,8 +135,7 @@ func (s *Session) ReadPacket() (pk packet.Packet, err error) {
 		return pk, err
 	}
 
-	pk = pks[0]
-	s.Player.PacketQueue = append(s.Player.PacketQueue, pks[1:]...)
+	s.Player.PacketQueue = append(s.Player.PacketQueue, pk)
 	return pk, nil
 }
 
