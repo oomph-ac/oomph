@@ -99,6 +99,8 @@ func Decode(buf *bytes.Buffer) player.Handler {
 		t = &VelocityA{}
 	case DetectionIDVelocityB:
 		t = &VelocityB{}
+	case DetectionIDScaffoldA:
+		t = &ScaffoldA{}
 	default:
 		panic(oerror.New("unknown detection ID: %s", id))
 	}

@@ -23,13 +23,22 @@ import (
 const HandlerIDChunks = "oomph:chunks"
 
 type ChunksHandler struct {
-	ChunkRadius   int32
-	InLoadedChunk bool
+	ChunkRadius     int32
+	InLoadedChunk   bool
+	BlockPlacements []BlockPlacement
 
-	placedBlocks map[cube.Pos]df_world.Block
-
+	placedBlocks     map[cube.Pos]df_world.Block
 	breakingBlockPos *protocol.BlockPos
+	ticked           bool
 	initalized       bool
+}
+
+type BlockPlacement struct {
+	Position cube.Pos
+	Block    df_world.Block
+
+	ClickedBlock df_world.Block
+	RawData      protocol.UseItemTransactionData
 }
 
 func NewChunksHandler() *ChunksHandler {
@@ -116,6 +125,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		p.World.CleanChunks(h.ChunkRadius, chunkPos)
 		h.InLoadedChunk = (p.World.GetChunk(chunkPos) != nil)
+		h.ticked = true
 	case *packet.RequestChunkRadius:
 		h.ChunkRadius = pk.ChunkRadius + 4
 	}
@@ -189,6 +199,10 @@ func (h *ChunksHandler) OnTick(p *player.Player) {
 }
 
 func (h *ChunksHandler) Defer() {
+	if h.ticked {
+		h.BlockPlacements = []BlockPlacement{}
+		h.ticked = false
+	}
 }
 
 func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTransaction, ghost bool) {
@@ -199,6 +213,11 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 
 	dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
 	if !ok {
+		return
+	}
+
+	// Validate action type.
+	if dat.ActionType != protocol.UseItemActionClickBlock {
 		return
 	}
 
@@ -263,6 +282,13 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 		return
 	}
 
+	h.BlockPlacements = append(h.BlockPlacements, BlockPlacement{
+		Position: replacePos,
+		Block:    b,
+
+		ClickedBlock: fb,
+		RawData:      *dat,
+	})
 	p.World.SetBlock(replacePos, b)
 	h.placedBlocks[replacePos] = b
 }

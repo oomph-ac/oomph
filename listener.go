@@ -32,7 +32,6 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 			TexturePacksRequired:   requirePacks,
 			AcceptedProtocols:      protocols,
 			FlushRate:              -1,
-			ReadBatches:            true,
 		}.Listen("raknet", o.settings.RemoteAddress)
 		if err != nil {
 			return nil, err
@@ -94,6 +93,8 @@ func (l listener) Accept() (session.Conn, error) {
 
 		return p.DefaultHandleFromServer(pks)
 	}
+
+	p.ReadBatchMode()
 
 	l.o.sessions <- s
 	return s, err
