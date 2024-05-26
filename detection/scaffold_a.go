@@ -61,46 +61,9 @@ func (d *ScaffoldA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	delay := p.ClientFrame - d.lastPlacementTick
-	if dat.BlockFace != d.startPlacementFace && delay <= 5 {
-		p.Message("%v %v (delay=%v)", dat.BlockFace, d.startPlacementFace, delay)
+	if dat.BlockFace != d.startPlacementFace && delay <= 4 {
+		d.Fail(p, nil)
 	}
 
 	return true
 }
-
-/* func (d *ScaffoldA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	_, ok := pk.(*packet.PlayerAuthInput)
-	if !ok {
-		return true
-	}
-
-	placements := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).BlockPlacements
-	if len(placements) == 0 {
-		return true
-	}
-
-	defer func() {
-		d.lastPlacementTick = p.ClientFrame
-	}()
-
-	// A zero-vector click position only occurs when the player is jump bridging. This means that the player would
-	// have to be going in one direction whilst bridging.
-	// A zero-vec click position will not happen if the player places a block in a different direction than
-	// the player started from.
-
-	for _, pl := range placements {
-		// If the clicked position is not a zero vector, then it is not a result of jump bridging.
-		if pl.RawData.ClickedPosition != utils.EmptyVec32 {
-			d.startPlacementFace = pl.RawData.BlockFace
-			continue
-		}
-
-		delay := p.ClientFrame - d.lastPlacementTick
-		if pl.RawData.BlockFace != d.startPlacementFace && delay <= 5 {
-			data := orderedmap.NewOrderedMap[string, any]()
-			d.Fail(p, data)
-		}
-	}
-
-	return true
-} */
