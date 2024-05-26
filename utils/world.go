@@ -382,7 +382,13 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{}
 	case "minecraft:acacia_trapdoor", "minecraft:birch_trapdoor", "minecraft:dark_oak_trapdoor", "minecraft:jungle_trapdoor", "minecraft:spruce_trapdoor",
 		"minecraft:trapdoor", "minecraft:iron_trapdoor", "minecraft:wooden_trapdoor", "minecraft:mangrove_trapdoor", "minecraft:cherry_trapdoor":
-		model := b.Model().(model.Trapdoor)
+		model, ok := b.Model().(model.Trapdoor)
+
+		// This is a hack to fix crashes where a trapdoor unregistered by dragonfly is in the world.
+		if !ok {
+			break
+		}
+
 		bb := cube.Box(0, 0, 0, 1, 1, 1)
 		trim := float32(0.8175)
 
