@@ -435,6 +435,10 @@ func (h *MovementHandler) Simulate(s Simulator) {
 	h.s = s
 }
 
+func (h *MovementHandler) Simulator() Simulator {
+	return h.s
+}
+
 func (h *MovementHandler) BoundingBox() cube.BBox {
 	pos := h.Position
 	//pos[1] += h.StepClipOffset
