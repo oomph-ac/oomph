@@ -10,7 +10,6 @@ import (
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/simulation"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 
 	osession "github.com/oomph-ac/oomph/session"
 )
@@ -32,7 +31,7 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 			TexturePacksRequired:   requirePacks,
 			AcceptedProtocols:      protocols,
 			FlushRate:              -1,
-		}.Listen("raknet", o.settings.RemoteAddress)
+		}.Listen("raknet", o.settings.LocalAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -79,22 +78,6 @@ func (l listener) Accept() (session.Conn, error) {
 	detection.RegisterDetections(p)
 
 	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
-
-	p.ClientPkFunc = func(pks []packet.Packet) error {
-		p.ProcessMu.Lock()
-		defer p.ProcessMu.Unlock()
-
-		return p.DefaultHandleFromClient(pks)
-	}
-
-	p.ServerPkFunc = func(pks []packet.Packet) error {
-		p.ProcessMu.Lock()
-		defer p.ProcessMu.Unlock()
-
-		return p.DefaultHandleFromServer(pks)
-	}
-
-	p.ReadBatchMode()
 
 	l.o.sessions <- s
 	return s, err
