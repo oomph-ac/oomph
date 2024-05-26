@@ -135,8 +135,9 @@ func (s *Session) ReadPacket() (pk packet.Packet, err error) {
 		return pk, err
 	}
 
-	s.Player.PacketQueue = append(s.Player.PacketQueue, pk)
-	return pk, nil
+	// Do recursive call to return the next packet in the packet queue. This is done so that in the
+	// case where Oomph cancels the packet, only the next allowed packet is returned.
+	return s.ReadPacket()
 }
 
 func (s *Session) StartGameContext(ctx context.Context, data minecraft.GameData) error {
