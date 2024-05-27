@@ -39,6 +39,8 @@ type BlockPlacement struct {
 
 	ClickedBlock df_world.Block
 	RawData      protocol.UseItemTransactionData
+
+	Sneaking bool
 }
 
 func NewChunksHandler() *ChunksHandler {
@@ -227,7 +229,7 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 	}
 
 	// BlockRuntimeIDs should be positive.
-	if dat.HeldItem.Stack.BlockRuntimeID < 0 {
+	if dat.HeldItem.Stack.BlockRuntimeID <= 0 {
 		return
 	}
 
@@ -282,12 +284,15 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 		return
 	}
 
+	mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
 	h.BlockPlacements = append(h.BlockPlacements, BlockPlacement{
 		Position: replacePos,
 		Block:    b,
 
 		ClickedBlock: fb,
 		RawData:      *dat,
+
+		Sneaking: mDat.SneakKeyPressed,
 	})
 	p.World.SetBlock(replacePos, b)
 	h.placedBlocks[replacePos] = b
