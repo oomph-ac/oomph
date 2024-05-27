@@ -205,7 +205,19 @@ func (s *Session) handleRecording() {
 	for {
 		select {
 		case ev := <-s.eventQueue:
-			f.Write(ev.Encode())
+			// Get a buffer from the pool to write the event to.
+			buf := internal.BufferPool.Get().(*bytes.Buffer)
+			buf.Reset()
+
+			enc := ev.Encode()
+			utils.WriteLInt64(buf, int64(len(enc)))
+			buf.Write(enc)
+
+			// Write the event data into the recording file.
+			f.Write(buf.Bytes())
+
+			// Put the buffer back into the pool.
+			internal.BufferPool.Put(buf)
 		case <-s.stopRecording:
 			return
 		}
