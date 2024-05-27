@@ -35,6 +35,5 @@ func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewServerNukeB())
 
 	p.RegisterDetection(NewScaffoldA())
-
 	//p.RegisterDetection(NewToolboxA())
 }
