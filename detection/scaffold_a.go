@@ -61,7 +61,7 @@ func (d *ScaffoldA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	delay := p.ClientFrame - d.lastPlacementTick
-	if dat.BlockFace != d.startPlacementFace && delay <= 4 {
+	if dat.BlockFace != d.startPlacementFace && delay == 0 {
 		d.Fail(p, nil)
 	}
 
