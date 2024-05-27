@@ -43,7 +43,18 @@ func DecodeEvents(dat []byte) ([]Event, error) {
 
 	events := []Event{}
 	for buf.Len() > 0 {
-		ev, err := DecodeEvent(buf)
+		evDat := internal.BufferPool.Get().(*bytes.Buffer)
+		evDat.Reset()
+
+		// Get the amount of bytes the event takes up.
+		evLen := utils.LInt64(buf.Next(8))
+		// Write the event data to the buffer, and then decode the event.
+		evDat.Write(buf.Next(int(evLen)))
+		ev, err := DecodeEvent(evDat)
+
+		// Return the evDat buffer to the pool.
+		internal.BufferPool.Put(evDat)
+
 		if err != nil {
 			return events, oerror.New("error decoding event: %v", err)
 		}
