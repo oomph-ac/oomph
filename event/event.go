@@ -3,7 +3,6 @@ package event
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/handler/ack"
@@ -69,8 +68,6 @@ func DecodeEvent(buf *bytes.Buffer) (Event, error) {
 	rawID := binary.LittleEndian.Uint64(buf.Next(8))
 	id := byte(rawID)
 	t := int64(binary.LittleEndian.Uint64(buf.Next(8)))
-
-	fmt.Println(rawID, t)
 
 	var err error
 	switch id {
