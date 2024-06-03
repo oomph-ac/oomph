@@ -12,6 +12,11 @@ import (
 
 const DetectionIDScaffoldA = "oomph:scaffold_a"
 
+const (
+	blockFaceDynamic = -1
+	blockFaceNotSet  = -2
+)
+
 type ScaffoldA struct {
 	BaseDetection
 
@@ -41,7 +46,7 @@ func NewScaffoldA() *ScaffoldA {
 	d.FailBuffer = 0
 	d.MaxBuffer = 1
 
-	d.expectedBlockFace = -2
+	d.expectedBlockFace = blockFaceNotSet
 	d.lastPlacementTick = 0
 	d.lane = placementLane{}
 
@@ -59,7 +64,7 @@ func (d *ScaffoldA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		// may have a zero-vector click position. We will set the expected block face to the next block face
 		// that is clicked.
 		if dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && dat.ActionType == protocol.UseItemActionClickAir {
-			d.expectedBlockFace = -1
+			d.expectedBlockFace = blockFaceDynamic
 		}
 	case *packet.PlayerAuthInput:
 		placements := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).BlockPlacements
@@ -73,7 +78,7 @@ func (d *ScaffoldA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 			placedFace := cube.Face(pl.RawData.BlockFace)
 
 			// Update the expected block face and the "building lane".
-			if pl.RawData.ClickedPosition != utils.EmptyVec32 || d.expectedBlockFace == -1 {
+			if pl.RawData.ClickedPosition != utils.EmptyVec32 || d.expectedBlockFace == blockFaceDynamic {
 				if d.expectedBlockFace != -1 {
 					d.lane.axis = placedFace.Axis()
 					d.lane.value = pl.Position.X()
@@ -87,13 +92,18 @@ func (d *ScaffoldA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 			}
 
 			if pl.RawData.BlockFace != d.expectedBlockFace && blockPlacedBelow {
+				if d.expectedBlockFace == blockFaceNotSet {
+					continue
+				}
+
 				// This behavior usually occurs with scaffolds due to the fact they are not done properly. This check
 				// can be easily bypassed - but cheat developers must figure out what Oomph is doing here :^)
 				data := orderedmap.NewOrderedMap[string, any]()
 				data.Set("type", "WBF")
 				d.Fail(p, data)
-
 				p.Log().Infof("ScaffoldA WBF: expected=%v got=%v", d.expectedBlockFace, pl.RawData.BlockFace)
+
+				d.expectedBlockFace = pl.RawData.BlockFace
 			} else if pl.RawData.BlockFace == d.expectedBlockFace && d.lane.axis != cube.Y {
 				// Since the clicked position is still a zero-vector, we are assuming the player is jump bridging here.
 				// Jump bridging cannot be done on two different axis at the same time, therefore, we validate that the
