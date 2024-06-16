@@ -51,5 +51,5 @@ func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewServerNukeB())
 
 	// scaffold detections
-	//p.RegisterDetection(NewScaffoldA())
+	p.RegisterDetection(NewScaffoldA())
 }
