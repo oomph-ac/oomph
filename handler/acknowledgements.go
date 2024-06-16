@@ -56,7 +56,7 @@ func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.
 		a.Ticked = true
 
 		if !a.initalized {
-			a.Playstation = p.ClientDat.DeviceOS == protocol.DeviceOrbis
+			a.Playstation = (p.ClientDat.DeviceOS == protocol.DeviceOrbis)
 			a.Refresh()
 			a.initalized = true
 		}

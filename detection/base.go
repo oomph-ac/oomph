@@ -30,7 +30,7 @@ type BaseDetection struct {
 	MaxBuffer  float32
 
 	Punishable bool
-	Settings   map[string]interface{}
+	Settings   *orderedmap.OrderedMap[string, any]
 
 	// trustDuration is the amount of ticks needed w/o flags before the detection trusts the player.
 	trustDuration int64
@@ -77,12 +77,16 @@ func Decode(buf *bytes.Buffer) player.Handler {
 		t = &HitboxA{}
 	case DetectionIDKillAuraA:
 		t = &KillAuraA{}
-	case DetectionIDMovementA:
-		t = &MovementA{}
-	case DetectionIDMovementB:
-		t = &MovementB{}
-	case DetectionIDMovementC:
-		t = &MovementC{}
+	case DetectionIDFlyA:
+		t = &FlyA{}
+	case DetectionIDMotionA:
+		t = &MotionA{}
+	case DetectionIDMotionB:
+		t = &MotionB{}
+	case DetectionIDMotionC:
+		t = &MotionC{}
+	case DetectionIDSpeedA:
+		t = &SpeedA{}
 	case DetectionIDReachA:
 		t = &ReachA{}
 	case DetectionIDReachB:
@@ -117,11 +121,6 @@ func Decode(buf *bytes.Buffer) player.Handler {
 // ID returns the ID of the detection.
 func (d *BaseDetection) ID() string {
 	panic(oerror.New("detection.ID() not implemented"))
-}
-
-// SetSettings sets the settings of the detection.
-func (d *BaseDetection) SetSettings(settings map[string]interface{}) {
-	d.Settings = settings
 }
 
 // Fail is called when the detection is triggered from adbnormal behavior.

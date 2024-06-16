@@ -10,7 +10,6 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
-	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/oomph-ac/oomph/world"
@@ -66,27 +65,8 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	// in a tick, correct their movement, and don't accept any client movement until
 	// the position has been syncrohnised.
 	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold {
-		s.correctMovement(p, mDat)
+		mDat.CorrectMovement(p)
 	}
-}
-
-func (s MovementSimulator) correctMovement(p *player.Player, mDat *handler.MovementHandler) {
-	if mDat.StepClipOffset > 0 {
-		return
-	}
-
-	mDat.OutgoingCorrections++
-	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
-		PredictionType: packet.PredictionTypePlayer,
-		Position:       mDat.Position.Add(mgl32.Vec3{0, 1.6201}),
-		Delta:          mDat.Velocity,
-		OnGround:       mDat.OnGround,
-		Tick:           uint64(p.ClientFrame),
-	})
-
-	p.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler).Add(ack.New(
-		ack.AckPlayerRecieveCorrection,
-	))
 }
 
 func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
@@ -152,6 +132,8 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 		blockFriction *= utils.BlockFriction(blockUnder)
 		v3 = mDat.MovementSpeed * (0.162771336 / math32.Pow(blockFriction, 3))
 	}
+
+	mDat.Friction = blockFriction
 	s.moveRelative(mDat, v3)
 
 	nearClimable := utils.BlockClimbable(w.GetBlock(cube.PosFromVec3(mDat.Position)))
@@ -164,6 +146,8 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 		if mDat.Sneaking && mDat.Velocity[1] < 0 {
 			mDat.Velocity[1] = 0
 		}
+
+		mDat.Climb = true
 	}
 
 	blocksInside, inside := s.blocksInside(mDat, w)
@@ -225,7 +209,7 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	cDat := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler)
 
-	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox().Grow(1), false, true, p.World) {
+	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox(), false, true, p.World) {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
 			return false
 		}
@@ -239,7 +223,7 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 		!mDat.Flying &&
 		!mDat.NoClip &&
 		p.Alive &&
-		cDat.InLoadedChunk &&
+		cDat.TicksInLoadedChunk >= 10 &&
 		mDat.Position.Y() >= -64
 }
 
@@ -251,7 +235,6 @@ func (s MovementSimulator) teleport(mDat *handler.MovementHandler) bool {
 			mDat.Velocity[1] = -0.002
 		}
 		mDat.OnGround = mDat.TeleportOnGround
-
 		mDat.TicksUntilNextJump = 0
 		s.jump(mDat)
 		return true
@@ -273,9 +256,11 @@ func (s MovementSimulator) teleport(mDat *handler.MovementHandler) bool {
 
 func (MovementSimulator) jump(mDat *handler.MovementHandler) {
 	if !mDat.Jumping || !mDat.OnGround || mDat.TicksUntilNextJump > 0 {
+		mDat.Jumped = false
 		return
 	}
 
+	mDat.Jumped = true
 	mDat.Velocity[1] = mDat.JumpHeight
 	mDat.TicksUntilNextJump = game.JumpDelayTicks
 	if !mDat.Sprinting {
@@ -299,7 +284,7 @@ func (MovementSimulator) pushOutOfBlocks(mDat *handler.MovementHandler, w *world
 	}
 
 	inside := false
-	bb := mDat.BoundingBox()
+	playerBB := mDat.BoundingBox()
 	newPos := mDat.Position
 
 	airBlocks := map[cube.Face]bool{}
@@ -310,34 +295,44 @@ func (MovementSimulator) pushOutOfBlocks(mDat *handler.MovementHandler, w *world
 	}
 
 	for _, result := range utils.GetNearbyBlocks(mDat.BoundingBox(), false, true, w) {
-		if !utils.CanPassBlock(result.Block) {
+		if utils.CanPassBlock(result.Block) {
 			continue
 		}
 
 		for _, box := range utils.BlockBoxes(result.Block, result.Position, w) {
 			box = box.Translate(result.Position.Vec3())
-			if !bb.IntersectsWith(box) {
+			if !playerBB.IntersectsWith(box) {
 				continue
 			}
 
-			minDelta, maxDelta := box.Max().Sub(bb.Min()), box.Min().Sub(bb.Max())
-			if !airBlocks[cube.FaceUp] && box.Max().Y()-bb.Min().Y() > 0 && minDelta.Y() <= 0.5 {
+			if airBlocks[cube.FaceUp] && playerBB.Min().Y() < box.Max().Y() && mDat.Mov.Y() <= 0 {
 				newPos[1] = box.Max().Y() + 1e-3
 				inside = true
+				continue
+			} else if airBlocks[cube.FaceDown] && !airBlocks[cube.FaceUp] && playerBB.Max().Y() > box.Min().Y() {
+				if box.Height() <= 0.5 {
+					newPos[1] = box.Max().Y() + 1e-3
+					inside = true
+				} else {
+					newPos[1] = box.Min().Y() - 1e-3
+					inside = true
+				}
+
+				continue
 			}
 
-			if !airBlocks[cube.FaceWest] && bb.Max().X()-box.Min().X() > 0 && minDelta.X() <= 0.5 {
+			if airBlocks[cube.FaceWest] && playerBB.Max().X()-box.Min().X() > 0 && box.Max().X()-playerBB.Min().X() <= 0.5 {
 				newPos[0] = box.Max().X() + 0.5
 				inside = true
-			} else if !airBlocks[cube.FaceEast] && box.Max().X()-bb.Min().X() > 0 && maxDelta.X() >= -0.5 {
+			} else if airBlocks[cube.FaceEast] && box.Max().X()-playerBB.Min().X() > 0 && playerBB.Max().X()-box.Min().X() >= -0.5 {
 				newPos[0] = box.Min().X() - 0.5
 				inside = true
 			}
 
-			if !airBlocks[cube.FaceNorth] && bb.Max().Z()-box.Min().Z() > 0 && minDelta.Z() <= 0.5 {
+			if airBlocks[cube.FaceNorth] && playerBB.Max().Z()-box.Min().Z() > 0 && box.Max().Z()-playerBB.Min().Z() <= 0.5 {
 				newPos[2] = box.Max().Z() + 0.5
 				inside = true
-			} else if !airBlocks[cube.FaceSouth] && box.Max().Z()-bb.Min().Z() > 0 && maxDelta.Z() >= -0.5 {
+			} else if airBlocks[cube.FaceSouth] && box.Max().Z()-playerBB.Min().Z() > 0 && playerBB.Max().Z()-box.Min().Z() >= -0.5 {
 				newPos[2] = box.Min().Z() - 0.5
 				inside = true
 			}
@@ -347,6 +342,7 @@ func (MovementSimulator) pushOutOfBlocks(mDat *handler.MovementHandler, w *world
 	if !mDat.KnownInsideBlock && inside {
 		mDat.Position = newPos
 	}
+
 	mDat.KnownInsideBlock = inside
 }
 
