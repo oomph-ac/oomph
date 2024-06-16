@@ -1,5 +1,6 @@
 github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 h1:/G0ghZwrhou0Wq21qc1vXXMm/t/aKWkALWwITptKbE0=
 github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9/go.mod h1:TOk10ahXejq9wkEaym3KPRNeuR/h5Jx+s8QRWIa2oTM=
+github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/chewxy/math32 v1.10.1 h1:LFpeY0SLJXeaiej/eIp2L40VYfscTvKh/FSEZ68uMkU=
@@ -11,6 +12,8 @@ github.com/df-mc/atomic v1.10.0 h1:0ZuxBKwR/hxcFGorKiHIp+hY7hgY+XBTzhCYD2NqSEg=
 github.com/df-mc/atomic v1.10.0/go.mod h1:Gw9rf+rPIbydMjA329Jn4yjd/O2c/qusw3iNp4tFGSc=
 github.com/df-mc/dragonfly v0.9.16-0.20240429014602-97fdfe269e3c h1:5J/hX2FqvC01kgLHL43Mlr8WPwVQrg6TJN6LZci5HwQ=
 github.com/df-mc/dragonfly v0.9.16-0.20240429014602-97fdfe269e3c/go.mod h1:XCb3PNVMz+uv7v6UVovu3ve3qkvhIFtt9wG+OzUnE6g=
+github.com/df-mc/dragonfly v0.9.16-0.20240614213155-4dab570bbb49 h1:SaXKS0N9x9lBWA8bIiE87QQkwX0WOgLpc+9nqBuW6xI=
+github.com/df-mc/dragonfly v0.9.16-0.20240614213155-4dab570bbb49/go.mod h1:UX+YPQvGWdZj5PL2th3uIeeWNs0ZmF9aYl8eQQjhHm4=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
 github.com/df-mc/worldupgrader v1.0.15 h1:kR/nYWQbFvmR5LqPncpBXtXKGyiRBPc9NPkBKlLSAIk=
@@ -68,6 +71,8 @@ github.com/oomph-ac/gophertunnel v0.0.0-20240616183157-9a90927ebb22 h1:UK6vY0tWv
 github.com/oomph-ac/gophertunnel v0.0.0-20240616183157-9a90927ebb22/go.mod h1:uFw9LFbbzhF+GHScX1uN9MkkNyU9AWhzTJKot+TVqHA=
 github.com/oomph-ac/mv v0.0.0-20240505011453-33a667ecc6d9 h1:BUznmwSEXOlF0N7r09GDh9dv/udCrH5ldsYNEFLbOkQ=
 github.com/oomph-ac/mv v0.0.0-20240505011453-33a667ecc6d9/go.mod h1:U56u7nXsCIoNvP1zTjzT2uK3A+eBW+YxEKu8LQVs63c=
+github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
+github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5/go.mod h1:jvVRKCrJTQWu0XVbaOlby/2lO20uSCHEMzzplHXte1o=
 github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba h1:3jPgmsFGBID1wFfU2AbYocNcN4wqU68UaHSdMjiw/7U=
 github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba/go.mod h1:pxMtw7cyUw6B2bRH0ZBANSPg+AoSud1I1iyJHI69jH4=

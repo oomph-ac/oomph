@@ -4,7 +4,7 @@ go 1.22.0
 
 require (
 	github.com/chewxy/math32 v1.10.1
-	github.com/df-mc/dragonfly v0.9.16-0.20240429014602-97fdfe269e3c
+	github.com/df-mc/dragonfly v0.9.16-0.20240614213155-4dab570bbb49
 	github.com/disgoorg/disgo v0.18.7
 	github.com/disgoorg/json v1.1.0
 	github.com/elliotchance/orderedmap/v2 v2.2.0
@@ -32,6 +32,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
+	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/rs/cors v1.7.0 // indirect
