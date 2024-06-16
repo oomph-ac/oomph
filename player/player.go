@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -24,11 +25,11 @@ const (
 	GameVersion1_20_10 = 594
 	GameVersion1_20_30 = 618
 	GameVersion1_20_40 = 622
+
+	TicksPerSecond = 20
+
+	targetedProcessingDelay = 10 * time.Millisecond
 )
-
-const TicksPerSecond = 20
-
-const targetedProcessingDelay = 10 * time.Millisecond
 
 type Player struct {
 	MState MonitoringState
@@ -37,7 +38,9 @@ type Player struct {
 	Connected bool
 	Closed    bool
 
-	Alive bool
+	Alive      bool
+	TicksAlive int64
+
 	Ready bool
 
 	CloseChan chan bool
@@ -97,9 +100,13 @@ type Player struct {
 	// detections contains packet handlers specifically used for detections.
 	detections []Handler
 
+	// debugDrawers is a list of debug drawers that are used to draw debug information on the client.
+	debugDrawers map[mgl32.Vec3]AABBDebugDrawer
+
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
 
+	// log is the logger of the player.
 	log *logrus.Logger
 
 	// readingBatches is true if Oomph has been configured to read batches of packets from the client instead
@@ -134,6 +141,8 @@ func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Playe
 		detections:     []Handler{},
 
 		eventHandler: &NopEventHandler{},
+
+		debugDrawers: make(map[mgl32.Vec3]AABBDebugDrawer),
 
 		readingBatches: readingBatches,
 
