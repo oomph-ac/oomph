@@ -25,7 +25,7 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 	conf.Listeners = nil
 	conf.Listeners = append(conf.Listeners, func(_ server.Config) (server.Listener, error) {
 		l, err := minecraft.ListenConfig{
-			StatusProvider:         minecraft.NewStatusProvider(name),
+			StatusProvider:         minecraft.NewStatusProvider(name, "oomph"),
 			AuthenticationDisabled: authDisabled,
 			ResourcePacks:          conf.Resources,
 			TexturePacksRequired:   requirePacks,
