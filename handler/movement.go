@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -22,12 +21,17 @@ type MovementScenario struct {
 	Position mgl32.Vec3
 	Velocity mgl32.Vec3
 
+	Friction float32
+
 	OffGroundTicks int64
 	OnGround       bool
 
 	CollisionX, CollisionZ bool
 	VerticallyCollided     bool
 	HorizontallyCollided   bool
+
+	Climb  bool
+	Jumped bool
 
 	KnownInsideBlock bool
 }
@@ -36,8 +40,9 @@ type MovementHandler struct {
 	MovementScenario
 	Scenarios []MovementScenario
 
-	OutgoingCorrections int32
-	RecievedCorrection  bool
+	OutgoingCorrections   int32
+	CorrectionTrustBuffer int32
+	CorrectionQueued      bool
 
 	CorrectionThreshold float32
 
@@ -90,6 +95,8 @@ type MovementHandler struct {
 	AirSpeed            float32
 	HasServerSpeed      bool
 	ClientPredictsSpeed bool
+
+	lastInput *packet.PlayerAuthInput
 
 	s    Simulator
 	mode player.AuthorityMode
@@ -190,6 +197,7 @@ func DecodeMovementHandler(buf *bytes.Buffer) MovementHandler {
 	return h
 }
 
+// Encode encodes the movement handler into a buffer. This is used for recordings/replays.
 func (h *MovementHandler) Encode(buf *bytes.Buffer) {
 	// Write width/height
 	utils.WriteLFloat32(buf, h.Width)
@@ -275,6 +283,54 @@ func (MovementHandler) ID() string {
 	return HandlerIDMovement
 }
 
+// CorrectMovement sends a movement correction to the client.
+func (h *MovementHandler) CorrectMovement(p *player.Player) {
+	if h.StepClipOffset > 0 || h.CorrectionQueued {
+		return
+	}
+
+	h.OutgoingCorrections++
+	h.CorrectionQueued = true
+	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
+		PredictionType: packet.PredictionTypePlayer,
+		Position:       h.Position.Add(mgl32.Vec3{0, 1.6201}),
+		Delta:          h.Velocity,
+		OnGround:       h.OnGround,
+		Tick:           uint64(p.ClientFrame),
+	})
+
+	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
+		ack.AckPlayerRecieveCorrection,
+	))
+}
+
+// RevertMovement sends a teleport packet to the client to revert the player's position.
+func (h *MovementHandler) RevertMovement(p *player.Player, pos mgl32.Vec3) {
+	p.SendPacketToClient(&packet.MovePlayer{
+		EntityRuntimeID: p.RuntimeId,
+		Mode:            packet.MoveModeTeleport,
+		Position:        pos.Add(mgl32.Vec3{0, 1.62}),
+		OnGround:        h.OnGround,
+
+		Pitch:   h.Rotation.X(),
+		HeadYaw: h.Rotation.Y(),
+		Yaw:     h.Rotation.Z(),
+	})
+
+	p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
+		ack.AckPlayerTeleport,
+		pos,
+		h.OnGround,
+		false,
+	))
+
+	p.SendPacketToClient(&packet.SetActorMotion{
+		EntityRuntimeID: p.RuntimeId,
+		Velocity:        utils.EmptyVec32,
+		Tick:            0,
+	})
+}
+
 func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	input, ok := pk.(*packet.PlayerAuthInput)
 	if !ok {
@@ -322,10 +378,12 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	}
 	h.TicksUntilNextJump--
 
-	if p.MovementMode == player.AuthorityModeComplete || (p.MovementMode == player.AuthorityModeSemi && h.OutgoingCorrections > 0) {
+	// If we are using full authority, we never send the client's position (unless the movement scenario is unsupported).
+	if p.MovementMode == player.AuthorityModeComplete {
 		input.Position = h.Position.Add(mgl32.Vec3{0, 1.62})
 	}
 
+	h.lastInput = input
 	return true
 }
 
@@ -403,30 +461,30 @@ func (*MovementHandler) OnTick(p *player.Player) {
 }
 
 func (h *MovementHandler) Defer() {
-	if h.mode == player.AuthorityModeSemi && h.OutgoingCorrections == 0 {
+	h.CorrectionQueued = false
+	if h.mode != player.AuthorityModeSemi {
+		return
+	}
+
+	// Detections may want to correct the player's movement on semi-authoritative mode, and we
+	// have to set the input position to the correct position.
+	score := h.CorrectionTrustBuffer
+	h.CorrectionTrustBuffer--
+	if h.OutgoingCorrections == 0 && score <= 0 {
 		h.Reset()
+	} else {
+		h.lastInput.Position = h.Position.Add(mgl32.Vec3{0, 1.62})
 	}
 }
 
 func (h *MovementHandler) Reset() {
-	recv := h.RecievedCorrection
-	h.RecievedCorrection = false
-
-	if recv {
-		return
-	}
-
-	tpTicks := 0
-	if h.SmoothTeleport {
-		tpTicks = 3
-	}
-
-	dev := h.Position.Sub(h.ClientPosition)
-	if math32.Abs(dev.X()) < 0.03 && math32.Abs(dev.Y()) < 0.03 && math32.Abs(dev.Z()) < 0.03 && h.HorizontallyCollided && h.TicksSinceTeleport <= tpTicks && h.StepClipOffset == 0 {
+	//dev := h.Position.Sub(h.ClientPosition)
+	if h.TicksSinceTeleport < h.TeleportTicks() || h.StepClipOffset > 0 {
 		return
 	}
 
 	h.Velocity = h.ClientVel
+	h.PrevVelocity = h.PrevClientVel
 	h.Position = h.ClientPosition
 	h.PrevPosition = h.PrevClientPosition
 }
@@ -490,6 +548,14 @@ func (h *MovementHandler) Teleport(pos mgl32.Vec3, ground, smooth bool) {
 	h.TicksSinceTeleport = -1
 }
 
+// TeleportTicks returns the ticks until a teleport is complete.
+func (h *MovementHandler) TeleportTicks() int {
+	if h.SmoothTeleport {
+		return 4
+	}
+	return 1
+}
+
 // SetKnockback sets the knockback of the player.
 func (h *MovementHandler) SetKnockback(kb mgl32.Vec3) {
 	h.Knockback = kb
@@ -539,6 +605,10 @@ func (h *MovementHandler) updateMovementStates(p *player.Player, pk *packet.Play
 	h.Jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 	h.JumpKeyPressed = utils.HasFlag(pk.InputData, packet.InputFlagJumping)
 	h.JumpHeight = game.DefaultJumpHeight
+
+	if je, ok := p.Handler(HandlerIDEffects).(*EffectsHandler).Get(packet.EffectJumpBoost); ok {
+		h.JumpHeight += float32(je.Level()) * 0.1
+	}
 
 	// Jump timer resets if the jump button is not held down.
 	if !h.JumpKeyPressed {

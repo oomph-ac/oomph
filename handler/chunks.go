@@ -23,14 +23,19 @@ import (
 const HandlerIDChunks = "oomph:chunks"
 
 type ChunksHandler struct {
-	ChunkRadius     int32
-	InLoadedChunk   bool
-	BlockPlacements []BlockPlacement
+	ChunkRadius          int32
+	BlockPlacements      []BlockPlacement
+	BroadcastGhostBlocks bool
 
-	placedBlocks     map[cube.Pos]df_world.Block
-	breakingBlockPos *protocol.BlockPos
-	ticked           bool
-	initalized       bool
+	TicksInLoadedChunk int64
+	InLoadedChunk      bool
+
+	placedBlocks       map[cube.Pos]df_world.Block
+	breakingBlockPos   *protocol.BlockPos
+	prevPlaceRequest   *protocol.UseItemTransactionData
+	lastPlaceBlockTick int64
+	ticked             bool
+	initalized         bool
 }
 
 type BlockPlacement struct {
@@ -45,8 +50,9 @@ type BlockPlacement struct {
 
 func NewChunksHandler() *ChunksHandler {
 	return &ChunksHandler{
-		ChunkRadius:  512,
-		placedBlocks: map[cube.Pos]df_world.Block{},
+		ChunkRadius:          512,
+		BroadcastGhostBlocks: true,
+		placedBlocks:         map[cube.Pos]df_world.Block{},
 	}
 }
 
@@ -61,13 +67,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
-		h.tryPlaceBlock(p, pk, false)
-
-		// If there are ghost blocks in the world, account for scenarios where the player will
-		// place a block on top of a ghost block, etc.
-		if p.World.HasGhostBlocks() {
-			h.tryPlaceBlock(p, pk, true)
-		}
+		return h.tryPlaceBlock(p, pk)
 	case *packet.PlayerAuthInput:
 		if !h.initalized {
 			h.ChunkRadius = int32(p.GameDat.ChunkRadius) + 4
@@ -127,6 +127,12 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		p.World.CleanChunks(h.ChunkRadius, chunkPos)
 		h.InLoadedChunk = (p.World.GetChunk(chunkPos) != nil)
+		if h.InLoadedChunk {
+			h.TicksInLoadedChunk++
+		} else {
+			h.TicksInLoadedChunk = 0
+		}
+
 		h.ticked = true
 	case *packet.RequestChunkRadius:
 		h.ChunkRadius = pk.ChunkRadius + 4
@@ -149,10 +155,18 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		pos := cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
 		isAir := utils.BlockName(b) == "minecraft:air"
 
+		ghBlock := false
 		if placed, ok := h.placedBlocks[pos]; ok && isAir {
 			p.World.MarkGhostBlock(pos, placed)
+			ghBlock = true
 		} else if !ok {
 			p.World.UnmarkGhostBlock(pos)
+		}
+
+		// This is done because some server-sided plugins may mess up with oomph's compatibility with being able
+		// to account for ghost blocks properly (e.g - BlockLagFix).
+		if !h.BroadcastGhostBlocks && ghBlock && p.ClientFrame-h.lastPlaceBlockTick <= 20 {
+			return false
 		}
 		delete(h.placedBlocks, pos)
 
@@ -207,8 +221,10 @@ func (h *ChunksHandler) Defer() {
 	}
 }
 
-func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTransaction, ghost bool) {
-	if ghost {
+func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTransaction) (send bool) {
+	send = true
+
+	if p.World.HasGhostBlocks() {
 		p.World.SearchWithGhost(true)
 		defer p.World.SearchWithGhost(false)
 	}
@@ -237,6 +253,16 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 	if !ok {
 		return
 	}
+
+	if h.prevPlaceRequest != nil && dat.BlockRuntimeID == h.prevPlaceRequest.BlockRuntimeID && dat.BlockFace == h.prevPlaceRequest.BlockFace &&
+		dat.BlockPosition == h.prevPlaceRequest.BlockPosition && dat.HotBarSlot == h.prevPlaceRequest.HotBarSlot &&
+		dat.Position == h.prevPlaceRequest.Position && dat.ClickedPosition == h.prevPlaceRequest.ClickedPosition {
+		return false
+	}
+
+	defer func() {
+		h.prevPlaceRequest = dat
+	}()
 
 	// Find the replace position of the block. This will be used if the block at the current position
 	// is replacable (e.g: water, lava, air).
@@ -279,11 +305,6 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 		}
 	}
 
-	if ghost {
-		p.World.MarkGhostBlock(replacePos, b)
-		return
-	}
-
 	mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
 	h.BlockPlacements = append(h.BlockPlacements, BlockPlacement{
 		Position: replacePos,
@@ -294,8 +315,12 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 
 		Sneaking: mDat.SneakKeyPressed,
 	})
+
 	p.World.SetBlock(replacePos, b)
 	h.placedBlocks[replacePos] = b
+	h.lastPlaceBlockTick = p.ClientFrame
+
+	return
 }
 
 // noinspection ALL
