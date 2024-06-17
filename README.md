@@ -12,3 +12,4 @@ At the moment, Oomph is undergoing a refactor, and the configuration is not yet 
 ## Credits
 * [ethaniccc](https://www.github.com/ethaniccc) - Created the systems for validating combat and movement, while keeping lag-compensation in mind.
 * [JustTalDevelops](https://github.com/JustTalDevelops) - Created the base of Oomph, making it able to intercept packets, and avoiding pesky import cycles.
+
