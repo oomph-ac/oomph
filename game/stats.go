@@ -13,6 +13,14 @@ func Sum(data []float64) (result float64) {
 	return result
 }
 
+// Sum32 ...
+func Sum32(data []float32) (result float32) {
+	for _, v := range data {
+		result += v
+	}
+	return result
+}
+
 // Mean ...
 func Mean(data []float64) float64 {
 	count := float64(len(data))
@@ -20,6 +28,15 @@ func Mean(data []float64) float64 {
 		return 0
 	}
 	return Sum(data) / count
+}
+
+// Mean32 ...
+func Mean32(data []float32) float32 {
+	count := float32(len(data))
+	if count == 0 {
+		return 0
+	}
+	return Sum32(data) / count
 }
 
 // Median ...
