@@ -87,6 +87,15 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 	if pk := a.CreatePacket(); pk != nil {
 		p.SendPacketToClient(pk)
 	}
+
+	// Resend all the current acknowledgements to the client.
+	for timestamp := range a.AckMap {
+		p.SendPacketToClient(&packet.NetworkStackLatency{
+			Timestamp:     a.getModifiedTimestamp(timestamp),
+			NeedsResponse: true,
+		})
+	}
+
 	a.Refresh()
 }
 
@@ -156,15 +165,18 @@ func (a *AcknowledgementHandler) CreatePacket() *packet.NetworkStackLatency {
 		return nil
 	}
 
-	timestamp := a.CurrentTimestamp
-	if a.LegacyMode && a.Playstation {
-		timestamp /= AckDivider
-	}
-
+	timestamp := a.getModifiedTimestamp(a.CurrentTimestamp)
 	return &packet.NetworkStackLatency{
 		Timestamp:     timestamp,
 		NeedsResponse: true,
 	}
+}
+
+func (a *AcknowledgementHandler) getModifiedTimestamp(original int64) (timestamp int64) {
+	if a.LegacyMode && a.Playstation {
+		timestamp = original / AckDivider
+	}
+	return timestamp
 }
 
 // tryExecute takes a timestamp, and looks for callbacks associated with it.
