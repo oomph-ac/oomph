@@ -4,6 +4,10 @@ import "github.com/oomph-ac/oomph/player"
 
 // RegisterDetections registers all detections with the given player.
 func RegisterDetections(p *player.Player) {
+	// aim detections
+	p.RegisterDetection(NewAimA())
+	p.RegisterDetection(NewAimB())
+
 	// hitbox detections
 	p.RegisterDetection(NewHitboxA())
 

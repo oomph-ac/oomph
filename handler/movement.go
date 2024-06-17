@@ -57,7 +57,8 @@ type MovementHandler struct {
 	PrevMov, PrevClientMov             mgl32.Vec3
 
 	// Rotation vectors are formatted as {pitch, headYaw, yaw}
-	Rotation, PrevRotation mgl32.Vec3
+	Rotation, PrevRotation           mgl32.Vec3
+	DeltaRotation, PrevDeltaRotation mgl32.Vec3
 
 	ForwardImpulse float32
 	LeftImpulse    float32
@@ -357,6 +358,9 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	// Update the client's rotations.
 	h.PrevRotation = h.Rotation
 	h.Rotation = mgl32.Vec3{input.Pitch, input.HeadYaw, input.Yaw}
+
+	h.PrevDeltaRotation = h.DeltaRotation
+	h.DeltaRotation = game.AbsVec32(h.Rotation.Sub(h.PrevRotation))
 
 	defer func() {
 		if h.OnGround {
