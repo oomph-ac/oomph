@@ -1,8 +1,6 @@
 package detection
 
 import (
-	"fmt"
-
 	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
@@ -69,13 +67,15 @@ func (d *MotionC) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	// Check to see if the player has had a significant boost in motion.
-	mChange := mDat.ClientMov.Y() - mDat.PrevClientMov.Y()
-	if mChange >= 0.1 || (mDat.PrevClientMov.Y() < 0 && mDat.ClientMov.Y() > 0 && mDat.Mov.Y() < 0) {
+	mChange := math32.Abs(mDat.ClientMov.Y() - mDat.PrevClientMov.Y())
+	yMovOppositeToServer := (mDat.PrevClientMov.Y() < 0 && mDat.ClientMov.Y() > 0 && mDat.Mov.Y() < 0) ||
+		(mDat.PrevClientMov.Y() > 0 && mDat.ClientMov.Y() < 0 && mDat.Mov.Y() > 0)
+
+	if mChange >= 0.1 || yMovOppositeToServer {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("accel", game.Round32(mChange, 3))
 		d.Fail(p, data)
 
-		fmt.Println(p.ClientFrame, mChange, mDat.ClientMov.Y(), mDat.Mov.Y())
 		if d.Settings.GetOrDefault("revert", true).(bool) {
 			mDat.RevertMovement(p, mDat.Position)
 		}
