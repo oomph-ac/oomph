@@ -12,7 +12,8 @@ import (
 const HandlerIDAcknowledgements = "oomph:acknowledgements"
 
 const (
-	AckDivider = 1_000
+	AckDivider  = 1_000
+	resendLimit = 5
 )
 
 // AcknowledgementHandler handles acknowledgements to the client, so that the anti-cheat knows the precise
@@ -36,6 +37,7 @@ type AcknowledgementHandler struct {
 	CurrentTimestamp int64
 
 	initalized bool
+	canResend  bool
 }
 
 func NewAcknowledgementHandler() *AcknowledgementHandler {
@@ -54,6 +56,7 @@ func (a *AcknowledgementHandler) HandleClientPacket(pk packet.Packet, p *player.
 		return !a.Execute(p, pk.Timestamp)
 	case *packet.PlayerAuthInput:
 		a.Ticked = true
+		a.canResend = true
 
 		if !a.initalized {
 			a.Playstation = (p.ClientDat.DeviceOS == protocol.DeviceOrbis)
@@ -89,11 +92,21 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 	}
 
 	// Resend all the current acknowledgements to the client.
-	for timestamp := range a.AckMap {
-		p.SendPacketToClient(&packet.NetworkStackLatency{
-			Timestamp:     a.getModifiedTimestamp(timestamp),
-			NeedsResponse: true,
-		})
+	if a.canResend {
+		resends := 0
+		a.canResend = false
+
+		for timestamp := range a.AckMap {
+			p.SendPacketToClient(&packet.NetworkStackLatency{
+				Timestamp:     a.getModifiedTimestamp(timestamp),
+				NeedsResponse: true,
+			})
+
+			// We do this to prevent Oomph from overloading the client with a bunch of packets.
+			if resends++; resends >= resendLimit {
+				break
+			}
+		}
 	}
 
 	a.Refresh()
@@ -135,7 +148,7 @@ func (a *AcknowledgementHandler) Validate(p *player.Player) {
 	}
 
 	a.NonResponsiveTicks++
-	if a.NonResponsiveTicks >= 300 {
+	if a.NonResponsiveTicks >= 200 {
 		p.Disconnect("Network timeout.")
 	}
 }
