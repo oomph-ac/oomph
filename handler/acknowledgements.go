@@ -177,7 +177,12 @@ func (a *AcknowledgementHandler) Refresh() {
 
 // CreatePacket creates a NetworkStackLatency packet with the current timestamp.
 func (a *AcknowledgementHandler) CreatePacket() *packet.NetworkStackLatency {
-	if a.AckMap[a.CurrentTimestamp].Amt() == 0 {
+	batch, ok := a.AckMap[a.CurrentTimestamp]
+	if !ok {
+		return nil
+	}
+
+	if batch.Amt() == 0 {
 		delete(a.AckMap, a.CurrentTimestamp)
 		return nil
 	}
