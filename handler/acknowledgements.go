@@ -141,7 +141,7 @@ func (a *AcknowledgementHandler) Execute(p *player.Player, timestamp int64) bool
 }
 
 func (a *AcknowledgementHandler) Validate(p *player.Player) {
-	if !a.Ticked || !p.Ready {
+	if !a.Ticked {
 		return
 	}
 	a.Ticked = false
@@ -194,10 +194,12 @@ func (a *AcknowledgementHandler) CreatePacket() *packet.NetworkStackLatency {
 	}
 }
 
-func (a *AcknowledgementHandler) getModifiedTimestamp(original int64) (timestamp int64) {
+func (a *AcknowledgementHandler) getModifiedTimestamp(original int64) int64 {
+	timestamp := original
 	if a.LegacyMode && a.Playstation {
 		timestamp = original / AckDivider
 	}
+
 	return timestamp
 }
 
