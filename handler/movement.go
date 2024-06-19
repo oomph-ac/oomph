@@ -361,6 +361,14 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 
 	h.PrevDeltaRotation = h.DeltaRotation
 	h.DeltaRotation = game.AbsVec32(h.Rotation.Sub(h.PrevRotation))
+	p.Dbg.Notify(
+		player.DebugModeRotations,
+		h.DeltaRotation.LenSqr() > 1e-10,
+		"dP=%f dHY=%f dY=%f",
+		game.Round32(h.DeltaRotation[0], 4),
+		game.Round32(h.DeltaRotation[1], 4),
+		game.Round32(h.DeltaRotation[2], 4),
+	)
 
 	defer func() {
 		if h.OnGround {

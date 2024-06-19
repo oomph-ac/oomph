@@ -205,15 +205,16 @@ func (a *AcknowledgementHandler) getModifiedTimestamp(original int64) int64 {
 
 // tryExecute takes a timestamp, and looks for callbacks associated with it.
 func (a *AcknowledgementHandler) tryExecute(p *player.Player, timestamp int64) bool {
-	p.Dbg.Notify(player.DebugModeACKs, "attempting to execute ack %d", timestamp)
+	p.Dbg.Notify(player.DebugModeACKs, true, "attempting to execute ack %d", timestamp)
 
 	batch, ok := a.AckMap[timestamp]
+	p.Dbg.Notify(player.DebugModeACKs, !ok, "ack %d not found", timestamp)
+
 	if !ok {
-		p.Dbg.Notify(player.DebugModeACKs, "ack %d not found", timestamp)
 		return false
 	}
 
-	p.Dbg.Notify(player.DebugModeACKs, "executing ack %d (total=%d)", timestamp, batch.Amt())
+	p.Dbg.Notify(player.DebugModeACKs, true, "executing ack %d (total=%d)", timestamp, batch.Amt())
 	a.NonResponsiveTicks = 0
 	for _, acked := range batch.Acks {
 		acked.Run(p)
