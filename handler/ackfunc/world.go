@@ -71,13 +71,16 @@ func WorldUpdateChunks(p *player.Player, opts ...interface{}) {
 		buf.Reset()
 		buf.Write(entry.RawPayload)
 
-		var index byte
-		sub, err := utils.DecodeSubChunk(buf, c, &index, chunk.NetworkEncoding)
-		if err != nil {
-			panic(err)
+		if entry.Result != protocol.SubChunkResultSuccessAllAir {
+			var index byte
+			sub, err := utils.DecodeSubChunk(buf, c, &index, chunk.NetworkEncoding)
+			if err != nil {
+				panic(err)
+			}
+			c.Sub()[index] = sub
 		}
 
-		c.Sub()[index] = sub
+
 		internal.BufferPool.Put(buf)
 	}
 
