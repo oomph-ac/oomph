@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -95,13 +94,13 @@ type Player struct {
 	// being associated with.
 	ProcessMu deadlock.Mutex
 
+	// Dbg is the debugger of the player. It is used to log debug messages to the player.
+	Dbg *Debugger
+
 	// packetHandlers contains packet packetHandlers registered to the player.
 	packetHandlers []Handler
 	// detections contains packet handlers specifically used for detections.
 	detections []Handler
-
-	// debugDrawers is a list of debug drawers that are used to draw debug information on the client.
-	debugDrawers map[mgl32.Vec3]AABBDebugDrawer
 
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
@@ -141,8 +140,6 @@ func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Playe
 		detections:     []Handler{},
 
 		eventHandler: &NopEventHandler{},
-
-		debugDrawers: make(map[mgl32.Vec3]AABBDebugDrawer),
 
 		readingBatches: readingBatches,
 
