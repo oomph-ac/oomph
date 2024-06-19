@@ -54,8 +54,7 @@ func (d *MotionC) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	if mDat.CorrectionTrustBuffer > 0 || mDat.StepClipOffset > 0 || mDat.Climb ||
 		mDat.ClientMov.Len() <= 1e-7 || mDat.TicksSinceTeleport < mDat.TeleportTicks() ||
-		math32.Abs(mDat.ClientMov.Y()) < 0.1 || mDat.KnownInsideBlock || mDat.Jumping ||
-		mDat.TicksSinceKnockback == 0 {
+		math32.Abs(mDat.ClientMov.Y()) < 0.1 || mDat.KnownInsideBlock {
 		return true
 	}
 
