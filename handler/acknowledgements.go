@@ -13,7 +13,7 @@ const HandlerIDAcknowledgements = "oomph:acknowledgements"
 
 const (
 	AckDivider  = 1_000
-	resendLimit = 5
+	resendLimit = 3
 )
 
 // AcknowledgementHandler handles acknowledgements to the client, so that the anti-cheat knows the precise
@@ -31,7 +31,7 @@ type AcknowledgementHandler struct {
 
 	// AckMap is a map of timestamps associated with a list of callbacks.
 	// The callbacks are called when NetworkStackLatency is received from the client.
-	AckMap map[int64][]ack.Acknowledgement
+	AckMap map[int64]*ack.BatchedAck
 	// CurrentTimestamp is the current timestamp for acks, which is refreshed every server tick
 	// where the connections are flushed.
 	CurrentTimestamp int64
@@ -42,7 +42,7 @@ type AcknowledgementHandler struct {
 
 func NewAcknowledgementHandler() *AcknowledgementHandler {
 	return &AcknowledgementHandler{
-		AckMap: make(map[int64][]ack.Acknowledgement),
+		AckMap: make(map[int64]*ack.BatchedAck),
 	}
 }
 
@@ -92,7 +92,14 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 		resends := 0
 		a.canResend = false
 
-		for timestamp := range a.AckMap {
+		for timestamp, batch := range a.AckMap {
+			// Check if the client still hasn't responded to the server within the resend threshold.
+			if batch.UntilResend--; batch.UntilResend > 0 {
+				continue
+			}
+			batch.UntilResend = ack.ResendThreshold
+
+			// Resend the packet to the client.
 			p.SendPacketToClient(&packet.NetworkStackLatency{
 				Timestamp:     a.getModifiedTimestamp(timestamp),
 				NeedsResponse: true,
@@ -112,13 +119,11 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 }
 
 // Add adds an acknowledgement to AckMap.
-func (a *AcknowledgementHandler) Add(v ack.Acknowledgement) {
+func (a *AcknowledgementHandler) Add(newAck ack.Acknowledgement) {
 	if a.AckMap[a.CurrentTimestamp] == nil {
-		a.AckMap[a.CurrentTimestamp] = []ack.Acknowledgement{v}
-		return
+		a.AckMap[a.CurrentTimestamp] = ack.NewBatch()
 	}
-
-	a.AckMap[a.CurrentTimestamp] = append(a.AckMap[a.CurrentTimestamp], v)
+	a.AckMap[a.CurrentTimestamp].Add(newAck)
 }
 
 // Execute takes a timestamp, and looks for callbacks associated with it.
@@ -172,7 +177,7 @@ func (a *AcknowledgementHandler) Refresh() {
 
 // CreatePacket creates a NetworkStackLatency packet with the current timestamp.
 func (a *AcknowledgementHandler) CreatePacket() *packet.NetworkStackLatency {
-	if len(a.AckMap[a.CurrentTimestamp]) == 0 {
+	if a.AckMap[a.CurrentTimestamp].Amt() == 0 {
 		delete(a.AckMap, a.CurrentTimestamp)
 		return nil
 	}
@@ -195,15 +200,15 @@ func (a *AcknowledgementHandler) getModifiedTimestamp(original int64) (timestamp
 func (a *AcknowledgementHandler) tryExecute(p *player.Player, timestamp int64) bool {
 	p.Dbg.Notify(player.DebugModeACKs, "attempting to execute ack %d", timestamp)
 
-	acks, ok := a.AckMap[timestamp]
+	batch, ok := a.AckMap[timestamp]
 	if !ok {
 		p.Dbg.Notify(player.DebugModeACKs, "ack %d not found", timestamp)
 		return false
 	}
 
-	p.Dbg.Notify(player.DebugModeACKs, "executing ack %d (total=%d)", timestamp, len(acks))
+	p.Dbg.Notify(player.DebugModeACKs, "executing ack %d (total=%d)", timestamp, batch.Amt())
 	a.NonResponsiveTicks = 0
-	for _, acked := range acks {
+	for _, acked := range batch.Acks {
 		acked.Run(p)
 	}
 
