@@ -179,6 +179,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		)
 
 		h.ClosestRawDistance = math32.Min(close1, close2)
+		p.Dbg.Notify(player.DebugModeCombat, true, "crD=%f blocks", game.Round32(h.ClosestRawDistance, 5))
 	case *packet.PlayerAuthInput:
 		if p.Version >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 			h.click(p)
@@ -269,7 +270,6 @@ func (h *CombatHandler) calculatePointingResults(p *player.Player) {
 			h.RaycastResults = append(h.RaycastResults, attackPos.Sub(result.Position()).Len())
 		}
 	}
-
 }
 
 // Click adds a click to the player's click history.

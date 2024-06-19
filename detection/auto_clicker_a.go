@@ -35,11 +35,12 @@ func (d *AutoClickerA) ID() string {
 
 func (d *AutoClickerA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	c := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
+	p.Dbg.Notify(player.DebugModeClicks, c.Clicking, "cps=%d", c.CPS)
+
 	if c.Clicking && c.CPS > 20 {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("cps", c.CPS)
 		d.Fail(p, data)
 	}
-
 	return true
 }

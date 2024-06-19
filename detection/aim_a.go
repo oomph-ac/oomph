@@ -76,6 +76,8 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		slices.Sort(rotations)
 
 		bSlope, matchAmt := d.determineBestSlope(rotations)
+		p.Dbg.Notify(player.DebugModeRotations, true, "bestSlope=%f matchAmt=%d", bSlope, matchAmt)
+
 		if bSlope < 0.2 && matchAmt <= 5 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("bSl", game.Round32(bSlope, 5))

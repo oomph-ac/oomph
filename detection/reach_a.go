@@ -2,6 +2,7 @@ package detection
 
 import (
 	"github.com/chewxy/math32"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -53,12 +54,25 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	var minDist, maxDist float32 = 14, -1
+	var (
+		minDist float32 = 14
+		maxDist float32 = -1
+	)
+
+	avg := game.Mean32(combatHandler.RaycastResults)
 	for _, result := range combatHandler.RaycastResults {
 		minDist = math32.Min(minDist, result)
 		maxDist = math32.Max(maxDist, result)
 	}
 
+	p.Dbg.Notify(
+		player.DebugModeCombat,
+		true,
+		"minDist=%f maxDist=%f avg=%f",
+		minDist,
+		maxDist,
+		avg,
+	)
 	if minDist > 2.9 && maxDist > 3 {
 		p.Log().Infof("ReachA: min=%f max=%f", minDist, maxDist)
 		d.Fail(p, nil)

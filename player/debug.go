@@ -2,6 +2,9 @@ package player
 
 const (
 	DebugModeACKs = iota
+	DebugModeRotations
+	DebugModeCombat
+	DebugModeClicks
 
 	debugModeCount
 )
@@ -13,6 +16,9 @@ const (
 
 var DebugModeList = []string{
 	"acks",
+	"rotations",
+	"combat",
+	"clicks",
 }
 
 type Debugger struct {
@@ -41,14 +47,14 @@ func (d *Debugger) Toggle(mode int) {
 	d.Modes[mode] = !d.Modes[mode]
 }
 
-func (d *Debugger) Notify(mode int, msg string, args ...interface{}) {
-	if !d.Modes[mode] {
+func (d *Debugger) Notify(mode int, cond bool, msg string, args ...interface{}) {
+	if v, ok := d.Modes[mode]; !ok || !v {
 		return
 	}
 
 	switch d.LoggingType {
 	case LoggingTypeLogFile:
-		d.target.Log().Infof(msg, args...)
+		d.target.Log().Debugf("["+DebugModeList[mode]+"]: "+msg, args...)
 	default:
 		d.target.Message(msg, args...)
 	}

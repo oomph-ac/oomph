@@ -50,6 +50,7 @@ func (d *AimB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	yawDelta := mDat.DeltaRotation.Z()
 	prevYawDelta := mDat.PrevDeltaRotation.Z()
+
 	if yawDelta < 1e-3 || yawDelta >= 180 || prevYawDelta < 1e-3 || prevYawDelta >= 180 {
 		return true
 	}
