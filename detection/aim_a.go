@@ -97,35 +97,32 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 }
 
 func (d *AimA) determineBestSlope(rotations []float32) (float32, int) {
-	// slope:similarity count
-	var slopesMatchCount = map[float32]int{}
+	slopes := make([]float32, len(rotations)-2)
+	for i := 0; i < len(rotations)-2; i++ {
+		slopes[i] = rotations[i+1] - rotations[i]
+	}
+	slices.Sort(slopes)
 
-	for i := 0; i < len(rotations)-1; i++ {
-		slope := rotations[i+1] - rotations[i]
-		if _, ok := slopesMatchCount[slope]; ok {
-			continue
+	var (
+		bestSlope    float32
+		currentSlope float32 = math32.MaxFloat32 - 1
+
+		bestCount, currentCount int
+	)
+
+	for _, slope := range slopes {
+		if math32.Abs(slope-currentSlope) <= 1e-4 {
+			currentCount++
+		} else {
+			currentSlope = slope
+			currentCount = 1
 		}
 
-		slopesMatchCount[slope] = 0
-		for j := 0; j < len(rotations)-1; j++ {
-			if j == i {
-				continue
-			}
-
-			currentSlope := rotations[j+1] - rotations[j]
-			if currentSlope > slope && math32.Mod(currentSlope, slope) < slope*0.01 ||
-				currentSlope < slope && math32.Mod(slope, currentSlope) < currentSlope*0.01 {
-				slopesMatchCount[slope]++
-			}
+		if currentCount > bestCount {
+			bestCount = currentCount
+			bestSlope = currentSlope
 		}
 	}
 
-	var bestSlope float32
-	for slope, count := range slopesMatchCount {
-		if bestSlope == 0 || count > slopesMatchCount[bestSlope] || (count == slopesMatchCount[bestSlope] && slope > bestSlope) {
-			bestSlope = slope
-		}
-	}
-
-	return bestSlope, slopesMatchCount[bestSlope]
+	return bestSlope, bestCount
 }
