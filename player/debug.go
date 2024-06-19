@@ -1,24 +1,55 @@
 package player
 
-import (
-	"time"
+const (
+	DebugModeACKs = iota
 
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	debugModeCount
 )
 
-type AABBDebugDrawer struct {
-	Packet  *packet.ClientBoundDebugRenderer
-	Expires time.Time
+const (
+	LoggingTypeMessage = iota
+	LoggingTypeLogFile
+)
+
+var DebugModeList = []string{
+	"acks",
 }
 
-func (p *Player) DebugBB(d time.Duration, pk *packet.ClientBoundDebugRenderer) {
-	_, found := p.debugDrawers[pk.Position]
-	p.debugDrawers[pk.Position] = AABBDebugDrawer{
-		Packet:  pk,
-		Expires: time.Now().Add(d),
+type Debugger struct {
+	Modes       map[int]bool
+	LoggingType byte
+
+	target *Player
+}
+
+func NewDebugger(t *Player) *Debugger {
+	d := &Debugger{
+		Modes:       make(map[int]bool),
+		LoggingType: LoggingTypeLogFile,
+
+		target: t,
+	}
+	for mode := range DebugModeList {
+		d.Modes[mode] = false
 	}
 
-	if !found {
-		p.SendPacketToClient(pk)
+	return d
+}
+
+// Toggle toggles the debug mode on/off based on the current state.
+func (d *Debugger) Toggle(mode int) {
+	d.Modes[mode] = !d.Modes[mode]
+}
+
+func (d *Debugger) Notify(mode int, msg string, args ...interface{}) {
+	if !d.Modes[mode] {
+		return
+	}
+
+	switch d.LoggingType {
+	case LoggingTypeLogFile:
+		d.target.Log().Infof(msg, args...)
+	default:
+		d.target.Message(msg, args...)
 	}
 }

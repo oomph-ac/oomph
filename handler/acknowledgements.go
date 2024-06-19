@@ -87,10 +87,6 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 		return
 	}
 
-	if pk := a.CreatePacket(); pk != nil {
-		p.SendPacketToClient(pk)
-	}
-
 	// Resend all the current acknowledgements to the client.
 	if a.canResend {
 		resends := 0
@@ -109,6 +105,9 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 		}
 	}
 
+	if pk := a.CreatePacket(); pk != nil {
+		p.SendPacketToClient(pk)
+	}
 	a.Refresh()
 }
 
@@ -137,7 +136,7 @@ func (a *AcknowledgementHandler) Execute(p *player.Player, timestamp int64) bool
 }
 
 func (a *AcknowledgementHandler) Validate(p *player.Player) {
-	if !a.Ticked {
+	if !a.Ticked || !p.Ready {
 		return
 	}
 	a.Ticked = false
@@ -194,11 +193,15 @@ func (a *AcknowledgementHandler) getModifiedTimestamp(original int64) (timestamp
 
 // tryExecute takes a timestamp, and looks for callbacks associated with it.
 func (a *AcknowledgementHandler) tryExecute(p *player.Player, timestamp int64) bool {
+	p.Dbg.Notify(player.DebugModeACKs, "attempting to execute ack %d", timestamp)
+
 	acks, ok := a.AckMap[timestamp]
 	if !ok {
+		p.Dbg.Notify(player.DebugModeACKs, "ack %d not found", timestamp)
 		return false
 	}
 
+	p.Dbg.Notify(player.DebugModeACKs, "executing ack %d (total=%d)", timestamp, len(acks))
 	a.NonResponsiveTicks = 0
 	for _, acked := range acks {
 		acked.Run(p)
