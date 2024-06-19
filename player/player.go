@@ -146,6 +146,8 @@ func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Playe
 		log: log,
 	}
 
+	p.Dbg = NewDebugger(p)
+
 	p.ClientPkFunc = p.DefaultHandleFromClient
 	p.ServerPkFunc = p.DefaultHandleFromServer
 
@@ -447,6 +449,7 @@ func (p *Player) ReadBatchMode() bool {
 // Close closes the player.
 func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
+
 		p.Connected = false
 		p.Closed = true
 
@@ -460,6 +463,7 @@ func (p *Player) Close() error {
 			}
 		}
 
+		p.Dbg.target = nil
 		close(p.CloseChan)
 	})
 
