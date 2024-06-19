@@ -9,6 +9,8 @@ type AckID int32
 type AckFunc func(*player.Player, ...interface{})
 
 const (
+	ResendThreshold = 10
+
 	AckWorldSetBlock     AckID = iota // OK
 	AckWorldUpdateChunks              // OK
 
@@ -29,6 +31,26 @@ const (
 )
 
 var FuncMap = map[AckID]AckFunc{}
+
+type BatchedAck struct {
+	Acks        []Acknowledgement
+	UntilResend int
+}
+
+func (b *BatchedAck) Add(a Acknowledgement) {
+	b.Acks = append(b.Acks, a)
+}
+
+func (b *BatchedAck) Amt() int {
+	return len(b.Acks)
+}
+
+func NewBatch() *BatchedAck {
+	return &BatchedAck{
+		Acks:        []Acknowledgement{},
+		UntilResend: ResendThreshold,
+	}
+}
 
 type Acknowledgement struct {
 	ID   AckID
