@@ -98,10 +98,10 @@ func (s *Session) actuallyStartRecording() {
 	ev.EvTime = time.Now().UnixNano()
 	s.eventQueue <- ev
 
-	for t, ackList := range ackHandler.AckMap {
+	for t, ackBatch := range ackHandler.AckMap {
 		ev := event.AckInsertEvent{
 			Timestamp: t,
-			Acks:      ackList,
+			Acks:      ackBatch.Acks,
 		}
 		ev.EvTime = time.Now().UnixNano()
 		s.eventQueue <- ev

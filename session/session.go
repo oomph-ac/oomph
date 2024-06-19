@@ -5,6 +5,7 @@ import (
 
 	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/handler"
+	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -178,7 +179,12 @@ func (s *Session) ProcessEvent(ev event.Event) error {
 		}
 
 		ackHandler := s.Player.Handler(handler.HandlerIDAcknowledgements).(*handler.AcknowledgementHandler)
-		ackHandler.AckMap[ev.Timestamp] = ev.Acks
+
+		ackBatch := ack.NewBatch()
+		for _, a := range ev.Acks {
+			ackBatch.Add(a)
+		}
+		ackHandler.AckMap[ev.Timestamp] = ackBatch
 	case event.TickEvent:
 		// This shouldn't be processed in an active session.
 		if !s.State.IsReplay {
