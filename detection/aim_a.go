@@ -57,6 +57,11 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+	if mDat.TicksSinceTeleport <= 1 {
+		d.rotationCount = 0
+		return true
+	}
+
 	yawDelta := game.Round32(math32.Abs(mDat.DeltaRotation.Z()), 5)
 	if yawDelta < 1e-4 || yawDelta >= 180 {
 		return true
@@ -78,7 +83,7 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		bSlope, matchAmt := d.determineBestSlope(rotations)
 		p.Dbg.Notify(player.DebugModeRotations, true, "bestSlope=%f matchAmt=%d", bSlope, matchAmt)
 
-		if bSlope < 0.2 && matchAmt <= 5 {
+		if matchAmt <= 5 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("bSl", game.Round32(bSlope, 5))
 			data.Set("amt", matchAmt)
