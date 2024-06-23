@@ -61,7 +61,7 @@ func (d *MotionC) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	// First, check if the current position of the player is within the predicted range of oomph's movement.
 	diff := math32.Abs(mDat.Position.Y() - mDat.ClientPosition.Y())
 	if diff < 0.1 {
-		d.Debuff(0.5)
+		d.Buffer = 0
 		return true
 	}
 
