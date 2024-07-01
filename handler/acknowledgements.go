@@ -74,7 +74,7 @@ func (*AcknowledgementHandler) HandleServerPacket(pk packet.Packet, p *player.Pl
 
 func (a *AcknowledgementHandler) OnTick(p *player.Player) {
 	a.Validate(p)
-	if !p.ReadBatchMode() {
+	if p.ServerConn() == nil {
 		a.Flush(p)
 	}
 }

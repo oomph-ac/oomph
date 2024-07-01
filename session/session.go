@@ -46,7 +46,7 @@ type SessionState struct {
 
 // New creates a new session with the logger and given settings.
 func New(log *logrus.Logger, s SessionState) *Session {
-	p := player.New(log, s.DirectMode, player.MonitoringState{
+	p := player.New(log, player.MonitoringState{
 		IsReplay:    s.IsReplay,
 		IsRecording: s.IsRecording,
 	})
