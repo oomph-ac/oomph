@@ -107,14 +107,10 @@ type Player struct {
 
 	// log is the logger of the player.
 	log *logrus.Logger
-
-	// readingBatches is true if Oomph has been configured to read batches of packets from the client instead
-	// of reading them one by one.
-	readingBatches bool
 }
 
 // New creates and returns a new Player instance.
-func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Player {
+func New(log *logrus.Logger, mState MonitoringState) *Player {
 	p := &Player{
 		MState: mState,
 
@@ -140,8 +136,6 @@ func New(log *logrus.Logger, readingBatches bool, mState MonitoringState) *Playe
 		detections:     []Handler{},
 
 		eventHandler: &NopEventHandler{},
-
-		readingBatches: readingBatches,
 
 		log: log,
 	}
@@ -192,6 +186,7 @@ func (p *Player) SendPacketToServer(pk packet.Packet) error {
 	}
 
 	if p.serverConn == nil {
+		p.PacketQueue = append(p.PacketQueue, pk)
 		// Don't return an error here, because the server connection may be nil if direct mode is used.
 		return nil
 	}
@@ -280,13 +275,7 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 		return nil
 	}
 
-	// If we are not using direct mode.
-	if p.serverConn != nil {
-		return p.SendPacketToServer(pk)
-	}
-
-	p.PacketQueue = append(p.PacketQueue, pk)
-	return nil
+	return p.SendPacketToServer(pk)
 }
 
 func (p *Player) handleOneFromServer(pk packet.Packet) error {
@@ -441,11 +430,6 @@ func (p *Player) Disconnect(reason string) {
 	}
 }
 
-// ReadBatchMode returns true if the player is configured to read batches of packets from the client.
-func (p *Player) ReadBatchMode() bool {
-	return p.readingBatches
-}
-
 // Close closes the player.
 func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
@@ -492,6 +476,7 @@ func (p *Player) Tick() bool {
 	defer p.ProcessMu.Unlock()
 
 	if p.Closed {
+		fmt.Println("Player is closed")
 		return false
 	}
 
@@ -517,7 +502,7 @@ func (p *Player) Tick() bool {
 	}
 
 	// We don't need to flush here, because Oomph will flush the connection after every batch read.
-	if p.readingBatches || p.MState.IsReplay {
+	if p.MState.IsReplay {
 		return true
 	}
 
@@ -528,7 +513,7 @@ func (p *Player) Tick() bool {
 	}
 
 	if err := p.conn.Flush(); err != nil {
-		p.log.Error("client connection is closed")
+		// p.log.Error("client connection is closed")
 		return false
 	}
 
