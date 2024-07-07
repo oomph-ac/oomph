@@ -17,7 +17,14 @@ import (
 
 const HandlerIDMovement = "oomph:movement"
 
+const (
+	SimulationNormal = iota + 1
+	SimulationAccountingGhostBlock
+)
+
 type MovementScenario struct {
+	ID int
+
 	Position mgl32.Vec3
 	Velocity mgl32.Vec3
 
@@ -42,9 +49,7 @@ type MovementHandler struct {
 
 	OutgoingCorrections   int32
 	CorrectionTrustBuffer int32
-	CorrectionQueued      bool
-
-	CorrectionThreshold float32
+	CorrectionThreshold   float32
 
 	Width  float32
 	Height float32
@@ -286,12 +291,11 @@ func (MovementHandler) ID() string {
 
 // CorrectMovement sends a movement correction to the client.
 func (h *MovementHandler) CorrectMovement(p *player.Player) {
-	if h.StepClipOffset > 0 || h.CorrectionQueued {
+	if h.StepClipOffset > 0 {
 		return
 	}
 
 	h.OutgoingCorrections++
-	h.CorrectionQueued = true
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,
 		Position:       h.Position.Add(mgl32.Vec3{0, 1.6201}),
@@ -473,7 +477,6 @@ func (*MovementHandler) OnTick(p *player.Player) {
 }
 
 func (h *MovementHandler) Defer() {
-	h.CorrectionQueued = false
 	if h.mode != player.AuthorityModeSemi {
 		return
 	}
