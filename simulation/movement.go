@@ -16,11 +16,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const (
-	SimulationNormal = iota + 1
-	SimulationAccountingGhostBlock
-)
-
 type MovementSimulator struct {
 }
 
@@ -45,7 +40,7 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 		return
 	}
 
-	for i := SimulationNormal; i <= SimulationAccountingGhostBlock; i++ {
+	for i := handler.SimulationNormal; i <= handler.SimulationAccountingGhostBlock; i++ {
 		s.doActualSimulation(p, i)
 	}
 
@@ -62,9 +57,10 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	mDat.MovementScenario = sc
 
 	// If the position between the server and client deviates more than the correction threshold
-	// in a tick, correct their movement, and don't accept any client movement until
-	// the position has been syncrohnised.
-	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold {
+	// in a tick, correct their movement, and don't accept any client movement until the position has been syncrohnised..
+	// We also correct the movement if the player is in a ghost block scenario, as they are not synced with
+	// the server's current state, but are not necessarily cheating.
+	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold || mDat.MovementScenario.ID == handler.SimulationAccountingGhostBlock {
 		mDat.CorrectMovement(p)
 	}
 }
@@ -73,13 +69,14 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	w := p.World
 
-	if run == SimulationAccountingGhostBlock && !w.HasGhostBlocks() {
+	if run == handler.SimulationAccountingGhostBlock && !w.HasGhostBlocks() {
 		return
 	}
 
 	oldS := mDat.MovementScenario
 	defer func() {
 		mDat.Scenarios = append(mDat.Scenarios, handler.MovementScenario{
+			ID:                   run,
 			Position:             mDat.Position,
 			Velocity:             mDat.Velocity,
 			OnGround:             mDat.OnGround,
@@ -93,7 +90,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 		mDat.MovementScenario = oldS
 	}()
 
-	if run == SimulationAccountingGhostBlock {
+	if run == handler.SimulationAccountingGhostBlock {
 		w.SearchWithGhost(true)
 		defer w.SearchWithGhost(false)
 	}
