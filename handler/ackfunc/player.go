@@ -123,5 +123,5 @@ func PlayerTeleport(p *player.Player, data ...interface{}) {
 func PlayerRecieveCorrection(p *player.Player, data ...interface{}) {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	mDat.OutgoingCorrections--
-	mDat.CorrectionTrustBuffer += 2
+	mDat.CorrectionTrustBuffer += 5
 }

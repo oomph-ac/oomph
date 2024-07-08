@@ -52,8 +52,8 @@ func (d *FlyA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.CorrectionTrustBuffer > 0 || mDat.StepClipOffset > 0 || mDat.KnownInsideBlock ||
-		mDat.OffGroundTicks <= 3 {
+	if mDat.CorrectionTrustBuffer > 0 || mDat.OutgoingCorrections > 0 ||
+		mDat.StepClipOffset > 0 || mDat.KnownInsideBlock || mDat.OffGroundTicks <= 3 {
 		return true
 	}
 
