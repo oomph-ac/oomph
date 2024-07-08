@@ -45,20 +45,24 @@ func (d *ReachB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	_, ok := pk.(*packet.InventoryTransaction)
-	if !ok {
+	cDat := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
+	if cDat.Phase != handler.CombatPhaseTicked {
 		return true
 	}
 
-	combatHandler := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
-	if combatHandler.Phase != handler.CombatPhaseTransaction {
-		return true
+	minDist := float32(14)
+	for _, dist := range cDat.NonRaycastResults {
+		if dist < minDist {
+			minDist = dist
+		}
 	}
 
-	if combatHandler.ClosestRawDistance > 3 {
+	// TODO: Adjust like in Reach (A)?
+	if minDist > 3 {
 		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("distance", game.Round32(combatHandler.ClosestRawDistance, 3))
+		data.Set("dist", game.Round32(minDist, 3))
 		d.Fail(p, data)
+		return true
 	}
 
 	d.Debuff(0.01)
