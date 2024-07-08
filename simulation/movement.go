@@ -60,7 +60,9 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	// in a tick, correct their movement, and don't accept any client movement until the position has been syncrohnised..
 	// We also correct the movement if the player is in a ghost block scenario, as they are not synced with
 	// the server's current state, but are not necessarily cheating.
-	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold || mDat.MovementScenario.ID == handler.SimulationAccountingGhostBlock {
+	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold ||
+		mDat.MovementScenario.ID == handler.SimulationAccountingGhostBlock ||
+		!p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).InLoadedChunk {
 		mDat.CorrectMovement(p)
 	}
 }
@@ -89,6 +91,11 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 		})
 		mDat.MovementScenario = oldS
 	}()
+
+	// Do not allow the player to move if not in a loaded chunk.
+	if !p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).InLoadedChunk {
+		return
+	}
 
 	if run == handler.SimulationAccountingGhostBlock {
 		w.SearchWithGhost(true)
@@ -204,8 +211,6 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 
 func (MovementSimulator) Reliable(p *player.Player) bool {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	cDat := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler)
-
 	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox(), false, true, p.World) {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
 			return false
@@ -220,7 +225,6 @@ func (MovementSimulator) Reliable(p *player.Player) bool {
 		!mDat.Flying &&
 		!mDat.NoClip &&
 		p.Alive &&
-		cDat.TicksInLoadedChunk >= 10 &&
 		mDat.Position.Y() >= -64
 }
 

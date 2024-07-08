@@ -21,4 +21,6 @@ func RegisterHandlers(p *player.Player) {
 	acks := NewAcknowledgementHandler()
 	acks.LegacyMode = p.Version <= player.GameVersion1_20_0
 	p.RegisterHandler(acks)
+
+	p.RegisterHandler(NewTransferHandler())
 }

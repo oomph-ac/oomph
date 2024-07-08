@@ -46,7 +46,7 @@ func (d *VelocityB) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.OutgoingCorrections > 0 {
+	if mDat.CorrectionTrustBuffer > 0 || mDat.OutgoingCorrections > 0 {
 		return true
 	}
 

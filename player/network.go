@@ -53,10 +53,12 @@ func (p *Player) SetServerConn(conn *minecraft.Conn) {
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID
-	p.ClientRuntimeId = conn.GameData().EntityRuntimeID
-	p.ClientUniqueId = conn.GameData().EntityUniqueID
-	p.IDModified = modified
+	if !modified {
+		p.ClientRuntimeId = conn.GameData().EntityRuntimeID
+		p.ClientUniqueId = conn.GameData().EntityUniqueID
+	}
 
+	p.IDModified = modified
 	p.GameDat = conn.GameData()
 }
 

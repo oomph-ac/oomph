@@ -404,6 +404,14 @@ func (p *Player) Message(msg string, args ...interface{}) {
 	})
 }
 
+// NMessage sends a message to the player without the oomph prefix.
+func (p *Player) NMessage(msg string, args ...interface{}) {
+	p.SendPacketToClient(&packet.Text{
+		TextType: packet.TextTypeChat,
+		Message:  text.Colourf(msg, args...),
+	})
+}
+
 // Log returns the player's logger.
 func (p *Player) Log() *logrus.Logger {
 	return p.log
@@ -476,7 +484,6 @@ func (p *Player) Tick() bool {
 	defer p.ProcessMu.Unlock()
 
 	if p.Closed {
-		fmt.Println("Player is closed")
 		return false
 	}
 
