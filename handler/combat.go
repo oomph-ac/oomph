@@ -3,7 +3,6 @@ package handler
 import (
 	"bytes"
 
-	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
@@ -36,8 +35,8 @@ type CombatHandler struct {
 	StartEntityPos mgl32.Vec3
 	EndEntityPos   mgl32.Vec3
 
-	ClosestRawDistance float32
-	RaycastResults     []float32
+	NonRaycastResults []float32
+	RaycastResults    []float32
 
 	LastSwingTick int64
 
@@ -63,7 +62,11 @@ func DecodeCombatHandler(buf *bytes.Buffer) CombatHandler {
 	h.EndAttackPos = utils.ReadVec32(buf.Next(12))
 	h.StartEntityPos = utils.ReadVec32(buf.Next(12))
 	h.EndEntityPos = utils.ReadVec32(buf.Next(12))
-	h.ClosestRawDistance = utils.LFloat32(buf.Next(4))
+	nrCount := utils.LInt32(buf.Next(4))
+	h.NonRaycastResults = make([]float32, nrCount)
+	for i := int32(0); i < nrCount; i++ {
+		h.NonRaycastResults[i] = utils.LFloat32(buf.Next(4))
+	}
 	rCount := utils.LInt32(buf.Next(4))
 	h.RaycastResults = make([]float32, rCount)
 	for i := int32(0); i < rCount; i++ {
@@ -94,7 +97,10 @@ func (h *CombatHandler) Encode(buf *bytes.Buffer) {
 	utils.WriteVec32(buf, h.EndAttackPos)
 	utils.WriteVec32(buf, h.StartEntityPos)
 	utils.WriteVec32(buf, h.EndEntityPos)
-	utils.WriteLFloat32(buf, h.ClosestRawDistance)
+	utils.WriteLInt32(buf, int32(len(h.NonRaycastResults)))
+	for _, result := range h.NonRaycastResults {
+		utils.WriteLFloat32(buf, result)
+	}
 	utils.WriteLInt32(buf, int32(len(h.RaycastResults)))
 	for _, result := range h.RaycastResults {
 		utils.WriteLFloat32(buf, result)
@@ -159,27 +165,6 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		h.StartEntityPos = entity.PrevPosition
 		h.EndEntityPos = entity.Position
-
-		// Calculate the closest raw point from the attack positions to the entity's bounding box.
-		bb1 := entity.Box(entity.PrevPosition).Grow(0.1)
-		bb2 := entity.Box(entity.Position).Grow(0.1)
-
-		point1 := game.ClosestPointToBBox(h.StartAttackPos, bb1)
-		point2 := game.ClosestPointToBBox(h.EndAttackPos, bb1)
-		point3 := game.ClosestPointToBBox(h.StartAttackPos, bb2)
-		point4 := game.ClosestPointToBBox(h.EndAttackPos, bb2)
-
-		close1 := math32.Min(
-			point1.Sub(h.StartAttackPos).Len(),
-			point2.Sub(h.EndAttackPos).Len(),
-		)
-		close2 := math32.Min(
-			point3.Sub(h.StartAttackPos).Len(),
-			point4.Sub(h.EndAttackPos).Len(),
-		)
-
-		h.ClosestRawDistance = math32.Min(close1, close2)
-		p.Dbg.Notify(player.DebugModeCombat, true, "crD=%f blocks", game.Round32(h.ClosestRawDistance, 5))
 	case *packet.PlayerAuthInput:
 		if p.Version >= player.GameVersion1_20_10 && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
 			h.click(p)
@@ -200,7 +185,9 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		if pk.InputMode == packet.InputModeTouch {
 			return true
 		}
-		h.calculatePointingResults(p)
+
+		h.calculateNonRaycastResults()
+		h.calculateRaycastResults(p)
 	case *packet.Animate:
 		h.LastSwingTick = p.ClientFrame
 	case *packet.LevelSoundEvent:
@@ -227,7 +214,19 @@ func (h *CombatHandler) Defer() {
 	h.Clicking = false
 }
 
-func (h *CombatHandler) calculatePointingResults(p *player.Player) {
+func (h *CombatHandler) calculateNonRaycastResults() {
+	attackPosDelta := h.EndAttackPos.Sub(h.StartAttackPos)
+	entityPosDelta := h.EndEntityPos.Sub(h.StartEntityPos)
+	h.NonRaycastResults = make([]float32, 0, 20)
+
+	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
+		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
+		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
+		h.NonRaycastResults = append(h.NonRaycastResults, game.ClosestPointToBBox(attackPos, h.TargetedEntity.Box(entityPos)).Sub(attackPos).Len())
+	}
+}
+
+func (h *CombatHandler) calculateRaycastResults(p *player.Player) {
 	mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
 	attackPosDelta := h.EndAttackPos.Sub(h.StartAttackPos)
 	entityPosDelta := h.EndEntityPos.Sub(h.StartEntityPos)
