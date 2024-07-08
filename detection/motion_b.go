@@ -48,7 +48,7 @@ func (d *MotionB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.CorrectionTrustBuffer > 0 || mDat.StepClipOffset > 0 || mDat.Climb ||
+	if mDat.CorrectionTrustBuffer > 0 || mDat.OutgoingCorrections > 0 || mDat.StepClipOffset > 0 || mDat.Climb ||
 		mDat.ClientMov.Len() <= 1e-7 || mDat.TicksSinceTeleport < mDat.TeleportTicks() ||
 		mDat.StepClipOffset > 0 {
 		return true

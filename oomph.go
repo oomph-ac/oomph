@@ -238,8 +238,6 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
 
-	p.SetServerConn(serverConn)
-
 	var g sync.WaitGroup
 	g.Add(2)
 
@@ -309,7 +307,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			}
 
 			listener.Disconnect(conn, "Report to admin: unknown cause for disconnect.")
-			serverConn.Close()
+			p.ServerConn().Close()
 		}()
 		defer g.Done()
 
@@ -353,7 +351,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			}
 
 			listener.Disconnect(conn, "Remote server disconnected unexpectedly from proxy.")
-			serverConn.Close()
+			p.ServerConn().Close()
 		}()
 		defer g.Done()
 
@@ -362,7 +360,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			pks, err := serverConn.ReadBatch()
+			pks, err := p.ServerConn().ReadBatch()
 			if err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					conn.WritePacket(&packet.Disconnect{

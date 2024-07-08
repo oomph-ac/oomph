@@ -50,7 +50,8 @@ func (d *SpeedA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.OnGround || mDat.Climb || mDat.StepClipOffset > 0 || mDat.Immobile {
+	if mDat.OnGround || mDat.Climb || mDat.StepClipOffset > 0 || mDat.Immobile ||
+		mDat.CorrectionTrustBuffer > 0 || mDat.OutgoingCorrections > 0 {
 		return true
 	}
 
