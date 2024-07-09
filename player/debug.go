@@ -5,6 +5,8 @@ const (
 	DebugModeRotations
 	DebugModeCombat
 	DebugModeClicks
+	DebugModeMovementSim
+	DebugModeLatency
 
 	debugModeCount
 )
@@ -19,6 +21,8 @@ var DebugModeList = []string{
 	"rotations",
 	"combat",
 	"clicks",
+	"movement_sim",
+	"latency",
 }
 
 type Debugger struct {
@@ -44,10 +48,25 @@ func NewDebugger(t *Player) *Debugger {
 
 // Toggle toggles the debug mode on/off based on the current state.
 func (d *Debugger) Toggle(mode int) {
+	if mode >= debugModeCount || mode < 0 {
+		return
+	}
 	d.Modes[mode] = !d.Modes[mode]
 }
 
+// Enabled returns wether the debug mode is enabled or not.
+func (d *Debugger) Enabled(mode int) bool {
+	if mode >= debugModeCount || mode < 0 {
+		return false
+	}
+	return d.Modes[mode]
+}
+
 func (d *Debugger) Notify(mode int, cond bool, msg string, args ...interface{}) {
+	if !cond {
+		return
+	}
+
 	if v, ok := d.Modes[mode]; !ok || !v {
 		return
 	}

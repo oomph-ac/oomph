@@ -222,7 +222,7 @@ func (h *CombatHandler) calculateNonRaycastResults() {
 	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
 		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
-		h.NonRaycastResults = append(h.NonRaycastResults, game.ClosestPointToBBox(attackPos, h.TargetedEntity.Box(entityPos)).Sub(attackPos).Len())
+		h.NonRaycastResults = append(h.NonRaycastResults, game.ClosestPointToBBox(attackPos, h.TargetedEntity.Box(entityPos).Grow(0.1)).Sub(attackPos).Len())
 	}
 }
 
