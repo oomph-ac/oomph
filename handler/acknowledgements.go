@@ -13,7 +13,7 @@ const HandlerIDAcknowledgements = "oomph:acknowledgements"
 
 const (
 	AckDivider  = 1_000
-	resendLimit = 3
+	resendLimit = 5
 )
 
 // AcknowledgementHandler handles acknowledgements to the client, so that the anti-cheat knows the precise
@@ -104,15 +104,18 @@ func (a *AcknowledgementHandler) Flush(p *player.Player) {
 				Timestamp:     a.getModifiedTimestamp(timestamp),
 				NeedsResponse: true,
 			})
+			p.Dbg.Notify(player.DebugModeACKs, true, "resending ack %d", timestamp)
 
 			// We do this to prevent Oomph from overloading the client with a bunch of packets.
 			if resends++; resends >= resendLimit {
+				p.Dbg.Notify(player.DebugModeACKs, true, "resend limit reached")
 				break
 			}
 		}
 	}
 
 	if pk := a.CreatePacket(); pk != nil {
+		p.Dbg.Notify(player.DebugModeACKs, true, "sending ack %d", pk.Timestamp)
 		p.SendPacketToClient(pk)
 	}
 	a.Refresh()

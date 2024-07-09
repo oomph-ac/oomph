@@ -50,12 +50,25 @@ func (d *ReachB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	minDist := float32(14)
+	var (
+		minDist float32 = 14
+		maxDist float32 = -1
+	)
 	for _, dist := range cDat.NonRaycastResults {
 		if dist < minDist {
 			minDist = dist
 		}
+		if dist > maxDist {
+			maxDist = dist
+		}
 	}
+
+	p.Dbg.Notify(
+		player.DebugModeCombat,
+		true,
+		"Reach (B): min=%f max=%f",
+		minDist, maxDist,
+	)
 
 	// TODO: Adjust like in Reach (A)?
 	if minDist > 3 {

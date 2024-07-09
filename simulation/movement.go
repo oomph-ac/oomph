@@ -20,6 +20,9 @@ type MovementSimulator struct {
 }
 
 func (s MovementSimulator) Simulate(p *player.Player) {
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "START movement simulation for tick %d", p.ClientFrame)
+	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement simulation for tick %d", p.ClientFrame)
+
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	mDat.Scenarios = nil
 	mDat.Scenarios = []handler.MovementScenario{}
@@ -68,6 +71,9 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 }
 
 func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN run %d", run)
+	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END run %d", run)
+
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	w := p.World
 
@@ -94,6 +100,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 
 	// Do not allow the player to move if not in a loaded chunk.
 	if !p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).InLoadedChunk {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "player not in loaded chunk")
 		return
 	}
 
@@ -103,17 +110,21 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	}
 
 	if mDat.Immobile {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "player is immobile")
 		mDat.Velocity = mgl32.Vec3{}
 		return
 	}
 
 	// If a teleport was able to be handled, do not continue with the simulation.
 	if s.teleport(mDat) {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", mDat.Position)
 		return
 	}
 
 	// Push the player out of any blocks they may be in.
+	old := mDat.Position
 	s.pushOutOfBlocks(mDat, w)
+	p.Dbg.Notify(player.DebugModeMovementSim, !old.ApproxEqual(mDat.Position), "pushOutOfBlocks (oldPos=%v, newPos=%v)", old, mDat.Position)
 
 	// Reset the velocity to zero if it's significantly small.
 	if mDat.Velocity.LenSqr() < 1e-12 {
@@ -121,8 +132,8 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	}
 
 	// Apply knockback if applicable.
-	s.knockback(mDat)
-	s.jump(mDat)
+	p.Dbg.Notify(player.DebugModeMovementSim, s.knockback(mDat), "knockback applied: %v", mDat.Velocity)
+	p.Dbg.Notify(player.DebugModeMovementSim, s.jump(mDat), "jump force applied (sprint=%v): %v", mDat.Sprinting, mDat.Velocity)
 
 	mDat.StepClipOffset *= game.StepClipMultiplier
 	if mDat.StepClipOffset < 1e-7 {
@@ -138,7 +149,9 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	}
 
 	mDat.Friction = blockFriction
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "blockUnder=%s, blockFriction=%v, v3=%v", utils.BlockName(blockUnder), blockFriction, v3)
 	s.moveRelative(mDat, v3)
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "moveRelative force applied (vel=%v)", mDat.Velocity)
 
 	nearClimable := utils.BlockClimbable(w.GetBlock(cube.PosFromVec3(mDat.Position)))
 	if nearClimable {
@@ -151,6 +164,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 			mDat.Velocity[1] = 0
 		}
 
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "climb velocity applied (vel=%v)", mDat.Velocity)
 		mDat.Climb = true
 	}
 
@@ -169,20 +183,27 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 		mDat.Velocity[0] *= 0.25
 		mDat.Velocity[1] *= 0.05
 		mDat.Velocity[2] *= 0.25
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "cobweb force applied (vel=%v)", mDat.Velocity)
 	}
 
 	// Avoid edges if the player is sneaking on the edge of a block.
+	old = mDat.Position
 	s.avoidEdge(mDat, w)
-	oldVel := mDat.Velocity
+	p.Dbg.Notify(player.DebugModeMovementSim, !old.ApproxEqual(mDat.Position), "avoidEdge (oldPos=%v, newPos=%v)", old, mDat.Position)
 
+	oldVel := mDat.Velocity
 	s.collide(mDat, w)
+	p.Dbg.Notify(player.DebugModeMovementSim, !oldVel.ApproxEqual(mDat.Velocity), "collide (oldVel=%v, newVel=%v)", oldVel, mDat.Velocity)
+
 	isClimb := nearClimable && (mDat.HorizontallyCollided || mDat.JumpKeyPressed)
 	if isClimb {
 		mDat.Velocity[1] = game.ClimbSpeed
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "upward climb applied")
 	}
 
 	mDat.Position = mDat.Position.Add(mDat.Velocity)
 	mDat.Mov = mDat.Velocity
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "result (pos=%v vel=%v)", mDat.Position, mDat.Velocity)
 
 	blockUnder = w.GetBlock(cube.PosFromVec3(mDat.Position.Sub(mgl32.Vec3{0, 0.2})))
 	if _, isAir := blockUnder.(block.Air); isAir {
@@ -197,6 +218,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	s.walkOnBlock(mDat, blockUnder)
 
 	if inCobweb {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move cobweb force applied (0 vel)")
 		mDat.Velocity = mgl32.Vec3{}
 	}
 
@@ -207,6 +229,8 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	// Apply friction.
 	mDat.Velocity[0] *= blockFriction
 	mDat.Velocity[2] *= blockFriction
+
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move final velocity: %v", mDat.Velocity)
 }
 
 func (MovementSimulator) Reliable(p *player.Player) bool {
@@ -255,22 +279,23 @@ func (s MovementSimulator) teleport(mDat *handler.MovementHandler) bool {
 	return false
 }
 
-func (MovementSimulator) jump(mDat *handler.MovementHandler) {
+func (MovementSimulator) jump(mDat *handler.MovementHandler) bool {
 	if !mDat.Jumping || !mDat.OnGround || mDat.TicksUntilNextJump > 0 {
 		mDat.Jumped = false
-		return
+		return false
 	}
 
 	mDat.Jumped = true
 	mDat.Velocity[1] = mDat.JumpHeight
 	mDat.TicksUntilNextJump = game.JumpDelayTicks
 	if !mDat.Sprinting {
-		return
+		return true
 	}
 
 	force := mDat.Rotation.Z() * 0.017453292
 	mDat.Velocity[0] -= game.MCSin(force) * 0.2
 	mDat.Velocity[2] += game.MCCos(force) * 0.2
+	return true
 }
 
 func (MovementSimulator) pushOutOfBlocks(mDat *handler.MovementHandler, w *world.World) {
@@ -347,11 +372,12 @@ func (MovementSimulator) pushOutOfBlocks(mDat *handler.MovementHandler, w *world
 	mDat.KnownInsideBlock = inside
 }
 
-func (MovementSimulator) knockback(mDat *handler.MovementHandler) {
+func (MovementSimulator) knockback(mDat *handler.MovementHandler) bool {
 	if mDat.TicksSinceKnockback != 0 {
-		return
+		return false
 	}
 	mDat.Velocity = mDat.Knockback
+	return true
 }
 
 func (MovementSimulator) moveRelative(mDat *handler.MovementHandler, fSpeed float32) {

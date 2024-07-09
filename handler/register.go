@@ -7,6 +7,7 @@ import (
 // RegisterHandlers registers all handlers to the player. They are registered
 // in order of priority, so that handlers registered first are called first.
 func RegisterHandlers(p *player.Player) {
+	p.RegisterHandler(NewDebugHandler())
 	p.RegisterHandler(NewLatencyHandler())
 
 	p.RegisterHandler(NewGamemodeHandler())
