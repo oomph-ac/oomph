@@ -65,7 +65,7 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	// the server's current state, but are not necessarily cheating.
 	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold ||
 		mDat.MovementScenario.ID == handler.SimulationAccountingGhostBlock ||
-		!p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).InLoadedChunk {
+		(!p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).InLoadedChunk && mDat.TicksSinceTeleport >= 100) {
 		mDat.CorrectMovement(p)
 	}
 }
