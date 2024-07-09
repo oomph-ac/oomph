@@ -312,7 +312,7 @@ func (h *MovementHandler) CorrectMovement(p *player.Player) {
 // RevertMovement sends a teleport packet to the client to revert the player's position.
 func (h *MovementHandler) RevertMovement(p *player.Player, pos mgl32.Vec3) {
 	p.SendPacketToClient(&packet.MovePlayer{
-		EntityRuntimeID: p.RuntimeId,
+		EntityRuntimeID: p.ClientRuntimeId,
 		Mode:            packet.MoveModeTeleport,
 		Position:        pos.Add(mgl32.Vec3{0, 1.62}),
 		OnGround:        h.OnGround,
@@ -330,7 +330,7 @@ func (h *MovementHandler) RevertMovement(p *player.Player, pos mgl32.Vec3) {
 	))
 
 	p.SendPacketToClient(&packet.SetActorMotion{
-		EntityRuntimeID: p.RuntimeId,
+		EntityRuntimeID: p.ClientRuntimeId,
 		Velocity:        utils.EmptyVec32,
 		Tick:            0,
 	})

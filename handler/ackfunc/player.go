@@ -38,8 +38,8 @@ func PlayerUpdateLatency(p *player.Player, data ...interface{}) {
 	h.StackLatency = p.Time().Sub(data[0].(time.Time)).Milliseconds()
 	h.LatencyUpdateTick = data[1].(int64) + 10
 	h.Responded = true
-
 	p.ClientTick = data[1].(int64)
+	p.Dbg.Notify(player.DebugModeLatency, true, "latency=%dms", h.StackLatency)
 }
 
 // OPTS: map[uint32]interface{}
