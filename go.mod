@@ -41,6 +41,6 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 )
 
-replace github.com/sandertv/gophertunnel v1.38.0 => github.com/oomph-ac/gophertunnel v0.0.0-20240616183157-9a90927ebb22
+replace github.com/sandertv/gophertunnel v1.38.0 => ../gophertunnel
 
 replace github.com/sandertv/go-raknet v1.14.0 => github.com/gameparrot/tedac-raknet v0.0.1
