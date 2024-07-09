@@ -7,6 +7,7 @@ const (
 	DebugModeClicks
 	DebugModeMovementSim
 	DebugModeLatency
+	DebugModeChunks
 
 	debugModeCount
 )
@@ -23,6 +24,7 @@ var DebugModeList = []string{
 	"clicks",
 	"movement_sim",
 	"latency",
+	"chunks",
 }
 
 type Debugger struct {

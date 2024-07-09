@@ -17,6 +17,7 @@ import (
 
 // OPTS: cube.Pos, world.Block
 func WorldSetBlock(p *player.Player, opts ...interface{}) {
+	p.Dbg.Notify(player.DebugModeChunks, true, "set block at %v to %s", opts[0].(cube.Pos), utils.BlockName(opts[1].(world.Block)))
 	p.World.SetBlock(opts[0].(cube.Pos), opts[1].(world.Block))
 }
 
@@ -31,6 +32,7 @@ func WorldUpdateChunks(p *player.Player, opts ...interface{}) {
 		}
 		c.Compact()
 
+		p.Dbg.Notify(player.DebugModeChunks, true, "received chunk update at %v", cpk.Position)
 		p.World.AddChunk(cpk.Position, c)
 		return
 	}
@@ -47,6 +49,7 @@ func WorldUpdateChunks(p *player.Player, opts ...interface{}) {
 
 	for _, entry := range spk.SubChunkEntries {
 		if entry.Result != protocol.SubChunkResultSuccess && entry.Result != protocol.SubChunkResultSuccessAllAir {
+			p.Dbg.Notify(player.DebugModeChunks, true, "unhandled subchunk result %d @ %v", entry.Result, spk.Position)
 			continue
 		}
 
@@ -58,13 +61,18 @@ func WorldUpdateChunks(p *player.Player, opts ...interface{}) {
 		var c *chunk.Chunk
 		if entry.Result == protocol.SubChunkResultSuccessAllAir {
 			c = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
-		} else if existing := p.World.GetChunk(chunkPos); existing != nil {
-			c = existing
+			newChunks[chunkPos] = c
+			p.Dbg.Notify(player.DebugModeChunks, true, "all air at %v", chunkPos)
 		} else if new, ok := newChunks[chunkPos]; ok {
 			c = new
+			p.Dbg.Notify(player.DebugModeChunks, true, "reusing chunk in map %v", chunkPos)
+		} else if existing := p.World.GetChunk(chunkPos); existing != nil {
+			c = existing
+			p.Dbg.Notify(player.DebugModeChunks, true, "using existing chunk %v", chunkPos)
 		} else {
 			c = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
 			newChunks[chunkPos] = c
+			p.Dbg.Notify(player.DebugModeChunks, true, "new chunk at %v", chunkPos)
 		}
 
 		buf := internal.BufferPool.Get().(*bytes.Buffer)
@@ -78,13 +86,14 @@ func WorldUpdateChunks(p *player.Player, opts ...interface{}) {
 				panic(err)
 			}
 			c.Sub()[index] = sub
+			p.Dbg.Notify(player.DebugModeChunks, true, "decoded subchunk %d at %v", index, chunkPos)
 		}
-
 
 		internal.BufferPool.Put(buf)
 	}
 
 	for pos, newC := range newChunks {
 		p.World.AddChunk(pos, newC)
+		p.Dbg.Notify(player.DebugModeChunks, true, "(sub) added chunk at %v", pos)
 	}
 }
