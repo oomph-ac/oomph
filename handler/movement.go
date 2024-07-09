@@ -296,6 +296,7 @@ func (h *MovementHandler) CorrectMovement(p *player.Player) {
 	}
 
 	h.OutgoingCorrections++
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "correcting movement at %d", p.ClientFrame)
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,
 		Position:       h.Position.Add(mgl32.Vec3{0, 1.6201}),
