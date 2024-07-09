@@ -49,6 +49,8 @@ func (DebugHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 			mode = player.DebugModeMovementSim
 		case "latency":
 			mode = player.DebugModeLatency
+		case "chunks":
+			mode = player.DebugModeChunks
 		default:
 			p.Message("Unknown debug mode: %s", split[1])
 			return false
