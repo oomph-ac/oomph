@@ -73,6 +73,7 @@ func (l listener) Accept() (session.Conn, error) {
 	p := s.Player
 	p.SetConn(c.(*minecraft.Conn))
 	p.RuntimeId = 1
+	p.ClientRuntimeId = 1
 
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
