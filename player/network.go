@@ -43,6 +43,7 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 
 // SetServerConn sets the connection to the server.
 func (p *Player) SetServerConn(conn *minecraft.Conn) {
+	p.serverConn = conn
 	p.GameMode = conn.GameData().PlayerGameMode
 	if p.GameMode == 5 {
 		p.GameMode = conn.GameData().WorldGameMode
