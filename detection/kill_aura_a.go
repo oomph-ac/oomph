@@ -47,7 +47,12 @@ func (d *KillAuraA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 	if data, ok := tpk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 		currentTick := p.ClientFrame
 		tickDiff := currentTick - c.LastSwingTick
-		if tickDiff > 10 {
+		e := p.Handler(handler.HandlerIDEffects).(*handler.EffectsHandler)
+		var maxTickDiff int64 = 10
+		if miningFatigue, ok := e.Get(packet.EffectMiningFatigue); ok {
+			maxTickDiff += int64(miningFatigue.Level())
+		}
+		if tickDiff > maxTickDiff {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("tick_diff", tickDiff)
 			data.Set("current_tick", currentTick)
