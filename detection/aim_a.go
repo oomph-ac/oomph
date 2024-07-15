@@ -57,7 +57,7 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.HorizontallyCollided { // why does this always false ROTATION checks??!!!
+	if mDat.HorizontallyCollided || math32.Abs(mDat.Rotation.X()) >= 89 { // why does this always false ROTATION checks??!!!
 		return true
 	}
 

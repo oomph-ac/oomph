@@ -25,8 +25,8 @@ func NewReachB() *ReachB {
 	d.MaxViolations = 5
 	d.trustDuration = 30 * player.TicksPerSecond
 
-	d.FailBuffer = 2
-	d.MaxBuffer = 4
+	d.FailBuffer = 3
+	d.MaxBuffer = 6
 	return d
 }
 
@@ -47,6 +47,10 @@ func (d *ReachB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	cDat := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
 	if cDat.Phase != handler.CombatPhaseTicked {
+		return true
+	}
+
+	if len(cDat.NonRaycastResults) == 0 {
 		return true
 	}
 
