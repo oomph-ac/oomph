@@ -291,9 +291,9 @@ func (MovementHandler) ID() string {
 
 // CorrectMovement sends a movement correction to the client.
 func (h *MovementHandler) CorrectMovement(p *player.Player) {
-	if h.StepClipOffset > 0 {
+	/* if h.StepClipOffset > 0 {
 		return
-	}
+	} */
 
 	h.OutgoingCorrections++
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "correcting movement at %d", p.ClientFrame)
