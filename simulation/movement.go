@@ -494,7 +494,7 @@ func (s MovementSimulator) collide(mDat *handler.MovementHandler, w *world.World
 		bb, stepVel[0] = utils.DoBoxCollision(utils.CollisionX, bb, list, stepVel[0])
 		bb, stepVel[2] = utils.DoBoxCollision(utils.CollisionZ, bb, list, stepVel[2])
 		_, rDy := utils.DoBoxCollision(utils.CollisionY, bb, bbList, -(stepVel.Y()))
-		stepVel[1] -= rDy
+		stepVel[1] += rDy
 
 		if game.Vec3HzDistSqr(newVel) < game.Vec3HzDistSqr(stepVel) {
 			mDat.StepClipOffset += stepVel.Y()
