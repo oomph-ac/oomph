@@ -1,5 +1,7 @@
 package player
 
+import "github.com/sirupsen/logrus"
+
 const (
 	DebugModeACKs = iota
 	DebugModeRotations
@@ -44,6 +46,7 @@ func NewDebugger(t *Player) *Debugger {
 	for mode := range DebugModeList {
 		d.Modes[mode] = false
 	}
+	t.Log().SetLevel(logrus.DebugLevel)
 
 	return d
 }
