@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/chewxy/math32"
@@ -33,8 +34,8 @@ func NewAimA() *AimA {
 	d.MaxViolations = 10
 	d.trustDuration = -1
 
-	d.FailBuffer = 5
-	d.MaxBuffer = 5
+	d.FailBuffer = 2
+	d.MaxBuffer = 4
 
 	d.rotations = make([]float32, 100)
 	d.rotationCount = 0
@@ -67,7 +68,7 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	yawDelta := game.Round32(math32.Abs(mDat.DeltaRotation.Z()), 5)
-	if yawDelta < 1e-4 || yawDelta >= 180 {
+	if yawDelta < 0.001 || yawDelta >= 180 {
 		return true
 	}
 
@@ -86,6 +87,7 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 		bSlope, matchAmt := d.determineBestSlope(rotations)
 		p.Dbg.Notify(player.DebugModeRotations, true, "bestSlope=%f matchAmt=%d", bSlope, matchAmt)
+		fmt.Println(rotations)
 
 		if matchAmt <= 5 {
 			data := orderedmap.NewOrderedMap[string, any]()
@@ -96,10 +98,7 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 			d.Buffer = 0
 		}
 
-		for i := 1; i < len(d.rotations); i++ {
-			d.rotations[i-1] = d.rotations[i]
-		}
-		d.rotationCount--
+		d.rotationCount = 0
 	}
 
 	return true

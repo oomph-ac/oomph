@@ -5,6 +5,7 @@ import (
 
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sirupsen/logrus"
 )
 
 type DebugHandler struct {
@@ -30,10 +31,12 @@ func (DebugHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		var mode int
 		switch split[1] {
 		case "type:log":
+			p.Log().SetLevel(logrus.DebugLevel)
 			p.Dbg.LoggingType = player.LoggingTypeLogFile
 			p.Message("Set debug logging type to <green>log file</green>.")
 			return false
 		case "type:message":
+			p.Log().SetLevel(logrus.InfoLevel)
 			p.Dbg.LoggingType = player.LoggingTypeMessage
 			p.Message("Set debug logging type to <green>message</green>.")
 			return false
@@ -45,7 +48,7 @@ func (DebugHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 			mode = player.DebugModeCombat
 		case "clicks":
 			mode = player.DebugModeClicks
-		case "movement_sim":
+		case "movement":
 			mode = player.DebugModeMovementSim
 		case "latency":
 			mode = player.DebugModeLatency
