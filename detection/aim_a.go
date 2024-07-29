@@ -1,7 +1,6 @@
 package detection
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/chewxy/math32"
@@ -87,7 +86,6 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 		bSlope, matchAmt := d.determineBestSlope(rotations)
 		p.Dbg.Notify(player.DebugModeRotations, true, "bestSlope=%f matchAmt=%d", bSlope, matchAmt)
-		fmt.Println(rotations)
 
 		if matchAmt <= 5 {
 			data := orderedmap.NewOrderedMap[string, any]()
