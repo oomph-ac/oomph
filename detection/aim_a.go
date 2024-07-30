@@ -13,6 +13,7 @@ import (
 
 const (
 	DetectionIDAimA = "oomph:aim_a"
+	rotationSamples = 40
 )
 
 type AimA struct {
@@ -36,7 +37,7 @@ func NewAimA() *AimA {
 	d.FailBuffer = 2
 	d.MaxBuffer = 4
 
-	d.rotations = make([]float32, 100)
+	d.rotations = make([]float32, rotationSamples)
 	d.rotationCount = 0
 	return d
 }
@@ -79,15 +80,15 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	d.rotations[d.rotationCount] = yawDelta
 	d.rotationCount++
 
-	if d.rotationCount == 100 {
+	if d.rotationCount == rotationSamples {
 		var rotations = make([]float32, len(d.rotations))
 		copy(rotations, d.rotations)
 		slices.Sort(rotations)
 
 		bSlope, matchAmt := d.determineBestSlope(rotations)
-		p.Dbg.Notify(player.DebugModeRotations, true, "bestSlope=%f matchAmt=%d", bSlope, matchAmt)
+		p.Dbg.Notify(player.DebugModeAimA, true, "bestSlope=%f matchAmt=%d", bSlope, matchAmt)
 
-		if matchAmt <= 5 {
+		if bSlope < 0.01 && matchAmt <= 2 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("bSl", game.Round32(bSlope, 5))
 			data.Set("amt", matchAmt)
