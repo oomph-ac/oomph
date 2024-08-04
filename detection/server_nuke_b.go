@@ -18,6 +18,7 @@ func NewServerNukeB() *ServerNukeB {
 
 	d.Description = "Checks if a player is sending text packet jukebox popup (usually combined with large parameters array to lag servers)."
 	d.Punishable = true // should ip ban when this flags
+	d.BlockIp = true
 
 	d.MaxViolations = 1
 	d.trustDuration = -1

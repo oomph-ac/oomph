@@ -68,7 +68,7 @@ func (l listener) Accept() (session.Conn, error) {
 		IsRecording: false,
 		DirectMode:  true,
 		CurrentTime: time.Now(),
-	})
+	}, l.Listener)
 
 	p := s.Player
 	p.SetConn(c.(*minecraft.Conn))

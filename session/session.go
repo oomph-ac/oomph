@@ -8,6 +8,7 @@ import (
 	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
@@ -45,11 +46,11 @@ type SessionState struct {
 }
 
 // New creates a new session with the logger and given settings.
-func New(log *logrus.Logger, s SessionState) *Session {
+func New(log *logrus.Logger, s SessionState, listener *minecraft.Listener) *Session {
 	p := player.New(log, player.MonitoringState{
 		IsReplay:    s.IsReplay,
 		IsRecording: s.IsRecording,
-	})
+	}, listener)
 
 	session := &Session{
 		Player: p,

@@ -18,7 +18,8 @@ func NewServerNukeA() *ServerNukeA {
 	d.SubType = "A"
 
 	d.Description = "Checks if a player is sending giant modal form response packet (used to lag servers)."
-	d.Punishable = true // should ip ban when this flags
+	d.Punishable = true
+	d.BlockIp = true
 
 	d.MaxViolations = 1
 	d.trustDuration = -1
