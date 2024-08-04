@@ -71,7 +71,7 @@ func (d *ReachB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		player.DebugModeCombat,
 		true,
 		"Reach (B): min=%f max=%f",
-		minDist, maxDist,
+		game.Round32(minDist, 4), game.Round32(maxDist, 4),
 	)
 
 	// TODO: Adjust like in Reach (A)?
