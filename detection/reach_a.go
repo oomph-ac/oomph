@@ -69,9 +69,9 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		player.DebugModeCombat,
 		true,
 		"Reach (A): minDist=%f maxDist=%f avg=%f",
-		minDist,
-		maxDist,
-		avg,
+		game.Round32(minDist, 4),
+		game.Round32(maxDist, 4),
+		game.Round32(avg, 4),
 	)
 	if minDist > 2.9 && maxDist > 3 {
 		p.Log().Warnf("ReachA: min=%f max=%f", minDist, maxDist)
