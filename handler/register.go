@@ -24,4 +24,6 @@ func RegisterHandlers(p *player.Player) {
 	p.RegisterHandler(acks)
 
 	p.RegisterHandler(NewTransferHandler())
+
+	p.RegisterHandler(NewRateLimitHandler())
 }

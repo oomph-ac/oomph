@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/google/uuid"
 	"github.com/oomph-ac/oomph/detection"
 	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/handler"
@@ -38,7 +39,8 @@ func init() {
 }
 
 type Oomph struct {
-	Log *logrus.Logger
+	Log      *logrus.Logger
+	Listener *minecraft.Listener
 
 	settings OomphSettings
 	sessions chan *session.Session
@@ -160,7 +162,7 @@ func (o *Oomph) Start() {
 		o.Log.Errorf("unable to start oomph: %v", err)
 		return
 	}
-
+	o.Listener = l
 	defer l.Close()
 	o.Log.Printf("Oomph is now listening on %v and directing connections to %v!\n", s.LocalAddress, s.RemoteAddress)
 	for {
@@ -186,7 +188,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		DirectMode:  false,
 
 		CurrentTime: time.Now(),
-	})
+	}, listener)
 
 	p := s.Player
 	p.SetConn(conn)
@@ -216,6 +218,10 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		IPAddress:                  conn.RemoteAddr().String(),
 
 		ReadBatches: true,
+
+		DownloadResourcePack: func(id uuid.UUID, version string, current, total int) bool {
+			return false
+		},
 	}.Dial("raknet", remoteAddr)
 
 	if err != nil {
