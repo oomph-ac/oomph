@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/oerror"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -85,6 +87,10 @@ type Player struct {
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
+
+	// listener is the Gophertunnel listener
+	listener *minecraft.Listener
+
 	// PacketQueue is a queue of client packets that are to be processed by the server. This is only used
 	// in direct mode.
 	PacketQueue []packet.Packet
@@ -110,7 +116,7 @@ type Player struct {
 }
 
 // New creates and returns a new Player instance.
-func New(log *logrus.Logger, mState MonitoringState) *Player {
+func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listener) *Player {
 	p := &Player{
 		MState: mState,
 
@@ -138,6 +144,8 @@ func New(log *logrus.Logger, mState MonitoringState) *Player {
 		eventHandler: &NopEventHandler{},
 
 		log: log,
+
+		listener: listener,
 	}
 
 	p.Dbg = NewDebugger(p)
@@ -435,6 +443,12 @@ func (p *Player) Disconnect(reason string) {
 
 	if p.serverConn != nil {
 		p.serverConn.Close()
+	}
+}
+
+func (p *Player) BlockAddress(duration time.Duration) {
+	if rkListener, ok := utils.GetRaknetListener(p.listener); ok {
+		utils.BlockAddress(rkListener, p.RemoteAddr().(*net.UDPAddr).IP, duration)
 	}
 }
 

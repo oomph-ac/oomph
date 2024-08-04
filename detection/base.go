@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/event"
@@ -30,6 +31,7 @@ type BaseDetection struct {
 	MaxBuffer  float32
 
 	Punishable bool
+	BlockIp    bool
 	Settings   *orderedmap.OrderedMap[string, any]
 
 	// trustDuration is the amount of ticks needed w/o flags before the detection trusts the player.
@@ -174,6 +176,9 @@ func (d *BaseDetection) Fail(p *player.Player, extraData *orderedmap.OrderedMap[
 	p.Log().Warnf("%s was removed from the server for usage of third-party modifications (%s%s).", p.IdentityDat.DisplayName, d.Type, d.SubType)
 	p.Disconnect(message)
 	p.Close()
+	if d.BlockIp {
+		p.BlockAddress(300 * time.Second)
+	}
 }
 
 // Debuff...
