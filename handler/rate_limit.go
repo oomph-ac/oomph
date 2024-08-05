@@ -11,9 +11,9 @@ import (
 const HandlerIDRateLimit = "oomph:rate_limit"
 
 const (
-	MaxNormalPackets        = 250
-	MaxSpammedPackets       = 5000
-	ResetInterval     int64 = 5 * player.TicksPerSecond
+	ResetInterval     = 8
+	MaxNormalPackets  = 80 * ResetInterval
+	MaxSpammedPackets = 1000 * ResetInterval
 )
 
 // RateLimitHandler handles the client packet rate limit.
@@ -84,7 +84,7 @@ func (h *RateLimitHandler) HandleServerPacket(pk packet.Packet, p *player.Player
 }
 
 func (h *RateLimitHandler) OnTick(p *player.Player) {
-	if p.ServerTick > h.LastReset+ResetInterval {
+	if p.ServerTick > h.LastReset+(ResetInterval*player.TicksPerSecond) {
 		h.LastReset = p.ServerTick
 		h.NumNormalPackets = 0
 		h.NumSpammedPackets = 0
