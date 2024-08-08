@@ -51,6 +51,9 @@ func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewEditionFakerB())
 	p.RegisterDetection(NewEditionFakerC())
 
+	// input faker detections
+	p.RegisterDetection(NewInputFakerA())
+
 	// server nuke detections
 	p.RegisterDetection(NewServerNukeA())
 	p.RegisterDetection(NewServerNukeB())
