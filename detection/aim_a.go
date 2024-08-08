@@ -13,7 +13,7 @@ import (
 
 const (
 	DetectionIDAimA = "oomph:aim_a"
-	rotationSamples = 40
+	rotationSamples = 150
 )
 
 type AimA struct {
@@ -34,8 +34,8 @@ func NewAimA() *AimA {
 	d.MaxViolations = 10
 	d.trustDuration = -1
 
-	d.FailBuffer = 2
-	d.MaxBuffer = 4
+	d.FailBuffer = 1
+	d.MaxBuffer = 1
 
 	d.rotations = make([]float32, rotationSamples)
 	d.rotationCount = 0
@@ -58,22 +58,17 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	}
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.HorizontallyCollided || math32.Abs(mDat.Rotation.X()) >= 89 { // why does this always false ROTATION checks??!!!
+	if mDat.HorizontallyCollided || math32.Abs(mDat.Rotation.X()) >= 89 || mDat.TicksSinceTeleport <= 1 {
 		return true
 	}
 
-	if mDat.TicksSinceTeleport <= 1 {
-		d.rotationCount = 0
+	yawDelta := mDat.DeltaRotation.Z()
+	if yawDelta == 0 {
 		return true
 	}
 
-	yawDelta := game.Round32(math32.Abs(mDat.DeltaRotation.Z()), 5)
-	if yawDelta < 0.001 || yawDelta >= 180 {
-		return true
-	}
-
-	for _, r := range d.rotations {
-		if math32.Abs(r-yawDelta) <= 1e-4 {
+	for i := 0; i < d.rotationCount; i++ {
+		if math32.Abs(d.rotations[i]-yawDelta) <= 1e-4 {
 			return true
 		}
 	}
@@ -81,35 +76,40 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	d.rotationCount++
 
 	if d.rotationCount == rotationSamples {
-		var rotations = make([]float32, len(d.rotations))
-		copy(rotations, d.rotations)
-		slices.Sort(rotations)
+		rots := make([]float32, len(d.rotations))
+		copy(rots, d.rotations)
+		slices.Sort(rots)
 
-		bSlope, matchAmt := d.determineBestSlope(rotations)
+		slopes := make([]float32, len(rots)-2)
+		for i := 0; i < len(rots)-2; i++ {
+			slopes[i] = rots[i+1] - rots[i]
+		}
+		slices.Sort(slopes)
+		bSlope, matchAmt := d.mostFrequentSlope(slopes)
+
 		p.Dbg.Notify(player.DebugModeAimA, true, "bestSlope=%f matchAmt=%d", bSlope, matchAmt)
 
-		if bSlope < 0.01 && matchAmt <= 2 {
+		if bSlope < 0.007 && matchAmt <= 4 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("bSl", game.Round32(bSlope, 5))
 			data.Set("amt", matchAmt)
 			d.Fail(p, data)
+			d.rotationCount = 0
+			return true
 		} else {
 			d.Buffer = 0
 		}
 
-		d.rotationCount = 0
+		d.rotationCount--
+		for i := 1; i < rotationSamples; i++ {
+			d.rotations[i-1] = d.rotations[i]
+		}
 	}
 
 	return true
 }
 
-func (d *AimA) determineBestSlope(rotations []float32) (float32, int) {
-	slopes := make([]float32, len(rotations)-2)
-	for i := 0; i < len(rotations)-2; i++ {
-		slopes[i] = rotations[i+1] - rotations[i]
-	}
-	slices.Sort(slopes)
-
+func (d *AimA) mostFrequentSlope(slopes []float32) (float32, int) {
 	var (
 		bestSlope    float32
 		currentSlope float32 = math32.MaxFloat32 - 1
