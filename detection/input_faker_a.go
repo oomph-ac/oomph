@@ -1,8 +1,6 @@
 package detection
 
 import (
-	"fmt"
-
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
@@ -21,8 +19,8 @@ func NewInputFakerA() *InputFakerA {
 	d.Type = "InputFaker"
 	d.SubType = "A"
 
-	d.Description = "Checks if the player is spoofing Touch input mode."
-	d.Punishable = true
+	d.Description = "Checks if the player is spoofing touch input mode. This is experimental."
+	d.Punishable = false
 
 	d.MaxViolations = 5
 	d.trustDuration = -1
