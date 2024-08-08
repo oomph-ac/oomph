@@ -38,7 +38,8 @@ type CombatHandler struct {
 	NonRaycastResults []float32
 	RaycastResults    []float32
 
-	LastSwingTick int64
+	LastSwingTick  int64
+	LastAttackTick int64
 
 	Clicking      bool
 	Clicks        []int64
@@ -135,6 +136,8 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		if dat.ActionType != protocol.UseItemOnEntityActionAttack {
 			return true
 		}
+
+		h.LastAttackTick = p.ClientFrame
 
 		h.click(p)
 
