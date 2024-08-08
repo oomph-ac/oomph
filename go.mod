@@ -13,6 +13,7 @@ require (
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-gl/mathgl v1.1.0
 	github.com/google/uuid v1.6.0
+	github.com/quic-go/quic-go v0.45.2
 	github.com/sandertv/go-raknet v1.14.0
 	github.com/sandertv/gophertunnel v1.38.0
 	github.com/sasha-s/go-deadlock v0.3.1
@@ -35,7 +36,6 @@ require (
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
-	github.com/quic-go/quic-go v0.45.2 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
