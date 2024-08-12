@@ -58,7 +58,7 @@ func (d *AimB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	if math32.Abs(yawDelta-prevYawDelta) < 1e-3 && math32.Abs(yawDelta-game.Round32(yawDelta, 3)) <= 1e-4 {
+	if math32.Abs(yawDelta-prevYawDelta) < 1e-3 && math32.Abs(yawDelta-game.Round32(yawDelta, 1)) <= 1e-4 {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("yD", game.Round32(yawDelta, 3))
 		d.Fail(p, data)
