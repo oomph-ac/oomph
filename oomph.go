@@ -101,7 +101,7 @@ func (o *Oomph) Start() {
 			EnableTracing:      os.Getenv("SENTRY_TRACE") == "true",
 			ProfilesSampleRate: 1.0,
 			TracesSampler: sentry.TracesSampler(func(ctx sentry.SamplingContext) float64 {
-				return 0.03
+				return 0.125
 			}),
 		}
 	}
