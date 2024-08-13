@@ -14,7 +14,7 @@ require (
 	github.com/go-gl/mathgl v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/quic-go/quic-go v0.45.2
-	github.com/sandertv/go-raknet v1.14.0
+	github.com/sandertv/go-raknet v1.14.1
 	github.com/sandertv/gophertunnel v1.38.0
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
@@ -53,4 +53,4 @@ require (
 
 replace github.com/sandertv/gophertunnel v1.38.0 => ../gophertunnel
 
-replace github.com/sandertv/go-raknet v1.14.0 => github.com/oomph-ac/go-raknet v0.0.1
+replace github.com/sandertv/go-raknet v1.14.1 => github.com/oomph-ac/go-raknet v0.0.1
