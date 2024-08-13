@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	rdsConn quic.Connection
+	rdsConn     quic.Connection
+	timeToRetry = 10
 )
 
 func init() {
@@ -33,7 +34,15 @@ func connect(inital bool) {
 
 	if err != nil {
 		rdsConn = nil
-		time.Sleep(time.Minute)
+		timeToRetry *= 2
+		if timeToRetry > 120 {
+			timeToRetry = 120
+		}
+
+		logrus.Warnf("Failed to connect to the RDS, retrying in %d seconds", timeToRetry)
+		time.Sleep(time.Duration(timeToRetry) * time.Second)
+
+		// Retry the connection again.
 		connect(false)
 		return
 	}
@@ -43,6 +52,7 @@ func connect(inital bool) {
 	} else {
 		logrus.Info("Re-established connection to the RDS")
 	}
+	timeToRetry = 2
 }
 
 func Available() bool {
