@@ -59,6 +59,7 @@ type OomphSettings struct {
 	ResourcePath             string
 	RequirePacks             bool
 	FetchRemoteResourcePacks bool
+	EncryptionKey            string
 
 	Protocols []minecraft.Protocol
 
@@ -68,6 +69,9 @@ type OomphSettings struct {
 
 // New creates and returns a new Oomph instance.
 func New(s OomphSettings) *Oomph {
+	if len(s.EncryptionKey) != 0 && len(s.EncryptionKey) != 32 {
+		panic("encryption key must be an empty string or a 32 byte string")
+	}
 	return &Oomph{
 		Log:      s.Logger,
 		sessions: make(chan *session.Session),
@@ -142,6 +146,15 @@ func (o *Oomph) Start() {
 		}
 	} else {
 		resourcePacks = utils.ResourcePacks(s.ResourcePath)
+	}
+
+	if s.EncryptionKey != "" {
+		for _, pack := range resourcePacks {
+			if pack.Encrypted() {
+				continue
+			}
+			utils.Encrypt(pack, s.EncryptionKey)
+		}
 	}
 
 	l, err := minecraft.ListenConfig{
