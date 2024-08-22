@@ -26,8 +26,8 @@ func NewAimB() *AimB {
 	d.MaxViolations = 20
 	d.trustDuration = -1
 
-	d.FailBuffer = 1
-	d.MaxBuffer = 1
+	d.FailBuffer = 10
+	d.MaxBuffer = 10
 
 	return d
 }

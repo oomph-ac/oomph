@@ -11,7 +11,7 @@ import (
 
 const (
 	EntityPlayerInterpolationTicks = 3
-	EntityMobInterpolationTicks    = 6
+	EntityMobInterpolationTicks    = 3
 )
 
 type Entity struct {
@@ -39,14 +39,14 @@ type Entity struct {
 }
 
 // New creates and returns a new Entity instance.
-func New(pos, vel mgl32.Vec3, historySize int, isPlayer bool) *Entity {
+func New(pos, vel mgl32.Vec3, historySize int, isPlayer bool, width, height float32) *Entity {
 	e := &Entity{
 		Position:     pos,
 		PrevPosition: pos,
 		RecvPosition: pos.Add(vel),
 
-		Width:  0.6,
-		Height: 1.8,
+		Width:  width,
+		Height: height,
 
 		HistorySize: historySize,
 		IsPlayer:    isPlayer,

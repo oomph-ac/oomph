@@ -2,6 +2,7 @@ package entity
 
 const (
 	DataKeyFlags             = iota
+	DataKeyScale             = 38
 	DataKeyBoundingBoxWidth  = 53
 	DataKeyBoundingBoxHeight = 54
 )
