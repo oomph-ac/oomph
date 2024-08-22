@@ -69,7 +69,8 @@ type OomphSettings struct {
 
 // New creates and returns a new Oomph instance.
 func New(s OomphSettings) *Oomph {
-	if len(s.EncryptionKey) != 0 && len(s.EncryptionKey) != 32 {
+	var length =  len(s.EncryptionKey);
+        if length != 0 && length != 32 {
 		panic("encryption key must be an empty string or a 32 byte string")
 	}
 	return &Oomph{
