@@ -35,7 +35,6 @@ require (
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
-	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect

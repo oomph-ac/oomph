@@ -42,9 +42,25 @@ func (h *EntitiesHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.AddActor:
-		h.Add(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, false))
+		width, height := calculateBBSize(pk.EntityMetadata, 0.6, 1.8)
+		h.Add(pk.EntityRuntimeID, entity.New(
+			pk.Position,
+			pk.Velocity,
+			h.MaxRewindTicks,
+			false,
+			width,
+			height,
+		))
 	case *packet.AddPlayer:
-		h.Add(pk.EntityRuntimeID, entity.New(pk.Position, pk.Velocity, h.MaxRewindTicks, true))
+		width, height := calculateBBSize(pk.EntityMetadata, 0.6, 1.8)
+		h.Add(pk.EntityRuntimeID, entity.New(
+			pk.Position,
+			pk.Velocity,
+			h.MaxRewindTicks,
+			true,
+			width,
+			height,
+		))
 	case *packet.RemoveActor:
 		h.Delete(uint64(pk.EntityUniqueID))
 	case *packet.MoveActorAbsolute:
@@ -100,21 +116,12 @@ func (h *EntitiesHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 			entity.RecvVelocity = pk.Velocity
 		}) */
 	case *packet.SetActorData:
-		width, widthExists := pk.EntityMetadata[entity.DataKeyBoundingBoxWidth]
-		height, heightExists := pk.EntityMetadata[entity.DataKeyBoundingBoxHeight]
-
 		e := h.Find(pk.EntityRuntimeID)
 		if e == nil {
 			return true
 		}
 
-		if widthExists {
-			e.Width = width.(float32)
-		}
-
-		if heightExists {
-			e.Height = height.(float32)
-		}
+		e.Width, e.Height = calculateBBSize(pk.EntityMetadata, e.Width, e.Height)
 	}
 
 	return true
@@ -169,4 +176,27 @@ func (h *EntitiesHandler) tickEntities(tick int64) {
 	for _, e := range h.Entities {
 		e.Tick(tick)
 	}
+}
+
+// calculateBBSize calculates the bounding box size for an entity based on the EntityMetadata.
+func calculateBBSize(data map[uint32]any, defaultWidth, defaultHeight float32) (width float32, height float32) {
+	w, ok := data[entity.DataKeyBoundingBoxWidth]
+	if !ok {
+		width = defaultWidth
+	} else {
+		width = w.(float32)
+	}
+
+	h, ok := data[entity.DataKeyBoundingBoxHeight]
+	if !ok {
+		height = defaultHeight
+	} else {
+		height = h.(float32)
+	}
+
+	if scale, ok := data[entity.DataKeyScale]; ok {
+		width *= scale.(float32)
+		height *= scale.(float32)
+	}
+	return
 }
