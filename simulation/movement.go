@@ -24,8 +24,7 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement simulation for tick %d", p.ClientFrame)
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	mDat.Scenarios = nil
-	mDat.Scenarios = []handler.MovementScenario{}
+	mDat.Scenarios = mDat.Scenarios[:0]
 
 	if !s.Reliable(p) {
 		mDat.Velocity = mDat.ClientVel
@@ -48,7 +47,7 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	}
 
 	var sc handler.MovementScenario
-	minDev := float32(math32.MaxFloat32 - 1)
+	minDev := float32(1_000_000.0)
 	for _, s := range mDat.Scenarios {
 		dev := s.Position.Sub(mDat.ClientPosition).LenSqr()
 		if dev < minDev {
@@ -61,12 +60,10 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 
 	// If the position between the server and client deviates more than the correction threshold
 	// in a tick, correct their movement, and don't accept any client movement until the position has been syncrohnised..
-	// We also correct the movement if the player is in a ghost block scenario, as they are not synced with
-	// the server's current state, but are not necessarily cheating.
 	if mDat.Position.Sub(mDat.ClientPosition).Len() >= mDat.CorrectionThreshold ||
-		mDat.MovementScenario.ID == handler.SimulationAccountingGhostBlock ||
 		(!p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).InLoadedChunk && mDat.TicksSinceTeleport >= 100) {
 		mDat.CorrectMovement(p)
+		return
 	}
 }
 
@@ -109,15 +106,15 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 		defer w.SearchWithGhost(false)
 	}
 
-	if mDat.Immobile {
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "player is immobile")
-		mDat.Velocity = mgl32.Vec3{}
-		return
-	}
-
 	// If a teleport was able to be handled, do not continue with the simulation.
 	if s.teleport(mDat) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", mDat.Position)
+		return
+	}
+
+	if mDat.Immobile {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "player is immobile")
+		mDat.Velocity = mgl32.Vec3{}
 		return
 	}
 

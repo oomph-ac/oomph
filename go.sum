@@ -12,8 +12,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/df-mc/atomic v1.10.0 h1:0ZuxBKwR/hxcFGorKiHIp+hY7hgY+XBTzhCYD2NqSEg=
 github.com/df-mc/atomic v1.10.0/go.mod h1:Gw9rf+rPIbydMjA329Jn4yjd/O2c/qusw3iNp4tFGSc=
-github.com/df-mc/dragonfly v0.9.17 h1:TmmX9aTFg8fcLzkK0bVQFYQY8NkhTJLxtcMKPR7nP1o=
-github.com/df-mc/dragonfly v0.9.17/go.mod h1:6sH5EymXRLFaFwpr5JucF/RHn2l8e4WQwvac4rI+YAI=
 github.com/df-mc/dragonfly v0.9.18-0.20240818101738-29a214b79bd5 h1:lqeOxA7HkyMixyDRvmf9BR/1u+UVbh6/nKugX22hFto=
 github.com/df-mc/dragonfly v0.9.18-0.20240818101738-29a214b79bd5/go.mod h1:nDs4PgdB+mXFLKKNBvCSxATrS4GBEIuV7vsaXUMAvgw=
 github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU=
@@ -72,8 +70,6 @@ github.com/onsi/gomega v1.27.6 h1:ENqfyGeS5AX/rlXDd/ETokDz93u0YufY1Pgxuy/PvWE=
 github.com/onsi/gomega v1.27.6/go.mod h1:PIQNjfQwkP3aQAH7lf7j87O/5FiNr+ZR8+ipb+qQlhg=
 github.com/oomph-ac/go-raknet v0.0.1 h1:4fUNuyEeKcJIHo086dHS3X9axAedq43Eg3W2wqP6ftU=
 github.com/oomph-ac/go-raknet v0.0.1/go.mod h1:7rKCOYPuOXSlzMccBmtTOT5AWSJUhQpTaMd35xrHHD8=
-github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
-github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5/go.mod h1:jvVRKCrJTQWu0XVbaOlby/2lO20uSCHEMzzplHXte1o=
 github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba h1:3jPgmsFGBID1wFfU2AbYocNcN4wqU68UaHSdMjiw/7U=
 github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba/go.mod h1:pxMtw7cyUw6B2bRH0ZBANSPg+AoSud1I1iyJHI69jH4=

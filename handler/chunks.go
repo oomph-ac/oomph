@@ -7,12 +7,9 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -61,13 +58,9 @@ func (h *ChunksHandler) ID() string {
 }
 
 func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	if p.MovementMode == player.AuthorityModeNone {
-		return true
-	}
-
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
-		return h.tryPlaceBlock(p, pk)
+		h.tryPlaceBlock(p, pk)
 	case *packet.PlayerAuthInput:
 		if !h.initalized {
 			h.Radius = int32(p.GameDat.ChunkRadius) + 4
@@ -144,6 +137,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.ChunkRadiusUpdated:
+		// We have an increased chunk radius here just in case.
 		h.Radius = pk.ChunkRadius + 4
 	case *packet.UpdateBlock:
 		b, ok := df_world.BlockByRuntimeID(pk.NewBlockRuntimeID)
@@ -153,14 +147,20 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		pos := cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
-		isAir := utils.BlockName(b) == "minecraft:air"
+		isAir := (b == block.Air{})
 
 		ghBlock := false
-		if placed, ok := h.placedBlocks[pos]; ok && isAir {
-			p.World.MarkGhostBlock(pos, placed)
-			ghBlock = true
-		} else if !ok {
-			p.World.UnmarkGhostBlock(pos)
+		if placed, ok := h.placedBlocks[pos]; ok {
+			// If we placed a block at that position but the server declines it, we want to mark it as a ghost block.
+			// As sometimes, the client has a race condition where the block won't properly update on its end.
+			if isAir {
+				p.World.MarkGhostBlock(pos, placed)
+				ghBlock = true
+			} else {
+				// If the block we placed isn't air, we want to unmark it as a ghost block. Blocks we haven't placed don't
+				// need to be unmarked as ghost blocks. They should properly update on the client-side.
+				p.World.UnmarkGhostBlock(pos)
+			}
 		}
 
 		// This is done because some server-sided plugins may mess up with oomph's compatibility with being able
@@ -170,6 +170,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 		delete(h.placedBlocks, pos)
 
+		// Send an acknowledgement to the client to know when the block is updated on the client-side world.
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckWorldSetBlock,
 			pos,
@@ -178,10 +179,6 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 	case *packet.LevelChunk:
 		// Check if this LevelChunk packet is compatiable with oomph's handling.
 		if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
-			return true
-		}
-
-		if p.MovementMode == player.AuthorityModeNone {
 			return true
 		}
 
@@ -194,10 +191,6 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 			&cpk,
 		))
 	case *packet.SubChunk:
-		if p.MovementMode == player.AuthorityModeNone {
-			return true
-		}
-
 		// NOTE: The reason we have to make a clone of the packet here is because multiversion implementations will downgrade the packet
 		// and Oomph, instead of using the regular chunk packet sent by the server, will use the one modified by the multiversion implementation
 		// since it is a pointer.
@@ -221,9 +214,11 @@ func (h *ChunksHandler) Defer() {
 	}
 }
 
-func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTransaction) (send bool) {
-	send = true
-
+// tryPlaceBlock attempts to place a block in Oomph's lag-compensated World. It accounts for ghost blocks
+// as well.
+func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTransaction) {
+	// If the world has ghost blocks, we want to account for the fact that the client may try to stack
+	// blocks on top of those ghost blocks before recieving an update from the server.
 	if p.World.HasGhostBlocks() {
 		p.World.SearchWithGhost(true)
 		defer p.World.SearchWithGhost(false)
@@ -257,7 +252,7 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 	if h.prevPlaceRequest != nil && dat.BlockRuntimeID == h.prevPlaceRequest.BlockRuntimeID && dat.BlockFace == h.prevPlaceRequest.BlockFace &&
 		dat.BlockPosition == h.prevPlaceRequest.BlockPosition && dat.HotBarSlot == h.prevPlaceRequest.HotBarSlot &&
 		dat.Position == h.prevPlaceRequest.Position && dat.ClickedPosition == h.prevPlaceRequest.ClickedPosition {
-		return false
+		return
 	}
 
 	defer func() {
@@ -268,6 +263,7 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
 	fb := p.World.GetBlock(replacePos)
+	clickedBlockIsGhost := p.World.IsGhostBlock(replacePos)
 
 	// If the block at the position is not replacable, we want to place the block on the side of the block.
 	if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
@@ -275,21 +271,7 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 	}
 
 	// Make a list of BBoxes the block will occupy.
-	bx := b.Model().BBox(df_cube.Pos(replacePos), nil)
-	boxes := make([]cube.BBox, 0)
-	for _, bxx := range bx {
-		// Don't continue if the block isn't 1x1x1.
-		// TODO: Implement placements for these blocks properly.
-		if bxx.Width() != 1 || bxx.Height() != 1 || bxx.Length() != 1 {
-			return
-		}
-
-		boxes = append(boxes, game.DFBoxToCubeBox(bxx).Translate(mgl32.Vec3{
-			float32(replacePos.X()),
-			float32(replacePos.Y()),
-			float32(replacePos.Z()),
-		}))
-	}
+	boxes := utils.BlockBoxes(b, replacePos, p.World)
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
@@ -298,6 +280,7 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 		return
 	}
 
+	// Check if any entity is in the way of the block being placed.
 	entHandler := p.Handler(HandlerIDEntities).(*EntitiesHandler)
 	for _, e := range entHandler.Entities {
 		if cube.AnyIntersections(boxes, e.Box(e.Position)) {
@@ -305,6 +288,9 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 		}
 	}
 
+	// The handler's BlockPlacements makes it easy for any detection attempting to handle block placements
+	// to know what blocks are being placed and where without double processing. This is mainly used for
+	// Scaffold detections.
 	mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
 	h.BlockPlacements = append(h.BlockPlacements, BlockPlacement{
 		Position: replacePos,
@@ -316,11 +302,13 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 		Sneaking: mDat.SneakKeyPressed,
 	})
 
+	h.lastPlaceBlockTick = p.ClientFrame
+	if clickedBlockIsGhost {
+		p.World.MarkGhostBlock(replacePos, fb)
+		return
+	}
 	p.World.SetBlock(replacePos, b)
 	h.placedBlocks[replacePos] = b
-	h.lastPlaceBlockTick = p.ClientFrame
-
-	return
 }
 
 // noinspection ALL

@@ -55,6 +55,15 @@ func (w *World) HasGhostBlocks() bool {
 	return len(w.ghostBlocks) > 0
 }
 
+// IsGhostBlock returns true if the block at the position passed is a ghost block.
+func (w *World) IsGhostBlock(pos cube.Pos) bool {
+	w.RLock()
+	_, ok := w.ghostBlocks[pos]
+	w.RUnlock()
+
+	return ok && w.GetNonGhostBlock(pos) == block.Air{}
+}
+
 // AddChunk adds a chunk to the world.
 func (w *World) AddChunk(pos protocol.ChunkPos, c *chunk.Chunk) {
 	w.Lock()
@@ -87,6 +96,15 @@ func (w *World) GetAllChunks() map[protocol.ChunkPos]*chunk.Chunk {
 	defer w.RUnlock()
 
 	return w.chunks
+}
+
+// GetNonGhostBlock returns the block at the position passed, ignoring ghost blocks.
+func (w *World) GetNonGhostBlock(blockPos cube.Pos) world.Block {
+	old := w.searchWithGhost
+	w.searchWithGhost = false
+	b := w.GetBlock(blockPos)
+	w.searchWithGhost = old
+	return b
 }
 
 // GetBlock returns the block at the position passed.

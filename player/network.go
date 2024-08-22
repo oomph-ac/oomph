@@ -38,7 +38,7 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 	p.ClientDat = conn.ClientData()
 	p.IdentityDat = conn.IdentityData()
 	p.GameDat = conn.GameData()
-	p.Version = conn.Protocol().ID()
+	p.Version = conn.Proto().ID()
 }
 
 // SetServerConn sets the connection to the server.

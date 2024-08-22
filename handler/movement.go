@@ -495,7 +495,7 @@ func (h *MovementHandler) Defer() {
 
 func (h *MovementHandler) Reset() {
 	//dev := h.Position.Sub(h.ClientPosition)
-	if h.TicksSinceTeleport < h.TeleportTicks() || h.StepClipOffset > 0 {
+	if h.TicksSinceTeleport < h.TeleportTicks() || h.StepClipOffset > 0 || h.Immobile {
 		return
 	}
 

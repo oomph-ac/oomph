@@ -162,6 +162,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		h.Phase = CombatPhaseTransaction
 		h.TargetedEntity = entity
+		p.Dbg.Notify(player.DebugModeCombat, true, "entWidth=%f entHeight=%f", entity.Width, entity.Height)
 
 		h.StartAttackPos = mDat.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
 		h.EndAttackPos = mDat.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
@@ -189,7 +190,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		h.calculateNonRaycastResults()
+		h.calculateNonRaycastResults(p)
 		h.calculateRaycastResults(p)
 	case *packet.Animate:
 		h.LastSwingTick = p.ClientFrame
@@ -217,7 +218,7 @@ func (h *CombatHandler) Defer() {
 	h.Clicking = false
 }
 
-func (h *CombatHandler) calculateNonRaycastResults() {
+func (h *CombatHandler) calculateNonRaycastResults(p *player.Player) {
 	attackPosDelta := h.EndAttackPos.Sub(h.StartAttackPos)
 	entityPosDelta := h.EndEntityPos.Sub(h.StartEntityPos)
 	h.NonRaycastResults = make([]float32, 0, 20)
@@ -225,6 +226,11 @@ func (h *CombatHandler) calculateNonRaycastResults() {
 	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
 		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
+		if h.TargetedEntity.Box(entityPos).Grow(0.1).IntersectsWith(p.Handler(HandlerIDMovement).(*MovementHandler).BoundingBox()) {
+			h.NonRaycastResults = append(h.NonRaycastResults, 0)
+			continue
+		}
+
 		h.NonRaycastResults = append(h.NonRaycastResults, game.ClosestPointToBBox(attackPos, h.TargetedEntity.Box(entityPos).Grow(0.1)).Sub(attackPos).Len())
 	}
 }
@@ -254,6 +260,12 @@ func (h *CombatHandler) calculateRaycastResults(p *player.Player) {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
 		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
 		bb := h.TargetedEntity.Box(entityPos).Grow(0.1)
+
+		// If the player is inside the entity's bounding box, the raycast resu
+		if bb.IntersectsWith(mDat.BoundingBox()) {
+			h.RaycastResults = append(h.RaycastResults, 0)
+			continue
+		}
 
 		rotation := startRotation.Add(rotationDelta.Mul(partialTicks))
 		directionVec := game.DirectionVector(rotation.Z(), rotation.X()).Mul(14)
