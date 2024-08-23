@@ -11,7 +11,7 @@ import (
 
 const (
 	EntityPlayerInterpolationTicks = 3
-	EntityMobInterpolationTicks    = 3
+	EntityMobInterpolationTicks    = 6
 )
 
 type Entity struct {
@@ -34,12 +34,13 @@ type Entity struct {
 
 	Width  float32
 	Height float32
+	Scale  float32
 
 	IsPlayer bool
 }
 
 // New creates and returns a new Entity instance.
-func New(pos, vel mgl32.Vec3, historySize int, isPlayer bool, width, height float32) *Entity {
+func New(pos, vel mgl32.Vec3, historySize int, isPlayer bool, width, height, scale float32) *Entity {
 	e := &Entity{
 		Position:     pos,
 		PrevPosition: pos,
@@ -47,6 +48,7 @@ func New(pos, vel mgl32.Vec3, historySize int, isPlayer bool, width, height floa
 
 		Width:  width,
 		Height: height,
+		Scale:  scale,
 
 		HistorySize: historySize,
 		IsPlayer:    isPlayer,
@@ -119,7 +121,7 @@ func Decode(buf *bytes.Buffer) *Entity {
 	return e
 }
 
-// RecievePosition updates the position of the entity, and adds the previous position to the position history.
+// RecievePosition updates the position of the entity, and adds the previous position to its position history.
 func (e *Entity) RecievePosition(hp HistoricalPosition) {
 	e.PrevRecvPosition = e.RecvPosition
 	e.RecvPosition = hp.Position
@@ -157,7 +159,15 @@ func (e *Entity) UpdateVelocity(vel mgl32.Vec3) {
 
 // Box returns the entity's bounding box.
 func (e *Entity) Box(pos mgl32.Vec3) cube.BBox {
-	return cube.Box(-e.Width/2, 0, -e.Width/2, e.Width/2, e.Height, e.Width/2).Translate(pos)
+	w := (e.Width * e.Scale) / 2
+	return cube.Box(
+		-w,
+		0,
+		-w,
+		w,
+		e.Height*e.Scale,
+		w,
+	).Translate(pos)
 }
 
 // Tick updates the entity's position based on the interpolation ticks.
