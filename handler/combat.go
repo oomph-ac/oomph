@@ -162,7 +162,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		h.Phase = CombatPhaseTransaction
 		h.TargetedEntity = entity
-		p.Dbg.Notify(player.DebugModeCombat, true, "entWidth=%f entHeight=%f", entity.Width, entity.Height)
+		p.Dbg.Notify(player.DebugModeCombat, true, "entWidth=%f entHeight=%f entScale=%f", entity.Width, entity.Height, entity.Scale)
 
 		h.StartAttackPos = mDat.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
 		h.EndAttackPos = mDat.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
