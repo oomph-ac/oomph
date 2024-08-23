@@ -57,7 +57,6 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	var (
 		minDist float32 = 14
 		maxDist float32 = -1
-		maxRaw  float32 = -1
 	)
 
 	avg := game.Mean32(combatHandler.RaycastResults)
@@ -66,21 +65,16 @@ func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		maxDist = math32.Max(maxDist, result)
 	}
 
-	for _, result := range combatHandler.NonRaycastResults {
-		maxRaw = math32.Max(maxRaw, result)
-	}
-
 	p.Dbg.Notify(
 		player.DebugModeCombat,
 		true,
-		"Reach (A): minDist=%f maxDist=%f avg=%f rawMax=%f",
+		"Reach (A): minDist=%f maxDist=%f avg=%f",
 		game.Round32(minDist, 4),
 		game.Round32(maxDist, 4),
 		game.Round32(avg, 4),
-		game.Round32(maxRaw, 4),
 	)
 
-	if minDist > 2.9 && maxDist > 3 && maxDist-maxRaw <= 0.5 {
+	if minDist > 2.9 && maxDist > 3 {
 		p.Log().Warnf("ReachA: min=%f max=%f", minDist, maxDist)
 		d.Fail(p, nil)
 		return true
