@@ -243,6 +243,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	data := serverConn.GameData()
 	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
+	data.GameRules = append(data.GameRules, protocol.GameRule{
+		Name:                  "doimmediaterespawn",
+		CanBeModifiedByPlayer: false,
+		Value:                 true,
+	})
 
 	var g sync.WaitGroup
 	g.Add(2)

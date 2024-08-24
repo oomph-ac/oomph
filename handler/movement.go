@@ -427,6 +427,15 @@ func (h *MovementHandler) HandleServerPacket(pk packet.Packet, p *player.Player)
 		}
 		pk.Tick = 0 // prevent rewind
 
+		if !p.Ready {
+			for i, attr := range pk.Attributes {
+				if attr.Name == "minecraft:health" && attr.Value <= 0 {
+					attr.Value = 1
+					pk.Attributes[i] = attr
+				}
+			}
+		}
+
 		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 			ack.AckPlayerUpdateAttributes,
 			pk.Attributes,
