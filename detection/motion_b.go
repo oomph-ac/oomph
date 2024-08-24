@@ -56,7 +56,7 @@ func (d *MotionB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 
 	// Check if the client is deviating from the server's movement before running this detection.
 	diff := game.AbsVec32(mDat.Mov.Sub(mDat.ClientMov))
-	if diff.X() <= 0.01 && diff.Z() <= 0.01 {
+	if diff.X() <= 0.05 && diff.Z() <= 0.05 {
 		d.Buffer = 0
 		return true
 	}
