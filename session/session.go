@@ -30,7 +30,7 @@ type SessionState struct {
 	IsRecording bool
 	// RecordingFile is the file that the events will be recorded to.
 	RecordingFile string
-	// RecordingDuration is the duration of the recording in server ticks,
+	// RecordingDuration is the duration of the recording in server ticks.
 	RecordingDuration int64
 
 	// IsReplay is true if the current session is a replay of a previous session.
