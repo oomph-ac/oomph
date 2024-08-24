@@ -317,7 +317,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			listener.Disconnect(conn, "Report to admin: unknown cause for disconnect.")
+			if rsn := p.ServerConn().DisconnectReason(); rsn != "" {
+				listener.Disconnect(conn, rsn)
+			} else {
+				listener.Disconnect(conn, "Unexpected disconnect (you shouldn't be able to see this).")
+			}
 			p.ServerConn().Close()
 		}()
 		defer g.Done()
@@ -361,7 +365,11 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			listener.Disconnect(conn, "Remote server disconnected unexpectedly from proxy.")
+			if rsn := p.ServerConn().DisconnectReason(); rsn != "" {
+				listener.Disconnect(conn, rsn)
+			} else {
+				listener.Disconnect(conn, "Remote server disconnected unexpectedly from proxy.")
+			}
 			p.ServerConn().Close()
 		}()
 		defer g.Done()
