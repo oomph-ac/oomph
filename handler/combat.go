@@ -226,12 +226,12 @@ func (h *CombatHandler) calculateNonRaycastResults(p *player.Player) {
 	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
 		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
-		if h.TargetedEntity.Box(entityPos).Grow(0.1).IntersectsWith(p.Handler(HandlerIDMovement).(*MovementHandler).BoundingBox()) {
+		if h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion()).IntersectsWith(p.Handler(HandlerIDMovement).(*MovementHandler).BoundingBox()) {
 			h.NonRaycastResults = append(h.NonRaycastResults, 0)
 			continue
 		}
 
-		h.NonRaycastResults = append(h.NonRaycastResults, game.ClosestPointToBBox(attackPos, h.TargetedEntity.Box(entityPos).Grow(0.1)).Sub(attackPos).Len())
+		h.NonRaycastResults = append(h.NonRaycastResults, game.ClosestPointToBBox(attackPos, h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion())).Sub(attackPos).Len())
 	}
 }
 
@@ -259,7 +259,7 @@ func (h *CombatHandler) calculateRaycastResults(p *player.Player) {
 	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
 		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
-		bb := h.TargetedEntity.Box(entityPos).Grow(0.1)
+		bb := h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion())
 
 		// If the player is inside the entity's bounding box, the raycast resu
 		if bb.IntersectsWith(mDat.BoundingBox()) {
@@ -278,7 +278,7 @@ func (h *CombatHandler) calculateRaycastResults(p *player.Player) {
 		// An extra raycast is ran here with the current entity position, as the client may have ticked
 		// the entity to a new position while the frame logic was running (where attacks are done).
 		entityPos = altEntityStartPos.Add(altEntityPosDelta.Mul(partialTicks))
-		bb = h.TargetedEntity.Box(entityPos).Grow(0.1)
+		bb = h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion())
 		result, ok = trace.BBoxIntercept(bb, attackPos, attackPos.Add(directionVec))
 		if ok {
 			h.RaycastResults = append(h.RaycastResults, attackPos.Sub(result.Position()).Len())
