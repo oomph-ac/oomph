@@ -170,6 +170,12 @@ func (e *Entity) Box(pos mgl32.Vec3) cube.BBox {
 	).Translate(pos)
 }
 
+// BoxExpansion returns the amount the bounding box of the entity should be extended
+// by to calculate combat reach.
+func (e *Entity) BoxExpansion() float32 {
+	return 0.1 * e.Scale
+}
+
 // Tick updates the entity's position based on the interpolation ticks.
 func (e *Entity) Tick(tick int64) {
 	pos := e.Position
