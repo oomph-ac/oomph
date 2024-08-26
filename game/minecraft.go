@@ -1,6 +1,9 @@
 package game
 
-import "github.com/chewxy/math32"
+import (
+	"github.com/chewxy/math32"
+	"github.com/go-gl/mathgl/mgl32"
+)
 
 // sinTable ...
 var sinTable []float32
@@ -28,4 +31,19 @@ func ClampFloat(num, min, max float32) float32 {
 		return min
 	}
 	return math32.Min(num, max)
+}
+
+// GetRotationToPoint returns the yaw/pitch needed to be aiming at a certain point.
+func GetRotationToPoint(origin, target mgl32.Vec3) mgl32.Vec2 {
+	hz := math32.Sqrt(math32.Pow(target.X()-origin.X(), 2) + math32.Pow(target.Z()-origin.Z(), 2))
+	v := target.Y() - origin.Y()
+
+	pitch := -math32.Atan2(v, hz) / math32.Pi * 180
+	xDist, zDist := target.X()-origin.X(), target.Z()-origin.Z()
+	yaw := math32.Atan2(zDist, xDist)/math32.Pi*180 - 90
+	if yaw <= -180 {
+		yaw += 360
+	}
+
+	return mgl32.Vec2{yaw, pitch}
 }
