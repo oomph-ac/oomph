@@ -6,7 +6,7 @@ import "github.com/oomph-ac/oomph/player"
 func RegisterDetections(p *player.Player) {
 	// aim detections
 	p.RegisterDetection(NewAimA())
-	p.RegisterDetection(NewAimB())
+	p.RegisterDetection(NewAimA())
 
 	// hitbox detections
 	p.RegisterDetection(NewHitboxA())

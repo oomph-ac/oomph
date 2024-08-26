@@ -365,7 +365,7 @@ func (h *MovementHandler) HandleClientPacket(pk packet.Packet, p *player.Player)
 	h.Rotation = mgl32.Vec3{input.Pitch, input.HeadYaw, input.Yaw}
 
 	h.PrevDeltaRotation = h.DeltaRotation
-	h.DeltaRotation = game.AbsVec32(h.Rotation.Sub(h.PrevRotation))
+	h.DeltaRotation = h.Rotation.Sub(h.PrevRotation)
 	p.Dbg.Notify(
 		player.DebugModeRotations,
 		h.DeltaRotation.LenSqr() > 1e-10,
