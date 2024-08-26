@@ -9,7 +9,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const DetectionIDAimB = "oomph:aim_b"
+const DetectionIDAimA = "oomph:aim_a"
 
 type AimA struct {
 	BaseDetection
@@ -33,7 +33,7 @@ func NewAimA() *AimA {
 }
 
 func (AimA) ID() string {
-	return DetectionIDAimB
+	return DetectionIDAimA
 }
 
 func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
