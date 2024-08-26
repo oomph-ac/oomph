@@ -151,7 +151,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
-		if mDat.TicksSinceTeleport <= 20 {
+		if mDat.TicksSinceTeleport <= 20 || mDat.CorrectionTrustBuffer > 0 {
 			return true
 		}
 
@@ -261,7 +261,7 @@ func (h *CombatHandler) calculateRaycastResults(p *player.Player) {
 		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
 		bb := h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion())
 
-		// If the player is inside the entity's bounding box, the raycast resu
+		// If the player is inside the entity's bounding box, don't attempt a raycast, it's a waste of resources.
 		if bb.IntersectsWith(mDat.BoundingBox()) {
 			h.RaycastResults = append(h.RaycastResults, 0)
 			continue
