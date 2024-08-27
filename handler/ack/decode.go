@@ -128,6 +128,8 @@ func Decode(buf *bytes.Buffer) Acknowledgement {
 		smooth := utils.Bool(buf.Next(1))
 
 		a.Data = append(a.Data, pos, ground, smooth)
+	case AckPlayerRecieveCorrection:
+		// OPTS: n/a
 	default:
 		panic(oerror.New("acknowledgement id %d not found", a.ID))
 	}
