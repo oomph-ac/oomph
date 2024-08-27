@@ -116,6 +116,8 @@ func Encode(a Acknowledgement) []byte {
 		utils.WriteVec32(buf, pos)
 		utils.WriteBool(buf, ground)
 		utils.WriteBool(buf, smooth)
+	case AckPlayerRecieveCorrection:
+		// OPTS: n/a
 	default:
 		panic(oerror.New("acknowledgement id %d not found", a.ID))
 	}
