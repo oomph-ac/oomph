@@ -69,8 +69,8 @@ type OomphSettings struct {
 
 // New creates and returns a new Oomph instance.
 func New(s OomphSettings) *Oomph {
-	var length =  len(s.EncryptionKey)
-        if length != 0 && length != 32 {
+	var length = len(s.EncryptionKey)
+	if length != 0 && length != 32 {
 		panic("encryption key must be an empty string or a 32 byte string")
 	}
 	return &Oomph{
@@ -168,6 +168,10 @@ func (o *Oomph) Start() {
 
 		AllowInvalidPackets: false,
 		AllowUnknownPackets: true,
+
+		/* PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
+			fmt.Printf("%s -> %s: %d\n", src.String(), dst.String(), header.PacketID)
+		}, */
 
 		ReadBatches: true,
 	}.Listen("raknet", s.LocalAddress)

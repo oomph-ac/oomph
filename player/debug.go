@@ -11,6 +11,7 @@ const (
 	DebugModeLatency
 	DebugModeChunks
 	DebugModeAimA
+	DebugModeTimerA
 
 	debugModeCount
 )
@@ -29,6 +30,7 @@ var DebugModeList = []string{
 	"latency",
 	"chunks",
 	"aim-a",
+	"timer-a",
 }
 
 type Debugger struct {
