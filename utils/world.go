@@ -72,6 +72,18 @@ func CanPassBlock(b world.Block) bool {
 	}
 }
 
+// OneWayCollisionBlocks returns an array of blocks that utilize one-way physics.
+func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
+	oneWayBlocks := []world.Block{}
+	for _, b := range blocks {
+		if BlockClimbable(b.Block) {
+			oneWayBlocks = append(oneWayBlocks, b.Block)
+		}
+	}
+
+	return oneWayBlocks
+}
+
 // IsWall returns true if the given block is a wall.
 func IsWall(n string) bool {
 	switch n {
@@ -627,7 +639,8 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oo
 				}
 
 				// If the hash is MaxUint64, then the block is unknown to dragonfly.
-				if !includeUnknown && b.Hash() == math.MaxUint64 {
+				bHash, _ := b.Hash()
+				if !includeUnknown && bHash == math.MaxUint64 {
 					b = nil
 					continue
 				}

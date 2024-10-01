@@ -49,7 +49,7 @@ func (d *VelocityA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 		return true
 	}
 
-	if mDat.StepClipOffset > 0 || mDat.TicksSinceKnockback > 0 || mDat.Mov.Y() < 0.03 || mDat.TicksSinceTeleport <= 20 {
+	if mDat.TicksSinceKnockback > 0 || mDat.Mov.Y() < 0.03 || mDat.TicksSinceTeleport <= 20 {
 		return true
 	}
 

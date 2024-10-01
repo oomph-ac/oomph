@@ -73,6 +73,14 @@ func New(id AckID, data ...interface{}) Acknowledgement {
 	}
 }
 
+func DirectCall(id AckID, p *player.Player, data ...interface{}) {
+	if f, found := FuncMap[id]; found {
+		f(p, data...)
+	} else {
+		panic(oerror.New("no ack found for ID %d", id))
+	}
+}
+
 func (a Acknowledgement) Run(p *player.Player) {
 	if a.f == nil {
 		panic(oerror.New("acknowledgement id %d has no callback", a.ID))
