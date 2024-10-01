@@ -19,6 +19,15 @@ import (
 
 const HandlerIDChunks = "oomph:chunks"
 
+// noinspection ALL
+//
+//go:linkname world_finaliseBlockRegistry github.com/df-mc/dragonfly/server/world.finaliseBlockRegistry
+func world_finaliseBlockRegistry()
+
+func init() {
+	world_finaliseBlockRegistry()
+}
+
 type ChunksHandler struct {
 	Radius               int32
 	BlockPlacements      []BlockPlacement
@@ -113,7 +122,7 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 						int(h.breakingBlockPos.Y()),
 						int(h.breakingBlockPos.Z()),
 					}, block.Air{})
-					h.breakingBlockPos = nil
+					//h.breakingBlockPos = nil
 				}
 			}
 		}
@@ -147,7 +156,7 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 
 		pos := cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
-		isAir := (b == block.Air{})
+		isAir := utils.BlockName(b) == "minecraft:air"
 
 		ghBlock := false
 		if placed, ok := h.placedBlocks[pos]; ok {
@@ -170,12 +179,18 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		}
 		delete(h.placedBlocks, pos)
 
-		// Send an acknowledgement to the client to know when the block is updated on the client-side world.
-		p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
-			ack.AckWorldSetBlock,
-			pos,
-			b,
-		))
+		// If the client is on semi-authoritative mode (deprecated for movement), send an acknowledgement
+		// to the client to know when the block is updated on the client-side world.
+		if p.MovementMode != player.AuthorityModeComplete {
+			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
+				ack.AckWorldSetBlock,
+				pos,
+				b,
+			))
+		} else {
+			// On full authoritative mode, we want to update the block ASAP to prevent ghost blocks, etc.
+			ack.DirectCall(ack.AckWorldSetBlock, p, pos, b)
+		}
 	case *packet.LevelChunk:
 		// Check if this LevelChunk packet is compatiable with oomph's handling.
 		if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {

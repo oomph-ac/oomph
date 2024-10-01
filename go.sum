@@ -18,6 +18,8 @@ github.com/df-mc/goleveldb v1.1.9 h1:ihdosZyy5jkQKrxucTQmN90jq/2lUwQnJZjIYIC/9YU
 github.com/df-mc/goleveldb v1.1.9/go.mod h1:+NHCup03Sci5q84APIA21z3iPZCuk6m6ABtg4nANCSk=
 github.com/df-mc/worldupgrader v1.0.16 h1:3n9yvLFNCe8IDJnUEliTGbhDvV1frjtPX/y5zl3Q5EE=
 github.com/df-mc/worldupgrader v1.0.16/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
+github.com/df-mc/worldupgrader v1.0.17 h1:9NRTihn8/KFL+ajUHDc+KikZcsrhoxR/Tq2ekA5ZR7k=
+github.com/df-mc/worldupgrader v1.0.17/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
 github.com/disgoorg/json v1.1.0 h1:7xigHvomlVA9PQw9bMGO02PHGJJPqvX5AnwlYg/Tnys=
 github.com/disgoorg/json v1.1.0/go.mod h1:BHDwdde0rpQFDVsRLKhma6Y7fTbQKub/zdGO5O9NqqA=
 github.com/elliotchance/orderedmap/v2 v2.2.0 h1:7/2iwO98kYT4XkOjA9mBEIwvi4KpGB4cyHeOFOnj4Vk=
@@ -83,6 +85,8 @@ github.com/quic-go/quic-go v0.45.2 h1:DfqBmqjb4ExSdxRIb/+qXhPC+7k6+DUNZha4oeiC9f
 github.com/quic-go/quic-go v0.45.2/go.mod h1:1dLehS7TIR64+vxGR70GDcatWTOtMX2PUtnKsjbTurI=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
+github.com/sandertv/gophertunnel v1.41.0 h1:PGqqALaatGqcZ+qWXOcR4+CHPhQohnm/ZrnHdhWRtNw=
+github.com/sandertv/gophertunnel v1.41.0/go.mod h1:uSaX7RbVaCcxsGAx2vyZnkT0M6kZFGCdAqLn0+wuKyY=
 github.com/sasha-s/go-deadlock v0.3.1 h1:sqv7fDNShgjcaxkO0JNcOAlr8B9+cV5Ey/OB71efZx0=
 github.com/sasha-s/go-deadlock v0.3.1/go.mod h1:F73l+cr82YSh10GxyRI6qZiCgK64VaZjwesgfQ1/iLM=
 github.com/segmentio/fasthash v1.0.3 h1:EI9+KE1EwvMLBWwjpRDc+fEM+prwxDYbslddQGtrmhM=
