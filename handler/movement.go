@@ -37,6 +37,9 @@ type MovementScenario struct {
 	VerticallyCollided     bool
 	HorizontallyCollided   bool
 
+	ClientHorizontalCollision bool
+	ClientVerticalCollision   bool
+
 	Climb  bool
 	Jumped bool
 
@@ -74,8 +77,11 @@ type MovementHandler struct {
 	Sprinting        bool
 	SprintKeyPressed bool
 
-	Gravity        float32
-	StepClipOffset float32
+	Gravity float32
+
+	SlideOffset          mgl32.Vec2
+	PenetratingLastFrame bool
+	StuckInCollider      bool
 
 	Jumping            bool
 	JumpKeyPressed     bool
@@ -161,7 +167,6 @@ func DecodeMovementHandler(buf *bytes.Buffer) MovementHandler {
 
 	// Read gravity/step clip offset
 	h.Gravity = utils.LFloat32(buf.Next(4))
-	h.StepClipOffset = utils.LFloat32(buf.Next(4))
 
 	// Read jumping states
 	h.Jumping = utils.Bool(buf.Next(1))
@@ -248,7 +253,6 @@ func (h *MovementHandler) Encode(buf *bytes.Buffer) {
 
 	// Write gravity/step clip offset
 	utils.WriteLFloat32(buf, h.Gravity)
-	utils.WriteLFloat32(buf, h.StepClipOffset)
 
 	// Write jumping states
 	utils.WriteBool(buf, h.Jumping)
@@ -291,12 +295,13 @@ func (MovementHandler) ID() string {
 
 // CorrectMovement sends a movement correction to the client.
 func (h *MovementHandler) CorrectMovement(p *player.Player) {
-	/* if h.StepClipOffset > 0 {
-		return
-	} */
-
 	h.OutgoingCorrections++
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "correcting movement at %d", p.ClientFrame)
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "clientVel=%v serverVel=%v", h.ClientMov, h.Mov)
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "clientPos=%v serverPos=%v", h.ClientPosition, h.Position)
+	p.Dbg.Notify(player.DebugModeMovementSim, h.ClientHorizontalCollision != h.HorizontallyCollided, "client horizontal collision mismatch (c=%v, s=%v)", h.ClientHorizontalCollision, h.HorizontallyCollided)
+	p.Dbg.Notify(player.DebugModeMovementSim, h.ClientVerticalCollision != h.VerticallyCollided, "client vertical collision mismatch (c=%v, s=%v)", h.ClientHorizontalCollision, h.VerticallyCollided)
+
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,
 		Position:       h.Position.Add(mgl32.Vec3{0, 1.6201}),
@@ -504,7 +509,7 @@ func (h *MovementHandler) Defer() {
 
 func (h *MovementHandler) Reset() {
 	//dev := h.Position.Sub(h.ClientPosition)
-	if h.TicksSinceTeleport < h.TeleportTicks() || h.StepClipOffset > 0 || h.Immobile {
+	if h.TicksSinceTeleport < h.TeleportTicks() || h.Immobile {
 		return
 	}
 
@@ -524,7 +529,7 @@ func (h *MovementHandler) Simulator() Simulator {
 
 func (h *MovementHandler) BoundingBox() cube.BBox {
 	pos := h.Position
-	//pos[1] += h.StepClipOffset
+	//pos[1] += h.SlideOffset.Y() / 0.4
 
 	return cube.Box(
 		pos.X()-(h.Width/2),
@@ -590,6 +595,9 @@ func (h *MovementHandler) SetKnockback(kb mgl32.Vec3) {
 func (h *MovementHandler) updateMovementStates(p *player.Player, pk *packet.PlayerAuthInput) {
 	h.ForwardImpulse = pk.MoveVector.Y() * 0.98
 	h.LeftImpulse = pk.MoveVector.X() * 0.98
+
+	h.ClientHorizontalCollision = utils.HasFlag(pk.InputData, packet.InputFlagHorizontalCollision)
+	h.ClientVerticalCollision = utils.HasFlag(pk.InputData, packet.InputFlagVerticalCollision)
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartFlying) {
 		h.ToggledFly = true

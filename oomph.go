@@ -158,7 +158,7 @@ func (o *Oomph) Start() {
 		}
 	}
 
-	l, err := minecraft.ListenConfig{
+	lCfg := minecraft.ListenConfig{
 		StatusProvider:         statusProvider,
 		AuthenticationDisabled: !s.Authentication,
 		ResourcePacks:          resourcePacks,
@@ -169,12 +169,16 @@ func (o *Oomph) Start() {
 		AllowInvalidPackets: false,
 		AllowUnknownPackets: true,
 
-		/* PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
-			fmt.Printf("%s -> %s: %d\n", src.String(), dst.String(), header.PacketID)
-		}, */
-
 		ReadBatches: true,
-	}.Listen("raknet", s.LocalAddress)
+	}
+
+	if os.Getenv("PACKET_FUNC") != "" {
+		lCfg.PacketFunc = func(header packet.Header, payload []byte, src, dst net.Addr) {
+			fmt.Printf("%s -> %s: %d\n", src.String(), dst.String(), header.PacketID)
+		}
+	}
+
+	l, err := lCfg.Listen("raknet", s.LocalAddress)
 
 	if err != nil {
 		o.Log.Errorf("unable to start oomph: %v", err)
