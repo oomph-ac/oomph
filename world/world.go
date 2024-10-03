@@ -3,6 +3,7 @@ package world
 import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -102,15 +103,16 @@ func (w *World) GetAllChunks() map[protocol.ChunkPos]*chunk.Chunk {
 func (w *World) GetNonGhostBlock(blockPos cube.Pos) world.Block {
 	old := w.searchWithGhost
 	w.searchWithGhost = false
-	b := w.GetBlock(blockPos)
+	b := w.Block(df_cube.Pos(blockPos))
 	w.searchWithGhost = old
 	return b
 }
 
-// GetBlock returns the block at the position passed.
-func (w *World) GetBlock(blockPos cube.Pos) world.Block {
+// Block returns the block at the position passed.
+func (w *World) Block(pos df_cube.Pos) world.Block {
+	blockPos := cube.Pos(pos)
 	w.RLock()
-	b, ok := w.ghostBlocks[blockPos]
+	b, ok := w.ghostBlocks[cube.Pos(blockPos)]
 	w.RUnlock()
 
 	if ok && w.searchWithGhost {
@@ -136,8 +138,8 @@ func (w *World) GetBlock(blockPos cube.Pos) world.Block {
 }
 
 // SetBlock sets the block at the position passed.
-func (w *World) SetBlock(pos cube.Pos, b world.Block) {
-	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
+func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
+	if cube.Pos(pos).OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return
 	}
 

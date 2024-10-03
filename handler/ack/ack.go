@@ -73,7 +73,7 @@ func New(id AckID, data ...interface{}) Acknowledgement {
 	}
 }
 
-func DirectCall(id AckID, p *player.Player, data ...interface{}) {
+func Instant(id AckID, p *player.Player, data ...interface{}) {
 	if f, found := FuncMap[id]; found {
 		f(p, data...)
 	} else {
