@@ -7,6 +7,7 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -93,11 +94,11 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 						continue
 					}
 
-					p.World.SetBlock(cube.Pos{
+					p.World.SetBlock(df_cube.Pos{
 						int(action.BlockPos.X()),
 						int(action.BlockPos.Y()),
 						int(action.BlockPos.Z()),
-					}, block.Air{})
+					}, block.Air{}, nil)
 				case protocol.PlayerActionStartBreak:
 					if h.breakingBlockPos != nil {
 						continue
@@ -117,11 +118,11 @@ func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 						continue
 					}
 
-					p.World.SetBlock(cube.Pos{
+					p.World.SetBlock(df_cube.Pos{
 						int(h.breakingBlockPos.X()),
 						int(h.breakingBlockPos.Y()),
 						int(h.breakingBlockPos.Z()),
-					}, block.Air{})
+					}, block.Air{}, nil)
 					//h.breakingBlockPos = nil
 				}
 			}
@@ -184,12 +185,12 @@ func (h *ChunksHandler) HandleServerPacket(pk packet.Packet, p *player.Player) b
 		if p.MovementMode != player.AuthorityModeComplete {
 			p.Handler(HandlerIDAcknowledgements).(*AcknowledgementHandler).Add(ack.New(
 				ack.AckWorldSetBlock,
-				pos,
+				df_cube.Pos(pos),
 				b,
 			))
 		} else {
 			// On full authoritative mode, we want to update the block ASAP to prevent ghost blocks, etc.
-			ack.DirectCall(ack.AckWorldSetBlock, p, pos, b)
+			ack.Instant(ack.AckWorldSetBlock, p, df_cube.Pos(pos), b)
 		}
 	case *packet.LevelChunk:
 		// Check if this LevelChunk packet is compatiable with oomph's handling.
@@ -277,7 +278,7 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 	// Find the replace position of the block. This will be used if the block at the current position
 	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
-	fb := p.World.GetBlock(replacePos)
+	fb := p.World.Block(df_cube.Pos(replacePos))
 	clickedBlockIsGhost := p.World.IsGhostBlock(replacePos)
 
 	// If the block at the position is not replacable, we want to place the block on the side of the block.
@@ -322,7 +323,7 @@ func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTran
 		p.World.MarkGhostBlock(replacePos, fb)
 		return
 	}
-	p.World.SetBlock(replacePos, b)
+	p.World.SetBlock(df_cube.Pos(replacePos), b, nil)
 	h.placedBlocks[replacePos] = b
 }
 

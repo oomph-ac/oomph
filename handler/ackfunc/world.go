@@ -3,9 +3,9 @@ package ackfunc
 import (
 	"bytes"
 
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
-	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/internal"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
@@ -17,8 +17,8 @@ import (
 
 // OPTS: cube.Pos, world.Block
 func WorldSetBlock(p *player.Player, opts ...interface{}) {
-	p.Dbg.Notify(player.DebugModeChunks, true, "set block at %v to %s", opts[0].(cube.Pos), utils.BlockName(opts[1].(world.Block)))
-	p.World.SetBlock(opts[0].(cube.Pos), opts[1].(world.Block))
+	p.Dbg.Notify(player.DebugModeChunks, true, "set block at %v to %s", opts[0].(df_cube.Pos), utils.BlockName(opts[1].(world.Block)))
+	p.World.SetBlock(opts[0].(df_cube.Pos), opts[1].(world.Block), nil)
 }
 
 // OPTS: packet.Packet

@@ -23,8 +23,7 @@ require (
 
 require (
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/df-mc/atomic v1.10.0 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.17 // indirect
 	github.com/gameparrot/goquery v0.2.0 // indirect
@@ -39,7 +38,6 @@ require (
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/image v0.19.0 // indirect

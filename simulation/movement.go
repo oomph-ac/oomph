@@ -5,6 +5,7 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -132,7 +133,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	p.Dbg.Notify(player.DebugModeMovementSim, s.knockback(mDat), "knockback applied: %v", mDat.Velocity)
 	p.Dbg.Notify(player.DebugModeMovementSim, s.jump(mDat), "jump force applied (sprint=%v): %v", mDat.Sprinting, mDat.Velocity)
 
-	blockUnder := w.GetBlock(cube.PosFromVec3(mDat.Position.Sub(mgl32.Vec3{0, 0.5})))
+	blockUnder := w.Block(df_cube.Pos(cube.PosFromVec3(mDat.Position.Sub(mgl32.Vec3{0, 0.5}))))
 	blockFriction := game.DefaultAirFriction
 	v3 := mDat.AirSpeed
 	if mDat.OnGround {
@@ -145,7 +146,7 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	s.moveRelative(mDat, v3)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "moveRelative force applied (vel=%v)", mDat.Velocity)
 
-	nearClimable := utils.BlockClimbable(w.GetBlock(cube.PosFromVec3(mDat.Position)))
+	nearClimable := utils.BlockClimbable(w.Block(df_cube.Pos(cube.PosFromVec3(mDat.Position))))
 	if nearClimable && !mDat.JumpKeyPressed {
 		mDat.Velocity[0] = game.ClampFloat(mDat.Velocity[0], -0.3, 0.3)
 		mDat.Velocity[2] = game.ClampFloat(mDat.Velocity[2], -0.3, 0.3)
@@ -187,9 +188,9 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 	s.tryCollisions(mDat, w, p.Dbg)
 	mDat.Mov = mDat.Velocity
 
-	blockUnder = w.GetBlock(cube.PosFromVec3(mDat.Position.Sub(mgl32.Vec3{0, 0.2})))
+	blockUnder = w.Block(df_cube.Pos(cube.PosFromVec3(mDat.Position.Sub(mgl32.Vec3{0, 0.2}))))
 	if _, isAir := blockUnder.(block.Air); isAir {
-		b := w.GetBlock(cube.PosFromVec3(mDat.Position).Side(cube.FaceDown))
+		b := w.Block(df_cube.Pos(cube.PosFromVec3(mDat.Position).Side(cube.FaceDown)))
 		n := utils.BlockName(b)
 		if utils.IsFence(b) || utils.IsWall(n) || strings.Contains(n, "fence") {
 			blockUnder = b
