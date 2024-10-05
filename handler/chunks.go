@@ -230,6 +230,10 @@ func (h *ChunksHandler) Defer() {
 	}
 }
 
+func (h *ChunksHandler) validateInteraction(p *player.Player, pk *packet.InventoryTransaction) bool {
+	return true
+}
+
 // tryPlaceBlock attempts to place a block in Oomph's lag-compensated World. It accounts for ghost blocks
 // as well.
 func (h *ChunksHandler) tryPlaceBlock(p *player.Player, pk *packet.InventoryTransaction) {
