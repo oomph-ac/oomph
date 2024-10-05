@@ -228,6 +228,12 @@ func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
 
 func (MovementSimulator) Reliable(p *player.Player) bool {
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
+
+	// Always simulate teleports sent by the server to prevent de-sync.
+	if mDat.TicksSinceTeleport < mDat.TeleportTicks() {
+		return true
+	}
+
 	for _, b := range utils.GetNearbyBlocks(mDat.BoundingBox(), false, true, p.World) {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
 			return false
