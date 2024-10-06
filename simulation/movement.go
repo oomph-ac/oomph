@@ -25,7 +25,6 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement simulation for tick %d", p.ClientFrame)
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	mDat.Scenarios = mDat.Scenarios[:0]
 
 	if !s.Reliable(p) {
 		mDat.Velocity = mDat.ClientVel
@@ -33,7 +32,6 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 		mDat.Position = mDat.ClientPosition
 		mDat.Mov = mDat.ClientMov
 		mDat.OnGround = true
-		mDat.Scenarios = append(mDat.Scenarios, mDat.MovementScenario)
 		return
 	}
 
@@ -43,21 +41,7 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 		return
 	}
 
-	for i := handler.SimulationNormal; i <= handler.SimulationAccountingGhostBlock; i++ {
-		s.doActualSimulation(p, i)
-	}
-
-	var sc handler.MovementScenario
-	minDev := float32(1_000_000.0)
-	for _, s := range mDat.Scenarios {
-		dev := s.Position.Sub(mDat.ClientPosition).LenSqr()
-		if dev < minDev {
-			minDev = dev
-			sc = s
-		}
-	}
-
-	mDat.MovementScenario = sc
+	s.doActualSimulation(p)
 
 	// If the position between the server and client deviates more than the correction threshold
 	// in a tick, correct their movement, and don't accept any client movement until the position has been syncrohnised..
@@ -68,43 +52,17 @@ func (s MovementSimulator) Simulate(p *player.Player) {
 	}
 }
 
-func (s MovementSimulator) doActualSimulation(p *player.Player, run int) {
-	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN run %d", run)
-	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END run %d", run)
+func (s MovementSimulator) doActualSimulation(p *player.Player) {
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN movement sim")
+	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement sim")
 
 	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
 	w := p.World
-
-	if run == handler.SimulationAccountingGhostBlock && !w.HasGhostBlocks() {
-		return
-	}
-
-	oldS := mDat.MovementScenario
-	defer func() {
-		mDat.Scenarios = append(mDat.Scenarios, handler.MovementScenario{
-			ID:                   run,
-			Position:             mDat.Position,
-			Velocity:             mDat.Velocity,
-			OnGround:             mDat.OnGround,
-			OffGroundTicks:       mDat.OffGroundTicks,
-			CollisionX:           mDat.CollisionX,
-			CollisionZ:           mDat.CollisionZ,
-			VerticallyCollided:   mDat.VerticallyCollided,
-			HorizontallyCollided: mDat.HorizontallyCollided,
-			KnownInsideBlock:     mDat.KnownInsideBlock,
-		})
-		mDat.MovementScenario = oldS
-	}()
 
 	// Do not allow the player to move if not in a loaded chunk.
 	if !p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler).InLoadedChunk {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "player not in loaded chunk")
 		return
-	}
-
-	if run == handler.SimulationAccountingGhostBlock {
-		w.SearchWithGhost(true)
-		defer w.SearchWithGhost(false)
 	}
 
 	// If a teleport was able to be handled, do not continue with the simulation.
