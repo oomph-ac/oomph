@@ -92,9 +92,8 @@ func (d *ScaffoldA) HandleClientPacket(pk packet.Packet, p *player.Player) bool 
 			}
 
 			if pl.RawData.BlockFace != d.expectedBlockFace && blockPlacedBelow {
-				// If the expected block face is not set, or if the placed face is the opposite of the expected and there is a ghost
-				// block in the world, don't flag.
-				if d.expectedBlockFace == blockFaceNotSet || (placedFace.Opposite() == cube.Face(d.expectedBlockFace) && p.World.HasGhostBlocks()) {
+				// If the expected block face is not set, or if the placed face is the opposite of the expected, don't flag
+				if d.expectedBlockFace == blockFaceNotSet || placedFace.Opposite() == cube.Face(d.expectedBlockFace) {
 					continue
 				}
 
