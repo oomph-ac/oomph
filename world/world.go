@@ -29,9 +29,6 @@ type World struct {
 	chunks map[protocol.ChunkPos]*chunk.Chunk
 	id     uint64
 
-	ghostBlocks     map[cube.Pos]world.Block
-	searchWithGhost bool
-
 	lastCleanPos protocol.ChunkPos
 
 	deadlock.RWMutex
@@ -40,29 +37,9 @@ type World struct {
 func New() *World {
 	currentWorldId++
 	return &World{
-		chunks:      make(map[protocol.ChunkPos]*chunk.Chunk),
-		ghostBlocks: make(map[cube.Pos]world.Block),
-		id:          currentWorldId,
+		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
+		id:     currentWorldId,
 	}
-}
-
-// SearchWithGhost sets wether the world should search for ghost blocks or not while calling GetBlock.
-func (w *World) SearchWithGhost(search bool) {
-	w.searchWithGhost = search
-}
-
-// HasGhostBlocks returns true if the world has ghost blocks.
-func (w *World) HasGhostBlocks() bool {
-	return len(w.ghostBlocks) > 0
-}
-
-// IsGhostBlock returns true if the block at the position passed is a ghost block.
-func (w *World) IsGhostBlock(pos cube.Pos) bool {
-	w.RLock()
-	_, ok := w.ghostBlocks[pos]
-	w.RUnlock()
-
-	return ok && w.GetNonGhostBlock(pos) == block.Air{}
 }
 
 // AddChunk adds a chunk to the world.
@@ -99,26 +76,9 @@ func (w *World) GetAllChunks() map[protocol.ChunkPos]*chunk.Chunk {
 	return w.chunks
 }
 
-// GetNonGhostBlock returns the block at the position passed, ignoring ghost blocks.
-func (w *World) GetNonGhostBlock(blockPos cube.Pos) world.Block {
-	old := w.searchWithGhost
-	w.searchWithGhost = false
-	b := w.Block(df_cube.Pos(blockPos))
-	w.searchWithGhost = old
-	return b
-}
-
 // Block returns the block at the position passed.
 func (w *World) Block(pos df_cube.Pos) world.Block {
 	blockPos := cube.Pos(pos)
-	w.RLock()
-	b, ok := w.ghostBlocks[cube.Pos(blockPos)]
-	w.RUnlock()
-
-	if ok && w.searchWithGhost {
-		return b
-	}
-
 	if blockPos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
@@ -130,7 +90,7 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 	}
 	rid := c.Block(uint8(blockPos[0]), int16(blockPos[1]), uint8(blockPos[2]), 0)
 
-	b, ok = world.BlockByRuntimeID(rid)
+	b, ok := world.BlockByRuntimeID(rid)
 	if !ok {
 		return block.Air{}
 	}
@@ -152,25 +112,6 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 
 	// TODO: Implement layers properly.
 	c.SetBlock(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0, blockID)
-}
-
-// MarkGhostBlock marks a block as a ghost block at the position passed.
-func (w *World) MarkGhostBlock(pos cube.Pos, b world.Block) {
-	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
-		return
-	}
-
-	w.ghostBlocks[pos] = b
-}
-
-// RemoveGhostBlock removes a ghost block at the position passed.
-func (w *World) RemoveGhostBlock(pos cube.Pos) {
-	delete(w.ghostBlocks, pos)
-}
-
-// UnmarkGhostBLock unmarks a ghost block at the position passed.
-func (w *World) UnmarkGhostBlock(pos cube.Pos) {
-	delete(w.ghostBlocks, pos)
 }
 
 // CleanChunks cleans up the chunks in respect to the given chunk radius and chunk position.

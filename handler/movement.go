@@ -17,14 +17,7 @@ import (
 
 const HandlerIDMovement = "oomph:movement"
 
-const (
-	SimulationNormal = iota + 1
-	SimulationAccountingGhostBlock
-)
-
 type MovementScenario struct {
-	ID int
-
 	Position mgl32.Vec3
 	Velocity mgl32.Vec3
 
@@ -48,7 +41,6 @@ type MovementScenario struct {
 
 type MovementHandler struct {
 	MovementScenario
-	Scenarios []MovementScenario
 
 	OutgoingCorrections   int32
 	CorrectionTrustBuffer int32
