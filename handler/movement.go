@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -294,6 +295,20 @@ func (h *MovementHandler) CorrectMovement(p *player.Player) {
 	p.Dbg.Notify(player.DebugModeMovementSim, h.ClientHorizontalCollision != h.HorizontallyCollided, "client horizontal collision mismatch (c=%v, s=%v)", h.ClientHorizontalCollision, h.HorizontallyCollided)
 	p.Dbg.Notify(player.DebugModeMovementSim, h.ClientVerticalCollision != h.VerticallyCollided, "client vertical collision mismatch (c=%v, s=%v)", h.ClientHorizontalCollision, h.VerticallyCollided)
 
+	// Update the blocks around the player to ensure they have an up-to-date world state.
+	for _, bRes := range utils.GetNearbyBlocks(h.BoundingBox().Grow(1), true, true, p.World) {
+		p.SendPacketToClient(&packet.UpdateBlock{
+			Position: protocol.BlockPos{
+				int32(bRes.Position.X()),
+				int32(bRes.Position.Y()),
+				int32(bRes.Position.Z()),
+			},
+			NewBlockRuntimeID: world.BlockRuntimeID(bRes.Block),
+			Flags:             packet.BlockUpdatePriority | packet.BlockUpdateNetwork | packet.BlockUpdateNeighbours,
+			Layer:             0,
+		})
+	}
+
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,
 		Position:       h.Position.Add(mgl32.Vec3{0, 1.6201}),
@@ -484,14 +499,14 @@ func (*MovementHandler) OnTick(p *player.Player) {
 }
 
 func (h *MovementHandler) Defer() {
+	score := h.CorrectionTrustBuffer
+	h.CorrectionTrustBuffer--
 	if h.mode != player.AuthorityModeSemi {
 		return
 	}
 
 	// Detections may want to correct the player's movement on semi-authoritative mode, and we
 	// have to set the input position to the correct position.
-	score := h.CorrectionTrustBuffer
-	h.CorrectionTrustBuffer--
 	if h.OutgoingCorrections == 0 && score <= 0 {
 		h.Reset()
 	} else {

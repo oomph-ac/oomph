@@ -26,6 +26,15 @@ const (
 	GameVersion1_20_10 = 594
 	GameVersion1_20_30 = 618
 	GameVersion1_20_40 = 622
+	GameVersion1_20_50 = 630
+	GameVersion1_20_60 = 649
+	GameVersion1_20_70 = 662
+	GameVersion1_20_80 = 671
+
+	GameVersion1_21_0  = 685
+	GameVersion1_21_2  = 686
+	GameVersion1_21_20 = 712
+	GameVersion1_21_30 = 729
 
 	TicksPerSecond = 20
 
@@ -417,6 +426,13 @@ func (p *Player) NMessage(msg string, args ...interface{}) {
 	p.SendPacketToClient(&packet.Text{
 		TextType: packet.TextTypeChat,
 		Message:  text.Colourf(msg, args...),
+	})
+}
+
+func (p *Player) Popup(msg string) {
+	p.SendPacketToClient(&packet.Text{
+		TextType: packet.TextTypeJukeboxPopup,
+		Message:  msg,
 	})
 }
 

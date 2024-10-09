@@ -81,3 +81,36 @@ func AbsVec32(vec mgl32.Vec3) mgl32.Vec3 {
 func Vec3HzDistSqr(vec3 mgl32.Vec3) float32 {
 	return vec3.X()*vec3.X() + vec3.Z()*vec3.Z()
 }
+
+func MinVec3(vecs []mgl32.Vec3) mgl32.Vec3 {
+	min := mgl32.Vec3{math32.MaxFloat32, math32.MaxFloat32, math32.MaxFloat32}
+	for _, v := range vecs {
+		if v[0] <= min[0] || v[1] <= min[1] || v[2] <= min[2] {
+			min = v
+		}
+	}
+
+	return min
+}
+
+func MaxVec3(vecs []mgl32.Vec3) mgl32.Vec3 {
+	max := mgl32.Vec3{-math32.MaxFloat32, -math32.MaxFloat32, -math32.MaxFloat32}
+	for _, v := range vecs {
+		if v[0] >= max[0] || v[1] >= max[1] || v[2] >= max[2] {
+			max = v
+		}
+	}
+
+	return max
+}
+
+// Returns -1 if x < y, 0 if x == y, or 1 if x > y
+func PHPSpaceshipOp(x, y float32) float32 {
+	if x < y {
+		return -1
+	} else if x == y {
+		return 0
+	}
+
+	return 1
+}
