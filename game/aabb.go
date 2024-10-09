@@ -228,3 +228,20 @@ func AABBMiddlePosition(bb cube.BBox) mgl32.Vec3 {
 		(bb.Min().Z() + bb.Max().Z()) / 2,
 	}
 }
+
+// AABBSidePoints returns all the side points of a given bounding box.
+func AABBSidePoints(bb cube.BBox) []mgl32.Vec3 {
+	min := bb.Min()
+	max := bb.Max()
+
+	return []mgl32.Vec3{
+		min,                         // 0: min
+		{min.X(), min.Y(), max.Z()}, // 1: min, max.z
+		{min.X(), max.Y(), min.Z()}, // 2: max.y, min.z
+		{min.X(), max.Y(), max.Z()}, // 3: max.y, max.z
+		{max.X(), min.Y(), min.Z()}, // 4: max.x, min.z
+		{max.X(), min.Y(), max.Z()}, // 5: max.x, max.z
+		{max.X(), max.Y(), min.Z()}, // 6: max.x, max.y, min.z
+		max,                         // 7: max
+	}
+}

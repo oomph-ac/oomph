@@ -218,9 +218,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 13.0/16.0, 1)}
 	}
 
-	dfBoxes := b.Model().BBox(df_cube.Pos{
-		pos.X(), pos.Y(), pos.Z(),
-	}, w)
+	dfBoxes := b.Model().BBox(df_cube.Pos(pos), w)
 
 	var boxes []cube.BBox
 	for _, bb := range dfBoxes {

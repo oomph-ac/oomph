@@ -11,6 +11,8 @@ import (
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/ethaniccc/float32-cube/cube/trace"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/handler/ack"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -35,6 +37,9 @@ type ChunksHandler struct {
 
 	TicksInLoadedChunk int64
 	InLoadedChunk      bool
+
+	initalInteraction         *protocol.UseItemTransactionData
+	initalInteractionAccepted bool
 
 	breakingBlockPos   *protocol.BlockPos
 	prevPlaceRequest   *protocol.UseItemTransactionData
@@ -66,6 +71,9 @@ func (h *ChunksHandler) ID() string {
 func (h *ChunksHandler) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
+		if !h.validateInteraction(p, pk) {
+			return false
+		}
 		h.tryPlaceBlock(p, pk)
 	case *packet.PlayerAuthInput:
 		if !h.initalized {
@@ -213,6 +221,98 @@ func (h *ChunksHandler) Defer() {
 }
 
 func (h *ChunksHandler) validateInteraction(p *player.Player, pk *packet.InventoryTransaction) bool {
+	dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
+	if !ok {
+		return true
+	}
+
+	// No point in validating an air click...
+	if dat.ActionType == protocol.UseItemActionClickAir || dat.ClickedPosition.Len() > 1 {
+		h.initalInteractionAccepted = true
+		return true
+	}
+
+	// Ignore duplicate inputs made by the client to save CPU.
+	if h.prevPlaceRequest != nil && dat.BlockRuntimeID == h.prevPlaceRequest.BlockRuntimeID && dat.BlockFace == h.prevPlaceRequest.BlockFace &&
+		dat.BlockPosition == h.prevPlaceRequest.BlockPosition && dat.HotBarSlot == h.prevPlaceRequest.HotBarSlot &&
+		dat.Position == h.prevPlaceRequest.Position && dat.ClickedPosition == h.prevPlaceRequest.ClickedPosition {
+		return false
+	}
+
+	// On newer versions of the game (1.21.20+), we are able to determine wether the input was from a
+	// simulation frame, or from the player itself. However, on older versions there's no other way to
+	// distinguish this besides a zero-vector click position that is usually from jump-bridging.
+	var isInitalInput bool
+	if p.Conn().Proto().ID() >= player.GameVersion1_21_20 {
+		isInitalInput = dat.TriggerType == protocol.TriggerTypePlayerInput
+	} else {
+		isInitalInput = dat.ClickedPosition.LenSqr() > 0
+	}
+
+	if !isInitalInput {
+		return h.initalInteractionAccepted
+	}
+
+	defer func() {
+		h.initalInteraction = dat
+	}()
+
+	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
+	interactedBlock := p.World.Block(df_cube.Pos(blockPos))
+	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
+
+	if len(utils.BlockBoxes(interactedBlock, blockPos, p.World)) == 0 {
+		h.initalInteractionAccepted = true
+		return true
+	}
+
+	mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
+	if !mDat.s.Reliable(p) {
+		return true
+	}
+
+	eyePos := mDat.Position
+	if mDat.Sneaking {
+		eyePos[1] += 1.54
+	} else {
+		eyePos[1] += 1.62
+	}
+
+	// We have 5 blocks here for leniency since we don't account for the interpolated camera position.
+	if eyePos.Sub(interactPos).Len() > 5.0 {
+		h.initalInteractionAccepted = false
+		p.Popup("Interaction denied - too far away.")
+		return false
+	}
+
+	// Check for all the blocks in between the interaction position and the player's eye position. If any blocks intersect
+	// with the line between the player's eye position and the interaction position, the interaction is cancelled.
+	for _, intersectingBlockPos := range game.BlocksBetween(eyePos, interactPos) {
+		flooredPos := df_cube.Pos{int(intersectingBlockPos[0]), int(intersectingBlockPos[1]), int(intersectingBlockPos[2])}
+		if flooredPos == df_cube.Pos(blockPos) {
+			continue
+		}
+
+		intersectingBlock := p.World.Block(flooredPos)
+		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), p.World)
+		if len(iBBs) == 0 {
+			continue
+		}
+
+		// Iterate through all the block's bounding boxes to check if it is in the way of the interaction position.
+		for _, iBB := range iBBs {
+			iBB = iBB.Translate(intersectingBlockPos)
+
+			// If there is an intersection, the interaction is invalid.
+			if _, ok := trace.BBoxIntercept(iBB, eyePos, interactPos); ok {
+				p.Popup("Interaction denied - block is in the way.")
+				h.initalInteractionAccepted = false
+				return false
+			}
+		}
+	}
+
+	h.initalInteractionAccepted = true
 	return true
 }
 
