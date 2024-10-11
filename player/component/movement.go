@@ -389,3 +389,19 @@ func (mc *AuthoritativeMovementComponent) Update(input *packet.PlayerAuthInput) 
 
 	// TODO: Effects component.
 }
+
+// Simulate does any simulations needed by the movement component.
+func (mc *AuthoritativeMovementComponent) Simulate() {
+	if !mc.canSimulate {
+		return
+	}
+}
+
+// Validate is a function that returns true if this movement component has a position within
+// the given threshold of the other movement component.
+func (mc *AuthoritativeMovementComponent) Validate(threshold float32, other player.MovementComponent) bool {
+	if !mc.canSimulate {
+		return true
+	}
+	return other.Pos().Sub(mc.pos).Len() <= threshold
+}
