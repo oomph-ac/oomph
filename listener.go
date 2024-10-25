@@ -8,10 +8,8 @@ import (
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/oomph-ac/oomph/detection"
 	"github.com/oomph-ac/oomph/handler"
-	"github.com/oomph-ac/oomph/simulation"
+	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
-
-	osession "github.com/oomph-ac/oomph/session"
 )
 
 // listener is a Dragonfly listener implementation for direct Oomph.
@@ -47,8 +45,8 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 
 // Accept accepts an incoming player into the server. It blocks until a player connects to the server.
 // Accept returns an error if the Server is no longer available.
-func (o *Oomph) Accept() (*osession.Session, error) {
-	s, ok := <-o.sessions
+func (o *Oomph) Accept() (*player.Player, error) {
+	s, ok := <-o.players
 	if !ok {
 		return nil, errors.New("could not accept player: oomph stopped")
 	}
@@ -63,14 +61,12 @@ func (l listener) Accept() (session.Conn, error) {
 		return nil, err
 	}
 
-	s := osession.New(l.o.Log, osession.SessionState{
+	p := player.New(l.o.Log, player.MonitoringState{
 		IsReplay:    false,
 		IsRecording: false,
-		DirectMode:  true,
 		CurrentTime: time.Now(),
 	}, l.Listener)
 
-	p := s.Player
 	p.SetConn(c.(*minecraft.Conn))
 	p.RuntimeId = 1
 	p.ClientRuntimeId = 1
@@ -78,20 +74,18 @@ func (l listener) Accept() (session.Conn, error) {
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
 
-	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
-
-	l.o.sessions <- s
-	return s, err
+	l.o.players <- p
+	return p, err
 }
 
 // Disconnect disconnects a connection from the Listener with a reason.
 func (l listener) Disconnect(conn session.Conn, reason string) error {
-	return l.Listener.Disconnect(conn.(*osession.Session).Conn(), reason)
+	return l.Listener.Disconnect(conn.(*player.Player).Conn(), reason)
 }
 
 // Close closes the Listener.
 func (l listener) Close() error {
 	_ = l.Listener.Close()
-	close(l.o.sessions)
+	close(l.o.players)
 	return nil
 }

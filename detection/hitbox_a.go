@@ -5,7 +5,6 @@ import (
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -38,7 +37,7 @@ func (d *HitboxA) ID() string {
 
 func (d *HitboxA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 	if interaction, ok := pk.(*packet.Interact); ok && interaction.ActionType == packet.InteractActionMouseOverEntity && interaction.Position != (mgl32.Vec3{}) {
-		entity := p.Handler(handler.HandlerIDEntities).(*handler.EntitiesHandler).Find(interaction.TargetEntityRuntimeID)
+		entity := p.EntityTracker().FindEntity(interaction.TargetEntityRuntimeID)
 		if entity == nil || !entity.IsPlayer {
 			return true
 		}

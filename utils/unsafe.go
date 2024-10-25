@@ -65,5 +65,5 @@ func BlockAddress(l *raknet.Listener, addr net.IP, duration time.Duration) {
 	sec.mu.Lock()
 	defer sec.mu.Unlock()
 	sec.blockCount.Add(1)
-	sec.blocks[[16]byte(addr.To16())] = time.Now().Add(duration).Add(-sec.conf.BlockDuration)
+	sec.blocks[[16]byte(addr.To16())] = time.Now().Add(duration)
 }

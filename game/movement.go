@@ -12,6 +12,7 @@ const (
 	SlimeBounceMultiplier = float32(-1)
 	BedBounceMultiplier   = float32(-0.66)
 	ClimbSpeed            = float32(0.2)
+	PlayerHeightOffset    = float32(1.62)
 
 	JumpDelayTicks = 10
 )

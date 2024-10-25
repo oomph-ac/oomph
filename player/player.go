@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/oomph-ac/oomph/world"
@@ -68,8 +68,7 @@ type Player struct {
 
 	// combatMode and movementMode are the authority modes of the player. They are used to determine
 	// how certain actions should be handled.
-	CombatMode   AuthorityMode
-	MovementMode AuthorityMode
+	CombatMode AuthorityMode
 
 	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
@@ -82,6 +81,7 @@ type Player struct {
 	ClientTick, ClientFrame int64
 	ServerTick              int64
 	Tps                     float32
+	StackLatency            time.Duration
 	LastServerTick          time.Time
 
 	// World is the world of the player.
@@ -112,6 +112,13 @@ type Player struct {
 	// Dbg is the debugger of the player. It is used to log debug messages to the player.
 	Dbg *Debugger
 
+	acks           AcknowledgmentComponent
+	effects        EffectsComponent
+	entTracker     EntityTrackerComponent
+	gamemodeHandle GamemodeComponent
+	movement       MovementComponent
+	worldUpdater   WorldUpdaterComponent // TODO: figure out a name for this shit.
+
 	// packetHandlers contains packet packetHandlers registered to the player.
 	packetHandlers []Handler
 	// detections contains packet handlers specifically used for detections.
@@ -131,8 +138,7 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 		Connected: true,
 
-		CombatMode:   AuthorityModeSemi,
-		MovementMode: AuthorityModeSemi,
+		CombatMode: AuthorityModeSemi,
 
 		World: world.New(),
 
@@ -158,10 +164,10 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 	}
 
 	p.Dbg = NewDebugger(p)
-
 	p.ClientPkFunc = p.DefaultHandleFromClient
 	p.ServerPkFunc = p.DefaultHandleFromServer
 
+	go p.startTicking()
 	return p
 }
 
@@ -268,47 +274,6 @@ func (p *Player) DefaultHandleFromServer(pks []packet.Packet) error {
 	}
 
 	return nil
-}
-
-func (p *Player) handleOneFromClient(pk packet.Packet) error {
-	span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("p.handleOneFromClient(%T)", pk))
-	defer span.Finish()
-
-	if s, ok := pk.(*packet.ScriptMessage); ok && strings.Contains(s.Identifier, "oomph:") {
-		panic(oerror.New("malicious payload detected"))
-	}
-
-	cancel := false
-	for _, h := range p.packetHandlers {
-		cancel = cancel || !h.HandleClientPacket(pk, p)
-	}
-
-	det := p.RunDetections(pk)
-	for _, h := range p.packetHandlers {
-		h.Defer()
-	}
-
-	if !det || cancel {
-		return nil
-	}
-
-	return p.SendPacketToServer(pk)
-}
-
-func (p *Player) handleOneFromServer(pk packet.Packet) error {
-	span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("p.handleOneFromServer(%T)", pk))
-	defer span.Finish()
-
-	cancel := false
-	for _, h := range p.packetHandlers {
-		cancel = cancel || !h.HandleServerPacket(pk, p)
-	}
-
-	if cancel {
-		return nil
-	}
-
-	return p.SendPacketToClient(pk)
 }
 
 // RegisterHandler registers a handler to the player.
@@ -492,8 +457,24 @@ func (p *Player) Close() error {
 	return nil
 }
 
+func (p *Player) startTicking() {
+	t := time.NewTicker(time.Millisecond * 50)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			if !p.tick() {
+				return
+			}
+		case <-p.CloseChan:
+			return
+		}
+	}
+}
+
 // tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
-func (p *Player) Tick() bool {
+func (p *Player) tick() bool {
 	p.SentryTransaction = sentry.StartTransaction(
 		context.Background(),
 		"oomph:tick",
@@ -526,6 +507,10 @@ func (p *Player) Tick() bool {
 		p.ServerTick++
 	}
 
+	p.EntityTracker().Tick(p.ServerTick)
+	p.ACKs().Tick()
+	p.ACKs().Flush()
+
 	// Tick all the handlers.
 	for _, h := range p.packetHandlers {
 		subSpan := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("%T.OnTick()", h))
@@ -538,33 +523,28 @@ func (p *Player) Tick() bool {
 		d.OnTick(p)
 	}
 
-	// We don't need to flush here, because Oomph will flush the connection after every batch read.
-	if p.MState.IsReplay {
-		return true
-	}
-
-	// Flush all the packets for the client to receive.
-	if p.conn == nil {
-		p.log.Error("p.conn is nil - cannot tick")
-		return false
-	}
-
 	if err := p.conn.Flush(); err != nil {
-		// p.log.Error("client connection is closed")
 		return false
 	}
-
-	// serverConn will be nil if direct mode w/ Dragonfly is used.
-	if p.serverConn == nil {
-		return true
-	}
-
-	// Flush all the packets for the server to receive.
-	if err := p.serverConn.Flush(); err != nil {
-		p.log.Error("server connection is closed")
-		p.Disconnect("Proxy unexpectedly lost connection to remote server.")
-		return false
-	}
-
 	return true
+}
+
+// calculateBBSize calculates the bounding box size for an entity based on the EntityMetadata.
+func calculateBBSize(data map[uint32]any, defaultWidth, defaultHeight, defaultScale float32) (width float32, height float32, s float32) {
+	width = defaultWidth
+	if w, ok := data[entity.DataKeyBoundingBoxWidth]; ok {
+		width = w.(float32)
+	}
+
+	height = defaultHeight
+	if h, ok := data[entity.DataKeyBoundingBoxHeight]; ok {
+		height = h.(float32)
+	}
+
+	s = defaultScale
+	if scale, ok := data[entity.DataKeyScale]; ok {
+		s = scale.(float32)
+	}
+
+	return
 }
