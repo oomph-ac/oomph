@@ -36,3 +36,11 @@ type Acknowledgment interface {
 	// Run runs the acknowledgment once it has been acknowledged by the member player.
 	Run()
 }
+
+func (p *Player) SetACKs(c AcknowledgmentComponent) {
+	p.acks = c
+}
+
+func (p *Player) ACKs() AcknowledgmentComponent {
+	return p.acks
+}

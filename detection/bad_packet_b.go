@@ -2,8 +2,8 @@ package detection
 
 import (
 	"github.com/elliotchance/orderedmap/v2"
-	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -36,13 +36,13 @@ func (d *BadPacketB) ID() string {
 }
 
 func (d *BadPacketB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	switch pk.(type) {
+	switch pk := pk.(type) {
 	case *packet.MovePlayer:
 		speed := d.tick - d.last
-		mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-		cDat := p.Handler(handler.HandlerIDChunks).(*handler.ChunksHandler)
-
-		if speed < 2 && !mDat.Immobile && cDat.InLoadedChunk {
+		if speed < 2 && !p.Movement().NoClientPredictions() && p.World.GetChunk(protocol.ChunkPos{
+			int32(pk.Position.X()) >> 4,
+			int32(pk.Position.Z()) >> 4,
+		}) != nil {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("speed", speed)
 			d.Fail(p, data)

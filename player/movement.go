@@ -1,6 +1,8 @@
 package player
 
 import (
+	"fmt"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -10,6 +12,9 @@ import (
 // It is used for updating movement states of the player, and providing them to any other
 // component that requires it.
 type MovementComponent interface {
+	// Client returns the non-authoritative client movement sent to the server.
+	Client() NonAuthoritativeMovementInfo
+
 	// Pos returns the position of the movement component.
 	Pos() mgl32.Vec3
 	// LastPos returns the previous position of the movement component.
@@ -47,22 +52,18 @@ type MovementComponent interface {
 	// Impulse returns the movement impulse of the movement component. The X-axis contains
 	// the forward impulse, and the Y-axis contains the left impulse.
 	Impulse() mgl32.Vec2
-	// SetImpulse sets the movement impulse of the movement component.
-	SetImpulse(impulse mgl32.Vec2)
 
 	// Sprinting returns true if the movement component is sprinting.
 	Sprinting() bool
 	// SetSprinting sets wether or not the movement component is sprinting.
 	SetSprinting(sprint bool)
+	// PressingSprint returns wether or not the movement component is holding down the key bound to the sprint action.
+	PressingSprint() bool
 
 	// Jumping returns true if the movement component is expecting a jump in the current frame.
 	Jumping() bool
-	// SetJumping sets wether or not the movement component is expecting a jump in the current frame.
-	SetJumping(jumping bool)
 	// PressingJump returns true if the movement component is holding down the key bound to the jump action.
 	PressingJump() bool
-	// SetPressingJump sets wether or not the movement component is holding down the key bound to the jump action.
-	SetPressingJump(pressing bool)
 	// JumpDelay returns the number of ticks until the movement component can make another jump.
 	JumpDelay() uint64
 	// SetJumpDelay sets the number of ticks until the movement component can make another jump.
@@ -70,8 +71,6 @@ type MovementComponent interface {
 
 	// Sneaking returns true if the movement component is currently sneaking.
 	Sneaking() bool
-	// SetSneaking sets wether or not the movement component is currently sneaking.
-	SetSneaking(sneaking bool)
 	// PressingSneak returns true if the movement component is holding down the key bound to the sneak action.
 	PressingSneak() bool
 	// SetPressingSneak sets if the movement component is holding down the key bound o the sneak action.
@@ -103,6 +102,10 @@ type MovementComponent interface {
 	TeleportPos() mgl32.Vec3
 	// HasTeleport returns true if the movement component needs a teleport applied on the next simulation.
 	HasTeleport() bool
+	// TeleportSmoothed returns true if the movement component has a teleport that needs to be smoothed out.
+	TeleportSmoothed() bool
+	// RemainingTeleportTicks returns the amount of ticks the teleport still needs to be completed.
+	RemainingTeleportTicks() int
 
 	// Size returns the width and height of the movement component in a Vec2. The X-axis
 	// contains the width, and the Y-axis contains the height.
@@ -122,6 +125,10 @@ type MovementComponent interface {
 	MovementSpeed() float32
 	// SetMovementSpeed sets the movement speed of the movement component.
 	SetMovementSpeed(speed float32)
+	// DefaultMovementSpeed return the movement speed the client should default to.
+	DefaultMovementSpeed() float32
+	// SetDefaultMovementSpeed sets the movement speed the client should default to.
+	SetDefaultMovementSpeed(speed float32)
 
 	// AirSpeed returns the movement speed of the movement component while off ground.
 	AirSpeed() float32
@@ -161,12 +168,76 @@ type MovementComponent interface {
 	// SetCanSimulate sets wether or not the movement component can be simulated by the server for the current frame.
 	SetCanSimulate(simulate bool)
 
+	// Flying returns true if the movement component is currently flying.
+	Flying() bool
+	// SetFlying sets wether or not the movement component is flying.
+	SetFlying(fly bool)
+	// TrustFlyStatus returns wether or not the movement component can trust the fly status sent by the client.
+	TrustFlyStatus() bool
+	// SetTrustFlyStatus sets wether or not the movement component can trust the fly status sent by the client.
+	SetTrustFlyStatus(bool)
+
 	// Update updates the states of the movement component from the given input.
 	Update(input *packet.PlayerAuthInput)
-	// Simulate does any simulations needed by the movement component.
-	Simulate()
+	// ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
+	ServerUpdate(pk packet.Packet)
 
-	// Validate is a function that returns true if this movement component has a position within
-	// the given threshold of the other movement component.
-	Validate(threshold float32, other MovementComponent) bool
+	// SetValidationThreshold sets the amount of blocks the client's position can deviate from the simulated one before a correction is required.
+	SetValidationThreshold(threshold float32)
+	// ValidationThreshold returnsr the amount of blocks the client's position can deviate from the simmulated one before a correction is required.
+	ValidationThreshold() float32
+	// Validate is a function that returns true if this movement component has a position within the given threshold of the non authoritative movement.
+	Validate() bool
+	// Reset is a function that resets the current movement of the movement component to the client's non-authoritative movement.
+	Reset()
+}
+
+// NonAuthoritativeMovementInfo represents the velocity and position that the player has sent to the server but has not validated.
+type NonAuthoritativeMovementInfo interface {
+	Pos() mgl32.Vec3
+	LastPos() mgl32.Vec3
+
+	Vel() mgl32.Vec3
+	LastVel() mgl32.Vec3
+
+	Mov() mgl32.Vec3
+	LastMov() mgl32.Vec3
+
+	// ToggledFly returns wether or not the client has attempted to trigger a fly action.
+	ToggledFly() bool
+	// SetToggledFly sets wether or not the client has attempted to trigger a fly action.
+	SetToggledFly(bool)
+}
+
+func (p *Player) SetMovement(c MovementComponent) {
+	p.movement = c
+}
+
+func (p *Player) Movement() MovementComponent {
+	return p.movement
+}
+
+func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
+	p.ClientFrame = int64(pk.Tick)
+	p.ClientTick++
+
+	p.effects.Tick()
+	p.movement.Update(pk)
+
+	if !p.movement.Validate() {
+		p.sendMovementCorrection()
+	}
+	pk.Position = p.movement.Pos().Add(mgl32.Vec3{0, 1.6201})
+}
+
+func (p *Player) sendMovementCorrection() {
+	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.ClientFrame)
+	fmt.Println("correcting movement", p.movement.Pos(), p.movement.Client().Pos(), p.ClientFrame)
+	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
+		PredictionType: packet.PredictionTypePlayer,
+		Position:       p.movement.Pos().Add(mgl32.Vec3{0, 1.6201}),
+		Delta:          p.movement.Vel(),
+		OnGround:       p.movement.OnGround(),
+		Tick:           uint64(p.ClientFrame),
+	})
 }

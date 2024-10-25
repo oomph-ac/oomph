@@ -12,24 +12,7 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/game"
 	oomph_world "github.com/oomph-ac/oomph/world"
-)
-
-const fenceInset = 0.5 - (0.25 / 2)
-
-const (
-	noCorner = iota
-	cornerRightInner
-	cornerLeftInner
-	cornerRightOuter
-	cornerLeftOuter
-)
-
-type CollisionType byte
-
-const (
-	CollisionX CollisionType = iota
-	CollisionY
-	CollisionZ
+	"github.com/oomph-ac/oomph/world/blockmodel"
 )
 
 type BlockSearchResult struct {
@@ -204,12 +187,12 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	case "minecraft:daylight_detector", "minecraft:daylight_detector_inverted":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 3.0/8.0, 1)}
 	case "minecraft:bamboo_sapling", "minecraft:bamboo":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)} // HACK.
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:vine", "minecraft:cave_vines", "minecraft:cave_vines_body_with_berries", "minecraft:cave_vines_head_with_berries",
 		"minecraft:twisting_vines", "minecraft:weeping_vines":
 		return []cube.BBox{}
 	case "minecraft:flower_pot":
-		return []cube.BBox{cube.Box(0, 0, 0, 13/16.0, 3/8.0, 13/16.0)}
+		return []cube.BBox{cube.Box(5/16.0, 0, 5/16.0, 11/16.0, 3/8.0, 11/16.0)}
 	case "minecraft:black_candle":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:tallgrass", "minecraft:fern", "minecraft:large_fern", "minecraft:rose_bush", "minecraft:peony", "minecraft:paeonia":
@@ -218,11 +201,24 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 13.0/16.0, 1)}
 	}
 
-	dfBoxes := b.Model().BBox(df_cube.Pos(pos), w)
+	var m world.BlockModel
+	switch oldM := b.Model().(type) {
+	case model.Wall:
+		m = blockmodel.Wall{
+			NorthConnection: oldM.NorthConnection,
+			EastConnection:  oldM.EastConnection,
+			SouthConnection: oldM.SouthConnection,
+			WestConnection:  oldM.WestConnection,
+			Post:            oldM.Post,
+		}
+	default:
+		m = oldM
+	}
 
-	var boxes []cube.BBox
-	for _, bb := range dfBoxes {
-		boxes = append(boxes, game.DFBoxToCubeBox(bb))
+	dfBoxes := m.BBox(df_cube.Pos(pos), w)
+	var boxes = make([]cube.BBox, len(dfBoxes))
+	for i, bb := range dfBoxes {
+		boxes[i] = game.DFBoxToCubeBox(bb)
 	}
 
 	return boxes

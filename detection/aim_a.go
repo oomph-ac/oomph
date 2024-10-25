@@ -4,7 +4,6 @@ import (
 	"github.com/chewxy/math32"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -47,12 +46,11 @@ func (d *AimA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		return true
 	}
 
-	mDat := p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler)
-	if mDat.HorizontallyCollided { // why does this always false ROTATION checks??!!!
+	if p.Movement().XCollision() || p.Movement().ZCollision() { // why does this always false ROTATION checks??!!!
 		return true
 	}
 
-	yawDelta := math32.Abs(mDat.DeltaRotation.Z())
+	yawDelta := math32.Abs(p.Movement().RotationDelta().Z())
 	if yawDelta < 1e-3 {
 		return true
 	}
