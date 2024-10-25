@@ -1,18 +1,69 @@
 package component
 
 import (
+	"fmt"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/assert"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/player/component/acknowledgement"
+	"github.com/oomph-ac/oomph/player/simulation"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+var playerHeightOffset = mgl32.Vec3{0, game.PlayerHeightOffset}
+
+// NonAuthoritativeMovementInfo represents the velocity and position that the player has sent to the server but has not validated.
+type NonAuthoritativeMovement struct {
+	pos, lastPos mgl32.Vec3
+	vel, lastVel mgl32.Vec3
+	mov, lastMov mgl32.Vec3
+
+	toggledFly bool
+}
+
+func (m *NonAuthoritativeMovement) Pos() mgl32.Vec3 {
+	return m.pos
+}
+
+func (m *NonAuthoritativeMovement) LastPos() mgl32.Vec3 {
+	return m.lastPos
+}
+
+func (m *NonAuthoritativeMovement) Vel() mgl32.Vec3 {
+	return m.vel
+}
+
+func (m *NonAuthoritativeMovement) LastVel() mgl32.Vec3 {
+	return m.lastVel
+}
+
+func (m *NonAuthoritativeMovement) Mov() mgl32.Vec3 {
+	return m.mov
+}
+
+func (m *NonAuthoritativeMovement) LastMov() mgl32.Vec3 {
+	return m.lastMov
+}
+
+// ToggledFly returns wether or not the movement component has attempted to trigger a fly action.
+func (m *NonAuthoritativeMovement) ToggledFly() bool {
+	return m.toggledFly
+}
+
+// SetToggledFly sets wether or not the movement component has attempted to trigger a fly action.
+func (m *NonAuthoritativeMovement) SetToggledFly(toggled bool) {
+	m.toggledFly = toggled
+}
+
 type AuthoritativeMovementComponent struct {
-	mPlayer  *player.Player
-	fallback *AuthoritativeMovementComponent
+	mPlayer *player.Player
+
+	nonAuthoritative *NonAuthoritativeMovement
 
 	pos, lastPos           mgl32.Vec3
 	vel, lastVel           mgl32.Vec3
@@ -22,19 +73,23 @@ type AuthoritativeMovementComponent struct {
 	impulse mgl32.Vec2
 	size    mgl32.Vec2
 
-	gravity                 float32
-	jumpHeight              float32
-	movementSpeed, airSpeed float32
+	gravity    float32
+	jumpHeight float32
+
+	movementSpeed        float32
+	defaultMovementSpeed float32
+	airSpeed             float32
 
 	knockback    mgl32.Vec3
 	ticksSinceKb uint64
 
-	teleportPos        mgl32.Vec3
-	ticksSinceTeleport uint64
-	teleportIsSmoothed bool
+	teleportPos             mgl32.Vec3
+	ticksSinceTeleport      uint64
+	teleportCompletionTicks uint64
+	teleportIsSmoothed      bool
 
-	sprinting               bool
-	sneaking, pressingSneak bool
+	sprinting, pressingSprint bool
+	sneaking, pressingSneak   bool
 
 	jumping, pressingJump bool
 	jumpDelay             uint64
@@ -43,7 +98,29 @@ type AuthoritativeMovementComponent struct {
 	onGround                     bool
 
 	penetratedLastFrame, stuckInCollider bool
-	clientHasNoPredictions, canSimulate  bool
+
+	clientHasNoPredictions bool
+	canSimulate            bool
+	flying, trustFlyStatus bool
+
+	validationThreshold float32
+}
+
+func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
+	return &AuthoritativeMovementComponent{
+		mPlayer:          p,
+		nonAuthoritative: &NonAuthoritativeMovement{},
+
+		canSimulate:         true,
+		validationThreshold: 0.3,
+
+		defaultMovementSpeed: 0.1,
+	}
+}
+
+// Client returns the non-authoritative movement data sent to us from the client.
+func (mc *AuthoritativeMovementComponent) Client() player.NonAuthoritativeMovementInfo {
+	return mc.nonAuthoritative
 }
 
 // Pos returns the position of the movement component.
@@ -113,21 +190,14 @@ func (mc *AuthoritativeMovementComponent) SetRotation(newRotation mgl32.Vec3) {
 	mc.rotation = newRotation
 }
 
-// RotationDelta returns the difference from the current and previous rotations of
-// the movement component.
+// RotationDelta returns the difference from the current and previous rotations of the movement component.
 func (mc *AuthoritativeMovementComponent) RotationDelta() mgl32.Vec3 {
 	return mc.rotation.Sub(mc.lastRotation)
 }
 
-// Impulse returns the movement impulse of the movement component. The X-axis contains
-// the forward impulse, and the Y-axis contains the left impulse.
+// Impulse returns the movement impulse of the movement component. The X-axis contains the forward impulse, and the Y-axis contains the left impulse.
 func (mc *AuthoritativeMovementComponent) Impulse() mgl32.Vec2 {
 	return mc.impulse
-}
-
-// SetImpulse sets the movement impulse of the movement component.
-func (mc *AuthoritativeMovementComponent) SetImpulse(newImpulse mgl32.Vec2) {
-	mc.impulse = newImpulse
 }
 
 // Sprinting returns true if the movement component is sprinting.
@@ -140,24 +210,19 @@ func (mc *AuthoritativeMovementComponent) SetSprinting(sprinting bool) {
 	mc.sprinting = sprinting
 }
 
+// PressingSprint returns wether or not the movement component is holding down the key bound to the sprint action.
+func (mc *AuthoritativeMovementComponent) PressingSprint() bool {
+	return mc.pressingSprint
+}
+
 // Jumping returns true if the movement component is expecting a jump in the current frame.
 func (mc *AuthoritativeMovementComponent) Jumping() bool {
 	return mc.jumping
 }
 
-// SetJumping sets wether or not the movement component is expecting a jump in the current frame.
-func (mc *AuthoritativeMovementComponent) SetJumping(jumping bool) {
-	mc.jumping = jumping
-}
-
 // PressingJump returns true if the movement component is holding down the key bound to the jump action.
 func (mc *AuthoritativeMovementComponent) PressingJump() bool {
 	return mc.pressingJump
-}
-
-// SetPressingJump sets wether or not the movement component is holding down the key bound to the jump action.
-func (mc *AuthoritativeMovementComponent) SetPressingJump(pressing bool) {
-	mc.pressingJump = pressing
 }
 
 // JumpDelay returns the number of ticks until the movement component can make another jump.
@@ -173,11 +238,6 @@ func (mc *AuthoritativeMovementComponent) SetJumpDelay(ticks uint64) {
 // Sneaking returns true if the movement component is currently sneaking.
 func (mc *AuthoritativeMovementComponent) Sneaking() bool {
 	return mc.sneaking
-}
-
-// SetSneaking sets wether or not the movement component is currently sneaking.
-func (mc *AuthoritativeMovementComponent) SetSneaking(sneaking bool) {
-	mc.sneaking = sneaking
 }
 
 // PressingSneak returns true if the movement component is holding down the key bound to the sneak action.
@@ -236,6 +296,12 @@ func (mc *AuthoritativeMovementComponent) Teleport(pos mgl32.Vec3, onGround bool
 	mc.onGround = onGround
 	mc.teleportIsSmoothed = smoothed
 	mc.ticksSinceTeleport = 0
+
+	if smoothed {
+		mc.teleportCompletionTicks = 3
+	} else {
+		mc.teleportCompletionTicks = 0
+	}
 }
 
 // TeleportPos returns the teleport position sent to the movement component.
@@ -245,7 +311,17 @@ func (mc *AuthoritativeMovementComponent) TeleportPos() mgl32.Vec3 {
 
 // HasTeleport returns true if the movement component needs a teleport applied on the next simulation.
 func (mc *AuthoritativeMovementComponent) HasTeleport() bool {
-	return mc.ticksSinceTeleport == 0
+	return mc.ticksSinceTeleport <= mc.teleportCompletionTicks
+}
+
+// TeleportSmoothed returns true if the movement component has a teleport that needs to be smoothed out.
+func (mc *AuthoritativeMovementComponent) TeleportSmoothed() bool {
+	return mc.teleportIsSmoothed
+}
+
+// RemainingTeleportTicks returns the amount of ticks the teleport still needs to be completed.
+func (mc *AuthoritativeMovementComponent) RemainingTeleportTicks() int {
+	return int(mc.teleportCompletionTicks) - int(mc.ticksSinceTeleport)
 }
 
 // Size returns the width and height of the movement component in a Vec2. The X-axis
@@ -259,8 +335,7 @@ func (mc *AuthoritativeMovementComponent) SetSize(newSize mgl32.Vec2) {
 	mc.size = newSize
 }
 
-// BoundingBox returns the bounding box of the movement component translated to
-// it's current position.
+// BoundingBox returns the bounding box of the movement component translated to it's current position.
 func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 	width := mc.size[0] / 2
 	return cube.Box(
@@ -301,6 +376,16 @@ func (mc *AuthoritativeMovementComponent) MovementSpeed() float32 {
 // SetMovementSpeed sets the movement speed of the movement component.
 func (mc *AuthoritativeMovementComponent) SetMovementSpeed(newSpeed float32) {
 	mc.movementSpeed = newSpeed
+}
+
+// DefaultMovementSpeed return the movement speed the client should default to.
+func (mc *AuthoritativeMovementComponent) DefaultMovementSpeed() float32 {
+	return mc.defaultMovementSpeed
+}
+
+// SetDefaultMovementSpeed sets the movement speed the client should default to.
+func (mc *AuthoritativeMovementComponent) SetDefaultMovementSpeed(speed float32) {
+	mc.defaultMovementSpeed = speed
 }
 
 // AirSpeed returns the movement speed of the movement component while off ground.
@@ -369,39 +454,181 @@ func (mc *AuthoritativeMovementComponent) SetCanSimulate(canSim bool) {
 	mc.canSimulate = canSim
 }
 
+// Flying returns true if the movement component is flying.
+func (mc *AuthoritativeMovementComponent) Flying() bool {
+	return mc.flying
+}
+
+// SetFlying sets if the movement component is flying.
+func (mc *AuthoritativeMovementComponent) SetFlying(fly bool) {
+	mc.flying = fly
+}
+
+// TrustFlyStatus returns wether or not the movement component can trust the fly status sent by the client.
+func (mc *AuthoritativeMovementComponent) TrustFlyStatus() bool {
+	return mc.trustFlyStatus
+}
+
+// SetTrustFlyStatus sets wether or not the movement component can trust the fly status sent by the client.
+func (mc *AuthoritativeMovementComponent) SetTrustFlyStatus(trust bool) {
+	mc.trustFlyStatus = trust
+}
+
 // Update updates the states of the movement component from the given input.
-func (mc *AuthoritativeMovementComponent) Update(input *packet.PlayerAuthInput) {
+func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	assert.IsTrue(mc.mPlayer != nil, "parent player is null")
-	assert.IsTrue(input != nil, "given player input is nil")
+	assert.IsTrue(pk != nil, "given player input is nil")
+	assert.IsTrue(mc.nonAuthoritative != nil, "non-authoritative data is null")
 
-	mc.impulse = input.MoveVector
+	mc.nonAuthoritative.lastPos = mc.nonAuthoritative.pos
+	mc.nonAuthoritative.pos = pk.Position.Sub(playerHeightOffset)
+	mc.nonAuthoritative.lastVel = mc.nonAuthoritative.vel
+	mc.nonAuthoritative.vel = pk.Delta
+	mc.nonAuthoritative.lastMov = mc.nonAuthoritative.mov
+	mc.nonAuthoritative.mov = mc.nonAuthoritative.pos.Sub(mc.nonAuthoritative.lastPos)
 
-	startFlag, stopFlag := utils.HasFlag(input.InputData, packet.InputFlagStartSprinting), utils.HasFlag(input.InputData, packet.InputFlagStopSprinting)
-	if (startFlag && stopFlag) || stopFlag {
-		mc.sprinting = false
-	} else if startFlag {
-		mc.sprinting = true
+	mc.impulse = pk.MoveVector.Mul(0.98)
+
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartFlying) {
+		mc.nonAuthoritative.toggledFly = true
+		if mc.trustFlyStatus {
+			mc.flying = true
+		}
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopFlying) {
+		mc.flying = false
+		mc.nonAuthoritative.toggledFly = false
 	}
 
-	mc.jumping = utils.HasFlag(input.InputData, packet.InputFlagStartJumping)
-	mc.pressingJump = utils.HasFlag(input.InputData, packet.InputFlagJumping)
-	mc.jumpHeight = game.DefaultJumpHeight
+	mc.lastRotation = mc.rotation
+	mc.rotation = mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}
 
-	// TODO: Effects component.
+	startFlag, stopFlag := utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting), utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting)
+	needsSpeedAdjusted := false
+	if (startFlag && stopFlag) || stopFlag {
+		mc.sprinting = false
+		needsSpeedAdjusted = startFlag && stopFlag
+	} else if startFlag {
+		mc.sprinting = true
+		needsSpeedAdjusted = true
+	}
+	mc.pressingSprint = utils.HasFlag(pk.InputData, packet.InputFlagSprinting)
+
+	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+		mc.sneaking = true
+	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+		mc.sneaking = false
+	}
+	mc.pressingSneak = utils.HasFlag(pk.InputData, packet.InputFlagSneaking)
+
+	mc.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
+	mc.pressingJump = utils.HasFlag(pk.InputData, packet.InputFlagJumping)
+	mc.jumpHeight = game.DefaultJumpHeight
+	if jumpBoost, ok := mc.mPlayer.Effects().Get(packet.EffectJumpBoost); ok {
+		mc.jumpHeight += float32(jumpBoost.Level()) * 0.1
+	}
+
+	// Jump timer resets if the jump button is not held down.
+	if !mc.pressingJump {
+		mc.jumpDelay = 0
+	}
+
+	// Adjust the movement speed of the movement component if their sprint state changes.
+	if needsSpeedAdjusted {
+		mc.movementSpeed = mc.defaultMovementSpeed
+		if speed, ok := mc.mPlayer.Effects().Get(packet.EffectSpeed); ok {
+			mc.movementSpeed += float32(speed.Level()) * 0.02
+		}
+		if slowness, ok := mc.mPlayer.Effects().Get(packet.EffectSlowness); ok {
+			mc.movementSpeed -= float32(slowness.Level()) * 0.015
+		}
+
+		if mc.sprinting {
+			mc.movementSpeed *= 1.3
+		}
+	}
+
+	mc.gravity = game.NormalGravity
+	mc.airSpeed = 0.02
+	if mc.sprinting {
+		mc.airSpeed = 0.026
+	}
+
+	// Run the movement simulation after the states of the movement component have been updated.
+	mc.Simulate()
+
+	mc.ticksSinceKb++
+	mc.ticksSinceTeleport++
+	if mc.jumpDelay > 0 {
+		mc.jumpDelay--
+	}
+}
+
+// ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
+func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
+	switch pk := pk.(type) {
+	case *packet.MoveActorAbsolute:
+		if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
+			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround), false))
+		}
+	case *packet.MovePlayer:
+		if pk.Mode != packet.MoveModeRotation {
+			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, pk.Position.Sub(playerHeightOffset), pk.OnGround, pk.Mode == packet.MoveModeNormal))
+		}
+	case *packet.SetActorData:
+		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateActorData(mc.mPlayer, pk.EntityMetadata))
+	case *packet.SetActorMotion:
+		mc.mPlayer.ACKs().Add(acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity))
+	case *packet.UpdateAbilities:
+		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateAbilitiesACK(mc.mPlayer, pk.AbilityData))
+	case *packet.UpdateAttributes:
+		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateAttributesACK(mc.mPlayer, pk.Attributes))
+	default:
+		panic(oerror.New("movement component cannot handle %T", pk))
+	}
+}
+
+// SetValidationThreshold sets the amount of blocks the client's position can deviate from the simulated one before a correction is required.
+func (mc *AuthoritativeMovementComponent) SetValidationThreshold(threshold float32) {
+	mc.validationThreshold = threshold
+}
+
+// ValidationThreshold returnsr the amount of blocks the client's position can deviate from the simmulated one before a correction is required.
+func (mc *AuthoritativeMovementComponent) ValidationThreshold() float32 {
+	return mc.validationThreshold
 }
 
 // Simulate does any simulations needed by the movement component.
 func (mc *AuthoritativeMovementComponent) Simulate() {
 	if !mc.canSimulate {
+		mc.pos = mc.nonAuthoritative.pos
+		mc.lastPos = mc.nonAuthoritative.lastPos
+		mc.vel = mc.nonAuthoritative.vel
+		mc.lastVel = mc.nonAuthoritative.lastVel
+		mc.mov = mc.nonAuthoritative.mov
+		mc.lastMov = mc.nonAuthoritative.lastMov
+
+		mc.canSimulate = true
+		fmt.Println("no simulation for frame", mc.mPlayer.ClientFrame)
 		return
 	}
+
+	simulation.SimulatePlayerMovement(mc.mPlayer)
 }
 
-// Validate is a function that returns true if this movement component has a position within
-// the given threshold of the other movement component.
-func (mc *AuthoritativeMovementComponent) Validate(threshold float32, other player.MovementComponent) bool {
+// Validate is a function that returns true if this movement component has a position within the given threshold of the other movement component.
+func (mc *AuthoritativeMovementComponent) Validate() bool {
 	if !mc.canSimulate {
 		return true
 	}
-	return other.Pos().Sub(mc.pos).Len() <= threshold
+	return mc.nonAuthoritative.Pos().Sub(mc.pos).Len() <= mc.validationThreshold
+}
+
+// Reset is a function that resets the current movement of the movement component to the client's non-authoritative movement.
+func (mc *AuthoritativeMovementComponent) Reset() {
+	mc.lastPos = mc.nonAuthoritative.lastPos
+	mc.pos = mc.nonAuthoritative.pos
+	mc.lastVel = mc.nonAuthoritative.lastVel
+	mc.vel = mc.nonAuthoritative.vel
+	mc.lastMov = mc.nonAuthoritative.lastMov
+	mc.mov = mc.nonAuthoritative.mov
 }

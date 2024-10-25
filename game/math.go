@@ -8,6 +8,26 @@ import (
 	"github.com/go-gl/mathgl/mgl64"
 )
 
+// LerpRotation lerps a rotation by the given partial ticks.
+func LerpRotation(from, to mgl32.Vec3, partialTicks float32) mgl32.Vec3 {
+	delta := to.Sub(from)
+	delta[0] = math32.Mod(delta[0], 360.0)
+	delta[1] = math32.Mod(delta[1], 360.0)
+	delta[2] = math32.Mod(delta[2], 360.0)
+
+	if delta[0] < 0 {
+		delta[0] += 360.0
+	}
+	if delta[1] < 0 {
+		delta[1] += 360.0
+	}
+	if delta[2] < 0 {
+		delta[2] += 360.0
+	}
+
+	return from.Add(delta)
+}
+
 // Round32 will round a float32 to a given precision.
 func Round32(val float32, precision int) float32 {
 	pwr := math32.Pow(10, float32(precision))

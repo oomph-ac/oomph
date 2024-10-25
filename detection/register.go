@@ -23,21 +23,6 @@ func RegisterDetections(p *player.Player) {
 	// kill aura detections
 	p.RegisterDetection(NewKillAuraA())
 
-	// fly detections
-	p.RegisterDetection(NewFlyA())
-
-	// speed detections
-	p.RegisterDetection(NewSpeedA())
-
-	// (invalid) motion detections
-	p.RegisterDetection(NewMotionA())
-	p.RegisterDetection(NewMotionB())
-	p.RegisterDetection(NewMotionC())
-
-	// velocity (aka. anti-kb) detections
-	p.RegisterDetection(NewVelocityA())
-	p.RegisterDetection(NewVelocityB())
-
 	// timer detections
 	p.RegisterDetection(NewTimerA())
 
@@ -57,7 +42,4 @@ func RegisterDetections(p *player.Player) {
 	// server nuke detections
 	p.RegisterDetection(NewServerNukeA())
 	p.RegisterDetection(NewServerNukeB())
-
-	// scaffold detections
-	p.RegisterDetection(NewScaffoldA())
 }

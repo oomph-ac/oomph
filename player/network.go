@@ -8,6 +8,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 func VersionInRange(version int, min int, max int) bool {
@@ -71,6 +72,16 @@ func (p *Player) ClientCacheEnabled() bool {
 	// todo: support client cache
 	//return p.conn.ClientCacheEnabled()
 	return false
+}
+
+// ReadPacket reads a packet from the connection.
+func (p *Player) ReadPacket() (packet.Packet, error) {
+	return p.conn.ReadPacket()
+}
+
+// WritePacket writes a packet to the connection.
+func (p *Player) WritePacket(pk packet.Packet) error {
+	return p.conn.WritePacket(pk)
 }
 
 // IdentityData returns the login.IdentityData of a player. It contains the UUID, XUID and username of the connection.

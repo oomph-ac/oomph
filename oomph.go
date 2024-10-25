@@ -11,12 +11,10 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/oomph-ac/oomph/detection"
-	"github.com/oomph-ac/oomph/event"
 	"github.com/oomph-ac/oomph/handler"
-	_ "github.com/oomph-ac/oomph/handler/ackfunc"
 	"github.com/oomph-ac/oomph/oerror"
-	"github.com/oomph-ac/oomph/session"
-	"github.com/oomph-ac/oomph/simulation"
+	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/player/component"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -43,7 +41,7 @@ type Oomph struct {
 	Listener *minecraft.Listener
 
 	settings OomphSettings
-	sessions chan *session.Session
+	players  chan *player.Player
 }
 
 type OomphSettings struct {
@@ -53,8 +51,6 @@ type OomphSettings struct {
 	LocalAddress   string
 	RemoteAddress  string
 	Authentication bool
-
-	LatencyReportType handler.LatencyReportType
 
 	ResourcePath             string
 	RequirePacks             bool
@@ -74,8 +70,8 @@ func New(s OomphSettings) *Oomph {
 		panic("encryption key must be an empty string or a 32 byte string")
 	}
 	return &Oomph{
-		Log:      s.Logger,
-		sessions: make(chan *session.Session),
+		Log:     s.Logger,
+		players: make(chan *player.Player),
 
 		settings: s,
 	}
@@ -204,21 +200,19 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		scope.SetTag("func", "oomph.handleConn()")
 	})
 
-	s := session.New(o.Log, session.SessionState{
+	p := player.New(o.Log, player.MonitoringState{
 		IsReplay:    false,
 		IsRecording: false,
-		DirectMode:  false,
-
 		CurrentTime: time.Now(),
 	}, listener)
 
-	p := s.Player
 	p.SetConn(conn)
 
 	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
+	component.RegisterAll(p)
 
-	defer s.Close()
+	defer p.Close()
 	defer func() {
 		if err := recover(); err != nil {
 			o.Log.Errorf("oomph.handleConn() panic: %v", err)
@@ -303,17 +297,14 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		return
 	}
 
-	p.Handler(handler.HandlerIDMovement).(*handler.MovementHandler).Simulate(&simulation.MovementSimulator{})
-	p.Handler(handler.HandlerIDLatency).(*handler.LatencyHandler).ReportType = o.settings.LatencyReportType
-
 	select {
-	case o.sessions <- s:
+	case o.players <- p:
 		break
 	case <-time.After(time.Second * 3):
 		conn.WritePacket(&packet.Disconnect{
 			Message: "Oomph timed out: please try re-logging.",
 		})
-		s.Close()
+		p.Close()
 
 		hub := sentry.CurrentHub().Clone()
 		hub.CaptureMessage("Oomph timed out accepting player into channel")
@@ -348,6 +339,16 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		}()
 		defer g.Done()
 
+		p.ClientPkFunc = func(pks []packet.Packet) error {
+			p.ProcessMu.Lock()
+			defer p.ProcessMu.Unlock()
+
+			if err := p.DefaultHandleFromClient(pks); err != nil {
+				return err
+			}
+			return p.ServerConn().Flush()
+		}
+
 		for {
 			if p.Closed {
 				return
@@ -358,14 +359,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			ev := event.PacketEvent{
-				Packets: pks,
-				Server:  false,
-			}
-			ev.EvTime = time.Now().UnixNano()
-
-			if err := s.QueueEvent(ev); err != nil {
-				o.Log.Errorf("error handling packets from client: %v", err)
+			if err := p.ClientPkFunc(pks); err != nil {
+				o.Log.Errorf("error handling packet from client: %v", err)
 				return
 			}
 		}
@@ -396,6 +391,17 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 		}()
 		defer g.Done()
 
+		p.ServerPkFunc = func(pks []packet.Packet) error {
+			p.ProcessMu.Lock()
+			defer p.ProcessMu.Unlock()
+
+			if err := p.DefaultHandleFromServer(pks); err != nil {
+				return err
+			}
+			p.ACKs().Flush()
+			return p.Conn().Flush()
+		}
+
 		for {
 			if p.Closed {
 				return
@@ -413,14 +419,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 				return
 			}
 
-			ev := event.PacketEvent{
-				Packets: pks,
-				Server:  true,
-			}
-			ev.EvTime = time.Now().UnixNano()
-
-			if err := s.QueueEvent(ev); err != nil {
-				o.Log.Errorf("error handling packets from server: %v", err)
+			if err := p.ServerPkFunc(pks); err != nil {
+				o.Log.Errorf("error handling packet from server: %v", err)
 				return
 			}
 		}

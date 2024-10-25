@@ -1,9 +1,38 @@
 package utils
 
 import (
+	"strings"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+// CenterAlignText takes an array of strings and centers them based on the longest string.
+func CenterAlignText(text ...string) string {
+	if len(text) == 0 {
+		return ""
+	}
+
+	// Find the length of the longest string
+	maxLength := 0
+	for _, line := range text {
+		if len(line) > maxLength {
+			maxLength = len(line)
+		}
+	}
+
+	var centeredLines []string
+	for _, line := range text {
+		// Calculate the number of spaces needed for centering
+		totalSpaces := maxLength - len(line)
+		leftPadding := totalSpaces / 2
+		centeredLine := strings.Repeat(" ", leftPadding) + line + strings.Repeat(" ", totalSpaces-leftPadding)
+		centeredLines = append(centeredLines, centeredLine)
+	}
+
+	// Join the centered lines with newlines
+	return strings.Join(centeredLines, "\n")
+}
 
 // Device returns the device name from the DeviceOS.
 func Device(os protocol.DeviceOS) string {

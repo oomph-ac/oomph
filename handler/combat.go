@@ -141,7 +141,7 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 
 		h.click(p)
 
-		entity := p.Handler(HandlerIDEntities).(*EntitiesHandler).Find(dat.TargetEntityRuntimeID)
+		entity := p.EntityTracker().FindEntity(dat.TargetEntityRuntimeID)
 		if entity == nil {
 			return true
 		}
@@ -150,13 +150,12 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 			return true
 		}
 
-		mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
-		if mDat.TicksSinceTeleport <= 20 || mDat.CorrectionTrustBuffer > 0 {
+		if p.Movement().HasTeleport() {
 			return true
 		}
 
 		h.AttackOffset = float32(1.62)
-		if mDat.Sneaking {
+		if p.Movement().Sneaking() {
 			h.AttackOffset = 1.54
 		}
 
@@ -164,8 +163,8 @@ func (h *CombatHandler) HandleClientPacket(pk packet.Packet, p *player.Player) b
 		h.TargetedEntity = entity
 		p.Dbg.Notify(player.DebugModeCombat, true, "entWidth=%f entHeight=%f entScale=%f", entity.Width, entity.Height, entity.Scale)
 
-		h.StartAttackPos = mDat.PrevClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
-		h.EndAttackPos = mDat.ClientPosition.Add(mgl32.Vec3{0, h.AttackOffset})
+		h.StartAttackPos = p.Movement().Client().LastPos().Add(mgl32.Vec3{0, h.AttackOffset})
+		h.EndAttackPos = p.Movement().Client().Pos().Add(mgl32.Vec3{0, h.AttackOffset})
 
 		h.StartEntityPos = entity.PrevPosition
 		h.EndEntityPos = entity.Position
@@ -214,7 +213,6 @@ func (h *CombatHandler) Defer() {
 	if h.Phase == CombatPhaseTicked {
 		h.Phase = CombatPhaseNone
 	}
-
 	h.Clicking = false
 }
 
@@ -226,7 +224,7 @@ func (h *CombatHandler) calculateNonRaycastResults(p *player.Player) {
 	for partialTicks := float32(0); partialTicks <= 1; partialTicks += h.InterpolationStep {
 		attackPos := h.StartAttackPos.Add(attackPosDelta.Mul(partialTicks))
 		entityPos := h.StartEntityPos.Add(entityPosDelta.Mul(partialTicks))
-		if h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion()).IntersectsWith(p.Handler(HandlerIDMovement).(*MovementHandler).BoundingBox()) {
+		if h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion()).IntersectsWith(p.Movement().BoundingBox()) {
 			h.NonRaycastResults = append(h.NonRaycastResults, 0)
 			continue
 		}
@@ -236,12 +234,11 @@ func (h *CombatHandler) calculateNonRaycastResults(p *player.Player) {
 }
 
 func (h *CombatHandler) calculateRaycastResults(p *player.Player) {
-	mDat := p.Handler(HandlerIDMovement).(*MovementHandler)
 	attackPosDelta := h.EndAttackPos.Sub(h.StartAttackPos)
 	entityPosDelta := h.EndEntityPos.Sub(h.StartEntityPos)
 
-	startRotation := mDat.PrevRotation
-	endRotation := mDat.Rotation
+	startRotation := p.Movement().LastRotation()
+	endRotation := p.Movement().Rotation()
 	rotationDelta := endRotation.Sub(startRotation)
 	if rotationDelta.Len() >= 180 {
 		return
@@ -262,7 +259,7 @@ func (h *CombatHandler) calculateRaycastResults(p *player.Player) {
 		bb := h.TargetedEntity.Box(entityPos).Grow(h.TargetedEntity.BoxExpansion())
 
 		// If the player is inside the entity's bounding box, don't attempt a raycast, it's a waste of resources.
-		if bb.IntersectsWith(mDat.BoundingBox()) {
+		if bb.IntersectsWith(p.Movement().BoundingBox()) {
 			h.RaycastResults = append(h.RaycastResults, 0)
 			continue
 		}
