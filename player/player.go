@@ -66,10 +66,6 @@ type Player struct {
 	GameDat     minecraft.GameData
 	Version     int32
 
-	// combatMode and movementMode are the authority modes of the player. They are used to determine
-	// how certain actions should be handled.
-	CombatMode AuthorityMode
-
 	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
 	RuntimeId, ClientRuntimeId uint64
@@ -91,8 +87,13 @@ type Player struct {
 	// if they are not in survival or adventure mode.
 	GameMode int32
 
+	LastEquipmentData *packet.MobEquipment
+
 	// SentryTransaction is the transaction that is used to monitor performance of packet handling.
 	SentryTransaction *sentry.Span
+
+	// InputMode is the input mode of the player.
+	InputMode uint32
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn, serverConn *minecraft.Conn
@@ -112,15 +113,31 @@ type Player struct {
 	// Dbg is the debugger of the player. It is used to log debug messages to the player.
 	Dbg *Debugger
 
-	acks           AcknowledgmentComponent
-	effects        EffectsComponent
-	entTracker     EntityTrackerComponent
+	// acks is the component that handles acknowledgments from the player.
+	acks AcknowledgmentComponent
+	// effects is the component that handles effect from the server sent to the player.
+	effects EffectsComponent
+	// gamemodeHandle is a component that sends acknowledgments whenever the server updates the player's gamemode.
 	gamemodeHandle GamemodeComponent
-	movement       MovementComponent
-	worldUpdater   WorldUpdaterComponent // TODO: figure out a name for this shit.
+	// movement is a component that handles updating movement states for the player and validating their movement.
+	movement MovementComponent
+	// worldUpdater is a component that handles chunk and block updates in the world for the player
+	worldUpdater WorldUpdaterComponent // TODO: figure out a better name for this shit.
 
-	// packetHandlers contains packet packetHandlers registered to the player.
-	packetHandlers []Handler
+	// entTracker is an entity tracker for server-sided view of entities. It does not rely on the client sending back
+	// acknowledgments to update positions and states of the entity.
+	entTracker EntityTrackerComponent
+	// clientEntTracker is an entity tracker for the client-sided view of entities. It relies on the client sending
+	// back acknowledgments to update the positions and states of the entity.
+	clientEntTracker EntityTrackerComponent
+
+	// combat is the component that handles validating combat. This combat component does not rely on client ACKs to determine the position
+	// and state of the entity. This component determines wether or not an attack should be sent to the server.
+	combat CombatComponent
+	// clientCombat is the component that handles validating combat. This combat component relies on client ACKs to determine the position
+	// and state of the entity. This component is used for detections to alert staff members when someone is using reach.
+	clientCombat CombatComponent
+
 	// detections contains packet handlers specifically used for detections.
 	detections []Handler
 
@@ -138,8 +155,6 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 		Connected: true,
 
-		CombatMode: AuthorityModeSemi,
-
 		World: world.New(),
 
 		PacketQueue: []packet.Packet{},
@@ -153,8 +168,7 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
 
-		packetHandlers: []Handler{},
-		detections:     []Handler{},
+		detections: []Handler{},
 
 		eventHandler: &NopEventHandler{},
 
@@ -270,49 +284,6 @@ func (p *Player) DefaultHandleFromServer(pks []packet.Packet) error {
 	for _, pk := range pks {
 		if err := p.handleOneFromServer(pk); err != nil {
 			return err
-		}
-	}
-
-	return nil
-}
-
-// RegisterHandler registers a handler to the player.
-func (p *Player) RegisterHandler(h Handler) {
-	p.packetHandlers = append(p.packetHandlers, h)
-}
-
-// ReplaceHandler replaces a handler in the player.
-func (p *Player) ReplaceHandler(id string, h Handler) {
-	for i, otherH := range p.packetHandlers {
-		if otherH.ID() != id {
-			continue
-		}
-
-		p.packetHandlers[i] = nil
-		p.packetHandlers[i] = h
-		return
-	}
-
-	panic(oerror.New("handler %s not found", id))
-}
-
-// UnregisterHandler unregisters a handler from the player.
-func (p *Player) UnregisterHandler(id string) {
-	for i, h := range p.packetHandlers {
-		if h.ID() != id {
-			continue
-		}
-
-		p.packetHandlers = append(p.packetHandlers[:i], p.packetHandlers[i+1:]...)
-		return
-	}
-}
-
-// Handler returns a handler from the player.
-func (p *Player) Handler(id string) Handler {
-	for _, h := range p.packetHandlers {
-		if h.ID() == id {
-			return h
 		}
 	}
 
@@ -436,7 +407,6 @@ func (p *Player) BlockAddress(duration time.Duration) {
 // Close closes the player.
 func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
-
 		p.Connected = false
 		p.Closed = true
 
@@ -510,13 +480,6 @@ func (p *Player) tick() bool {
 	p.EntityTracker().Tick(p.ServerTick)
 	p.ACKs().Tick()
 	p.ACKs().Flush()
-
-	// Tick all the handlers.
-	for _, h := range p.packetHandlers {
-		subSpan := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("%T.OnTick()", h))
-		h.OnTick(p)
-		subSpan.Finish()
-	}
 
 	// Tick all the detections.
 	for _, d := range p.detections {

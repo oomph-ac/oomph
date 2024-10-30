@@ -7,7 +7,6 @@ import (
 	"github.com/df-mc/dragonfly/server"
 	"github.com/df-mc/dragonfly/server/session"
 	"github.com/oomph-ac/oomph/detection"
-	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 )
@@ -71,7 +70,6 @@ func (l listener) Accept() (session.Conn, error) {
 	p.RuntimeId = 1
 	p.ClientRuntimeId = 1
 
-	handler.RegisterHandlers(p)
 	detection.RegisterDetections(p)
 
 	l.o.players <- p

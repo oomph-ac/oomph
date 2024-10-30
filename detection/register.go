@@ -6,7 +6,6 @@ import "github.com/oomph-ac/oomph/player"
 func RegisterDetections(p *player.Player) {
 	// aim detections
 	p.RegisterDetection(NewAimA())
-	p.RegisterDetection(NewAimA())
 
 	// hitbox detections
 	p.RegisterDetection(NewHitboxA())
@@ -14,11 +13,6 @@ func RegisterDetections(p *player.Player) {
 	// reach detections
 	p.RegisterDetection(NewReachA())
 	p.RegisterDetection(NewReachB())
-
-	// auto-clicker detections
-	p.RegisterDetection(NewAutoClickerA())
-	p.RegisterDetection(NewAutoClickerB())
-	//p.RegisterDetection(NewAutoClickerC())
 
 	// kill aura detections
 	p.RegisterDetection(NewKillAuraA())
@@ -35,9 +29,6 @@ func RegisterDetections(p *player.Player) {
 	p.RegisterDetection(NewEditionFakerA())
 	p.RegisterDetection(NewEditionFakerB())
 	p.RegisterDetection(NewEditionFakerC())
-
-	// input faker detections
-	p.RegisterDetection(NewInputFakerA())
 
 	// server nuke detections
 	p.RegisterDetection(NewServerNukeA())
