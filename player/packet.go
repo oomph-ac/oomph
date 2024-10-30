@@ -11,6 +11,8 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/oerror"
+	"github.com/oomph-ac/oomph/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
@@ -18,6 +20,8 @@ import (
 func (p *Player) handleOneFromClient(pk packet.Packet) error {
 	span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("p.handleOneFromClient(%T)", pk))
 	defer span.Finish()
+
+	cancel := false
 
 	switch pk := pk.(type) {
 	case *packet.ScriptMessage:
@@ -27,60 +31,74 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 		}
 	case *packet.Text:
 		split := strings.Split(pk.Message, " ")
-		if split[0] != "!oomph_debug" {
-			return nil
-		}
+		if split[0] == "!oomph_debug" {
+			if len(split) != 2 {
+				p.Message("Usage: !oomph_debug <mode>")
+				return nil
+			}
 
-		if len(split) != 2 {
-			p.Message("Usage: !oomph_debug <mode>")
-			return nil
-		}
+			var mode int
+			switch split[1] {
+			case "type:log":
+				p.Log().SetLevel(logrus.DebugLevel)
+				p.Dbg.LoggingType = LoggingTypeLogFile
+				p.Message("Set debug logging type to <green>log file</green>.")
+				return nil
+			case "type:message":
+				p.Log().SetLevel(logrus.InfoLevel)
+				p.Dbg.LoggingType = LoggingTypeMessage
+				p.Message("Set debug logging type to <green>message</green>.")
+				return nil
+			case "acks":
+				mode = DebugModeACKs
+			case "rotations":
+				mode = DebugModeRotations
+			case "combat":
+				mode = DebugModeCombat
+			case "clicks":
+				mode = DebugModeClicks
+			case "movement":
+				mode = DebugModeMovementSim
+			case "latency":
+				mode = DebugModeLatency
+			case "chunks":
+				mode = DebugModeChunks
+			case "aim-a":
+				mode = DebugModeAimA
+			case "timer-a":
+				mode = DebugModeTimerA
+			default:
+				p.Message("Unknown debug mode: %s", split[1])
+				return nil
+			}
 
-		var mode int
-		switch split[1] {
-		case "type:log":
-			p.Log().SetLevel(logrus.DebugLevel)
-			p.Dbg.LoggingType = LoggingTypeLogFile
-			p.Message("Set debug logging type to <green>log file</green>.")
-			return nil
-		case "type:message":
-			p.Log().SetLevel(logrus.InfoLevel)
-			p.Dbg.LoggingType = LoggingTypeMessage
-			p.Message("Set debug logging type to <green>message</green>.")
-			return nil
-		case "acks":
-			mode = DebugModeACKs
-		case "rotations":
-			mode = DebugModeRotations
-		case "combat":
-			mode = DebugModeCombat
-		case "clicks":
-			mode = DebugModeClicks
-		case "movement":
-			mode = DebugModeMovementSim
-		case "latency":
-			mode = DebugModeLatency
-		case "chunks":
-			mode = DebugModeChunks
-		case "aim-a":
-			mode = DebugModeAimA
-		case "timer-a":
-			mode = DebugModeTimerA
-		default:
-			p.Message("Unknown debug mode: %s", split[1])
+			p.Dbg.Toggle(mode)
+			if p.Dbg.Enabled(mode) {
+				p.Message("<green>Enabled</green> debug mode: %s", split[1])
+			} else {
+				p.Message("<red>Disabled</red> debug mode: %s", split[1])
+			}
 			return nil
 		}
-
-		p.Dbg.Toggle(mode)
-		if p.Dbg.Enabled(mode) {
-			p.Message("<green>Enabled</green> debug mode: %s", split[1])
-		} else {
-			p.Message("<red>Disabled</red> debug mode: %s", split[1])
-		}
-		return nil
 	case *packet.PlayerAuthInput:
+		p.InputMode = pk.InputMode
+
+		missedSwing := false
+		if p.InputMode != packet.InputModeTouch && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+			missedSwing = true
+			p.combat.Attack(nil)
+		}
+
+		p.clientEntTracker.Tick(p.ClientFrame)
+
 		p.handleBlockBreak(pk)
 		p.handlePlayerMovementInput(pk)
+
+		serverVerifiedHit := p.combat.Calculate()
+		if serverVerifiedHit && missedSwing {
+			pk.InputData = pk.InputData &^ packet.InputFlagMissedSwing
+		}
+		p.clientCombat.Calculate()
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {
 			return nil
@@ -88,21 +106,24 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
+		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+			p.combat.Attack(pk)
+			p.clientCombat.Attack(pk)
+			cancel = true
+		}
+
 		if !p.worldUpdater.AttemptBlockPlacement(pk) {
 			return nil
 		}
-	}
-
-	cancel := false
-	for _, h := range p.packetHandlers {
-		cancel = cancel || !h.HandleClientPacket(pk, p)
+	case *packet.MobEquipment:
+		p.LastEquipmentData = pk
+	case *packet.Animate:
+		if pk.ActionType == packet.AnimateActionSwingArm {
+			p.ClientCombat().Swing()
+		}
 	}
 
 	det := p.RunDetections(pk)
-	for _, h := range p.packetHandlers {
-		h.Defer()
-	}
-
 	if !det || cancel {
 		return nil
 	}
@@ -126,13 +147,31 @@ func (p *Player) handleOneFromServer(pk packet.Packet) error {
 			height,
 			scale,
 		))
+		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.Position,
+			pk.Velocity,
+			p.clientEntTracker.MaxRewind(),
+			false,
+			width,
+			height,
+			scale,
+		))
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
 			pk.Position,
 			pk.Velocity,
 			p.entTracker.MaxRewind(),
-			false,
+			true,
+			width,
+			height,
+			scale,
+		))
+		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.Position,
+			pk.Velocity,
+			p.clientEntTracker.MaxRewind(),
+			true,
 			width,
 			height,
 			scale,
@@ -146,21 +185,27 @@ func (p *Player) handleOneFromServer(pk packet.Packet) error {
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMoveActorAbsolute(pk)
+			p.clientEntTracker.HandleMoveActorAbsolute(pk)
 		} else {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.MovePlayer:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMovePlayer(pk)
+			p.clientEntTracker.HandleMovePlayer(pk)
 		} else {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.RemoveActor:
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
+		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 	case *packet.SetActorData:
 		pk.Tick = 0
 		if pk.EntityRuntimeID != p.RuntimeId {
 			if e := p.entTracker.FindEntity(pk.EntityRuntimeID); e != nil {
+				e.Width, e.Height, e.Scale = calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
+			}
+			if e := p.clientEntTracker.FindEntity(pk.EntityRuntimeID); e != nil {
 				e.Width, e.Height, e.Scale = calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
 			}
 		} else {
@@ -194,10 +239,6 @@ func (p *Player) handleOneFromServer(pk packet.Packet) error {
 	}
 
 	cancel := false
-	for _, h := range p.packetHandlers {
-		cancel = cancel || !h.HandleServerPacket(pk, p)
-	}
-
 	if cancel {
 		return nil
 	}

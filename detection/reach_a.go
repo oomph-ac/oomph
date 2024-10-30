@@ -1,9 +1,6 @@
 package detection
 
 import (
-	"github.com/chewxy/math32"
-	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -12,6 +9,7 @@ const DetectionIDReachA = "oomph:reach_a"
 
 type ReachA struct {
 	BaseDetection
+	initalized bool
 }
 
 func NewReachA() *ReachA {
@@ -27,6 +25,7 @@ func NewReachA() *ReachA {
 
 	d.FailBuffer = 1.01
 	d.MaxBuffer = 1.5
+
 	return d
 }
 
@@ -35,51 +34,32 @@ func (d *ReachA) ID() string {
 }
 
 func (d *ReachA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	// Full authoritative mode uses the rewind system, instead of completely lag compensating
-	// for entity positions on the client.
-	if p.CombatMode != player.AuthorityModeSemi {
-		return true
+	if !d.initalized {
+		d.initalized = true
+		p.ClientCombat().Hook(func(cc player.CombatComponent) {
+			if len(cc.Raycasts()) == 0 || (p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure) {
+				return
+			}
+
+			var minDist, maxDist float32 = 1_000_000, -1
+			for _, rayDist := range cc.Raycasts() {
+				if rayDist < minDist {
+					minDist = rayDist
+				}
+				if rayDist > maxDist {
+					maxDist = rayDist
+				}
+			}
+
+			if minDist > 2.9 && maxDist > 3 {
+				p.Log().Warnf("ReachA: min=%f max=%f", minDist, maxDist)
+				d.Fail(p, nil)
+				return
+			}
+
+			d.Debuff(0.005)
+		})
 	}
 
-	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
-		return true
-	}
-
-	combatHandler := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
-	if combatHandler.Phase != handler.CombatPhaseTicked {
-		return true
-	}
-
-	if len(combatHandler.RaycastResults) == 0 {
-		return true
-	}
-
-	var (
-		minDist float32 = 14
-		maxDist float32 = -1
-	)
-
-	avg := game.Mean32(combatHandler.RaycastResults)
-	for _, result := range combatHandler.RaycastResults {
-		minDist = math32.Min(minDist, result)
-		maxDist = math32.Max(maxDist, result)
-	}
-
-	p.Dbg.Notify(
-		player.DebugModeCombat,
-		true,
-		"Reach (A): minDist=%f maxDist=%f avg=%f",
-		game.Round32(minDist, 4),
-		game.Round32(maxDist, 4),
-		game.Round32(avg, 4),
-	)
-
-	if minDist > 2.9 && maxDist > 3 {
-		p.Log().Warnf("ReachA: min=%f max=%f", minDist, maxDist)
-		d.Fail(p, nil)
-		return true
-	}
-
-	d.Debuff(0.005)
 	return true
 }

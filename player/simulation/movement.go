@@ -127,7 +127,7 @@ func SimulatePlayerMovement(p *player.Player) {
 		}
 	}
 
-	isClimb := nearClimable
+	isClimb := nearClimable && (p.Movement().XCollision() || p.Movement().ZCollision() || p.Movement().PressingJump())
 	setPostCollisionMotion(movement, oldVel, isClimb, blockUnder)
 	walkOnBlock(movement, blockUnder)
 

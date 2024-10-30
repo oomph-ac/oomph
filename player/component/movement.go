@@ -1,8 +1,6 @@
 package component
 
 import (
-	"fmt"
-
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/assert"
@@ -608,7 +606,6 @@ func (mc *AuthoritativeMovementComponent) Simulate() {
 		mc.lastMov = mc.nonAuthoritative.lastMov
 
 		mc.canSimulate = true
-		fmt.Println("no simulation for frame", mc.mPlayer.ClientFrame)
 		return
 	}
 

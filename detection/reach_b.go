@@ -1,9 +1,6 @@
 package detection
 
 import (
-	"github.com/elliotchance/orderedmap/v2"
-	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -12,6 +9,7 @@ const DetectionIDReachB = "oomph:reach_b"
 
 type ReachB struct {
 	BaseDetection
+	initalized bool
 }
 
 func NewReachB() *ReachB {
@@ -35,53 +33,27 @@ func (d *ReachB) ID() string {
 }
 
 func (d *ReachB) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
-	// Full authoritative mode uses the rewind system, instead of completely lag compensating
-	// for entity positions on the client.
-	if p.CombatMode != player.AuthorityModeSemi {
-		return true
+	if !d.initalized {
+		d.initalized = true
+		p.ClientCombat().Hook(func(cc player.CombatComponent) {
+			if len(cc.Raws()) == 0 || (p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure) {
+				return
+			}
+
+			var minDist float32 = 1_000_000
+			for _, rayDist := range cc.Raws() {
+				if rayDist < minDist {
+					minDist = rayDist
+				}
+			}
+
+			if minDist > 3.01 {
+				d.Fail(p, nil)
+			} else {
+				d.Debuff(0.005)
+			}
+		})
 	}
 
-	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
-		return true
-	}
-
-	cDat := p.Handler(handler.HandlerIDCombat).(*handler.CombatHandler)
-	if cDat.Phase != handler.CombatPhaseTicked {
-		return true
-	}
-
-	if len(cDat.NonRaycastResults) == 0 {
-		return true
-	}
-
-	var (
-		minDist float32 = 14
-		maxDist float32 = -1
-	)
-	for _, dist := range cDat.NonRaycastResults {
-		if dist < minDist {
-			minDist = dist
-		}
-		if dist > maxDist {
-			maxDist = dist
-		}
-	}
-
-	p.Dbg.Notify(
-		player.DebugModeCombat,
-		true,
-		"Reach (B): min=%f max=%f",
-		game.Round32(minDist, 4), game.Round32(maxDist, 4),
-	)
-
-	// TODO: Adjust like in Reach (A)?
-	if minDist > 3 {
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("dist", game.Round32(minDist, 3))
-		d.Fail(p, data)
-		return true
-	}
-
-	d.Debuff(0.01)
 	return true
 }

@@ -20,14 +20,16 @@ type EntityTrackerComponent struct {
 
 	entities       map[uint64]*entity.Entity
 	maxRewindTicks int
+	ackDependent   bool
 }
 
-func NewEntityTrackerComponent(p *player.Player) *EntityTrackerComponent {
+func NewEntityTrackerComponent(p *player.Player, ackDependent bool) *EntityTrackerComponent {
 	return &EntityTrackerComponent{
 		mPlayer: p,
 
 		entities:       make(map[uint64]*entity.Entity),
 		maxRewindTicks: DEFAULT_MAX_REWIND_TICKS,
+		ackDependent:   ackDependent,
 	}
 }
 
@@ -55,25 +57,27 @@ func (c *EntityTrackerComponent) All() map[uint64]*entity.Entity {
 func (c *EntityTrackerComponent) MoveEntity(rid uint64, tick int64, pos mgl32.Vec3, teleport bool) {
 	if e, ok := c.entities[rid]; ok {
 		if e.IsPlayer {
-			pos[1] -= 1.62001
+			pos[1] -= 1.62
 		}
 		e.RecievePosition(entity.HistoricalPosition{
-			Position: pos,
-			Teleport: teleport,
-			Tick:     tick,
+			Position:     pos,
+			PrevPosition: e.RecvPosition,
+			Teleport:     teleport,
+			Tick:         tick,
 		})
 	}
 }
 
 // HandleMovePlayer is a function that handles entity position updates sent with MovePlayerPacket.
 func (c *EntityTrackerComponent) HandleMovePlayer(pk *packet.MovePlayer) {
-	if c.mPlayer.CombatMode == player.AuthorityModeSemi {
+	if c.ackDependent {
 		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateEntityPositionACK(
 			c.mPlayer,
 			pk.Position,
 			pk.EntityRuntimeID,
 			c.mPlayer.ServerTick,
 			pk.Mode == packet.MoveModeTeleport,
+			false,
 		))
 	} else {
 		acknowledgement.NewUpdateEntityPositionACK(
@@ -82,19 +86,21 @@ func (c *EntityTrackerComponent) HandleMovePlayer(pk *packet.MovePlayer) {
 			pk.EntityRuntimeID,
 			c.mPlayer.ServerTick,
 			pk.Mode == packet.MoveModeTeleport,
+			true,
 		).Run()
 	}
 }
 
 // HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute) {
-	if c.mPlayer.CombatMode == player.AuthorityModeSemi {
+	if c.ackDependent {
 		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateEntityPositionACK(
 			c.mPlayer,
 			pk.Position,
 			pk.EntityRuntimeID,
 			c.mPlayer.ServerTick,
 			utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport),
+			false,
 		))
 	} else {
 		acknowledgement.NewUpdateEntityPositionACK(
@@ -103,6 +109,7 @@ func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbs
 			pk.EntityRuntimeID,
 			c.mPlayer.ServerTick,
 			utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport),
+			true,
 		).Run()
 	}
 }
