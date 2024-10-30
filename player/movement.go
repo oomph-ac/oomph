@@ -1,8 +1,6 @@
 package player
 
 import (
-	"fmt"
-
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -192,7 +190,7 @@ type MovementComponent interface {
 	Reset()
 }
 
-// NonAuthoritativeMovementInfo represents the velocity and position that the player has sent to the server but has not validated.
+// NonAuthoritativeMovementInfo represents movement information that the player has sent to the server but has not validated/verified.
 type NonAuthoritativeMovementInfo interface {
 	Pos() mgl32.Vec3
 	LastPos() mgl32.Vec3
@@ -232,10 +230,9 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 
 func (p *Player) sendMovementCorrection() {
 	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.ClientFrame)
-	fmt.Println("correcting movement", p.movement.Pos(), p.movement.Client().Pos(), p.ClientFrame)
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,
-		Position:       p.movement.Pos().Add(mgl32.Vec3{0, 1.6201}),
+		Position:       p.movement.Pos().Add(mgl32.Vec3{0, 1.62}),
 		Delta:          p.movement.Vel(),
 		OnGround:       p.movement.OnGround(),
 		Tick:           uint64(p.ClientFrame),

@@ -11,7 +11,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/oomph-ac/oomph/detection"
-	"github.com/oomph-ac/oomph/handler"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
@@ -208,9 +207,8 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 
 	p.SetConn(conn)
 
-	handler.RegisterHandlers(p)
+	component.Register(p)
 	detection.RegisterDetections(p)
-	component.RegisterAll(p)
 
 	defer p.Close()
 	defer func() {

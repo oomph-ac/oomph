@@ -183,11 +183,14 @@ func (e *Entity) Tick(tick int64) {
 		delta := e.RecvPosition.Sub(e.Position).Mul(1 / float32(e.InterpolationTicks))
 		pos = pos.Add(delta)
 		e.InterpolationTicks--
+	} else {
+		pos = e.RecvPosition
 	}
 
 	e.UpdatePosition(HistoricalPosition{
-		Position: pos,
-		Tick:     tick,
+		Position:     pos,
+		PrevPosition: e.Position,
+		Tick:         tick,
 	})
 	e.TicksSinceTeleport++
 }

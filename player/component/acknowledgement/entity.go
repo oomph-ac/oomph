@@ -14,9 +14,10 @@ type UpdateEntityPositionACK struct {
 	runtimeId uint64
 	tick      int64
 	teleport  bool
+	instant   bool
 }
 
-func NewUpdateEntityPositionACK(p *player.Player, pos mgl32.Vec3, runtimeId uint64, tick int64, teleport bool) *UpdateEntityPositionACK {
+func NewUpdateEntityPositionACK(p *player.Player, pos mgl32.Vec3, runtimeId uint64, tick int64, teleport, instant bool) *UpdateEntityPositionACK {
 	return &UpdateEntityPositionACK{
 		mPlayer: p,
 
@@ -24,9 +25,14 @@ func NewUpdateEntityPositionACK(p *player.Player, pos mgl32.Vec3, runtimeId uint
 		runtimeId: runtimeId,
 		tick:      tick,
 		teleport:  teleport,
+		instant:   instant,
 	}
 }
 
 func (ack *UpdateEntityPositionACK) Run() {
-	ack.mPlayer.EntityTracker().MoveEntity(ack.runtimeId, ack.tick, ack.pos, ack.teleport)
+	if ack.instant {
+		ack.mPlayer.EntityTracker().MoveEntity(ack.runtimeId, ack.tick, ack.pos, ack.teleport)
+	} else {
+		ack.mPlayer.ClientEntityTracker().MoveEntity(ack.runtimeId, ack.tick, ack.pos, ack.teleport)
+	}
 }

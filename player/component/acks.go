@@ -85,6 +85,7 @@ func (ackC *ACKComponent) Execute(ackID int64) bool {
 		for _, a := range batch.acks {
 			a.Run()
 		}
+
 		// Put the batch back in the pool to eventually be reused.
 		batchPool.Put(batch)
 	}
@@ -131,7 +132,7 @@ func (ackC *ACKComponent) SetLegacy(legacy bool) {
 func (ackC *ACKComponent) Tick() {
 	// Update the latency every second.
 	if ackC.mPlayer.ServerTick%20 == 0 {
-		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, time.Now(), ackC.mPlayer.ClientTick))
+		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, time.Now(), ackC.mPlayer.ServerTick))
 	}
 
 	if len(ackC.pending) > 0 {
@@ -164,9 +165,9 @@ func (ackC *ACKComponent) Flush() {
 
 // Refresh resets the current timestamp of the acknowledgment component.
 func (ackC *ACKComponent) Refresh() {
-	//newBatch := &ackBatch{acks: make([]player.Acknowledgment, 0), timestamp: 0}
-	//newBatch.acks = newBatch.acks[:0]
-	ackC.currentBatch = &ackBatch{acks: make([]player.Acknowledgment, 0), timestamp: 0}
+	newBatch := &ackBatch{acks: make([]player.Acknowledgment, 0), timestamp: 0}
+	newBatch.acks = newBatch.acks[:0]
+	ackC.currentBatch = newBatch
 
 	// Create a random timestamp, and ensure that it is not already being used.
 timestampLoop:

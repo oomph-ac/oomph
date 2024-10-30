@@ -41,7 +41,7 @@ func NewLatencyACK(p *player.Player, timeOf time.Time, tickOf int64) *Latency {
 func (ack *Latency) Run() {
 	ack.mPlayer.StackLatency = time.Since(ack.timeOf)
 	ack.mPlayer.ClientTick = ack.tickOf
-	ack.mPlayer.Dbg.Notify(player.DebugModeLatency, true, "latency=%dms", game.Round64(float64(ack.mPlayer.StackLatency.Microseconds())/1000.0, 2))
+	ack.mPlayer.Dbg.Notify(player.DebugModeLatency, true, "latency=%fms", game.Round64(float64(ack.mPlayer.StackLatency.Microseconds())/1000.0, 2))
 }
 
 // UpdateSimRate is an acknowledgment that is ran to update the player's simulation rate.
