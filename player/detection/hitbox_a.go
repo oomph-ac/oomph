@@ -9,37 +9,48 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const DetectionIDHitboxA = "oomph:hitbox_a"
-
 type HitboxA struct {
-	BaseDetection
+	mPlayer  *player.Player
+	metadata *player.DetectionMetadata
 }
 
-func NewHitboxA() *HitboxA {
-	d := &HitboxA{}
-	d.Type = "Hitbox"
-	d.SubType = "A"
+func New_HitboxA(p *player.Player) *HitboxA {
+	return &HitboxA{
+		mPlayer: p,
+		metadata: &player.DetectionMetadata{
+			FailBuffer: 5,
+			MaxBuffer:  5,
 
-	d.Description = "Detects if the player interacts with entities outside of their hitbox."
-	d.Punishable = true
-
-	d.MaxViolations = 10
-	d.trustDuration = -1
-
-	d.FailBuffer = 5
-	d.MaxBuffer = 5
-	return d
+			MaxViolations: 10,
+		},
+	}
 }
 
-func (d *HitboxA) ID() string {
-	return DetectionIDHitboxA
+func (*HitboxA) Type() string {
+	return TYPE_HITBOX
 }
 
-func (d *HitboxA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
+func (*HitboxA) SubType() string {
+	return "A"
+}
+
+func (*HitboxA) Description() string {
+	return "Detects if the player is attacking an entity without looking at their hitbox."
+}
+
+func (*HitboxA) Punishable() bool {
+	return true
+}
+
+func (d *HitboxA) Metadata() *player.DetectionMetadata {
+	return d.metadata
+}
+
+func (d *HitboxA) Detect(pk packet.Packet) {
 	if interaction, ok := pk.(*packet.Interact); ok && interaction.ActionType == packet.InteractActionMouseOverEntity && interaction.Position != (mgl32.Vec3{}) {
-		entity := p.ClientEntityTracker().FindEntity(interaction.TargetEntityRuntimeID)
+		entity := d.mPlayer.ClientEntityTracker().FindEntity(interaction.TargetEntityRuntimeID)
 		if entity == nil || !entity.IsPlayer {
-			return true
+			return
 		}
 
 		bb1 := entity.Box(entity.PrevPosition).Grow(0.1)
@@ -53,11 +64,9 @@ func (d *HitboxA) HandleClientPacket(pk packet.Packet, p *player.Player) bool {
 		if min > 0.004 {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("amt", game.Round32(0.6+(min*2), 3))
-			d.Fail(p, data)
+			d.mPlayer.FailDetection(d, data)
 		} else {
-			d.Debuff(d.FailBuffer)
+			d.mPlayer.PassDetection(d, d.metadata.FailBuffer)
 		}
 	}
-
-	return true
 }

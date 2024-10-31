@@ -138,8 +138,8 @@ type Player struct {
 	// and state of the entity. This component is used for detections to alert staff members when someone is using reach.
 	clientCombat CombatComponent
 
-	// detections contains packet handlers specifically used for detections.
-	detections []Handler
+	// detections contains the detections for the player.
+	detections []Detection
 
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
@@ -168,7 +168,7 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
 
-		detections: []Handler{},
+		detections: []Detection{},
 
 		eventHandler: &NopEventHandler{},
 
@@ -315,38 +315,25 @@ func (p *Player) SendRemoteEvent(e RemoteEvent) {
 }
 
 // RegisterDetection registers a detection to the player.
-func (p *Player) RegisterDetection(d Handler) {
+func (p *Player) RegisterDetection(d Detection) {
 	p.detections = append(p.detections, d)
 }
 
-// UnregisterDetection unregisters a detection from the player.
-func (p *Player) UnregisterDetection(id string) {
-	for i, d := range p.detections {
-		if d.ID() != id {
-			continue
-		}
-
-		p.detections = append(p.detections[:i], p.detections[i+1:]...)
-		return
-	}
-}
-
 // Detections returns all the detections registered to the player.
-func (p *Player) Detections() []Handler {
+func (p *Player) Detections() []Detection {
 	return p.detections
 }
 
 // RunDetections runs all the detections registered to the player. It returns false
 // if the detection determines that the packet given should be dropped.
-func (p *Player) RunDetections(pk packet.Packet) bool {
-	cancel := false
+func (p *Player) RunDetections(pk packet.Packet) {
 	for _, d := range p.detections {
 		span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("%T.Run()", d))
-		cancel = cancel || !d.HandleClientPacket(pk, p)
+		d.Detect(pk)
 		span.Finish()
 	}
 
-	return !cancel
+	return
 }
 
 // Message sends a message to the player.
@@ -410,7 +397,7 @@ func (p *Player) Close() error {
 		p.Connected = false
 		p.Closed = true
 
-		p.eventHandler.HandleQuit(p)
+		p.eventHandler.HandleQuit()
 		p.World.PurgeChunks()
 
 		if !p.MState.IsReplay {
@@ -480,11 +467,6 @@ func (p *Player) tick() bool {
 	p.EntityTracker().Tick(p.ServerTick)
 	p.ACKs().Tick()
 	p.ACKs().Flush()
-
-	// Tick all the detections.
-	for _, d := range p.detections {
-		d.OnTick(p)
-	}
 
 	if err := p.conn.Flush(); err != nil {
 		return false

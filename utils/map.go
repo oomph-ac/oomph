@@ -1,4 +1,4 @@
-package detection
+package utils
 
 import (
 	"fmt"
