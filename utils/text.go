@@ -5,24 +5,28 @@ import (
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
 // CenterAlignText takes an array of strings and centers them based on the longest string.
-func CenterAlignText(text ...string) string {
-	if len(text) == 0 {
+func CenterAlignText(msg ...string) string {
+	if len(msg) == 0 {
 		return ""
+	}
+	for i, m := range msg {
+		msg[i] = text.Colourf(m)
 	}
 
 	// Find the length of the longest string
 	maxLength := 0
-	for _, line := range text {
+	for _, line := range msg {
 		if len(line) > maxLength {
 			maxLength = len(line)
 		}
 	}
 
 	var centeredLines []string
-	for _, line := range text {
+	for _, line := range msg {
 		// Calculate the number of spaces needed for centering
 		totalSpaces := maxLength - len(line)
 		leftPadding := totalSpaces / 2

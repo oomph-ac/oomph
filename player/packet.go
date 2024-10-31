@@ -123,8 +123,8 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 		}
 	}
 
-	det := p.RunDetections(pk)
-	if !det || cancel {
+	p.RunDetections(pk)
+	if cancel {
 		return nil
 	}
 

@@ -10,10 +10,10 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
-	"github.com/oomph-ac/oomph/detection"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
+	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -208,7 +208,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 	p.SetConn(conn)
 
 	component.Register(p)
-	detection.RegisterDetections(p)
+	detection.Register(p)
 
 	defer p.Close()
 	defer func() {
