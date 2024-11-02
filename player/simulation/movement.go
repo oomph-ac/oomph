@@ -1,6 +1,7 @@
 package simulation
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/chewxy/math32"
@@ -28,21 +29,30 @@ func SimulatePlayerMovement(p *player.Player) {
 		int32(movement.Pos().X()) >> 4,
 		int32(movement.Pos().Z()) >> 4,
 	}) == nil {
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: no available chunks", p.ClientFrame)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: no available chunks", p.SimulationFrame)
 		movement.Reset()
 		return
-	} else if !simulationIsReliable(p) {
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.ClientFrame)
+	}
+	if !simulationIsReliable(p) {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
 		movement.Reset()
 		return
 	}
 
-	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN movement sim for frame %d", p.ClientFrame)
-	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement sim for frame %d", p.ClientFrame)
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN movement sim for frame %d", p.SimulationFrame)
+	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement sim for frame %d", p.SimulationFrame)
+
+	blockUnder := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
+	blockFriction := game.DefaultAirFriction
 
 	// If a teleport was able to be handled, do not continue with the simulation.
 	if attemptTeleport(movement) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
+		if attemptKnockback(movement) {
+			p.Dbg.Notify(player.DebugModeMovementSim, true, "knockback applied: %v", movement.Vel())
+			movement.SetPos(movement.Pos().Add(movement.Vel()))
+		}
+
 		return
 	}
 
@@ -62,10 +72,7 @@ func SimulatePlayerMovement(p *player.Player) {
 	// Attempt jump velocity if applicable.
 	p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(movement), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
 
-	blockUnder := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
-	blockFriction := game.DefaultAirFriction
 	speed := movement.AirSpeed()
-
 	if movement.OnGround() {
 		blockFriction *= utils.BlockFriction(blockUnder)
 		speed = movement.MovementSpeed() * (0.162771336 / math32.Pow(blockFriction, 3))
@@ -397,28 +404,27 @@ func blocksInside(movement player.MovementComponent, w *world.World) ([]df_world
 
 func moveRelative(movement player.MovementComponent, speed float32) {
 	force := math32.Pow(movement.Impulse().Y(), 2) + math32.Pow(movement.Impulse().X(), 2)
-	if force < 1e-4 {
-		return
+	if force >= 1e-4 {
+		force = math32.Sqrt(force)
+		if force < 1 {
+			force = 1
+		}
+		force = speed / force
+
+		mf, ms := movement.Impulse().Y()*force, movement.Impulse().X()*force
+		v1 := movement.Rotation().Z() * (math32.Pi / 180.0)
+		v2, v3 := game.MCSin(v1), game.MCCos(v1)
+
+		newVel := movement.Vel()
+		newVel[0] += ms*v3 - mf*v2
+		newVel[2] += ms*v2 + mf*v3
+		movement.SetVel(newVel)
 	}
-
-	force = math32.Sqrt(force)
-	if force < 1 {
-		force = 1
-	}
-	force = speed / force
-
-	mf, ms := movement.Impulse().Y()*force, movement.Impulse().X()*force
-	v1 := movement.Rotation().Z() * (math32.Pi / 180.0)
-	v2, v3 := game.MCSin(v1), game.MCCos(v1)
-
-	newVel := movement.Vel()
-	newVel[0] += ms*v3 - mf*v2
-	newVel[2] += ms*v2 + mf*v3
-	movement.SetVel(newVel)
 }
 
 func attemptKnockback(movement player.MovementComponent) bool {
 	if movement.HasKnockback() {
+		fmt.Println("applies knockback of", movement.Knockback())
 		movement.SetVel(movement.Knockback())
 		return true
 	}
@@ -461,10 +467,10 @@ func attemptTeleport(movement player.MovementComponent) bool {
 		attemptJump(movement)
 	} else {
 		posDelta := movement.TeleportPos().Sub(movement.Pos())
-		movement.SetVel(mgl32.Vec3{0, -0.078})
-		if remaining := movement.RemainingTeleportTicks(); remaining > 1 {
+		if remaining := movement.RemainingTeleportTicks() + 1; remaining > 0 {
 			newPos := movement.Pos().Add(posDelta.Mul(1.0 / float32(remaining)))
 			movement.SetPos(newPos)
+			movement.SetVel(mgl32.Vec3{0, -0.078, 0})
 		}
 	}
 

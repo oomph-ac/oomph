@@ -1,9 +1,12 @@
 package component
 
 import (
+	"fmt"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/assert"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
@@ -296,7 +299,7 @@ func (mc *AuthoritativeMovementComponent) Teleport(pos mgl32.Vec3, onGround bool
 	mc.ticksSinceTeleport = 0
 
 	if smoothed {
-		mc.teleportCompletionTicks = 3
+		mc.teleportCompletionTicks = 2
 	} else {
 		mc.teleportCompletionTicks = 0
 	}
@@ -504,11 +507,14 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	needsSpeedAdjusted := false
 	if (startFlag && stopFlag) || stopFlag {
 		mc.sprinting = false
-		needsSpeedAdjusted = startFlag && stopFlag
+		needsSpeedAdjusted = true
+		fmt.Println("stop sprinting", mc.mPlayer.SimulationFrame)
 	} else if startFlag {
 		mc.sprinting = true
 		needsSpeedAdjusted = true
+		fmt.Println("start sprinting", mc.mPlayer.SimulationFrame)
 	}
+
 	mc.pressingSprint = utils.HasFlag(pk.InputData, packet.InputFlagSprinting)
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
@@ -533,12 +539,12 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	// Adjust the movement speed of the movement component if their sprint state changes.
 	if needsSpeedAdjusted {
 		mc.movementSpeed = mc.defaultMovementSpeed
-		if speed, ok := mc.mPlayer.Effects().Get(packet.EffectSpeed); ok {
+		/* if speed, ok := mc.mPlayer.Effects().Get(packet.EffectSpeed); ok {
 			mc.movementSpeed += float32(speed.Level()) * 0.02
 		}
 		if slowness, ok := mc.mPlayer.Effects().Get(packet.EffectSlowness); ok {
 			mc.movementSpeed -= float32(slowness.Level()) * 0.015
-		}
+		} */
 
 		if mc.sprinting {
 			mc.movementSpeed *= 1.3
@@ -573,6 +579,12 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, pk.Position.Sub(playerHeightOffset), pk.OnGround, pk.Mode == packet.MoveModeNormal))
 		}
 	case *packet.SetActorData:
+		if v, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
+			flags := uint64(v.(int64))
+			flags = utils.RemoveDataFlag(flags, entity.DataFlagSprinting)
+			flags = utils.RemoveDataFlag(flags, entity.DataFlagSneaking)
+			pk.EntityMetadata[entity.DataKeyFlags] = int64(flags)
+		}
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateActorData(mc.mPlayer, pk.EntityMetadata))
 	case *packet.SetActorMotion:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity))
