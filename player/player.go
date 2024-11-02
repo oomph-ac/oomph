@@ -10,6 +10,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/oomph-ac/oomph/world"
@@ -73,12 +74,13 @@ type Player struct {
 	IDModified                 bool
 
 	// ClientTick is the tick of the client, synchronized with the server's on an interval.
-	// ClientFrame is the simulation frame of the client, sent in PlayerAuthInput.
-	ClientTick, ClientFrame int64
-	ServerTick              int64
-	Tps                     float32
-	StackLatency            time.Duration
-	LastServerTick          time.Time
+	// SimulationFrame is the simulation frame of the client, sent in PlayerAuthInput.
+	SimulationFrame uint64
+	ClientTick      int64
+	ServerTick      int64
+	Tps             float32
+	StackLatency    time.Duration
+	LastServerTick  time.Time
 
 	// World is the world of the player.
 	World *world.World
@@ -159,11 +161,11 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 		PacketQueue: []packet.Packet{},
 
-		ClientTick:     0,
-		ClientFrame:    0,
-		ServerTick:     0,
-		LastServerTick: time.Now(),
-		Tps:            20.0,
+		ClientTick:      0,
+		SimulationFrame: 0,
+		ServerTick:      0,
+		LastServerTick:  time.Now(),
+		Tps:             20.0,
 
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
@@ -466,11 +468,16 @@ func (p *Player) tick() bool {
 
 	p.EntityTracker().Tick(p.ServerTick)
 	p.ACKs().Tick()
-	p.ACKs().Flush()
+	if !p.ACKs().Responsive() {
+		p.Disconnect(game.ErrorNetworkTimeout)
+		return false
+	}
 
+	p.ACKs().Flush()
 	if err := p.conn.Flush(); err != nil {
 		return false
 	}
+
 	return true
 }
 

@@ -33,7 +33,7 @@ func (o *Oomph) Listen(conf *server.Config, name string, protocols []minecraft.P
 			return nil, err
 		}
 
-		conf.Log.Infof("Dragonfly + Oomph is listening on %v", l.Addr())
+		conf.Log.Info("Dragonfly + Oomph is listening on %v", l.Addr())
 
 		return listener{
 			Listener: l,

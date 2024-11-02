@@ -20,6 +20,11 @@ func HasDataFlag(flag uint64, data int64) bool {
 	return (data & (1 << (flag % 64))) > 0
 }
 
+// RemoveDataFlag removes the specified flag from the flags.
+func RemoveDataFlag(flags uint64, flag int64) uint64 {
+	return flags &^ (1 << (flag % 64))
+}
+
 // WriteLInt32 writes a 32-bit integer to the given bytes.
 func WriteLInt32(b *bytes.Buffer, v int32) {
 	_ = b.WriteByte(byte(v))

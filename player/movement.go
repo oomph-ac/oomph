@@ -1,6 +1,8 @@
 package player
 
 import (
+	"fmt"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -216,7 +218,7 @@ func (p *Player) Movement() MovementComponent {
 }
 
 func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
-	p.ClientFrame = int64(pk.Tick)
+	p.SimulationFrame = pk.Tick
 	p.ClientTick++
 
 	p.effects.Tick()
@@ -229,12 +231,17 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 }
 
 func (p *Player) sendMovementCorrection() {
-	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.ClientFrame)
+	fmt.Println(p.movement.Pos(), p.movement.Client().Pos())
+	fmt.Println(p.movement.Mov(), p.movement.Vel(), p.SimulationFrame)
+	fmt.Println(p.movement.Client().Mov(), p.movement.Client().Vel(), p.SimulationFrame)
+	fmt.Println("correction", p.SimulationFrame)
+	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.SimulationFrame)
+
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,
-		Position:       p.movement.Pos().Add(mgl32.Vec3{0, 1.62}),
+		Position:       p.movement.Pos().Add(mgl32.Vec3{0, 1.6201}),
 		Delta:          p.movement.Vel(),
 		OnGround:       p.movement.OnGround(),
-		Tick:           uint64(p.ClientFrame),
+		Tick:           p.SimulationFrame,
 	})
 }

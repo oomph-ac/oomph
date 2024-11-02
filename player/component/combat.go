@@ -274,7 +274,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 }
 
 func (c *AuthoritativeCombatComponent) Swing() {
-	c.swingTick = c.mPlayer.ClientFrame
+	c.swingTick = int64(c.mPlayer.SimulationFrame)
 }
 
 func (c *AuthoritativeCombatComponent) LastSwing() int64 {

@@ -9,7 +9,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const timerA_tickSampleSize = 10
+const timerA_tickSampleSize = 100
 
 type TimerA struct {
 	mPlayer  *player.Player
@@ -100,9 +100,12 @@ func (d *TimerA) Detect(pk packet.Packet) {
 			d.mPlayer.Dbg.Notify(
 				player.DebugModeTimerA,
 				true,
-				"<red>timer balance reset due to conditions</red>",
+				"timer balance reset due to conditions",
 			)
 			d.balance = 0
+			for i := 0; i < 10; i++ {
+				d.tickTimes[i] = 0.0
+			}
 		}
 
 		d.lastTickTime = curr
