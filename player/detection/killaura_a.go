@@ -52,8 +52,8 @@ func (d *KillauraA) Detect(pk packet.Packet) {
 
 	lastSwung := d.mPlayer.ClientCombat().LastSwing()
 	if data, ok := tpk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
-		currentTick := d.mPlayer.ClientFrame
-		tickDiff := currentTick - lastSwung
+		currentTick := d.mPlayer.SimulationFrame
+		tickDiff := int64(currentTick) - lastSwung
 		var maxTickDiff int64 = 10
 		if miningFatigue, ok := d.mPlayer.Effects().Get(packet.EffectMiningFatigue); ok {
 			maxTickDiff += int64(miningFatigue.Level())

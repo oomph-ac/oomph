@@ -89,8 +89,7 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 			p.combat.Attack(nil)
 		}
 
-		p.clientEntTracker.Tick(p.ClientFrame)
-
+		p.clientEntTracker.Tick(p.ClientTick)
 		p.handleBlockBreak(pk)
 		p.handlePlayerMovementInput(pk)
 
@@ -181,6 +180,7 @@ func (p *Player) handleOneFromServer(pk packet.Packet) error {
 	case *packet.LevelChunk:
 		p.worldUpdater.HandleLevelChunk(pk)
 	case *packet.MobEffect:
+		pk.Tick = 0
 		p.handleEffectsPacket(pk)
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
@@ -190,6 +190,7 @@ func (p *Player) handleOneFromServer(pk packet.Packet) error {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.MovePlayer:
+		pk.Tick = 0
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMovePlayer(pk)
 			p.clientEntTracker.HandleMovePlayer(pk)

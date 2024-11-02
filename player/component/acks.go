@@ -2,6 +2,7 @@ package component
 
 import (
 	"math/rand/v2"
+	"slices"
 	"sync"
 	"time"
 
@@ -81,12 +82,16 @@ func (ackC *ACKComponent) Execute(ackID int64) bool {
 
 	// Iterate through all the ACK batches up until the matching one and run them.
 	for _, batch := range ackC.pending[:index+1] {
+		assert.IsTrue(batch.timestamp != 0, "batch timestamp should never be zero")
+
 		// Run all the acknowledgments in the batch
 		for _, a := range batch.acks {
 			a.Run()
 		}
 
 		// Put the batch back in the pool to eventually be reused.
+		batch.acks = batch.acks[:0]
+		batch.timestamp = 0
 		batchPool.Put(batch)
 	}
 
@@ -131,8 +136,15 @@ func (ackC *ACKComponent) SetLegacy(legacy bool) {
 // Tick ticks the acknowledgment component.
 func (ackC *ACKComponent) Tick() {
 	// Update the latency every second.
-	if ackC.mPlayer.ServerTick%20 == 0 {
+	if ackC.mPlayer.ServerTick%10 == 0 {
 		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, time.Now(), ackC.mPlayer.ServerTick))
+	}
+
+	// Validate that there are no duplicate timestamps.
+	knownTimestamps := make([]int64, 0, len(ackC.pending))
+	for _, batch := range ackC.pending {
+		assert.IsTrue(!slices.Contains(knownTimestamps, batch.timestamp), "multiple acks found with timestamp %d", batch.timestamp)
+		knownTimestamps = append(knownTimestamps, batch.timestamp)
 	}
 
 	if len(ackC.pending) > 0 {
@@ -165,12 +177,12 @@ func (ackC *ACKComponent) Flush() {
 
 // Refresh resets the current timestamp of the acknowledgment component.
 func (ackC *ACKComponent) Refresh() {
-	newBatch := &ackBatch{acks: make([]player.Acknowledgment, 0), timestamp: 0}
+	newBatch := batchPool.Get().(*ackBatch)
 	newBatch.acks = newBatch.acks[:0]
+	newBatch.timestamp = 0
 	ackC.currentBatch = newBatch
 
 	// Create a random timestamp, and ensure that it is not already being used.
-timestampLoop:
 	for i := 0; i < 3; i++ {
 		ackC.SetTimestamp(int64(rand.Uint32()))
 		if ackC.legacyMode {
@@ -178,17 +190,20 @@ timestampLoop:
 			ackC.currentBatch.timestamp *= ACK_DIVIDER
 		}
 
-		for _, ack := range ackC.pending {
-			if ack.timestamp == ackC.currentBatch.timestamp {
-				continue timestampLoop
+		unique := true
+		for _, otherACK := range ackC.pending {
+			if otherACK.timestamp == ackC.currentBatch.timestamp {
+				unique = false
 			}
 		}
 
 		// We found a timestamp that isn't matching.
-		return
+		if unique {
+			return
+		}
 	}
 
-	panic(oerror.New("unable to find new ack ID after 3 attempts"))
+	panic(oerror.New("unable to find new ack ID after multiple attempts"))
 }
 
 type ackBatch struct {
