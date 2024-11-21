@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	COMBAT_LERP_POSITION_STEPS         = 10
-	COMBAT_SURVIVAL_REACH      float32 = 2.9
+	COMBAT_LERP_POSITION_STEPS = 10
+
+	COMBAT_SURVIVAL_ENTITY_SEARCH_RADIUS float32 = 6.0
+	COMBAT_SURVIVAL_REACH                float32 = 2.9
 )
 
 // AuthoritativeCombatComponent is responsible for managing and simulating combat mechanics for players on the server.
@@ -155,6 +157,12 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		}
 	}
 
+	movement := c.mPlayer.Movement()
+	if movement.HasTeleport() && !movement.TeleportSmoothed() {
+		c.startAttackPos = movement.TeleportPos()
+		c.endAttackPos = movement.TeleportPos()
+	}
+
 	c.startRotation = c.mPlayer.Movement().LastRotation()
 	c.endRotation = c.mPlayer.Movement().Rotation()
 
@@ -240,7 +248,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	if hitValid && c.mPlayer.InputMode != packet.InputModeTouch && closestRaycastDist > 0 {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 
-	check_blocks_blocking_ray:
+	check_blocks_between_ray:
 		for _, blockPos := range game.BlocksBetween(start, end) {
 			flooredBlockPos := cube.PosFromVec3(blockPos)
 			blockInWay := c.mPlayer.World.Block(df_cube.Pos(flooredBlockPos))
@@ -251,7 +259,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 				if _, ok := trace.BBoxIntercept(blockBB, start, end); ok {
 					hitValid = false
 					c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "hit was invalidated due to %s blocking attack ray", utils.BlockName(blockInWay))
-					break check_blocks_blocking_ray
+					break check_blocks_between_ray
 				}
 			}
 		}
@@ -315,7 +323,7 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 		}
 
 		dist := rewind.Position.Sub(c.endAttackPos).Len()
-		if dist <= 4.5 {
+		if dist <= COMBAT_SURVIVAL_ENTITY_SEARCH_RADIUS {
 			if dist < minDist {
 				minDist = dist
 				rewindData = rewind
