@@ -21,7 +21,7 @@ func HasDataFlag(flag uint64, data int64) bool {
 }
 
 // RemoveDataFlag removes the specified flag from the flags.
-func RemoveDataFlag(flags uint64, flag int64) uint64 {
+func RemoveDataFlag(flags int64, flag uint64) int64 {
 	return flags &^ (1 << (flag % 64))
 }
 

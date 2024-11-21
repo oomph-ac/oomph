@@ -1,7 +1,6 @@
 package simulation
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/chewxy/math32"
@@ -72,14 +71,14 @@ func SimulatePlayerMovement(p *player.Player) {
 	// Attempt jump velocity if applicable.
 	p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(movement), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
 
-	speed := movement.AirSpeed()
+	moveRelativeSpeed := movement.AirSpeed()
 	if movement.OnGround() {
 		blockFriction *= utils.BlockFriction(blockUnder)
-		speed = movement.MovementSpeed() * (0.162771336 / math32.Pow(blockFriction, 3))
+		moveRelativeSpeed = movement.MovementSpeed() * (0.16277136 / (blockFriction * blockFriction * blockFriction))
 	}
 
-	p.Dbg.Notify(player.DebugModeMovementSim, true, "blockUnder=%s, blockFriction=%v, speed=%v", utils.BlockName(blockUnder), blockFriction, speed)
-	moveRelative(movement, speed)
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "blockUnder=%s, blockFriction=%v, speed=%v", utils.BlockName(blockUnder), blockFriction, moveRelativeSpeed)
+	moveRelative(movement, moveRelativeSpeed)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "moveRelative force applied (vel=%v)", movement.Vel())
 
 	nearClimable := utils.BlockClimbable(p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()))))
@@ -320,15 +319,17 @@ func tryCollisions(movement player.MovementComponent, w *world.World, dbg *playe
 		}
 	}
 
+	yCollision = math32.Abs(currVel.Y()-collisionVel.Y()) >= 1e-5
 	movement.SetCollisions(
 		math32.Abs(currVel.X()-collisionVel.X()) >= 1e-5, // xCollision
-		math32.Abs(currVel.Y()-collisionVel.Y()) >= 1e-5, // yCollision
+		yCollision,
 		math32.Abs(currVel.Z()-collisionVel.Z()) >= 1e-5, // zCollision
 	)
-	movement.SetOnGround((movement.YCollision() && currVel.Y() < 0) || (movement.OnGround() && !movement.YCollision() && currVel.Y() == 0.0))
+	movement.SetOnGround((yCollision && currVel.Y() < 0) || (movement.OnGround() && !yCollision && currVel.Y() == 0.0))
 	movement.SetVel(collisionVel)
 	movement.SetPos(movement.Pos().Add(collisionVel))
 	dbg.Notify(player.DebugModeMovementSim, true, "finalVel=%v finalPos=%v", collisionVel, movement.Pos())
+	dbg.Notify(player.DebugModeMovementSim, true, "clientVel=%v clientPos=%v", movement.Client().Mov(), movement.Client().Pos())
 }
 
 func avoidEdge(movement player.MovementComponent, w *world.World) {
@@ -402,29 +403,26 @@ func blocksInside(movement player.MovementComponent, w *world.World) ([]df_world
 	return blocks, len(blocks) > 0
 }
 
-func moveRelative(movement player.MovementComponent, speed float32) {
-	force := math32.Pow(movement.Impulse().Y(), 2) + math32.Pow(movement.Impulse().X(), 2)
-	if force >= 1e-4 {
-		force = math32.Sqrt(force)
-		if force < 1 {
-			force = 1
-		}
-		force = speed / force
+func moveRelative(movement player.MovementComponent, moveRelativeSpeed float32) {
+	impulse := movement.Impulse()
+	force := impulse.Y()*impulse.Y() + impulse.X()*impulse.X()
 
-		mf, ms := movement.Impulse().Y()*force, movement.Impulse().X()*force
-		v1 := movement.Rotation().Z() * (math32.Pi / 180.0)
+	if force >= 1e-4 {
+		force = moveRelativeSpeed / math32.Max(math32.Sqrt(force), 1.0)
+		mf, ms := impulse.Y()*force, impulse.X()*force
+
+		v1 := movement.Rotation().Z() * math32.Pi / 180.0
 		v2, v3 := game.MCSin(v1), game.MCCos(v1)
 
 		newVel := movement.Vel()
 		newVel[0] += ms*v3 - mf*v2
-		newVel[2] += ms*v2 + mf*v3
+		newVel[2] += mf*v3 + ms*v2
 		movement.SetVel(newVel)
 	}
 }
 
 func attemptKnockback(movement player.MovementComponent) bool {
 	if movement.HasKnockback() {
-		fmt.Println("applies knockback of", movement.Knockback())
 		movement.SetVel(movement.Knockback())
 		return true
 	}
