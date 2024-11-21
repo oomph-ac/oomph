@@ -11,7 +11,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func VersionInRange(version int, min int, max int) bool {
+func VersionInRange(version, min, max int32) bool {
 	return version >= min && version <= max
 }
 

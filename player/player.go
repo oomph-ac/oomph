@@ -153,8 +153,7 @@ type Player struct {
 // New creates and returns a new Player instance.
 func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listener) *Player {
 	p := &Player{
-		MState: mState,
-
+		MState:    mState,
 		Connected: true,
 
 		World: world.New(),

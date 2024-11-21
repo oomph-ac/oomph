@@ -1,12 +1,9 @@
 package component
 
 import (
-	"fmt"
-
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/assert"
-	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
@@ -80,6 +77,7 @@ type AuthoritativeMovementComponent struct {
 	movementSpeed        float32
 	defaultMovementSpeed float32
 	airSpeed             float32
+	serverUpdatedSpeed   bool
 
 	knockback    mgl32.Vec3
 	ticksSinceKb uint64
@@ -377,6 +375,7 @@ func (mc *AuthoritativeMovementComponent) MovementSpeed() float32 {
 // SetMovementSpeed sets the movement speed of the movement component.
 func (mc *AuthoritativeMovementComponent) SetMovementSpeed(newSpeed float32) {
 	mc.movementSpeed = newSpeed
+	mc.serverUpdatedSpeed = true
 }
 
 // DefaultMovementSpeed return the movement speed the client should default to.
@@ -440,7 +439,7 @@ func (mc *AuthoritativeMovementComponent) NoClientPredictions() bool {
 	return mc.clientHasNoPredictions
 }
 
-// SetNoClientPredictions sets wether or not the movement component needxs their movement simulated.
+// SetNoClientPredictions sets wether or not the movement component needs their movement simulated.
 func (mc *AuthoritativeMovementComponent) SetNoClientPredictions(noPredictions bool) {
 	mc.clientHasNoPredictions = noPredictions
 }
@@ -503,26 +502,38 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.lastRotation = mc.rotation
 	mc.rotation = mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}
 
-	startFlag, stopFlag := utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting), utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting)
-	needsSpeedAdjusted := false
-	if (startFlag && stopFlag) || stopFlag {
-		mc.sprinting = false
-		needsSpeedAdjusted = true
-		fmt.Println("stop sprinting", mc.mPlayer.SimulationFrame)
-	} else if startFlag {
-		mc.sprinting = true
-		needsSpeedAdjusted = true
-		fmt.Println("start sprinting", mc.mPlayer.SimulationFrame)
-	}
+	mc.pressingSneak = utils.HasFlag(pk.InputData, packet.InputFlagSneaking)
+	mc.pressingSprint = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
 
-	mc.pressingSprint = utils.HasFlag(pk.InputData, packet.InputFlagSprinting)
+	hasForwardKeyPressed := mc.impulse.Y() > 1e-4
+	startFlag, stopFlag := utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting), utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || !hasForwardKeyPressed
+	needsSpeedAdjusted := false
+
+	if player.VersionInRange(mc.mPlayer.Conn().Protocol().ID(), player.GameVersion1_20_0, 65536) {
+		if startFlag && stopFlag && hasForwardKeyPressed {
+			mc.sprinting = false
+			needsSpeedAdjusted = true
+		} else if startFlag && !mc.sprinting && hasForwardKeyPressed {
+			mc.sprinting = true
+			needsSpeedAdjusted = true
+		} else if stopFlag && mc.sprinting && !hasForwardKeyPressed {
+			mc.sprinting = false
+			needsSpeedAdjusted = !mc.serverUpdatedSpeed
+		}
+		if needsSpeedAdjusted {
+			mc.serverUpdatedSpeed = false
+			mc.movementSpeed = mc.defaultMovementSpeed
+			if mc.sprinting {
+				mc.movementSpeed *= 1.3
+			}
+		}
+	}
 
 	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
 		mc.sneaking = true
 	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
 		mc.sneaking = false
 	}
-	mc.pressingSneak = utils.HasFlag(pk.InputData, packet.InputFlagSneaking)
 
 	mc.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
 	mc.pressingJump = utils.HasFlag(pk.InputData, packet.InputFlagJumping)
@@ -536,21 +547,6 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.jumpDelay = 0
 	}
 
-	// Adjust the movement speed of the movement component if their sprint state changes.
-	if needsSpeedAdjusted {
-		mc.movementSpeed = mc.defaultMovementSpeed
-		/* if speed, ok := mc.mPlayer.Effects().Get(packet.EffectSpeed); ok {
-			mc.movementSpeed += float32(speed.Level()) * 0.02
-		}
-		if slowness, ok := mc.mPlayer.Effects().Get(packet.EffectSlowness); ok {
-			mc.movementSpeed -= float32(slowness.Level()) * 0.015
-		} */
-
-		if mc.sprinting {
-			mc.movementSpeed *= 1.3
-		}
-	}
-
 	mc.gravity = game.NormalGravity
 	mc.airSpeed = 0.02
 	if mc.sprinting {
@@ -559,6 +555,28 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 
 	// Run the movement simulation after the states of the movement component have been updated.
 	mc.Simulate()
+
+	// On older versions, there seems to be a delay before the sprinting status is actually applied.
+	if player.VersionInRange(mc.mPlayer.Conn().Protocol().ID(), -1, player.GameVersion1_20_80) {
+		if startFlag && stopFlag && hasForwardKeyPressed {
+			mc.sprinting = false
+			needsSpeedAdjusted = true
+		} else if startFlag && !mc.sprinting && hasForwardKeyPressed {
+			mc.sprinting = true
+			needsSpeedAdjusted = true
+		} else if stopFlag && mc.sprinting && !hasForwardKeyPressed {
+			mc.sprinting = false
+			needsSpeedAdjusted = !mc.serverUpdatedSpeed
+		}
+		// Adjust the movement speed of the movement component if their sprint state changes.
+		if needsSpeedAdjusted {
+			mc.serverUpdatedSpeed = false
+			mc.movementSpeed = mc.defaultMovementSpeed
+			if mc.sprinting {
+				mc.movementSpeed *= 1.3
+			}
+		}
+	}
 
 	mc.ticksSinceKb++
 	mc.ticksSinceTeleport++
@@ -579,12 +597,12 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, pk.Position.Sub(playerHeightOffset), pk.OnGround, pk.Mode == packet.MoveModeNormal))
 		}
 	case *packet.SetActorData:
-		if v, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
-			flags := uint64(v.(int64))
+		/* if v, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
+			flags := v.(int64)
 			flags = utils.RemoveDataFlag(flags, entity.DataFlagSprinting)
 			flags = utils.RemoveDataFlag(flags, entity.DataFlagSneaking)
 			pk.EntityMetadata[entity.DataKeyFlags] = int64(flags)
-		}
+		} */
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateActorData(mc.mPlayer, pk.EntityMetadata))
 	case *packet.SetActorMotion:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity))

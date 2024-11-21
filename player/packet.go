@@ -30,15 +30,15 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 			panic(oerror.New("malicious payload detected"))
 		}
 	case *packet.Text:
-		split := strings.Split(pk.Message, " ")
-		if split[0] == "!oomph_debug" {
-			if len(split) != 2 {
+		args := strings.Split(pk.Message, " ")
+		if args[0] == "!oomph_debug" {
+			if len(args) < 2 {
 				p.Message("Usage: !oomph_debug <mode>")
 				return nil
 			}
 
 			var mode int
-			switch split[1] {
+			switch args[1] {
 			case "type:log":
 				p.Log().SetLevel(logrus.DebugLevel)
 				p.Dbg.LoggingType = LoggingTypeLogFile
@@ -68,15 +68,15 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 			case "timer-a":
 				mode = DebugModeTimerA
 			default:
-				p.Message("Unknown debug mode: %s", split[1])
+				p.Message("Unknown debug mode: %s", args[1])
 				return nil
 			}
 
 			p.Dbg.Toggle(mode)
 			if p.Dbg.Enabled(mode) {
-				p.Message("<green>Enabled</green> debug mode: %s", split[1])
+				p.Message("<green>Enabled</green> debug mode: %s", args[1])
 			} else {
-				p.Message("<red>Disabled</red> debug mode: %s", split[1])
+				p.Message("<red>Disabled</red> debug mode: %s", args[1])
 			}
 			return nil
 		}
