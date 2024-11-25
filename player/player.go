@@ -392,6 +392,15 @@ func (p *Player) BlockAddress(duration time.Duration) {
 	}
 }
 
+func (p *Player) IsVersion(ver int32) bool {
+	return p.conn.Protocol().ID() == ver
+}
+
+func (p *Player) VersionInRange(oldest, latest int32) bool {
+	ver := p.conn.Protocol().ID()
+	return ver >= oldest && ver <= latest
+}
+
 // Close closes the player.
 func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
