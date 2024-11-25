@@ -68,8 +68,9 @@ type AuthoritativeMovementComponent struct {
 	mov, lastMov           mgl32.Vec3
 	rotation, lastRotation mgl32.Vec3
 
-	impulse mgl32.Vec2
-	size    mgl32.Vec2
+	slideOffset mgl32.Vec2
+	impulse     mgl32.Vec2
+	size        mgl32.Vec2
 
 	gravity    float32
 	jumpHeight float32
@@ -136,6 +137,16 @@ func (mc *AuthoritativeMovementComponent) LastPos() mgl32.Vec3 {
 func (mc *AuthoritativeMovementComponent) SetPos(newPos mgl32.Vec3) {
 	mc.lastPos = mc.pos
 	mc.pos = newPos
+}
+
+// SlideOffset returns the slide offset of the movement component.
+func (mc *AuthoritativeMovementComponent) SlideOffset() mgl32.Vec2 {
+	return mc.slideOffset
+}
+
+// SetSlideOffset sets the slide offset of the movement component.
+func (mc *AuthoritativeMovementComponent) SetSlideOffset(slideOffset mgl32.Vec2) {
+	mc.slideOffset = slideOffset
 }
 
 // Vel returns the velocity of the movement component.
@@ -337,12 +348,17 @@ func (mc *AuthoritativeMovementComponent) SetSize(newSize mgl32.Vec2) {
 // BoundingBox returns the bounding box of the movement component translated to it's current position.
 func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 	width := mc.size[0] / 2
+	var yOffset float32
+	if mc.mPlayer.VersionInRange(-1, player.GameVersion1_20_60) {
+		yOffset = mc.slideOffset.Y()
+	}
+
 	return cube.Box(
 		mc.pos[0]-width,
-		mc.pos[1],
+		mc.pos[1]+yOffset,
 		mc.pos[2]-width,
 		mc.pos[0]+width,
-		mc.pos[1]+mc.size[1],
+		mc.pos[1]+mc.size[1]+yOffset,
 		mc.pos[2]+width,
 	).GrowVec3(mgl32.Vec3{-0.001, 0, -0.001})
 }
@@ -507,25 +523,37 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 
 	hasForwardKeyPressed := mc.impulse.Y() > 1e-4
 	startFlag, stopFlag := utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting), utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || !hasForwardKeyPressed
-	needsSpeedAdjusted := false
 
-	if player.VersionInRange(mc.mPlayer.Conn().Protocol().ID(), player.GameVersion1_20_0, 65536) {
-		if startFlag && stopFlag && hasForwardKeyPressed {
-			mc.sprinting = false
-			needsSpeedAdjusted = true
-		} else if startFlag && !mc.sprinting && hasForwardKeyPressed {
-			mc.sprinting = true
-			needsSpeedAdjusted = true
-		} else if stopFlag && mc.sprinting && !hasForwardKeyPressed {
-			mc.sprinting = false
-			needsSpeedAdjusted = !mc.serverUpdatedSpeed
-		}
-		if needsSpeedAdjusted {
-			mc.serverUpdatedSpeed = false
-			mc.movementSpeed = mc.defaultMovementSpeed
-			if mc.sprinting {
-				mc.movementSpeed *= 1.3
-			}
+	isNewVersionPlayer := mc.mPlayer.VersionInRange(player.GameVersion1_21_0, 65536)
+	var needsSpeedAdjusted bool
+	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ start/stop state race condition")
+		mc.sprinting = false
+
+		needsSpeedAdjusted = isNewVersionPlayer
+		mc.airSpeed = 0.02
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+	} else if startFlag /*  && !mc.sprinting && hasForwardKeyPressed*/ {
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ starts sprint")
+		mc.sprinting = true
+
+		needsSpeedAdjusted = isNewVersionPlayer
+		mc.airSpeed = 0.026
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.026")
+	} else if stopFlag /*&& mc.sprinting && !hasForwardKeyPressed*/ {
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ stops sprint")
+		mc.sprinting = false
+
+		needsSpeedAdjusted = isNewVersionPlayer && !mc.serverUpdatedSpeed
+		mc.airSpeed = 0.02
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+	}
+
+	if needsSpeedAdjusted {
+		mc.serverUpdatedSpeed = false
+		mc.movementSpeed = mc.defaultMovementSpeed
+		if mc.sprinting {
+			mc.movementSpeed *= 1.3
 		}
 	}
 
@@ -546,25 +574,24 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	if !mc.pressingJump {
 		mc.jumpDelay = 0
 	}
-
 	mc.gravity = game.NormalGravity
-	mc.airSpeed = 0.02
-	if mc.sprinting {
-		mc.airSpeed = 0.026
-	}
 
 	// Run the movement simulation after the states of the movement component have been updated.
 	mc.Simulate()
 
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
-	if player.VersionInRange(mc.mPlayer.Conn().Protocol().ID(), -1, player.GameVersion1_20_80) {
-		if startFlag && stopFlag && hasForwardKeyPressed {
+	if !isNewVersionPlayer {
+		needsSpeedAdjusted = false
+		if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.21.80- has start/stop sprint race condition")
 			mc.sprinting = false
 			needsSpeedAdjusted = true
-		} else if startFlag && !mc.sprinting && hasForwardKeyPressed {
+		} else if startFlag /*&& !mc.sprinting && hasForwardKeyPressed*/ {
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.21.80- starts sprint")
 			mc.sprinting = true
 			needsSpeedAdjusted = true
-		} else if stopFlag && mc.sprinting && !hasForwardKeyPressed {
+		} else if stopFlag /*&& mc.sprinting && !hasForwardKeyPressed*/ {
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.21.80- stops sprint")
 			mc.sprinting = false
 			needsSpeedAdjusted = !mc.serverUpdatedSpeed
 		}
@@ -647,7 +674,8 @@ func (mc *AuthoritativeMovementComponent) Validate() bool {
 	if !mc.canSimulate {
 		return true
 	}
-	return mc.nonAuthoritative.Pos().Sub(mc.pos).Len() <= mc.validationThreshold
+
+	return mc.nonAuthoritative.pos.Sub(mc.pos).Len() <= mc.validationThreshold
 }
 
 // Reset is a function that resets the current movement of the movement component to the client's non-authoritative movement.
