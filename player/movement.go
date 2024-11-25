@@ -1,8 +1,11 @@
 package player
 
 import (
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -19,6 +22,11 @@ type MovementComponent interface {
 	LastPos() mgl32.Vec3
 	// SetPos sets the position of the movement component.
 	SetPos(pos mgl32.Vec3)
+
+	// SlideOffset returns the slide offset of the player.
+	SlideOffset() mgl32.Vec2
+	// SetSlideOffset sets the slide offset of the player.
+	SetSlideOffset(mgl32.Vec2)
 
 	// Vel returns the velocity of the movement component.
 	Vel() mgl32.Vec3
@@ -223,12 +231,26 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 	p.movement.Update(pk)
 
 	if !p.movement.Validate() {
-		p.sendMovementCorrection()
+		p.correctMovement()
 	}
 	pk.Position = p.movement.Pos().Add(mgl32.Vec3{0, 1.621})
 }
 
-func (p *Player) sendMovementCorrection() {
+func (p *Player) correctMovement() {
+	// Update the blocks in the world so the client can sync itself properly.
+	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World) {
+		p.SendPacketToClient(&packet.UpdateBlock{
+			Position: protocol.BlockPos{
+				int32(blockResult.Position[0]),
+				int32(blockResult.Position[1]),
+				int32(blockResult.Position[2]),
+			},
+			NewBlockRuntimeID: world.BlockRuntimeID(blockResult.Block),
+			Flags:             packet.BlockUpdateNeighbours | packet.BlockUpdateNetwork | packet.BlockUpdatePriority,
+			Layer:             0, // TODO: Implement and account for multi-layer blocks.
+		})
+	}
+
 	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.SimulationFrame)
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,

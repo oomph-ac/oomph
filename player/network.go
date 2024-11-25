@@ -11,10 +11,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-func VersionInRange(version, min, max int32) bool {
-	return version >= min && version <= max
-}
-
 // Conn returns the connection to the client.
 func (p *Player) Conn() *minecraft.Conn {
 	return p.conn
