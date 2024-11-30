@@ -4,10 +4,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const (
-	INTERPOLATED_STEPS = 10
-)
-
 type CombatHook func(CombatComponent)
 
 // CombatComponent is responsible for managing and simulating combat mechanics for players on the server.

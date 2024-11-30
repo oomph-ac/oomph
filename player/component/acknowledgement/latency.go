@@ -6,6 +6,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/player/event"
 )
 
 // PlayerInitalized is an acknowledgment that is ran to signal when the player is ready for processing
@@ -42,6 +43,13 @@ func (ack *Latency) Run() {
 	ack.mPlayer.StackLatency = time.Since(ack.timeOf)
 	ack.mPlayer.ClientTick = ack.tickOf
 	ack.mPlayer.Dbg.Notify(player.DebugModeLatency, true, "latency=%fms", game.Round64(float64(ack.mPlayer.StackLatency.Microseconds())/1000.0, 2))
+
+	// Now that we have a response from the player, we can send a latency update to the remote server.
+	ev := event.NewUpdateLatencyEvent(
+		ack.mPlayer.Conn().Latency().Milliseconds()*2, // We multiply the conn's latency here by 2 to show an accurate RTT latency, which is what most players expect to be shown.
+		ack.mPlayer.StackLatency.Milliseconds(),
+	)
+	ack.mPlayer.SendRemoteEvent(ev)
 }
 
 // UpdateSimRate is an acknowledgment that is ran to update the player's simulation rate.

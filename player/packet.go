@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/block"
-	"github.com/df-mc/dragonfly/server/block/cube"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	df_world "github.com/df-mc/dragonfly/server/world"
+	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/oerror"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -329,7 +330,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			}
 
 			if rsn := p.ServerConn().DisconnectReason(); rsn != "" {
-				listener.Disconnect(conn, rsn)
+				listener.Disconnect(conn, utils.MC_CenterAlignText(strings.Split(rsn, "\n")...))
 			} else {
 				listener.Disconnect(conn, "Unexpected disconnect (you shouldn't be able to see this).")
 			}
@@ -381,7 +382,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			}
 
 			if rsn := p.ServerConn().DisconnectReason(); rsn != "" {
-				listener.Disconnect(conn, rsn)
+				listener.Disconnect(conn, utils.MC_CenterAlignText(strings.Split(rsn, "\n")...))
 			} else {
 				listener.Disconnect(conn, "Remote server disconnected unexpectedly from proxy.")
 			}
@@ -409,7 +410,7 @@ func (o *Oomph) handleConn(conn *minecraft.Conn, listener *minecraft.Listener, r
 			if err != nil {
 				if disconnect, ok := errors.Unwrap(err).(minecraft.DisconnectError); ok {
 					conn.WritePacket(&packet.Disconnect{
-						Message: disconnect.Error(),
+						Message: utils.MC_CenterAlignText(strings.Split(disconnect.Error(), "\n")...),
 					})
 					listener.Disconnect(conn, disconnect.Error())
 				}

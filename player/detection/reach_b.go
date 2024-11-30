@@ -43,7 +43,7 @@ func (*ReachB) Type() string {
 }
 
 func (*ReachB) SubType() string {
-	return "A"
+	return "B"
 }
 
 func (*ReachB) Description() string {

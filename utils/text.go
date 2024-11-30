@@ -8,8 +8,8 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
-// CenterAlignText takes an array of strings and centers them based on the longest string.
-func CenterAlignText(msg ...string) string {
+// MC_CenterAlignText takes an array of strings and centers them based on the longest string.
+func MC_CenterAlignText(msg ...string) string {
 	if len(msg) == 0 {
 		return ""
 	}
@@ -18,24 +18,32 @@ func CenterAlignText(msg ...string) string {
 	}
 
 	// Find the length of the longest string
-	maxLength := 0
+	max_length := 0
 	for _, line := range msg {
-		if len(line) > maxLength {
-			maxLength = len(line)
+		if clean_length := len(clean_line(line)); clean_length > max_length {
+			max_length = clean_length
 		}
 	}
 
-	var centeredLines []string
+	var centered_lines []string
 	for _, line := range msg {
-		// Calculate the number of spaces needed for centering
-		totalSpaces := maxLength - len(line)
-		leftPadding := totalSpaces / 2
-		centeredLine := strings.Repeat(" ", leftPadding) + line + strings.Repeat(" ", totalSpaces-leftPadding)
-		centeredLines = append(centeredLines, centeredLine)
+		clean_length := len(clean_line(line))
+		if clean_length == max_length {
+			centered_lines = append(centered_lines, line)
+			continue
+		}
+
+		total_spaces := int((float64(max_length-clean_length)/10.0)*6.0) + 1
+		centered_line := strings.Repeat(" ", total_spaces) + line
+		centered_lines = append(centered_lines, centered_line)
 	}
 
 	// Join the centered lines with newlines
-	return strings.Join(centeredLines, "\n")
+	return strings.Join(centered_lines, "\n")
+}
+
+func clean_line(line string) string {
+	return strings.ReplaceAll(text.Clean(line), "\n", "")
 }
 
 // Device returns the device name from the DeviceOS.

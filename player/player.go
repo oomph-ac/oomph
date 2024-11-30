@@ -186,6 +186,11 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 	return p
 }
 
+// Name returns the name of the player.
+func (p *Player) Name() string {
+	return p.IdentityDat.DisplayName
+}
+
 // RunWhenFree runs a function when the player is free to do so.
 func (p *Player) RunWhenFree(f func()) {
 	p.RunChan <- f
@@ -333,8 +338,6 @@ func (p *Player) RunDetections(pk packet.Packet) {
 		d.Detect(pk)
 		span.Finish()
 	}
-
-	return
 }
 
 // Message sends a message to the player.
