@@ -230,9 +230,15 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 	p.effects.Tick()
 	p.movement.Update(pk)
 
+	// If the client's prediction of movement deviates from the server, we send a correction so that the client can re-sync.
 	if !p.movement.Validate() {
 		p.correctMovement()
 	}
+
+	// Update the position given in this packet to what the server predicts is correct. This is used so that there isn't any weird
+	// rubberbanding that is visible on the POVs of the other players if corrections are sent. This also implies the fact that
+	// other players will be unable to see if another client is using a cheat to modify their movement (e.g - fly). Of course, that is
+	// granted that the movement scenario is supported by Oomph.
 	pk.Position = p.movement.Pos().Add(mgl32.Vec3{0, 1.621})
 }
 
@@ -246,7 +252,7 @@ func (p *Player) correctMovement() {
 				int32(blockResult.Position[2]),
 			},
 			NewBlockRuntimeID: world.BlockRuntimeID(blockResult.Block),
-			Flags:             packet.BlockUpdateNeighbours | packet.BlockUpdateNetwork | packet.BlockUpdatePriority,
+			Flags:             packet.BlockUpdatePriority,
 			Layer:             0, // TODO: Implement and account for multi-layer blocks.
 		})
 	}

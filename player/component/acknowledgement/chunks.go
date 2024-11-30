@@ -80,6 +80,7 @@ func (ack *SubChunkUpdate) Run() {
 		}
 
 		buf := internal.BufferPool.Get().(*bytes.Buffer)
+		defer internal.BufferPool.Put(buf)
 		buf.Reset()
 		buf.Write(entry.RawPayload)
 
@@ -93,7 +94,6 @@ func (ack *SubChunkUpdate) Run() {
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "decoded subchunk %d at %v", index, chunkPos)
 		}
 
-		internal.BufferPool.Put(buf)
 	}
 
 	for pos, newC := range newChunks {

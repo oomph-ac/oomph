@@ -7,11 +7,12 @@ import (
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
+	oevent "github.com/oomph-ac/oomph/player/event"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-var DETECTION_DEFAULT_KICK_MESSAGE = utils.CenterAlignText(
+var DETECTION_DEFAULT_KICK_MESSAGE = utils.MC_CenterAlignText(
 	"<red><bold>Cheating Detected</bold></red>",
 	"<red>We've detected suspicious behavior from your gameplay and have</red>",
 	"<red>kicked you from the server</red>",
@@ -45,6 +46,12 @@ type DetectionMetadata struct {
 
 	TrustDuration int64
 	LastFlagged   int64
+
+	// Mitigation is true if the detection is simply meant to notify the remote server if there
+	// was a certain action that was mitigated (for combat and movement). For instance, a detection
+	// that would be considered a mitigation would be Velocity, as all movement is full-authoritative
+	// anyway, and no other player would be able to see the movement cheat in action.
+	Mitigation bool
 }
 
 func (p *Player) PassDetection(d Detection, sub float64) {
@@ -81,14 +88,24 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 	m.LastFlagged = p.ServerTick
 	if m.Violations >= 0.5 {
 		extraDatString := utils.OrderedMapToString(*extraData)
-		p.SendRemoteEvent(NewFlaggedEvent(
-			p,
-			d.Type(),
-			d.SubType(),
-			float32(m.Violations),
-			extraDatString,
-		))
-		p.Log().Warnf("%s flagged %s (%s) <x%f> %s", p.IdentityDat.DisplayName, d.Type(), d.SubType(), game.Round64(m.Violations, 2), extraDatString)
+		if !m.Mitigation {
+			p.SendRemoteEvent(oevent.NewFlaggedEvent(
+				p.IdentityDat.DisplayName,
+				d.Type(),
+				d.SubType(),
+				float32(m.Violations),
+				extraDatString,
+			))
+			p.Log().Warnf("%s flagged %s (%s) <x%f> %s", p.IdentityDat.DisplayName, d.Type(), d.SubType(), game.Round64(m.Violations, 2), extraDatString)
+		} else {
+			p.SendRemoteEvent(oevent.NewMitigationEvent(
+				d.Type(),
+				d.SubType(),
+				extraDatString,
+				m.Violations,
+			))
+			p.Log().Warnf("%s was mitigated for %s (%s) <%.2f> %s", p.Name(), d.Type(), d.SubType(), m.Violations, extraDatString)
+		}
 	}
 
 	if d.Punishable() && m.Violations >= m.MaxViolations {
