@@ -11,7 +11,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/oerror"
-	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -84,7 +83,7 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 		p.InputMode = pk.InputMode
 
 		missedSwing := false
-		if p.InputMode != packet.InputModeTouch && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+		if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
 			missedSwing = true
 			p.combat.Attack(nil)
 		}
@@ -95,7 +94,7 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 
 		serverVerifiedHit := p.combat.Calculate()
 		if serverVerifiedHit && missedSwing {
-			pk.InputData = pk.InputData &^ packet.InputFlagMissedSwing
+			pk.InputData.Unset(packet.InputFlagMissedSwing)
 		}
 		p.clientCombat.Calculate()
 	case *packet.NetworkStackLatency:

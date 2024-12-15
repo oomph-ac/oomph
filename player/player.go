@@ -98,7 +98,8 @@ type Player struct {
 	InputMode uint32
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
-	conn, serverConn *minecraft.Conn
+	conn       *minecraft.Conn
+	serverConn ServerConn
 
 	// listener is the Gophertunnel listener
 	listener *minecraft.Listener
@@ -177,12 +178,9 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 		listener: listener,
 	}
-
 	p.Dbg = NewDebugger(p)
 	p.ClientPkFunc = p.DefaultHandleFromClient
 	p.ServerPkFunc = p.DefaultHandleFromServer
-
-	go p.startTicking()
 	return p
 }
 
@@ -396,11 +394,11 @@ func (p *Player) BlockAddress(duration time.Duration) {
 }
 
 func (p *Player) IsVersion(ver int32) bool {
-	return p.conn.Protocol().ID() == ver
+	return p.conn.Proto().ID() == ver
 }
 
 func (p *Player) VersionInRange(oldest, latest int32) bool {
-	ver := p.conn.Protocol().ID()
+	ver := p.conn.Proto().ID()
 	return ver >= oldest && ver <= latest
 }
 
@@ -427,7 +425,7 @@ func (p *Player) Close() error {
 	return nil
 }
 
-func (p *Player) startTicking() {
+func (p *Player) StartTicking() {
 	t := time.NewTicker(time.Millisecond * 50)
 	defer t.Stop()
 

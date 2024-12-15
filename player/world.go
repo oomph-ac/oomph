@@ -4,7 +4,6 @@ import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -44,7 +43,7 @@ func (p *Player) handleBlockBreak(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.movement.Pos().Z())) >> 4,
 	}
 
-	if utils.HasFlag(pk.InputData, packet.InputFlagPerformBlockActions) {
+	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
 		for _, action := range pk.BlockActions {
 			switch action.Action {
 			case protocol.PlayerActionPredictDestroyBlock:
