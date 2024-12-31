@@ -108,6 +108,9 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 
 	// Make a list of BBoxes the block will occupy.
 	boxes := utils.BlockBoxes(b, replacePos, c.mPlayer.World)
+	for index, blockBox := range boxes {
+		boxes[index] = blockBox.Translate(replacePos.Vec3())
+	}
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.

@@ -40,14 +40,11 @@ const (
 type Player struct {
 	MState MonitoringState
 
-	// Connected is true if the player is connected to Oomph.
-	Connected bool
-	Closed    bool
+	Ready  bool
+	Closed bool
 
 	Alive      bool
 	TicksAlive int64
-
-	Ready bool
 
 	CloseChan chan bool
 	CloseFunc sync.Once
@@ -80,11 +77,12 @@ type Player struct {
 	// GameMode is the gamemode of the player. The player is exempt from movement predictions
 	// if they are not in survival or adventure mode.
 	GameMode int32
-
-	LastEquipmentData *packet.MobEquipment
-
 	// InputMode is the input mode of the player.
 	InputMode uint32
+
+	// LastEquipmentData stores the last MobEquipment packet sent by the client to properly
+	// make an attack packet when Oomph's full authoritative combat detects a misprediction.
+	LastEquipmentData *packet.MobEquipment
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn       *minecraft.Conn
@@ -93,9 +91,6 @@ type Player struct {
 	// listener is the Gophertunnel listener
 	listener *minecraft.Listener
 
-	// PacketQueue is a queue of client packets that are to be processed by the server. This is only used
-	// in direct mode.
-	PacketQueue []packet.Packet
 	// procMu is a mutex that is locked whenever packets need to be processed. It is used to
 	// prevent race conditions, and to maintain accuracy with anti-cheat.
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
@@ -104,6 +99,10 @@ type Player struct {
 
 	// Dbg is the debugger of the player. It is used to log debug messages to the player.
 	Dbg *Debugger
+
+	// deferredPackets is a slice of packets that is used when we are unable to write a
+	// packet to the destination server.
+	deferredPackets []packet.Packet
 
 	// acks is the component that handles acknowledgments from the player.
 	acks AcknowledgmentComponent
@@ -130,11 +129,11 @@ type Player struct {
 	// and state of the entity. This component is used for detections to alert staff members when someone is using reach.
 	clientCombat CombatComponent
 
-	// detections contains the detections for the player.
-	detections []Detection
-
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
+
+	// detections contains the detections for the player.
+	detections []Detection
 
 	// log is the logger of the player.
 	log *logrus.Logger
@@ -143,12 +142,9 @@ type Player struct {
 // New creates and returns a new Player instance.
 func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listener) *Player {
 	p := &Player{
-		MState:    mState,
-		Connected: true,
+		MState: mState,
 
 		World: world.New(),
-
-		PacketQueue: []packet.Packet{},
 
 		ClientTick:      0,
 		SimulationFrame: 0,
@@ -158,6 +154,8 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
+
+		deferredPackets: make([]packet.Packet, 0, 256),
 
 		detections: []Detection{},
 
@@ -211,13 +209,18 @@ func (p *Player) SendPacketToClient(pk packet.Packet) error {
 func (p *Player) SendPacketToServer(pk packet.Packet) error {
 	if p.MState.IsReplay {
 		return nil
-	}
-
-	if p.serverConn == nil {
-		p.PacketQueue = append(p.PacketQueue, pk)
-		// Don't return an error here, because the server connection may be nil if direct mode is used.
+	} else if p.serverConn == nil {
+		p.deferredPackets = append(p.deferredPackets, pk)
 		return nil
 	}
+
+	for _, dPk := range p.deferredPackets {
+		if err := p.serverConn.WritePacket(dPk); err != nil {
+			return err
+		}
+	}
+	p.deferredPackets = p.deferredPackets[:0]
+
 	return p.serverConn.WritePacket(pk)
 }
 
@@ -330,7 +333,6 @@ func (p *Player) VersionInRange(oldest, latest int32) bool {
 // Close closes the player.
 func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
-		p.Connected = false
 		p.Closed = true
 
 		p.eventHandler.HandleQuit()
