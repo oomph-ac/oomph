@@ -32,6 +32,7 @@ func (ack *ChunkUpdate) Run() {
 	c.Compact()
 
 	ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "received chunk update at %v", ack.pk.Position)
+	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
 	ack.mPlayer.World.AddChunk(ack.pk.Position, c)
 }
 
