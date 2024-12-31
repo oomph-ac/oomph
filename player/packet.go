@@ -23,6 +23,7 @@ var DecodeClientPackets = []uint32{
 	packet.IDInventoryTransaction,
 	packet.IDMobEquipment,
 	packet.IDAnimate,
+	packet.IDMovePlayer,
 }
 
 func (p *Player) HandleClientPacket(pk packet.Packet) error {
