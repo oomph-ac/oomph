@@ -1,28 +1,35 @@
 package player
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/oerror"
-	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
 
-func (p *Player) handleOneFromClient(pk packet.Packet) error {
-	span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("p.handleOneFromClient(%T)", pk))
-	defer span.Finish()
+var DecodeClientPackets = []uint32{
+	packet.IDScriptMessage,
+	packet.IDText,
+	packet.IDPlayerAuthInput,
+	packet.IDNetworkStackLatency,
+	packet.IDRequestChunkRadius,
+	packet.IDInventoryTransaction,
+	packet.IDMobEquipment,
+	packet.IDAnimate,
+}
+
+func (p *Player) HandleClientPacket(pk packet.Packet) error {
+	p.procMu.Lock()
+	defer p.procMu.Unlock()
 
 	cancel := false
-
 	switch pk := pk.(type) {
 	case *packet.ScriptMessage:
 		if strings.Contains(pk.Identifier, "oomph:") {
@@ -84,7 +91,7 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 		p.InputMode = pk.InputMode
 
 		missedSwing := false
-		if p.InputMode != packet.InputModeTouch && utils.HasFlag(pk.InputData, packet.InputFlagMissedSwing) {
+		if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
 			missedSwing = true
 			p.combat.Attack(nil)
 		}
@@ -95,7 +102,7 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 
 		serverVerifiedHit := p.combat.Calculate()
 		if serverVerifiedHit && missedSwing {
-			pk.InputData = pk.InputData &^ packet.InputFlagMissedSwing
+			pk.InputData.Unset(packet.InputFlagMissedSwing)
 		}
 		p.clientCombat.Calculate()
 	case *packet.NetworkStackLatency:
@@ -130,9 +137,9 @@ func (p *Player) handleOneFromClient(pk packet.Packet) error {
 	return p.SendPacketToServer(pk)
 }
 
-func (p *Player) handleOneFromServer(pk packet.Packet) error {
-	span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("p.handleOneFromServer(%T)", pk))
-	defer span.Finish()
+func (p *Player) HandleServerPacket(pk packet.Packet) error {
+	p.procMu.Lock()
+	defer p.procMu.Unlock()
 
 	switch pk := pk.(type) {
 	case *packet.AddActor:

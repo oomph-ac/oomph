@@ -505,12 +505,12 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 
 	mc.impulse = pk.MoveVector.Mul(0.98)
 
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartFlying) {
+	if pk.InputData.Load(packet.InputFlagStartFlying) {
 		mc.nonAuthoritative.toggledFly = true
 		if mc.trustFlyStatus {
 			mc.flying = true
 		}
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopFlying) {
+	} else if pk.InputData.Load(packet.InputFlagStopFlying) {
 		mc.flying = false
 		mc.nonAuthoritative.toggledFly = false
 	}
@@ -518,11 +518,11 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.lastRotation = mc.rotation
 	mc.rotation = mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}
 
-	mc.pressingSneak = utils.HasFlag(pk.InputData, packet.InputFlagSneaking)
-	mc.pressingSprint = utils.HasFlag(pk.InputData, packet.InputFlagSprintDown)
+	mc.pressingSneak = pk.InputData.Load(packet.InputFlagSneaking)
+	mc.pressingSprint = pk.InputData.Load(packet.InputFlagSprintDown)
 
 	hasForwardKeyPressed := mc.impulse.Y() > 1e-4
-	startFlag, stopFlag := utils.HasFlag(pk.InputData, packet.InputFlagStartSprinting), utils.HasFlag(pk.InputData, packet.InputFlagStopSprinting) || !hasForwardKeyPressed
+	startFlag, stopFlag := pk.InputData.Load(packet.InputFlagStartSprinting), pk.InputData.Load(packet.InputFlagStopSprinting) || !hasForwardKeyPressed
 
 	isNewVersionPlayer := mc.mPlayer.VersionInRange(player.GameVersion1_21_0, 65536)
 	var needsSpeedAdjusted bool
@@ -557,14 +557,14 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		}
 	}
 
-	if utils.HasFlag(pk.InputData, packet.InputFlagStartSneaking) {
+	if pk.InputData.Load(packet.InputFlagStartSneaking) {
 		mc.sneaking = true
-	} else if utils.HasFlag(pk.InputData, packet.InputFlagStopSneaking) {
+	} else if pk.InputData.Load(packet.InputFlagStopSneaking) {
 		mc.sneaking = false
 	}
 
-	mc.jumping = utils.HasFlag(pk.InputData, packet.InputFlagStartJumping)
-	mc.pressingJump = utils.HasFlag(pk.InputData, packet.InputFlagJumping)
+	mc.jumping = pk.InputData.Load(packet.InputFlagStartJumping)
+	mc.pressingJump = pk.InputData.Load(packet.InputFlagJumping)
 	mc.jumpHeight = game.DefaultJumpHeight
 	if jumpBoost, ok := mc.mPlayer.Effects().Get(packet.EffectJumpBoost); ok {
 		mc.jumpHeight += float32(jumpBoost.Level()) * 0.1
