@@ -106,7 +106,7 @@ func EncryptToWriter(pack *resource.Pack, writer io.Writer, key string) error {
 
 	header := bytes.NewBuffer(nil)
 	header.Write([]byte{0, 0, 0, 0, 0xFC, 0xB9, 0xCF, 0x9B, 0, 0, 0, 0, 0, 0, 0, 0})
-	header.Write([]byte("$" + pack.UUID()))
+	header.Write([]byte("$" + pack.UUID().String()))
 	header.Write(make([]byte, 256-header.Len()))
 	if _, err := content.Write(header.Bytes()); err != nil {
 		return err

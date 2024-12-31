@@ -9,8 +9,8 @@ type ReachA struct {
 	mPlayer  *player.Player
 	metadata *player.DetectionMetadata
 
-	distances []float32
-	run       bool
+	raycasts []float32
+	run      bool
 }
 
 func New_ReachA(p *player.Player) *ReachA {
@@ -24,16 +24,9 @@ func New_ReachA(p *player.Player) *ReachA {
 			MaxViolations: 10,
 		},
 
-		distances: make([]float32, 0, 20),
+		raycasts: make([]float32, 0, 20),
 	}
-	p.ClientCombat().Hook(func(cc player.CombatComponent) {
-		d.distances = d.distances[:0]
-		for _, dist := range cc.Raycasts() {
-			d.distances = append(d.distances, dist)
-		}
-
-		d.run = true
-	})
+	p.ClientCombat().Hook(d.combatHook)
 
 	return d
 }
@@ -64,9 +57,9 @@ func (d *ReachA) Detect(pk packet.Packet) {
 	}
 	d.run = false
 
-	if len(d.distances) != 0 {
+	if len(d.raycasts) != 0 {
 		var minDist, maxDist float32 = 1_000_000, -1
-		for _, dist := range d.distances {
+		for _, dist := range d.raycasts {
 			if dist < minDist {
 				minDist = dist
 			}
@@ -82,4 +75,10 @@ func (d *ReachA) Detect(pk packet.Packet) {
 			d.mPlayer.PassDetection(d, 0.005)
 		}
 	}
+}
+
+func (d *ReachA) combatHook(cc player.CombatComponent) {
+	d.raycasts = d.raycasts[:0]
+	d.raycasts = append(d.raycasts, cc.Raycasts()...)
+	d.run = true
 }

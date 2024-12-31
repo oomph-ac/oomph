@@ -26,8 +26,10 @@ func init() {
 var currentWorldId uint64
 
 type World struct {
-	chunks map[protocol.ChunkPos]*chunk.Chunk
-	id     uint64
+	chunks         map[protocol.ChunkPos]*chunk.Chunk
+	exemptedChunks map[protocol.ChunkPos]struct{}
+
+	id uint64
 
 	lastCleanPos protocol.ChunkPos
 
@@ -37,17 +39,18 @@ type World struct {
 func New() *World {
 	currentWorldId++
 	return &World{
-		chunks: make(map[protocol.ChunkPos]*chunk.Chunk),
-		id:     currentWorldId,
+		chunks:         make(map[protocol.ChunkPos]*chunk.Chunk),
+		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
+
+		id: currentWorldId,
 	}
 }
 
 // AddChunk adds a chunk to the world.
 func (w *World) AddChunk(pos protocol.ChunkPos, c *chunk.Chunk) {
 	w.Lock()
-	defer w.Unlock()
-
 	w.chunks[pos] = c
+	w.Unlock()
 }
 
 // RemoveChunk removes a chunk from the world.
@@ -58,14 +61,23 @@ func (w *World) RemoveChunk(pos protocol.ChunkPos) {
 	delete(w.chunks, pos)
 }
 
+// ExemptChunk adds a chunk to the exemption list. This exemption is removed when
+// the player is within range of the chunk, which is handled in World.CleanChunks()
+func (w *World) ExemptChunk(pos protocol.ChunkPos) {
+	w.Lock()
+	w.exemptedChunks[pos] = struct{}{}
+	w.Unlock()
+}
+
 // GetChunk returns a cached chunk at the position passed. The mutex is
 // not locked here because it is assumed that the caller has already locked
 // the mutex before calling this function.
 func (w *World) GetChunk(pos protocol.ChunkPos) *chunk.Chunk {
 	w.RLock()
-	defer w.RUnlock()
+	c := w.chunks[pos]
+	w.RUnlock()
 
-	return w.chunks[pos]
+	return c
 }
 
 // GetAllChunks returns all chunks in the world.
@@ -125,11 +137,14 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 	w.lastCleanPos = pos
 
 	for chunkPos := range w.chunks {
-		if chunkInRange(radius, chunkPos, pos) {
-			continue
-		}
+		_, exempted := w.exemptedChunks[chunkPos]
+		inRange := chunkInRange(radius, chunkPos, pos)
 
-		delete(w.chunks, chunkPos)
+		if exempted && inRange {
+			delete(w.exemptedChunks, chunkPos)
+		} else if !exempted && !inRange {
+			delete(w.chunks, chunkPos)
+		}
 	}
 }
 

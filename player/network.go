@@ -17,7 +17,7 @@ func (p *Player) Conn() *minecraft.Conn {
 }
 
 // ServerConn returns the connection to the server.
-func (p *Player) ServerConn() *minecraft.Conn {
+func (p *Player) ServerConn() ServerConn {
 	return p.serverConn
 }
 
@@ -39,7 +39,7 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 }
 
 // SetServerConn sets the connection to the server.
-func (p *Player) SetServerConn(conn *minecraft.Conn) {
+func (p *Player) SetServerConn(conn ServerConn) {
 	p.serverConn = conn
 	p.GameMode = conn.GameData().PlayerGameMode
 	if p.GameMode == 5 {

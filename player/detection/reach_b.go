@@ -26,14 +26,7 @@ func New_ReachB(p *player.Player) *ReachB {
 
 		distances: make([]float32, 0, 10),
 	}
-	p.ClientCombat().Hook(func(cc player.CombatComponent) {
-		d.distances = d.distances[:0]
-		for _, dist := range cc.Raws() {
-			d.distances = append(d.distances, dist)
-		}
-
-		d.run = true
-	})
+	p.ClientCombat().Hook(d.combatHook)
 
 	return d
 }
@@ -79,4 +72,10 @@ func (d *ReachB) Detect(pk packet.Packet) {
 			d.mPlayer.PassDetection(d, 0.005)
 		}
 	}
+}
+
+func (d *ReachB) combatHook(cc player.CombatComponent) {
+	d.distances = d.distances[:0]
+	d.distances = append(d.distances, cc.Raws()...)
+	d.run = true
 }
