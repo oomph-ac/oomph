@@ -27,7 +27,7 @@ func main() {
 	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery("127.0.0.1:20000", ""), logger, opts, nil)
 	if err := proxy.Listen(minecraft.ListenConfig{
 		StatusProvider: util.NewStatusProvider("Spectrum Proxy", "Spectrum"),
-		FlushRate:      -1,
+		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
 	}); err != nil {
 		panic(err)
 	}
@@ -39,7 +39,7 @@ func main() {
 		}
 
 		go func(s *session.Session) {
-			// Disable auto-login so that Oomph's processor can modify the StartGame data to
+			// Disable auto-login so that Oomph's processor can modify the StartGame data to allow server-authoritative movement.
 			s.SetProcessor(oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), oomphLog))
 			if err := s.Login(); err != nil {
 				s.Disconnect(err.Error())
