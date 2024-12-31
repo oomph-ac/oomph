@@ -8,6 +8,7 @@ import (
 	"github.com/oomph-ac/oomph/player/component"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
@@ -18,21 +19,29 @@ var _ session.Processor = &Processor{}
 
 type Processor struct {
 	session.NopProcessor
+
 	identity login.IdentityData
 	registry *session.Registry
 	pl       *player.Player
 }
 
-func NewProcessor(s *session.Session, registry *session.Registry, listener *minecraft.Listener, log *logrus.Logger) *Processor {
+func NewProcessor(
+	s *session.Session,
+	registry *session.Registry,
+	listener *minecraft.Listener,
+	log *logrus.Logger,
+) *Processor {
 	pl := player.New(log, player.MonitoringState{
 		IsReplay:    false,
 		IsRecording: false,
 		CurrentTime: time.Now(),
 	}, listener)
+
 	pl.SetConn(s.Client())
-	pl.SetServerConn(s.Server())
+
 	component.Register(pl)
 	detection.Register(pl)
+
 	go pl.StartTicking()
 	return &Processor{
 		identity: s.Client().IdentityData(),
@@ -41,10 +50,19 @@ func NewProcessor(s *session.Session, registry *session.Registry, listener *mine
 	}
 }
 
+func (p *Processor) Player() *player.Player {
+	return p.pl
+}
+
+func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameData) {
+	gd.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
+	gd.PlayerMovementSettings.RewindHistorySize = 20
+}
+
 func (p *Processor) ProcessServer(ctx *session.Context, pk packet.Packet) {
 	if p.pl != nil {
 		ctx.Cancel()
-		if err := p.pl.DefaultHandleFromServer([]packet.Packet{pk}); err != nil {
+		if err := p.pl.HandleServerPacket(pk); err != nil {
 			p.disconnect(text.Colourf("error while processing server packet: %s", err.Error()))
 		}
 	}
@@ -53,7 +71,7 @@ func (p *Processor) ProcessServer(ctx *session.Context, pk packet.Packet) {
 func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
 	if p.pl != nil {
 		ctx.Cancel()
-		if err := p.pl.DefaultHandleFromClient([]packet.Packet{pk}); err != nil {
+		if err := p.pl.HandleClientPacket(pk); err != nil {
 			p.disconnect(text.Colourf("error while processing client packet: %s", err.Error()))
 		}
 	}

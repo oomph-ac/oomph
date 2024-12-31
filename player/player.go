@@ -1,14 +1,11 @@
 package player
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
@@ -59,9 +56,6 @@ type Player struct {
 
 	RunChan chan func()
 
-	ClientPkFunc func([]packet.Packet) error
-	ServerPkFunc func([]packet.Packet) error
-
 	ClientDat   login.ClientData
 	IdentityDat login.IdentityData
 	GameDat     minecraft.GameData
@@ -91,9 +85,6 @@ type Player struct {
 
 	LastEquipmentData *packet.MobEquipment
 
-	// SentryTransaction is the transaction that is used to monitor performance of packet handling.
-	SentryTransaction *sentry.Span
-
 	// InputMode is the input mode of the player.
 	InputMode uint32
 
@@ -107,11 +98,11 @@ type Player struct {
 	// PacketQueue is a queue of client packets that are to be processed by the server. This is only used
 	// in direct mode.
 	PacketQueue []packet.Packet
-	// ProcessMu is a mutex that is locked whenever packets need to be processed. It is used to
+	// procMu is a mutex that is locked whenever packets need to be processed. It is used to
 	// prevent race conditions, and to maintain accuracy with anti-cheat.
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
 	// being associated with.
-	ProcessMu deadlock.Mutex
+	procMu deadlock.Mutex
 
 	// Dbg is the debugger of the player. It is used to log debug messages to the player.
 	Dbg *Debugger
@@ -179,8 +170,6 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 		listener: listener,
 	}
 	p.Dbg = NewDebugger(p)
-	p.ClientPkFunc = p.DefaultHandleFromClient
-	p.ServerPkFunc = p.DefaultHandleFromServer
 	return p
 }
 
@@ -234,66 +223,6 @@ func (p *Player) SendPacketToServer(pk packet.Packet) error {
 	return p.serverConn.WritePacket(pk)
 }
 
-// DefaultHandleFromClient handles a packet from the client.
-func (p *Player) DefaultHandleFromClient(pks []packet.Packet) error {
-	if p.Closed {
-		return nil
-	}
-
-	p.SentryTransaction = sentry.StartTransaction(
-		context.Background(),
-		"oomph:handle_client",
-		sentry.WithOpName("p.ClientPkFunc"),
-		sentry.WithDescription("Handling packets from the client"),
-	)
-	defer func() {
-		p.SentryTransaction.Status = sentry.SpanStatusOK
-		if time.Since(p.SentryTransaction.StartTime) >= targetedProcessingDelay {
-			p.SentryTransaction.Status = sentry.SpanStatusDeadlineExceeded
-		}
-
-		p.SentryTransaction.Finish()
-	}()
-
-	for _, pk := range pks {
-		if err := p.handleOneFromClient(pk); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// DefaultHandleFromServer handles a packet from the server.
-func (p *Player) DefaultHandleFromServer(pks []packet.Packet) error {
-	if p.Closed {
-		return nil
-	}
-
-	p.SentryTransaction = sentry.StartTransaction(
-		context.Background(),
-		"oomph:handle_server",
-		sentry.WithOpName("p.ServerPkFunc"),
-		sentry.WithDescription("Handling packets from the server"),
-	)
-	defer func() {
-		p.SentryTransaction.Status = sentry.SpanStatusOK
-		if time.Since(p.SentryTransaction.StartTime) >= targetedProcessingDelay {
-			p.SentryTransaction.Status = sentry.SpanStatusDeadlineExceeded
-		}
-
-		p.SentryTransaction.Finish()
-	}()
-
-	for _, pk := range pks {
-		if err := p.handleOneFromServer(pk); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // HandleEvents sets the event handler for the player.
 func (p *Player) HandleEvents(h EventHandler) {
 	p.eventHandler = h
@@ -332,9 +261,7 @@ func (p *Player) Detections() []Detection {
 // if the detection determines that the packet given should be dropped.
 func (p *Player) RunDetections(pk packet.Packet) {
 	for _, d := range p.detections {
-		span := sentry.StartSpan(p.SentryTransaction.Context(), fmt.Sprintf("%T.Run()", d))
 		d.Detect(pk)
-		span.Finish()
 	}
 }
 
@@ -443,24 +370,8 @@ func (p *Player) StartTicking() {
 
 // tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
 func (p *Player) tick() bool {
-	p.SentryTransaction = sentry.StartTransaction(
-		context.Background(),
-		"oomph:tick",
-		sentry.WithOpName("p.tick()"),
-		sentry.WithDescription("Ticking the player"),
-	)
-
-	defer func() {
-		p.SentryTransaction.Status = sentry.SpanStatusOK
-		if time.Since(p.SentryTransaction.StartTime) >= targetedProcessingDelay {
-			p.SentryTransaction.Status = sentry.SpanStatusDeadlineExceeded
-		}
-
-		p.SentryTransaction.Finish()
-	}()
-
-	p.ProcessMu.Lock()
-	defer p.ProcessMu.Unlock()
+	p.procMu.Lock()
+	defer p.procMu.Unlock()
 
 	if p.Closed {
 		return false
@@ -483,11 +394,7 @@ func (p *Player) tick() bool {
 	}
 
 	p.ACKs().Flush()
-	if err := p.conn.Flush(); err != nil {
-		return false
-	}
-
-	return true
+	return p.conn.Flush() == nil
 }
 
 // calculateBBSize calculates the bounding box size for an entity based on the EntityMetadata.

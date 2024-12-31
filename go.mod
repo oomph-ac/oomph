@@ -6,7 +6,7 @@ toolchain go1.23.4
 
 require (
 	github.com/chewxy/math32 v1.10.1
-	github.com/cooldogedev/spectrum v0.0.33
+	github.com/cooldogedev/spectrum v0.0.35-0.20241220224851-5e68a26a2411
 	github.com/cooldogedev/spectrum-df v0.0.20
 	github.com/df-mc/dragonfly v0.9.20
 	github.com/elliotchance/orderedmap/v2 v2.2.0
@@ -19,13 +19,13 @@ require (
 	github.com/sandertv/gophertunnel v1.43.0
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 )
 
 require (
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cooldogedev/spectral v0.0.4 // indirect
+	github.com/cooldogedev/spectral v0.0.5 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.18 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
@@ -35,14 +35,14 @@ require (
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
-	github.com/onsi/ginkgo/v2 v2.22.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
 	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.32.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
