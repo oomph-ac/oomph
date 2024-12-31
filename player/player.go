@@ -35,8 +35,6 @@ const (
 	GameVersion1_21_30 = 729
 
 	TicksPerSecond = 20
-
-	targetedProcessingDelay = 10 * time.Millisecond
 )
 
 type Player struct {
