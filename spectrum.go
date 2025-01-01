@@ -12,7 +12,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sandertv/gophertunnel/minecraft/text"
 	"github.com/sirupsen/logrus"
 )
 
@@ -51,24 +50,18 @@ func NewProcessor(
 
 func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameData) {
 	gd.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-	gd.PlayerMovementSettings.RewindHistorySize = 20
+	gd.PlayerMovementSettings.RewindHistorySize = 40
 }
 
 func (p *Processor) ProcessServer(ctx *session.Context, pk packet.Packet) {
 	if pl := p.pl.Load(); pl != nil {
-		ctx.Cancel()
-		if err := pl.HandleServerPacket(pk); err != nil {
-			p.disconnect(text.Colourf("error while processing server packet: %s", err.Error()))
-		}
+		pl.HandleServerPacket(pk)
 	}
 }
 
 func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
-	if pl := p.pl.Load(); pl != nil {
+	if pl := p.pl.Load(); pl != nil && pl.HandleClientPacket(pk) {
 		ctx.Cancel()
-		if err := pl.HandleClientPacket(pk); err != nil {
-			p.disconnect(text.Colourf("error while processing client packet: %s", err.Error()))
-		}
 	}
 }
 
@@ -87,10 +80,4 @@ func (p *Processor) ProcessDisconnection(_ *session.Context) {
 
 func (p *Processor) Player() *player.Player {
 	return p.pl.Load()
-}
-
-func (p *Processor) disconnect(reason string) {
-	if s := p.registry.GetSession(p.identity.XUID); s != nil {
-		s.Disconnect(reason)
-	}
 }

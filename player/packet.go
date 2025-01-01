@@ -26,7 +26,7 @@ var DecodeClientPackets = []uint32{
 	packet.IDMovePlayer,
 }
 
-func (p *Player) HandleClientPacket(pk packet.Packet) error {
+func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
@@ -42,7 +42,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) error {
 		if args[0] == "!oomph_debug" {
 			if len(args) < 2 {
 				p.Message("Usage: !oomph_debug <mode>")
-				return nil
+				return false
 			}
 
 			var mode int
@@ -51,12 +51,12 @@ func (p *Player) HandleClientPacket(pk packet.Packet) error {
 				p.Log().SetLevel(logrus.DebugLevel)
 				p.Dbg.LoggingType = LoggingTypeLogFile
 				p.Message("Set debug logging type to <green>log file</green>.")
-				return nil
+				return true
 			case "type:message":
 				p.Log().SetLevel(logrus.InfoLevel)
 				p.Dbg.LoggingType = LoggingTypeMessage
 				p.Message("Set debug logging type to <green>message</green>.")
-				return nil
+				return true
 			case "acks":
 				mode = DebugModeACKs
 			case "rotations":
@@ -77,7 +77,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) error {
 				mode = DebugModeTimerA
 			default:
 				p.Message("Unknown debug mode: %s", args[1])
-				return nil
+				return true
 			}
 
 			p.Dbg.Toggle(mode)
@@ -86,7 +86,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) error {
 			} else {
 				p.Message("<red>Disabled</red> debug mode: %s", args[1])
 			}
-			return nil
+			return true
 		}
 	case *packet.PlayerAuthInput:
 		p.InputMode = pk.InputMode
@@ -108,7 +108,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) error {
 		p.clientCombat.Calculate()
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {
-			return nil
+			return false
 		}
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
@@ -120,7 +120,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) error {
 		}
 
 		if !p.worldUpdater.AttemptBlockPlacement(pk) {
-			return nil
+			return false
 		}
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
@@ -131,14 +131,10 @@ func (p *Player) HandleClientPacket(pk packet.Packet) error {
 	}
 
 	p.RunDetections(pk)
-	if cancel {
-		return nil
-	}
-
-	return p.SendPacketToServer(pk)
+	return cancel
 }
 
-func (p *Player) HandleServerPacket(pk packet.Packet) error {
+func (p *Player) HandleServerPacket(pk packet.Packet) {
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
@@ -246,11 +242,4 @@ func (p *Player) HandleServerPacket(pk packet.Packet) error {
 
 		p.World.SetBlock(df_cube.Pos(pos), b, nil)
 	}
-
-	cancel := false
-	if cancel {
-		return nil
-	}
-
-	return p.SendPacketToClient(pk)
 }
