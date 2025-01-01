@@ -159,6 +159,11 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 	w.Lock()
 	defer w.Unlock()
 
+	if pos == w.lastCleanPos {
+		return
+	}
+	w.lastCleanPos = pos
+
 	for chunkPos, c := range w.chunks {
 		_, exempted := w.exemptedChunks[chunkPos]
 		inRange := chunkInRange(radius, chunkPos, pos)
