@@ -54,9 +54,14 @@ func New() *World {
 // AddChunk adds a chunk to the world.
 func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
 	w.Lock()
+	_, isNewChunkCached := c.(*CachedChunk)
 	if old, ok := w.chunks[chunkPos]; ok {
 		if cached, ok := old.(*CachedChunk); ok {
 			cached.Unsubscribe()
+		} else if _, ok := old.(*chunk.Chunk); ok && isNewChunkCached {
+			// Never replace a non-cached chunk with a cached one.
+			w.Unlock()
+			return
 		}
 	}
 
