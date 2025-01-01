@@ -71,6 +71,10 @@ func (p *Processor) ProcessServer(ctx *session.Context, pk packet.Packet) {
 func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
 	if p.pl != nil {
 		ctx.Cancel()
+
+		if t, ok := pk.(*packet.Text); ok && t.Message == "getmeout" {
+			p.registry.GetSession(p.pl.IdentityData().XUID).Transfer("127.0.0.1:20002")
+		}
 		if err := p.pl.HandleClientPacket(pk); err != nil {
 			p.disconnect(text.Colourf("error while processing client packet: %s", err.Error()))
 		}
