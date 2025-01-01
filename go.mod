@@ -29,6 +29,8 @@ require (
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.18 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
+	github.com/go-echarts/go-echarts/v2 v2.4.1 // indirect
+	github.com/go-echarts/statsview v0.4.2 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -37,6 +39,7 @@ require (
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
 	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
+	github.com/rs/cors v1.11.0 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	go.uber.org/mock v0.5.0 // indirect

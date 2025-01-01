@@ -23,14 +23,10 @@ func (p *Player) ServerConn() ServerConn {
 
 // SetConn sets the connection to the client.
 func (p *Player) SetConn(conn *minecraft.Conn) {
-	modified := p.conn != nil
 	p.conn = conn
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID
-	p.ClientRuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID
-	p.ClientUniqueId = conn.GameData().EntityUniqueID
-	p.IDModified = modified
 
 	p.ClientDat = conn.ClientData()
 	p.IdentityDat = conn.IdentityData()
@@ -40,6 +36,11 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 
 // SetServerConn sets the connection to the server.
 func (p *Player) SetServerConn(conn ServerConn) {
+	if conn == nil {
+		p.Disconnect("<red>Proxy was unable to complete transfer to remote server.</red>")
+		return
+	}
+
 	p.serverConn = conn
 	p.GameMode = conn.GameData().PlayerGameMode
 	if p.GameMode == 5 {
@@ -48,12 +49,7 @@ func (p *Player) SetServerConn(conn ServerConn) {
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID
-	if !p.IDModified {
-		p.ClientRuntimeId = conn.GameData().EntityRuntimeID
-		p.ClientUniqueId = conn.GameData().EntityUniqueID
-	}
 
-	p.IDModified = true
 	p.GameDat = conn.GameData()
 }
 

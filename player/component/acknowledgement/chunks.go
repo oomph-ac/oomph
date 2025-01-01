@@ -25,15 +25,8 @@ func NewChunkUpdateACK(p *player.Player, pk *packet.LevelChunk) *ChunkUpdate {
 }
 
 func (ack *ChunkUpdate) Run() {
-	c, err := chunk.NetworkDecode(oworld.AirRuntimeID, ack.pk.RawPayload, int(ack.pk.SubChunkCount), world.Overworld.Range())
-	if err != nil {
-		c = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
-	}
-	c.Compact()
-
-	ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "received chunk update at %v", ack.pk.Position)
 	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
-	ack.mPlayer.World.AddChunk(ack.pk.Position, c)
+	oworld.Cache(ack.mPlayer.World, ack.pk)
 }
 
 // SubChunkUpdate is an acknowledgment that runs when a player recievs a SubChunk packet.
@@ -72,7 +65,8 @@ func (ack *SubChunkUpdate) Run() {
 			c = new
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "reusing chunk in map %v", chunkPos)
 		} else if existing := ack.mPlayer.World.GetChunk(chunkPos); existing != nil {
-			c = existing
+			// We assume that the existing chunk is not cached because the cache does not support SubChunks for the time being.
+			c = existing.(*chunk.Chunk)
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "using existing chunk %v", chunkPos)
 		} else {
 			c = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())

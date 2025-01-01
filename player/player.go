@@ -58,9 +58,8 @@ type Player struct {
 
 	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
-	RuntimeId, ClientRuntimeId uint64
-	UniqueId, ClientUniqueId   int64
-	IDModified                 bool
+	RuntimeId uint64
+	UniqueId  int64
 
 	// ClientTick is the tick of the client, synchronized with the server's on an interval.
 	// SimulationFrame is the simulation frame of the client, sent in PlayerAuthInput.
@@ -306,7 +305,7 @@ func (p *Player) Disconnect(reason string) {
 	}
 
 	p.SendPacketToClient(&packet.Disconnect{
-		Message: reason,
+		Message: text.Colourf(reason),
 	})
 	p.conn.Close()
 
