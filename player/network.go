@@ -37,7 +37,7 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 // SetServerConn sets the connection to the server.
 func (p *Player) SetServerConn(conn ServerConn) {
 	if conn == nil {
-		p.Disconnect("<red>Proxy was unable to complete transfer to remote server</red>")
+		p.Disconnect("<red>Proxy was unable to complete transfer to remote server.</red>")
 		return
 	}
 

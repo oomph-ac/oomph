@@ -1,6 +1,7 @@
 package oomph
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/cooldogedev/spectrum/session"
@@ -11,7 +12,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sandertv/gophertunnel/minecraft/text"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,7 +22,7 @@ type Processor struct {
 
 	identity login.IdentityData
 	registry *session.Registry
-	pl       *player.Player
+	pl       atomic.Pointer[player.Player]
 }
 
 func NewProcessor(
@@ -43,59 +43,41 @@ func NewProcessor(
 	detection.Register(pl)
 
 	go pl.StartTicking()
-	return &Processor{
-		identity: s.Client().IdentityData(),
-		registry: registry,
-		pl:       pl,
-	}
-}
-
-func (p *Processor) Player() *player.Player {
-	return p.pl
+	p := &Processor{identity: s.Client().IdentityData(), registry: registry}
+	p.pl.Store(pl)
+	return p
 }
 
 func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameData) {
 	gd.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-	gd.PlayerMovementSettings.RewindHistorySize = 20
+	gd.PlayerMovementSettings.RewindHistorySize = 40
 }
 
 func (p *Processor) ProcessServer(ctx *session.Context, pk packet.Packet) {
-	if p.pl != nil {
-		ctx.Cancel()
-		if err := p.pl.HandleServerPacket(pk); err != nil {
-			p.disconnect(text.Colourf("error while processing server packet: %s", err.Error()))
-		}
+	if pl := p.pl.Load(); pl != nil {
+		pl.HandleServerPacket(pk)
 	}
 }
 
 func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
-	if p.pl != nil {
+	if pl := p.pl.Load(); pl != nil && pl.HandleClientPacket(pk) {
 		ctx.Cancel()
-
-		if t, ok := pk.(*packet.Text); ok && t.Message == "getmeout" {
-			p.registry.GetSession(p.pl.IdentityData().XUID).Transfer("127.0.0.1:20002")
-		}
-		if err := p.pl.HandleClientPacket(pk); err != nil {
-			p.disconnect(text.Colourf("error while processing client packet: %s", err.Error()))
-		}
 	}
 }
 
 func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string) {
-	if s := p.registry.GetSession(p.identity.XUID); s != nil && p.pl != nil {
-		p.pl.SetServerConn(s.Server())
+	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
+		pl.SetServerConn(s.Server())
 	}
 }
 
 func (p *Processor) ProcessDisconnection(_ *session.Context) {
-	if p.pl != nil {
-		_ = p.pl.Close()
-		p.pl = nil
+	if pl := p.pl.Load(); pl != nil {
+		_ = pl.Close()
+		p.pl.Store(nil)
 	}
 }
 
-func (p *Processor) disconnect(reason string) {
-	if s := p.registry.GetSession(p.identity.XUID); s != nil {
-		s.Disconnect(reason)
-	}
+func (p *Processor) Player() *player.Player {
+	return p.pl.Load()
 }
