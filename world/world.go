@@ -31,9 +31,10 @@ type World struct {
 
 	chunks         map[protocol.ChunkPos]ChunkSource
 	exemptedChunks map[protocol.ChunkPos]struct{}
+	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
 
 	deferredBlocks map[df_cube.Pos]world.Block
-	dbMu           sync.Mutex
+	blocksMu       sync.Mutex
 
 	lastCleanPos protocol.ChunkPos
 
@@ -45,6 +46,8 @@ func New() *World {
 	return &World{
 		chunks:         make(map[protocol.ChunkPos]ChunkSource),
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
+		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
+
 		deferredBlocks: make(map[df_cube.Pos]world.Block),
 
 		id: currentWorldId,
@@ -58,11 +61,12 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
 		if cached, ok := old.(*CachedChunk); ok {
 			cached.Unsubscribe()
 		}
+		delete(w.blockUpdates, chunkPos)
 	}
 	w.chunks[chunkPos] = c
 	w.Unlock()
 
-	w.dbMu.Lock()
+	w.blocksMu.Lock()
 	for blockPos, b := range w.deferredBlocks {
 		blockChunk := protocol.ChunkPos{int32(blockPos[0] >> 4), int32(blockPos[2] >> 4)}
 		if blockChunk == chunkPos {
@@ -70,7 +74,7 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
 			delete(w.deferredBlocks, blockPos)
 		}
 	}
-	w.dbMu.Unlock()
+	w.blocksMu.Unlock()
 }
 
 // ExemptChunk adds a chunk to the exemption list. This exemption is removed when
@@ -100,6 +104,14 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 	}
 
 	chunkPos := protocol.ChunkPos{int32(blockPos[0]) >> 4, int32(blockPos[2]) >> 4}
+	if blockUpdates, found := w.blockUpdates[chunkPos]; found {
+		if b, ok := blockUpdates[df_cube.Pos(blockPos)]; ok {
+			return b
+		}
+	} else {
+		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
+	}
+
 	c := w.GetChunk(chunkPos)
 	if c == nil {
 		return block.Air{}
@@ -119,7 +131,6 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 		return
 	}
 
-	blockID := world.BlockRuntimeID(b)
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
 	c := w.GetChunk(chunkPos)
 	if c == nil {
@@ -127,32 +138,20 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 		// in the cache workers adding the chunk to the world.
 		w.Lock()
 		if _, exempted := w.exemptedChunks[chunkPos]; exempted {
-			w.dbMu.Lock()
+			w.blocksMu.Lock()
 			w.deferredBlocks[pos] = b
-			w.dbMu.Unlock()
+			w.blocksMu.Unlock()
 		}
 		w.Unlock()
 		return
 	}
 
-	// Check if the current chunk source is a SubscribedChunk (it's cached), and if so, make a copy
-	// of the chunk and replace it in the map with a local chunk.
-	if cachedChunk, ok := c.(*CachedChunk); ok {
-		cachedChunk.Unsubscribe()
-		originalChunk := *(cachedChunk.c)
-		c = &originalChunk
-
-		w.Lock()
-		w.chunks[chunkPos] = c
-		w.Unlock()
+	w.Lock()
+	if w.blockUpdates[chunkPos] == nil {
+		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
 	}
-
-	if originalChunk, ok := c.(*chunk.Chunk); ok {
-		// TODO: Implement chunk layers properly.
-		originalChunk.SetBlock(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0, blockID)
-	} else {
-		panic(oerror.New("unexpected ChunkSource in world: %T", c))
-	}
+	w.blockUpdates[chunkPos][pos] = b
+	w.Unlock()
 }
 
 // CleanChunks cleans up the chunks in respect to the given chunk radius and chunk position.
@@ -176,6 +175,7 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 				cached.Unsubscribe()
 			}
 			delete(w.chunks, chunkPos)
+			delete(w.blockUpdates, chunkPos)
 		}
 	}
 }
