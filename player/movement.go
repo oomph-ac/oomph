@@ -257,6 +257,10 @@ func (p *Player) correctMovement() {
 	p.SyncWorld()
 
 	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.SimulationFrame)
+	if p.Dbg.Enabled(DebugModeMovementSim) {
+		p.Message("correcting movement for simulation frame %d", p.SimulationFrame)
+	}
+
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer,
 		Position:       p.movement.Pos().Add(mgl32.Vec3{0, 1.621}),
