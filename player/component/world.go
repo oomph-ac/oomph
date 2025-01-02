@@ -71,9 +71,9 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 		return true
 	}
 
-	if !c.validateInteraction(pk) {
+	/* if !c.validateInteraction(pk) {
 		return false
-	}
+	} */
 	c.prevPlaceRequest = dat
 
 	// Validate action type.
