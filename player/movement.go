@@ -1,11 +1,8 @@
 package player
 
 import (
-	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/utils"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -257,18 +254,7 @@ func (p *Player) correctMovement() {
 	// teleport is not occuring.
 
 	// Update the blocks in the world so the client can sync itself properly.
-	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World) {
-		p.SendPacketToClient(&packet.UpdateBlock{
-			Position: protocol.BlockPos{
-				int32(blockResult.Position[0]),
-				int32(blockResult.Position[1]),
-				int32(blockResult.Position[2]),
-			},
-			NewBlockRuntimeID: world.BlockRuntimeID(blockResult.Block),
-			Flags:             packet.BlockUpdatePriority,
-			Layer:             0, // TODO: Implement and account for multi-layer blocks.
-		})
-	}
+	p.SyncWorld()
 
 	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.SimulationFrame)
 	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{

@@ -131,20 +131,22 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 	if c == nil {
 		// If the given chunk is not found, but is in the exempted list, this is casued by a small delay
 		// in the cache workers adding the chunk to the world.
-		w.dbMu.Lock()
+		w.Lock()
 		if _, exempted := w.exemptedChunks[chunkPos]; exempted {
+			w.dbMu.Lock()
 			w.deferredBlocks[pos] = b
+			w.dbMu.Unlock()
 		}
-		w.dbMu.Unlock()
+		w.Unlock()
 		return
 	}
 
 	// Check if the current chunk source is a SubscribedChunk (it's cached), and if so, make a copy
 	// of the chunk and replace it in the map with a local chunk.
 	if cachedChunk, ok := c.(*CachedChunk); ok {
+		cachedChunk.Unsubscribe()
 		originalChunk := *(cachedChunk.c)
 		c = &originalChunk
-		cachedChunk.Unsubscribe()
 
 		w.Lock()
 		w.chunks[chunkPos] = c

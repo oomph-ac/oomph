@@ -284,7 +284,7 @@ func (p *Player) NMessage(msg string, args ...interface{}) {
 
 func (p *Player) Popup(msg string) {
 	p.SendPacketToClient(&packet.Text{
-		TextType: packet.TextTypeJukeboxPopup,
+		TextType: packet.TextTypePopup,
 		Message:  msg,
 	})
 }
