@@ -14,3 +14,4 @@ players/*
 .fleet/
 .vscode.code-workspace
 example/spectrum/spectrum.exe
+example/spectrum/logs/*
