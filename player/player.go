@@ -2,6 +2,7 @@ package player
 
 import (
 	"encoding/json"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -342,6 +343,10 @@ func (p *Player) Close() error {
 			if p.serverConn != nil {
 				p.serverConn.Close()
 			}
+		}
+
+		if f, ok := p.log.Out.(io.WriteCloser); ok {
+			f.Close()
 		}
 
 		p.Dbg.target = nil
