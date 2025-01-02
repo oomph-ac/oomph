@@ -42,7 +42,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		if args[0] == "!oomph_debug" {
 			if len(args) < 2 {
 				p.Message("Usage: !oomph_debug <mode>")
-				return false
+				return true
 			}
 
 			var mode int
@@ -120,7 +120,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		}
 
 		if !p.worldUpdater.AttemptBlockPlacement(pk) {
-			return false
+			return true
 		}
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
@@ -199,7 +199,6 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			p.entTracker.HandleMovePlayer(pk)
 			p.clientEntTracker.HandleMovePlayer(pk)
 		} else {
-			pk.Mode = packet.MoveModeNormal
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.RemoveActor:

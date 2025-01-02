@@ -115,12 +115,14 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
 	if cube.AnyIntersections(boxes, c.mPlayer.Movement().BoundingBox()) {
+		c.mPlayer.SyncWorld()
 		return false
 	}
 
 	// Check if any entity is in the way of the block being placed.
 	for _, e := range c.mPlayer.EntityTracker().All() {
 		if cube.AnyIntersections(boxes, e.Box(e.Position)) {
+			c.mPlayer.SyncWorld()
 			return false
 		}
 	}
@@ -135,7 +137,7 @@ func (c *WorldUpdaterComponent) validateInteraction(pk *packet.InventoryTransact
 	}
 
 	dat := pk.TransactionData.(*protocol.UseItemTransactionData)
-	if dat.ActionType == protocol.UseItemActionClickAir || dat.ClickedPosition.Len() > 1 { // No point in validating an air click...
+	if dat.ActionType != protocol.UseItemActionClickBlock || dat.ClickedPosition.Len() > 1 { // No point in validating an air click...
 		c.initalInteractionAccepted = true
 		return true
 	}
@@ -176,10 +178,9 @@ func (c *WorldUpdaterComponent) validateInteraction(pk *packet.InventoryTransact
 		eyePos[1] += 1.62
 	}
 
-	// We have 5 blocks here for leniency since we don't account for the interpolated camera position.
-	if eyePos.Sub(interactPos).Len() > 5.0 {
+	if eyePos.Sub(interactPos).Len() >= 7.0 {
 		c.initalInteractionAccepted = false
-		c.mPlayer.Popup("Interaction denied - too far away.")
+		c.mPlayer.NMessage("<red>Interaction denied: too far away.</red>")
 		return false
 	}
 
@@ -203,7 +204,7 @@ func (c *WorldUpdaterComponent) validateInteraction(pk *packet.InventoryTransact
 
 			// If there is an intersection, the interaction is invalid.
 			if _, ok := trace.BBoxIntercept(iBB, eyePos, interactPos); ok {
-				c.mPlayer.Popup("Interaction denied - block is in the way.")
+				c.mPlayer.NMessage("<red>Interaction denied: block obstructs path.</red>")
 				c.initalInteractionAccepted = false
 				return false
 			}
