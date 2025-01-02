@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/cooldogedev/spectrum"
 	"github.com/cooldogedev/spectrum/server"
@@ -40,16 +42,27 @@ func main() {
 
 		go func(s *session.Session) {
 			// Disable auto-login so that Oomph's processor can modify the StartGame data to allow server-authoritative movement.
-			s.SetProcessor(oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), oomphLog))
+			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), oomphLog)
+			f, err := os.OpenFile(fmt.Sprintf("./logs/%s.log", proc.Player().Conn().IdentityData().DisplayName), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0744)
+			if err != nil {
+				s.Disconnect("failed to create log file")
+				proc.Player().Close()
+				return
+			}
+
+			proc.Player().Log().SetOutput(f)
+			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
 				s.Disconnect(err.Error())
+				proc.Player().Close()
 				if !errors.Is(err, context.Canceled) {
 					logger.Error("failed to login session", "err", err)
 				}
 				return
 			}
-			(s.Processor().(*oomph.Processor)).Player().SetServerConn(s.Server())
+
+			proc.Player().SetServerConn(s.Server())
 		}(initalSession)
 	}
 }
