@@ -235,14 +235,27 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 		p.correctMovement()
 	}
 
+	// To prevent the server never accepting our position (PMMP), we will always set our position to the final teleport position if a teleport is in progress.
+	// Otherwise, we will use the movement component's prediction.
+	var finalPos mgl32.Vec3
+	if p.Movement().HasTeleport() {
+		finalPos = p.Movement().TeleportPos()
+	} else {
+		finalPos = p.Movement().Pos()
+	}
+
 	// Update the position given in this packet to what the server predicts is correct. This is used so that there isn't any weird
 	// rubberbanding that is visible on the POVs of the other players if corrections are sent. This also implies the fact that
 	// other players will be unable to see if another client is using a cheat to modify their movement (e.g - fly). Of course, that is
 	// granted that the movement scenario is supported by Oomph.
-	pk.Position = p.movement.Pos().Add(mgl32.Vec3{0, 1.621})
+	pk.Position = finalPos.Add(mgl32.Vec3{0, 1.621})
 }
 
 func (p *Player) correctMovement() {
+	// We never want to send a correction while the player is in the middle of the teleport.
+	// Any discrepencies between the client and the server will be corrected in the next frame where a
+	// teleport is not occuring.
+
 	// Update the blocks in the world so the client can sync itself properly.
 	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World) {
 		p.SendPacketToClient(&packet.UpdateBlock{

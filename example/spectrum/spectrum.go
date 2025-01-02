@@ -41,11 +41,13 @@ func main() {
 		go func(s *session.Session) {
 			// Disable auto-login so that Oomph's processor can modify the StartGame data to allow server-authoritative movement.
 			s.SetProcessor(oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), oomphLog))
+
 			if err := s.Login(); err != nil {
 				s.Disconnect(err.Error())
 				if !errors.Is(err, context.Canceled) {
 					logger.Error("failed to login session", "err", err)
 				}
+				return
 			}
 			(s.Processor().(*oomph.Processor)).Player().SetServerConn(s.Server())
 		}(initalSession)
