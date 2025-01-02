@@ -199,6 +199,7 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			p.entTracker.HandleMovePlayer(pk)
 			p.clientEntTracker.HandleMovePlayer(pk)
 		} else {
+			pk.Mode = packet.MoveModeNormal
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.RemoveActor:
