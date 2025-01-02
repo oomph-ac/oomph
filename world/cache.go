@@ -17,9 +17,8 @@ import (
 
 var (
 	chunkCache = make(map[[32]byte]*CachedChunk)
+	chunkQueue = make(chan addChunkRequest, 4096)
 	cMu        sync.RWMutex
-
-	addQueue = make(chan addChunkRequest, 4096)
 )
 
 func init() {
@@ -30,12 +29,12 @@ func init() {
 }
 
 func StopCache() {
-	close(addQueue)
+	close(chunkQueue)
 }
 
 func Cache(w *World, input *packet.LevelChunk) {
 	select {
-	case addQueue <- addChunkRequest{input: input, target: w}:
+	case chunkQueue <- addChunkRequest{input: input, target: w}:
 		// OK
 	case <-time.After(time.Second * 5):
 		panic(oerror.New("AddChunkToWorld: timeout"))
@@ -90,7 +89,7 @@ func cacheWorker() {
 		}
 	}()
 
-	for req := range addQueue {
+	for req := range chunkQueue {
 		// First, get the SHA-256 chunkHash of the packet's chunk payload.
 		chunkHash := sha256.Sum256(req.input.RawPayload)
 		// Then, check if the current chunk is already in the cache. If it is, add it to the player's world.
