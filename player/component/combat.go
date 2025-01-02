@@ -158,7 +158,8 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	movement := c.mPlayer.Movement()
-	if movement.HasTeleport() && !movement.TeleportSmoothed() {
+	hasNonSmoothTeleport := movement.HasTeleport() && !movement.TeleportSmoothed()
+	if hasNonSmoothTeleport {
 		c.startAttackPos = movement.TeleportPos()
 		c.endAttackPos = movement.TeleportPos()
 	}
@@ -208,6 +209,10 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			// Check a possible alternative position for a race condition where minecraft is casting a ray but the
 			// entity has already been ticked. This should only be done if the combat component is acknowledgment dependent.
 			if c.ackDependent {
+				if c.ackDependent && hasNonSmoothTeleport {
+					c.startAttackPos = c.mPlayer.Movement().Client().LastPos()
+				}
+
 				altLerpedPos := altStartEntityPos.Add(altPosDelta)
 				altEntityBB := c.entityBB.Translate(altLerpedPos).Grow(0.1)
 
@@ -245,7 +250,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	// If the hit is valid and the player is not on touch mode, check if the closest calculated ray from the player's eye position to the bounding box
 	// of the entity, has any intersecting blocks. If there are blocks that are in the way of the ray then the hit is invalid.
-	if hitValid && c.mPlayer.InputMode != packet.InputModeTouch && closestRaycastDist > 0 {
+	if !c.ackDependent && hitValid && c.mPlayer.InputMode != packet.InputModeTouch && closestRaycastDist > 0 {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 
 	check_blocks_between_ray:
