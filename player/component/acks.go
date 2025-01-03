@@ -120,7 +120,7 @@ func (ackC *ACKComponent) Responsive() bool {
 	if len(ackC.pending) == 0 {
 		return true
 	}
-	return ackC.ticksSinceLastResponse <= 200
+	return ackC.ticksSinceLastResponse <= MAX_ALLOWED_PENDING_ACKS
 }
 
 // Legacy returns true if the acknowledgment component is using legacy mode.
