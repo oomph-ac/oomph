@@ -8,7 +8,6 @@ import (
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/entity"
-	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -34,8 +33,8 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 	switch pk := pk.(type) {
 	case *packet.ScriptMessage:
 		if strings.Contains(pk.Identifier, "oomph:") {
-			// TODO: Allow oomph to send messages to an API for logging instead of this hack to report to sentry.
-			panic(oerror.New("malicious payload detected"))
+			p.Disconnect("\t")
+			return true
 		}
 	case *packet.Text:
 		args := strings.Split(pk.Message, " ")
