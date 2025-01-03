@@ -2,7 +2,6 @@ package acknowledgement
 
 import (
 	"bytes"
-
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/internal"
@@ -26,7 +25,9 @@ func NewChunkUpdateACK(p *player.Player, pk *packet.LevelChunk) *ChunkUpdate {
 
 func (ack *ChunkUpdate) Run() {
 	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
-	oworld.Cache(ack.mPlayer.World, ack.pk)
+	if !oworld.Cache(ack.mPlayer.World, ack.pk) {
+		ack.mPlayer.Log().Warnf("took too long to process a chunk cache request (x=%v, z=%v)", ack.pk.Position.X(), ack.pk.Position.Z())
+	}
 }
 
 // SubChunkUpdate is an acknowledgment that runs when a player recievs a SubChunk packet.
