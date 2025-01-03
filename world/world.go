@@ -104,12 +104,17 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 	}
 
 	chunkPos := protocol.ChunkPos{int32(blockPos[0]) >> 4, int32(blockPos[2]) >> 4}
-	if blockUpdates, found := w.blockUpdates[chunkPos]; found {
+	w.RLock()
+	blockUpdates, found := w.blockUpdates[chunkPos]
+	w.RUnlock()
+	if found {
 		if b, ok := blockUpdates[df_cube.Pos(blockPos)]; ok {
 			return b
 		}
 	} else {
+		w.Lock()
 		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
+		w.Unlock()
 	}
 
 	c := w.GetChunk(chunkPos)
