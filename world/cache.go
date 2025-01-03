@@ -32,12 +32,24 @@ func StopCache() {
 	close(chunkQueue)
 }
 
-func Cache(w *World, input *packet.LevelChunk) {
+func Cache(w *World, input *packet.LevelChunk) (ok bool) {
 	select {
 	case chunkQueue <- addChunkRequest{input: input, target: w}:
 		// OK
+		return true
 	case <-time.After(time.Second * 5):
-		panic(oerror.New("AddChunkToWorld: timeout"))
+		c, err := chunk.NetworkDecode(
+			AirRuntimeID,
+			input.RawPayload,
+			int(input.SubChunkCount),
+			world.Overworld.Range(),
+		)
+		if err != nil {
+			c = chunk.New(AirRuntimeID, world.Overworld.Range())
+		}
+		c.Compact()
+		w.AddChunk(input.Position, c)
+		return false
 	}
 }
 
