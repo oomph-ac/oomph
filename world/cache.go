@@ -10,6 +10,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/getsentry/sentry-go"
+	"github.com/oomph-ac/oomph/internal"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -17,7 +18,7 @@ import (
 
 var (
 	chunkCache = make(map[[32]byte]*CachedChunk)
-	chunkQueue = make(chan addChunkRequest, 4096)
+	chunkQueue = internal.Chan[addChunkRequest](128, 1024*8)
 	cMu        sync.RWMutex
 )
 
@@ -28,29 +29,23 @@ func init() {
 	go clearCacheWorker()
 }
 
-func StopCache() {
-	close(chunkQueue)
-}
-
 func Cache(w *World, input *packet.LevelChunk) (ok bool) {
-	select {
-	case chunkQueue <- addChunkRequest{input: input, target: w}:
-		// OK
+	if chunkQueue.Send(addChunkRequest{input: input, target: w}, time.Second*5) {
 		return true
-	case <-time.After(time.Second * 5):
-		c, err := chunk.NetworkDecode(
-			AirRuntimeID,
-			input.RawPayload,
-			int(input.SubChunkCount),
-			world.Overworld.Range(),
-		)
-		if err != nil {
-			c = chunk.New(AirRuntimeID, world.Overworld.Range())
-		}
-		c.Compact()
-		w.AddChunk(input.Position, c)
-		return false
 	}
+
+	c, err := chunk.NetworkDecode(
+		AirRuntimeID,
+		input.RawPayload,
+		int(input.SubChunkCount),
+		world.Overworld.Range(),
+	)
+	if err != nil {
+		c = chunk.New(AirRuntimeID, world.Overworld.Range())
+	}
+	c.Compact()
+	w.AddChunk(input.Position, c)
+	return false
 }
 
 type CachedChunk struct {
@@ -101,7 +96,12 @@ func cacheWorker() {
 		}
 	}()
 
-	for req := range chunkQueue {
+	for {
+		req, ok := chunkQueue.Recv(nil)
+		if !ok {
+			break
+		}
+
 		// First, get the SHA-256 chunkHash of the packet's chunk payload.
 		chunkHash := sha256.Sum256(req.input.RawPayload)
 		// Then, check if the current chunk is already in the cache. If it is, add it to the player's world.
