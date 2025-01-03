@@ -391,7 +391,7 @@ func BlockClimbable(b world.Block) bool {
 // collision bounding box.
 func IsBlockPassInteraction(b world.Block) bool {
 	switch BlockName(b) {
-	case "minecraft:barrier":
+	case "minecraft:barrier", "minecraft:invisible_bedrock":
 		return true
 	default:
 		return false
