@@ -257,6 +257,9 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		for _, blockPos := range game.BlocksBetween(start, end) {
 			flooredBlockPos := cube.PosFromVec3(blockPos)
 			blockInWay := c.mPlayer.World.Block(df_cube.Pos(flooredBlockPos))
+			if utils.IsBlockPassInteraction(blockInWay) {
+				continue
+			}
 
 			// Iterate through each block's bounding boxes and check if it is in the way of the ray.
 			for _, blockBB := range utils.BlockBoxes(blockInWay, flooredBlockPos, c.mPlayer.World) {

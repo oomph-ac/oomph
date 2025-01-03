@@ -387,6 +387,17 @@ func BlockClimbable(b world.Block) bool {
 	}
 }
 
+// IsBlockPassInteraction returns true if the block allows interactions although it has a solid
+// collision bounding box.
+func IsBlockPassInteraction(b world.Block) bool {
+	switch BlockName(b) {
+	case "minecraft:barrier":
+		return true
+	default:
+		return false
+	}
+}
+
 // BlockToCubePos converts protocol.BlockPos into cube.Pos
 func BlockToCubePos(p [3]int32) cube.Pos {
 	return cube.Pos{int(p[0]), int(p[1]), int(p[2])}
