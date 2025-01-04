@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -49,8 +50,10 @@ func (p *Player) SetServerConn(conn ServerConn) {
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID
-
 	p.GameDat = conn.GameData()
+
+	p.movement.SetPos(p.GameDat.PlayerPosition)
+	p.movement.SetVel(mgl32.Vec3{})
 }
 
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
