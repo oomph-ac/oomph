@@ -199,6 +199,8 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{}
 	case "minecraft:end_portal_frame":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 13.0/16.0, 1)}
+	case "minecraft:red_mushroom", "minecraft:brown_mushroom":
+		return []cube.BBox{}
 	}
 
 	var m world.BlockModel
