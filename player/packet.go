@@ -224,6 +224,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		if pk.EntityRuntimeID == p.RuntimeId {
 			p.movement.ServerUpdate(pk)
 		}
+	case *packet.SetPlayerGameType:
+		p.gamemodeHandle.Handle(pk)
 	case *packet.SubChunk:
 		p.worldUpdater.HandleSubChunk(pk)
 	case *packet.UpdateAbilities:

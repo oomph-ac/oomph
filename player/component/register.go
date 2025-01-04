@@ -14,4 +14,5 @@ func Register(p *player.Player) {
 	p.SetACKs(NewACKComponent(p))
 	p.SetMovement(NewAuthoritativeMovementComponent(p))
 	p.SetWorldUpdater(NewWorldUpdaterComponent(p))
+	p.SetGamemodeHandle(NewGamemodeComponent(p))
 }
