@@ -2,7 +2,6 @@ package component
 
 import (
 	"math/rand/v2"
-	"slices"
 	"sync"
 	"time"
 
@@ -141,10 +140,11 @@ func (ackC *ACKComponent) Tick() {
 	}
 
 	// Validate that there are no duplicate timestamps.
-	knownTimestamps := make([]int64, 0, len(ackC.pending))
+	knownTimestamps := make(map[int64]struct{})
 	for _, batch := range ackC.pending {
-		assert.IsTrue(!slices.Contains(knownTimestamps, batch.timestamp), "multiple acks found with timestamp %d", batch.timestamp)
-		knownTimestamps = append(knownTimestamps, batch.timestamp)
+		_, exists := knownTimestamps[batch.timestamp]
+		knownTimestamps[batch.timestamp] = struct{}{}
+		assert.IsTrue(!exists, "multiple acks found with timestamp %d", batch.timestamp)
 	}
 
 	if len(ackC.pending) > 0 {
@@ -173,6 +173,18 @@ func (ackC *ACKComponent) Flush() {
 	})
 	ackC.pending = append(ackC.pending, ackC.currentBatch)
 	ackC.Refresh()
+}
+
+// Invalidate drops and clears all current acknowledgments. This should only be called when the player is
+// in the process of being transfered to another server.
+func (ackC *ACKComponent) Invalidate() {
+	for _, b := range ackC.pending {
+		b.acks = b.acks[:0]
+		b.timestamp = 0
+		batchPool.Put(b)
+	}
+	ackC.pending = ackC.pending[:0]
+	ackC.mPlayer.Log().Info("invalidated ACKs due to transfer")
 }
 
 // Refresh resets the current timestamp of the acknowledgment component.

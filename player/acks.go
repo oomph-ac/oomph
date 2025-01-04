@@ -28,6 +28,9 @@ type AcknowledgmentComponent interface {
 	Flush()
 	// Refresh resets the current timestamp of the acknowledgment component.
 	Refresh()
+	// Invalidate drops and clears all current acknowledgments. This should only be called when the player is
+	// in the process of being transfered to another server.
+	Invalidate()
 }
 
 // Acknowledgment is an interface for client acknowledgments to be ran once the member player

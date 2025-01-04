@@ -169,6 +169,16 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 	return p
 }
 
+// PauseProcessing locks the procMu to prevent any packets from being processed.
+func (p *Player) PauseProcessing() {
+	p.procMu.Lock()
+}
+
+// ResumeProcessing unlocks the procMu to allow packets to be processed.
+func (p *Player) ResumeProcessing() {
+	p.procMu.Unlock()
+}
+
 // Name returns the name of the player.
 func (p *Player) Name() string {
 	return p.IdentityDat.DisplayName

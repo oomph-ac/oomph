@@ -1,6 +1,7 @@
 package oomph
 
 import (
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -23,6 +24,8 @@ type Processor struct {
 	identity login.IdentityData
 	registry *session.Registry
 	pl       atomic.Pointer[player.Player]
+
+	dbgTransfer bool
 }
 
 func NewProcessor(
@@ -60,13 +63,33 @@ func (p *Processor) ProcessServer(ctx *session.Context, pk packet.Packet) {
 }
 
 func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
+	if os.Getenv("DBG") != "" {
+		if txt, ok := pk.(*packet.Text); ok && txt.Message == "transferme" {
+			if !p.dbgTransfer {
+				p.registry.GetSession(p.identity.XUID).Transfer("127.0.0.1:20002")
+				p.dbgTransfer = true
+			} else {
+				p.registry.GetSession(p.identity.XUID).Transfer("127.0.0.1:20000")
+				p.dbgTransfer = false
+			}
+		}
+	}
+
 	if pl := p.pl.Load(); pl != nil && pl.HandleClientPacket(pk) {
 		ctx.Cancel()
 	}
 }
 
+func (p *Processor) ProcessPreTransfer(*session.Context, *string, *string) {
+	if pl := p.pl.Load(); pl != nil {
+		pl.PauseProcessing()
+		pl.ACKs().Invalidate()
+	}
+}
+
 func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string) {
 	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
+		pl.ResumeProcessing()
 		pl.SetServerConn(s.Server())
 	}
 }
