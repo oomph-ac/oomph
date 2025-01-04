@@ -29,9 +29,9 @@ func init() {
 	go clearCacheWorker()
 }
 
-func Cache(w *World, input *packet.LevelChunk) (ok bool) {
+func Cache(w *World, input *packet.LevelChunk) (bool, error) {
 	if chunkQueue.Send(addChunkRequest{input: input, target: w}, time.Second*5) {
-		return true
+		return true, nil
 	}
 
 	c, err := chunk.NetworkDecode(
@@ -45,7 +45,8 @@ func Cache(w *World, input *packet.LevelChunk) (ok bool) {
 	}
 	c.Compact()
 	w.AddChunk(input.Position, c)
-	return false
+
+	return false, err
 }
 
 type CachedChunk struct {

@@ -2,6 +2,7 @@ package acknowledgement
 
 import (
 	"bytes"
+
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/internal"
@@ -25,7 +26,9 @@ func NewChunkUpdateACK(p *player.Player, pk *packet.LevelChunk) *ChunkUpdate {
 
 func (ack *ChunkUpdate) Run() {
 	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
-	if !oworld.Cache(ack.mPlayer.World, ack.pk) {
+	if insertedToCache, err := oworld.Cache(ack.mPlayer.World, ack.pk); err != nil {
+		ack.mPlayer.Log().Errorf("failed to decode chunk: %v", err)
+	} else if !insertedToCache {
 		ack.mPlayer.Log().Warnf("took too long to process a chunk cache request (x=%v, z=%v)", ack.pk.Position.X(), ack.pk.Position.Z())
 	}
 }

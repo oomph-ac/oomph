@@ -31,10 +31,10 @@ type World struct {
 
 	chunks         map[protocol.ChunkPos]ChunkSource
 	exemptedChunks map[protocol.ChunkPos]struct{}
-	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
 
+	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
 	deferredBlocks map[df_cube.Pos]world.Block
-	blocksMu       sync.Mutex
+	dBlocksMu      sync.Mutex
 
 	lastCleanPos protocol.ChunkPos
 
@@ -46,8 +46,8 @@ func New() *World {
 	return &World{
 		chunks:         make(map[protocol.ChunkPos]ChunkSource),
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
-		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
 
+		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
 		deferredBlocks: make(map[df_cube.Pos]world.Block),
 
 		id: currentWorldId,
@@ -66,7 +66,7 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
 	w.chunks[chunkPos] = c
 	w.Unlock()
 
-	w.blocksMu.Lock()
+	w.dBlocksMu.Lock()
 	for blockPos, b := range w.deferredBlocks {
 		blockChunk := protocol.ChunkPos{int32(blockPos[0] >> 4), int32(blockPos[2] >> 4)}
 		if blockChunk == chunkPos {
@@ -74,7 +74,7 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
 			delete(w.deferredBlocks, blockPos)
 		}
 	}
-	w.blocksMu.Unlock()
+	w.dBlocksMu.Unlock()
 }
 
 // ExemptChunk adds a chunk to the exemption list. This exemption is removed when
@@ -139,15 +139,9 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
 	c := w.GetChunk(chunkPos)
 	if c == nil {
-		// If the given chunk is not found, but is in the exempted list, this is casued by a small delay
-		// in the cache workers adding the chunk to the world.
-		w.Lock()
-		if _, exempted := w.exemptedChunks[chunkPos]; exempted {
-			w.blocksMu.Lock()
-			w.deferredBlocks[pos] = b
-			w.blocksMu.Unlock()
-		}
-		w.Unlock()
+		w.dBlocksMu.Lock()
+		w.deferredBlocks[pos] = b
+		w.dBlocksMu.Unlock()
 		return
 	}
 

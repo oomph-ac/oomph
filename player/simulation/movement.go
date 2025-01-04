@@ -23,23 +23,19 @@ func SimulatePlayerMovement(p *player.Player) {
 	movement := p.Movement()
 	assert.IsTrue(movement != nil, "movement component should be non-nil for simulation")
 
-	// Check if we are in a loaded chunk, otherwise reset to the player's movement.
-	if p.World.GetChunk(protocol.ChunkPos{
-		int32(movement.Pos().X()) >> 4,
-		int32(movement.Pos().Z()) >> 4,
-	}) == nil {
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: no available chunks", p.SimulationFrame)
-		movement.Reset()
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN movement sim for frame %d", p.SimulationFrame)
+	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement sim for frame %d", p.SimulationFrame)
+
+	// Check if we are in a loaded chunk, otherwise don't allow the player to move until a new chunk is present.
+	if p.World.GetChunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
+		movement.SetVel(mgl32.Vec3{})
 		return
-	}
-	if !simulationIsReliable(p) {
+	} else if !simulationIsReliable(p) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
 		movement.Reset()
 		return
 	}
-
-	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN movement sim for frame %d", p.SimulationFrame)
-	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement sim for frame %d", p.SimulationFrame)
 
 	blockUnder := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
 	blockFriction := game.DefaultAirFriction
