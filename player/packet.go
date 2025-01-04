@@ -26,6 +26,8 @@ var DecodeClientPackets = []uint32{
 }
 
 func (p *Player) HandleClientPacket(pk packet.Packet) bool {
+	defer p.recoverError()
+
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
@@ -134,6 +136,8 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 }
 
 func (p *Player) HandleServerPacket(pk packet.Packet) {
+	defer p.recoverError()
+
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
