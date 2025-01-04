@@ -1,6 +1,8 @@
 package acknowledgement
 
-import "github.com/oomph-ac/oomph/player"
+import (
+	"github.com/oomph-ac/oomph/player"
+)
 
 // UpdateGamemode is an acknowledgment that is ran when the player recieves an update to their current gamemode.
 type UpdateGamemode struct {
