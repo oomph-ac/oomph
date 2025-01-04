@@ -29,7 +29,7 @@ func SimulatePlayerMovement(p *player.Player) {
 	// Check if we are in a loaded chunk, otherwise don't allow the player to move until a new chunk is present.
 	if p.World.GetChunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
-		movement.SetVel(mgl32.Vec3{})
+		movement.Reset()
 		return
 	} else if !simulationIsReliable(p) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
