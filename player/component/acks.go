@@ -147,7 +147,7 @@ func (ackC *ACKComponent) Tick() {
 		assert.IsTrue(!exists, "multiple acks found with timestamp %d", batch.timestamp)
 	}
 
-	if len(ackC.pending) > 0 {
+	if len(ackC.pending) > 0 && ackC.mPlayer.ServerConn() != nil {
 		ackC.ticksSinceLastResponse++
 	} else {
 		ackC.ticksSinceLastResponse = 0
