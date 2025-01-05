@@ -181,12 +181,14 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 
 // PurgeChunks removes all chunks from the world.
 func (w *World) PurgeChunks() {
+	w.Lock()
 	for chunkPos, c := range w.chunks {
 		if cached, ok := c.(*CachedChunk); ok {
 			cached.Unsubscribe()
 		}
 		delete(w.chunks, chunkPos)
 	}
+	w.Unlock()
 }
 
 // chunkInRange returns true if the chunk position is within the given radius of the chunk position.
