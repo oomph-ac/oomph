@@ -349,14 +349,18 @@ func (p *Player) Close() error {
 		p.World.PurgeChunks()
 
 		if !p.MState.IsReplay {
-			p.conn.Close()
-			if p.serverConn != nil {
-				p.serverConn.Close()
+			if c := p.conn; c != nil {
+				c.Close()
+			}
+			if c := p.serverConn; c != nil {
+				c.Close()
 			}
 		}
 
-		if f, ok := p.log.Out.(io.WriteCloser); ok {
-			f.Close()
+		if log := p.log; log != nil {
+			if f, ok := log.Out.(io.WriteCloser); ok {
+				f.Close()
+			}
 		}
 
 		p.Dbg.target = nil
