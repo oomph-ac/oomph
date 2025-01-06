@@ -26,14 +26,13 @@ func SimulatePlayerMovement(p *player.Player) {
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN movement sim for frame %d", p.SimulationFrame)
 	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement sim for frame %d", p.SimulationFrame)
 
-	// Check if we are in a loaded chunk, otherwise don't allow the player to move until a new chunk is present.
-	if p.World.GetChunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
-		movement.Reset()
-		return
-	} else if !simulationIsReliable(p) {
+	if !simulationIsReliable(p) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
 		movement.Reset()
+		return
+	} else if p.World.GetChunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
+		movement.SetVel(mgl32.Vec3{})
 		return
 	}
 
@@ -191,10 +190,7 @@ func simulationIsReliable(p *player.Player) bool {
 	}
 
 	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) &&
-		!movement.Flying() &&
-		!movement.Immobile() &&
-		p.Alive &&
-		movement.Pos().Y() >= -64
+		!movement.Flying() && !movement.NoClip() && p.Alive
 }
 
 func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder df_world.Block) {
