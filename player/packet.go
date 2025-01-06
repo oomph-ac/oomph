@@ -99,7 +99,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		}
 
 		p.clientEntTracker.Tick(p.ClientTick)
-		p.handleBlockBreak(pk)
+		p.handleBlockActions(pk)
 		p.handlePlayerMovementInput(pk)
 
 		serverVerifiedHit := p.combat.Calculate()
