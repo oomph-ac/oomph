@@ -55,7 +55,7 @@ func (p *Player) SyncWorld() {
 	}
 }
 
-func (p *Player) handleBlockBreak(pk *packet.PlayerAuthInput) {
+func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	chunkPos := protocol.ChunkPos{
 		int32(math32.Floor(p.movement.Pos().X())) >> 4,
 		int32(math32.Floor(p.movement.Pos().Z())) >> 4,
@@ -107,5 +107,7 @@ func (p *Player) handleBlockBreak(pk *packet.PlayerAuthInput) {
 		}
 	}
 
-	p.World.CleanChunks(p.worldUpdater.ChunkRadius(), chunkPos)
+	if p.Ready {
+		p.World.CleanChunks(p.worldUpdater.ChunkRadius(), chunkPos)
+	}
 }
