@@ -51,7 +51,7 @@ func SimulatePlayerMovement(p *player.Player) {
 		return
 	}
 
-	if movement.NoClientPredictions() || !p.Ready {
+	if movement.Immobile() || !p.Ready {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "player is immobile")
 		movement.SetVel(mgl32.Vec3{})
 		return
@@ -192,7 +192,7 @@ func simulationIsReliable(p *player.Player) bool {
 
 	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) &&
 		!movement.Flying() &&
-		!movement.NoClientPredictions() &&
+		!movement.Immobile() &&
 		p.Alive &&
 		movement.Pos().Y() >= -64
 }
