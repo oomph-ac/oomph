@@ -161,10 +161,15 @@ type MovementComponent interface {
 	// SetOnGround sets wether or not the movement component is on the ground.
 	SetOnGround(onGround bool)
 
-	// NoClientPredictions returns true if the movement component does not need their movement simulated.
-	NoClientPredictions() bool
-	// SetNoClientPredictions sets wether or not the movement component needxs their movement simulated.
-	SetNoClientPredictions(noClip bool)
+	// Immobile returns true if the movement component is immobile.
+	Immobile() bool
+	// SetImmobile sets wether or not the movement component is immobile.
+	SetImmobile(immobile bool)
+
+	// NoClip returns true if the movement component has no collisions.
+	NoClip() bool
+	// SetNoClip sets wether or not the movement component has no collisions.
+	SetNoClip(noClip bool)
 
 	// CanSimulate returns true if the movement component can be simulated by the server for the current frame.
 	CanSimulate() bool

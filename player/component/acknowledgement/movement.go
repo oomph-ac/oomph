@@ -46,7 +46,7 @@ func (ack *UpdateAbilities) Run() {
 	for _, l := range ack.data.Layers {
 		mayFly := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
 		ack.mPlayer.Movement().SetFlying(utils.HasFlag(uint64(l.Values), protocol.AbilityFlying))
-		ack.mPlayer.Movement().SetNoClientPredictions(utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip))
+		ack.mPlayer.Movement().SetNoClip(utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip))
 
 		if ack.mPlayer.Movement().Client().ToggledFly() {
 			ack.mPlayer.Movement().SetTrustFlyStatus(ack.mPlayer.Movement().Flying() || mayFly)
@@ -109,7 +109,7 @@ func (ack *PlayerUpdateActorData) Run() {
 
 	if f, ok := ack.metadata[entity.DataKeyFlags]; ok {
 		flags := f.(int64)
-		ack.mPlayer.Movement().SetNoClientPredictions(utils.HasDataFlag(entity.DataFlagImmobile, flags))
+		ack.mPlayer.Movement().SetImmobile(utils.HasDataFlag(entity.DataFlagImmobile, flags))
 		ack.mPlayer.Movement().SetSprinting(utils.HasDataFlag(entity.DataFlagSprinting, flags))
 	}
 }
