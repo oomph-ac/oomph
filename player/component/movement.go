@@ -99,7 +99,9 @@ type AuthoritativeMovementComponent struct {
 
 	penetratedLastFrame, stuckInCollider bool
 
-	clientHasNoPredictions bool
+	immobile bool
+	noClip   bool
+
 	canSimulate            bool
 	flying, trustFlyStatus bool
 
@@ -450,14 +452,24 @@ func (mc *AuthoritativeMovementComponent) SetOnGround(onGround bool) {
 	mc.onGround = onGround
 }
 
-// NoClientPredictions returns true if the movement component does not need their movement simulated.
-func (mc *AuthoritativeMovementComponent) NoClientPredictions() bool {
-	return mc.clientHasNoPredictions
+// Immobile returns true if the movement component is immobile.
+func (mc *AuthoritativeMovementComponent) Immobile() bool {
+	return mc.immobile
 }
 
-// SetNoClientPredictions sets wether or not the movement component needs their movement simulated.
-func (mc *AuthoritativeMovementComponent) SetNoClientPredictions(noPredictions bool) {
-	mc.clientHasNoPredictions = noPredictions
+// SetImmobile sets wether or not the movement component is immobile.
+func (mc *AuthoritativeMovementComponent) SetImmobile(immobile bool) {
+	mc.immobile = immobile
+}
+
+// NoClip returns true if the movement component has no collisions.
+func (mc *AuthoritativeMovementComponent) NoClip() bool {
+	return mc.noClip
+}
+
+// SetNoClip sets wether or not the movement component has collisions.
+func (mc *AuthoritativeMovementComponent) SetNoClip(noClip bool) {
+	mc.noClip = noClip
 }
 
 // CanSimulate returns true if the movement component can be simulated by the server for the current frame.

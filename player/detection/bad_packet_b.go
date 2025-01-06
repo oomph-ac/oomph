@@ -50,7 +50,7 @@ func (d *BadPacketB) Detect(pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.MovePlayer:
 		speed := d.tick - d.last
-		if speed < 2 && !d.mPlayer.Movement().NoClientPredictions() && d.mPlayer.World.GetChunk(protocol.ChunkPos{
+		if speed < 2 && !d.mPlayer.Movement().Immobile() && d.mPlayer.World.GetChunk(protocol.ChunkPos{
 			int32(pk.Position.X()) >> 4,
 			int32(pk.Position.Z()) >> 4,
 		}) != nil {
