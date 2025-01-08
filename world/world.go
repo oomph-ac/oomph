@@ -12,11 +12,21 @@ import (
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sasha-s/go-deadlock"
+
+	_ "unsafe"
+
+	_ "github.com/oomph-ac/oomph/world/block"
 )
 
 var AirRuntimeID uint32
 
+// noinspection ALL
+//
+//go:linkname world_finaliseBlockRegistry github.com/df-mc/dragonfly/server/world.finaliseBlockRegistry
+func world_finaliseBlockRegistry()
+
 func init() {
+	world_finaliseBlockRegistry()
 	a, ok := chunk.StateToRuntimeID("minecraft:air", nil)
 	if !ok {
 		panic(oerror.New("unable to find runtime ID for air"))

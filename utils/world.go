@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"fmt"
 	"math"
+	"strings"
 	_ "unsafe"
 
 	"github.com/chewxy/math32"
@@ -104,12 +106,6 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	}
 
 	switch BlockName(b) {
-	case "minecraft:wooden_pressure_plate", "minecraft:spruce_pressure_plate", "minecraft:birch_pressure_plate",
-		"minecraft:jungle_pressure_plate", "minecraft:acacia_pressure_plate", "minecraft:dark_oak_pressure_plate",
-		"minecraft:mangrove_pressure_plate", "minecraft:cherry_pressure_plate", "minecraft:crimson_pressure_plate",
-		"minecraft:warped_pressure_plate", "minecraft:stone_pressure_plate", "minecraft:light_weighted_pressure_plate",
-		"minecraft:heavy_weighted_pressure_plate", "minecraft:polished_blackstone_pressure_plate":
-		return []cube.BBox{}
 	case "minecraft:acacia_button", "minecraft:bamboo_button", "minecraft:birch_button", "minecraft:cherry_button",
 		"minecraft:crimson_button", "minecraft:dark_oak_button", "minecraft:jungle_button", "minecraft:mangrove_button",
 		"minecraft:polished_blackstone_button", "minecraft:spruce_button", "minecraft:stone_button", "minecraft:warped_button",
@@ -201,6 +197,11 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 13.0/16.0, 1)}
 	case "minecraft:red_mushroom", "minecraft:brown_mushroom":
 		return []cube.BBox{}
+	}
+
+	if strings.Contains(BlockName(b), "pressure_plate") {
+		n, prop := b.EncodeBlock()
+		fmt.Printf("%T %s %v\n", b, n, prop)
 	}
 
 	var m world.BlockModel
