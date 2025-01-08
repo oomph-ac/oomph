@@ -106,11 +106,6 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	}
 
 	switch BlockName(b) {
-	case "minecraft:acacia_button", "minecraft:bamboo_button", "minecraft:birch_button", "minecraft:cherry_button",
-		"minecraft:crimson_button", "minecraft:dark_oak_button", "minecraft:jungle_button", "minecraft:mangrove_button",
-		"minecraft:polished_blackstone_button", "minecraft:spruce_button", "minecraft:stone_button", "minecraft:warped_button",
-		"minecraft:wooden_button":
-		return []cube.BBox{}
 	case "minecraft:trip_wire":
 		return []cube.BBox{}
 	case "minecraft:portal", "minecraft:end_portal":

@@ -5,12 +5,12 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 )
 
-type PressurePlate struct{}
+type NoCollisionSolid struct{}
 
-func (pp PressurePlate) BBox(pos cube.Pos, s world.BlockSource) []cube.BBox {
+func (pp NoCollisionSolid) BBox(pos cube.Pos, s world.BlockSource) []cube.BBox {
 	return []cube.BBox{}
 }
 
-func (pp PressurePlate) FaceSolid(pos cube.Pos, face cube.Face, s world.BlockSource) bool {
+func (pp NoCollisionSolid) FaceSolid(pos cube.Pos, face cube.Face, s world.BlockSource) bool {
 	return true
 }

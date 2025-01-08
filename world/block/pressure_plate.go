@@ -24,7 +24,7 @@ func (pp PressurePlate) Hash() (uint64, uint64) {
 }
 
 func (pp PressurePlate) Model() world.BlockModel {
-	return blockmodel.PressurePlate{}
+	return blockmodel.NoCollisionSolid{}
 }
 
 func (pp PressurePlate) EncodeBlock() (string, map[string]any) {
