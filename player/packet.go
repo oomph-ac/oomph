@@ -121,7 +121,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		}
 
 		if !p.worldUpdater.AttemptBlockPlacement(pk) {
-			return true
+			return false
 		}
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
