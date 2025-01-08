@@ -412,7 +412,16 @@ func (p *Player) tick() bool {
 	}
 
 	p.ACKs().Flush()
-	return p.conn.Flush() == nil
+
+	if err := p.conn.Flush(); err != nil {
+		return false
+	}
+	if srvConn, ok := p.serverConn.(*minecraft.Conn); ok {
+		if err := srvConn.Flush(); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // calculateBBSize calculates the bounding box size for an entity based on the EntityMetadata.
