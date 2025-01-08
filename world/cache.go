@@ -20,6 +20,7 @@ var (
 	chunkCache = make(map[[32]byte]*CachedChunk)
 	chunkQueue = internal.Chan[addChunkRequest](128, 1024*8)
 	cMu        sync.RWMutex
+	requestMu  sync.Mutex
 )
 
 func init() {
@@ -30,7 +31,10 @@ func init() {
 }
 
 func Cache(w *World, input *packet.LevelChunk) (bool, error) {
-	if chunkQueue.Send(addChunkRequest{input: input, target: w}, time.Second*5) {
+	requestMu.Lock()
+	sent := chunkQueue.Send(addChunkRequest{input: input, target: w}, time.Second*5)
+	requestMu.Unlock()
+	if sent {
 		return true, nil
 	}
 
