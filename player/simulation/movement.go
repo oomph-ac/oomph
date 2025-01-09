@@ -1,8 +1,6 @@
 package simulation
 
 import (
-	"strings"
-
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -14,6 +12,7 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/oomph-ac/oomph/world"
+	oomph_block "github.com/oomph-ac/oomph/world/block"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -122,8 +121,7 @@ func SimulatePlayerMovement(p *player.Player) {
 	blockUnder = p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.2}))))
 	if _, isAir := blockUnder.(block.Air); isAir {
 		b := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()).Side(cube.FaceDown)))
-		n := utils.BlockName(b)
-		if utils.IsFence(b) || utils.IsWall(n) || strings.Contains(n, "fence") {
+		if oomph_block.IsWall(b) || oomph_block.IsFence(b) {
 			blockUnder = b
 		}
 	}
