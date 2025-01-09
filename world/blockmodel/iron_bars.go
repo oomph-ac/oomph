@@ -47,10 +47,11 @@ func (ib IronBars) checkConnection(pos cube.Pos, f cube.Face, s world.BlockSourc
 	b := s.Block(pos.Side(f))
 	if _, isIronBar := b.(block.IronBars); isIronBar {
 		return true
+	} else if _, isWall := b.(block.Wall); isWall {
+		return true
 	} else if _, isLeaves := b.(block.Leaves); isLeaves {
 		return false
 	}
-	// TODO: check for walls, as they are able to connect with iron bars.
 
 	boxCount := 0
 	for _, bb := range b.Model().BBox(pos.Side(f), s) {
