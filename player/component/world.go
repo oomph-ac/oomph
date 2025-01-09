@@ -16,15 +16,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// noinspection ALL
-//
-//go:linkname world_finaliseBlockRegistry github.com/df-mc/dragonfly/server/world.finaliseBlockRegistry
-func world_finaliseBlockRegistry()
-
-func init() {
-	world_finaliseBlockRegistry()
-}
-
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
 type WorldUpdaterComponent struct {
 	mPlayer          *player.Player
