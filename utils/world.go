@@ -66,31 +66,6 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 	return oneWayBlocks
 }
 
-// IsWall returns true if the given block is a wall.
-func IsWall(n string) bool {
-	switch n {
-	case "minecraft:cobblestone_wall", "minecraft:blackstone_wall", "minecraft:polished_blackstone_wall",
-		"minecraft:cobbled_deepslate_wall", "minecraft:polished_blackstone_brick_wall", "minecraft:deepslate_tile_wall",
-		"minecraft:mud_brick_wall", "minecraft:polished_deepslate_wall", "minecraft:deepslate_brick_wall":
-		return true
-	default:
-		return false
-	}
-}
-
-// IsFence returns true if the given block is a fence.
-func IsFence(b world.Block) bool {
-	if _, ok := b.Model().(model.Fence); ok {
-		return true
-	}
-
-	if _, ok := b.Model().(model.FenceGate); ok {
-		return true
-	}
-
-	return false
-}
-
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
 func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	sblocks := map[cube.Face]world.Block{}
