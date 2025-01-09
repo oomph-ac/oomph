@@ -1,9 +1,7 @@
 package utils
 
 import (
-	"fmt"
 	"math"
-	"strings"
 	_ "unsafe"
 
 	"github.com/chewxy/math32"
@@ -118,42 +116,6 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/64.0, 1)}
 	case "minecraft:soul_sand":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 7.0/8.0, 1)}
-	case "minecraft:iron_bars":
-		var bbs []cube.BBox
-		connectWest, connectEast, connectNorth, connectSouth := CheckBarConnections(b, w, sblocks)
-		inset := float32(7.0 / 16.0)
-
-		if connectWest || connectEast {
-			bb := cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.Z, -inset)
-			if !connectWest {
-				bb = bb.ExtendTowards(cube.FaceWest, -inset)
-			} else if !connectEast {
-				bb = bb.ExtendTowards(cube.FaceEast, -inset)
-			}
-
-			bbs = append(bbs, bb)
-		}
-
-		if connectNorth || connectSouth {
-			bb := cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.X, -inset)
-
-			if !connectNorth {
-				bb = bb.ExtendTowards(cube.FaceNorth, -inset)
-			} else if !connectSouth {
-				bb = bb.ExtendTowards(cube.FaceSouth, -inset)
-			}
-
-			bbs = append(bbs, bb)
-		}
-
-		if len(bbs) == 0 {
-			return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1).
-				Stretch(cube.X, -inset).
-				Stretch(cube.Z, -inset),
-			}
-		}
-
-		return bbs
 	case "minecraft:snow_layer":
 		_, dat := b.EncodeBlock()
 		height, ok := dat["height"]
@@ -194,11 +156,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{}
 	}
 
-	if strings.Contains(BlockName(b), "pressure_plate") {
-		n, prop := b.EncodeBlock()
-		fmt.Printf("%T %s %v\n", b, n, prop)
-	}
-
+	// This is used whenever a block is already registered by DF, but the bounding boxes produced by the
 	var m world.BlockModel
 	switch oldM := b.Model().(type) {
 	case model.Wall:
@@ -210,7 +168,12 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 			Post:            oldM.Post,
 		}
 	default:
-		m = oldM
+		switch b.(type) {
+		case block.IronBars:
+			m = blockmodel.IronBars{}
+		default:
+			m = oldM
+		}
 	}
 
 	dfBoxes := m.BBox(df_cube.Pos(pos), w)
@@ -220,77 +183,6 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	}
 
 	return boxes
-}
-
-// IsStair returns true if the block given is a stair block.
-func IsStair(n string) bool {
-	switch n {
-	case "minecraft:prismarine_stairs", "minecraft:dark_prismarine_stairs", "minecraft:prismarine_bricks_stairs", "minecraft:granite_stairs",
-		"minecraft:diorite_stairs", "minecraft:andesite_stairs", "minecraft:polished_granite_stairs", "minecraft:polished_diorite_stairs", "minecraft:polished_andesite_stairs",
-		"minecraft:mossy_stone_brick_stairs", "minecraft:smooth_red_sandstone_stairs", "minecraft:smooth_sandstone_stairs", "minecraft:end_brick_stairs",
-		"minecraft:mossy_cobblestone_stairs", "minecraft:normal_stone_stairs", "minecraft:red_nether_brick_stairs", "minecraft:smooth_quartz_stairs",
-		"minecraft:oak_stairs", "minecraft:stone_stairs", "minecraft:brick_stairs", "minecraft:stone_brick_stairs", "minecraft:nether_brick_stairs",
-		"minecraft:sandstone_stairs", "minecraft:spruce_stairs", "minecraft:birch_stairs", "minecraft:jungle_stairs", "minecraft:quartz_stairs",
-		"minecraft:acacia_stairs", "minecraft:dark_oak_stairs", "minecraft:red_sandstone_stairs", "minecraft:purpur_stairs", "minecraft:mangrove_stairs",
-		"minecraft:deepslate_brick_stairs":
-		return true
-	default:
-		return false
-	}
-}
-
-// Check fence connection checks for connections on the x and z axis the fence may have.
-func CheckBarConnections(b world.Block, w *oomph_world.World, sblocks map[cube.Face]world.Block) (bool, bool, bool, bool) {
-	// Connections on the X-axis.
-	wb, connectWest := sblocks[cube.FaceWest]
-	eb, connectEast := sblocks[cube.FaceEast]
-
-	// Check if the block can connect with the fence.
-	if connectWest && !BarConnectionCompatiable(wb, w) {
-		connectWest = false
-	}
-	if connectEast && !BarConnectionCompatiable(eb, w) {
-		connectEast = false
-	}
-
-	// Connections on the Z-axis.
-	nb, connectNorth := sblocks[cube.FaceNorth]
-	sb, connectSouth := sblocks[cube.FaceSouth]
-
-	// Check if the block can connect with the fence.
-	if connectNorth && !BarConnectionCompatiable(nb, w) {
-		connectNorth = false
-	}
-	if connectSouth && !BarConnectionCompatiable(sb, w) {
-		connectSouth = false
-	}
-
-	return connectWest, connectEast, connectNorth, connectSouth
-}
-
-// BarConnectionCompatiable returns true if the given block is compatiable to conenct to a fence.
-func BarConnectionCompatiable(b world.Block, w *oomph_world.World) bool {
-	n := BlockName(b)
-	if n == "minecraft:iron_bars" || IsWall(n) {
-		return true
-	}
-
-	switch n {
-	case "minecraft:azalea_leaves", "minecraft:azalea_leaves_flowered", "minecraft:cherry_leaves", "minecraft:leaves",
-		"minecraft:leaves2", "minecraft:mangrove_leaves":
-		return false
-	default:
-		// Assume for now only blocks that are 1x1x1 are compatiable for connections. True for majority of blocks.
-		// FIXME: Some non-full cube blocks can still make a connection w/ walls.
-		bbs := b.Model().BBox(df_cube.Pos{}, w)
-		for _, bb := range bbs {
-			if bb.Width() != 1 || bb.Height() != 1 || bb.Length() != 1 {
-				return false
-			}
-		}
-
-		return true
-	}
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
