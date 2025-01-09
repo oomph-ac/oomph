@@ -68,6 +68,7 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
 func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
+	var blockModel world.BlockModel
 	switch BlockName(b) {
 	case "minecraft:portal", "minecraft:end_portal":
 		return []cube.BBox{}
@@ -117,29 +118,27 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 13.0/16.0, 1)}
 	case "minecraft:red_mushroom", "minecraft:brown_mushroom":
 		return []cube.BBox{}
-	}
-
-	// This is used whenever a block is already registered by DF, but the bounding boxes produced by the
-	var m world.BlockModel
-	switch oldModel := b.Model().(type) {
-	case model.Wall:
-		m = blockmodel.Wall{
-			NorthConnection: oldModel.NorthConnection,
-			EastConnection:  oldModel.EastConnection,
-			SouthConnection: oldModel.SouthConnection,
-			WestConnection:  oldModel.WestConnection,
-			Post:            oldModel.Post,
-		}
 	default:
-		switch b.(type) {
-		case block.IronBars:
-			m = blockmodel.IronBars{}
+		switch oldModel := b.Model().(type) {
+		case model.Wall:
+			blockModel = blockmodel.Wall{
+				NorthConnection: oldModel.NorthConnection,
+				EastConnection:  oldModel.EastConnection,
+				SouthConnection: oldModel.SouthConnection,
+				WestConnection:  oldModel.WestConnection,
+				Post:            oldModel.Post,
+			}
 		default:
-			m = oldModel
+			switch b.(type) {
+			case block.IronBars:
+				blockModel = blockmodel.IronBars{}
+			default:
+				blockModel = oldModel
+			}
 		}
 	}
 
-	dfBoxes := m.BBox(df_cube.Pos(pos), w)
+	dfBoxes := blockModel.BBox(df_cube.Pos(pos), w)
 	var boxes = make([]cube.BBox, len(dfBoxes))
 	for i, bb := range dfBoxes {
 		boxes[i] = game.DFBoxToCubeBox(bb)
