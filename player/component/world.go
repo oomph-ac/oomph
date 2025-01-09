@@ -90,10 +90,14 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	// Find the replace position of the block. This will be used if the block at the current position
 	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
-	fb := c.mPlayer.World.Block(df_cube.Pos(replacePos))
+	replacingBlock := c.mPlayer.World.Block(df_cube.Pos(replacePos))
+	if _, ok := replacingBlock.(block.Activatable); ok && !c.mPlayer.Movement().PressingSneak() {
+		c.mPlayer.SyncWorld()
+		return false
+	}
 
 	// If the block at the position is not replacable, we want to place the block on the side of the block.
-	if replaceable, ok := fb.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
+	if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
 		replacePos = replacePos.Side(cube.Face(dat.BlockFace))
 	}
 
