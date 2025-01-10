@@ -39,7 +39,6 @@ func NewProcessor(
 		IsRecording: false,
 		CurrentTime: time.Now(),
 	}, listener)
-
 	pl.SetConn(s.Client())
 
 	component.Register(pl)
