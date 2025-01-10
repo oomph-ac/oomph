@@ -344,8 +344,9 @@ func (p *Player) VersionInRange(oldest, latest int32) bool {
 func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
 		p.Closed = true
-
-		p.eventHandler.HandleQuit()
+		if evHandler := p.eventHandler; evHandler != nil {
+			evHandler.HandleQuit()
+		}
 		p.World.PurgeChunks()
 
 		if !p.MState.IsReplay {
@@ -362,7 +363,6 @@ func (p *Player) Close() error {
 				f.Close()
 			}
 		}
-
 		p.Dbg.target = nil
 		close(p.CloseChan)
 	})
