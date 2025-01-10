@@ -22,11 +22,20 @@ func main() {
 	oomphLog := logrus.New()
 	oomphLog.SetLevel(logrus.DebugLevel)
 
+	if len(os.Args) < 3 {
+		oomphLog.Fatal("Usage: ./oomph-bin <local_port> <remort_port> <optional: spectrum_token>")
+		return
+	}
+
 	opts := util.DefaultOpts()
 	opts.ClientDecode = player.DecodeClientPackets
 	opts.AutoLogin = false
+	opts.Addr = ":" + os.Args[1]
+	if len(os.Args) >= 4 {
+		opts.Token = os.Args[3]
+	}
 
-	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery("127.0.0.1:20000", ""), logger, opts, nil)
+	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery("127.0.0.1:"+os.Args[2], ""), logger, opts, nil)
 	if err := proxy.Listen(minecraft.ListenConfig{
 		StatusProvider: util.NewStatusProvider("Spectrum Proxy", "Spectrum"),
 		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
@@ -54,8 +63,8 @@ func main() {
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
-				s.Disconnect(err.Error())
 				proc.Player().Close()
+				s.Disconnect(err.Error())
 				if !errors.Is(err, context.Canceled) {
 					logger.Error("failed to login session", "err", err)
 				}
