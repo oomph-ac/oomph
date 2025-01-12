@@ -3,6 +3,7 @@ package player
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
@@ -10,14 +11,16 @@ import (
 	oevent "github.com/oomph-ac/oomph/player/event"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
-var DETECTION_DEFAULT_KICK_MESSAGE = utils.MC_CenterAlignText(
+var DETECTION_DEFAULT_KICK_MESSAGE = text.Colourf(strings.Join([]string{
 	"<red><bold>Cheating Detected</bold></red>",
-	"<red>We've detected suspicious behavior from your gameplay and have</red>",
-	"<red>kicked you from the server</red>",
-	"<yellow>Read the Fair Play Policy at github.com/oomph-ac/fpp</yellow>",
-)
+	"<red>We've identified suspicious behavior from your gameplay</red>",
+	"<red>and removed you from the server.</red>",
+	"<purple><italic>Cheating ruins the fun of the game for other players.</italic></purple>",
+	"<yellow>Read our Fair Play Policy @ github.com/oomph-ac/fpp</yellow>",
+}, "\n"))
 
 type Detection interface {
 	// Type returns the primary type of the detection. E.G - "Reach", "KillAura", etc.

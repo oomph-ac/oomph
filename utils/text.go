@@ -1,50 +1,9 @@
 package utils
 
 import (
-	"strings"
-
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sandertv/gophertunnel/minecraft/text"
 )
-
-// MC_CenterAlignText takes an array of strings and centers them based on the longest string.
-func MC_CenterAlignText(msg ...string) string {
-	if len(msg) == 0 {
-		return ""
-	}
-	for i, m := range msg {
-		msg[i] = text.Colourf(m)
-	}
-
-	// Find the length of the longest string
-	max_length := 0
-	for _, line := range msg {
-		if clean_length := len(clean_line(line)); clean_length > max_length {
-			max_length = clean_length
-		}
-	}
-
-	var centered_lines []string
-	for _, line := range msg {
-		clean_length := len(clean_line(line))
-		if clean_length == max_length {
-			centered_lines = append(centered_lines, line)
-			continue
-		}
-
-		total_spaces := int((float64(max_length-clean_length)/10.0)*6.0) + 1
-		centered_line := strings.Repeat(" ", total_spaces) + line
-		centered_lines = append(centered_lines, centered_line)
-	}
-
-	// Join the centered lines with newlines
-	return strings.Join(centered_lines, "\n")
-}
-
-func clean_line(line string) string {
-	return strings.ReplaceAll(text.Clean(line), "\n", "")
-}
 
 // Device returns the device name from the DeviceOS.
 func Device(os protocol.DeviceOS) string {

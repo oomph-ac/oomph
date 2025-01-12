@@ -9,17 +9,16 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const timerA_tickSampleSize = 100
+const timerA_samples = 200
 
 type TimerA struct {
 	mPlayer  *player.Player
 	metadata *player.DetectionMetadata
 
-	tickTimes     []float64
-	tickTimeCount uint8
-
 	balance      float64
 	lastTickTime time.Time
+	tickTimes    []float64
+	averages     []float64
 }
 
 func New_TimerA(p *player.Player) *TimerA {
@@ -32,7 +31,10 @@ func New_TimerA(p *player.Player) *TimerA {
 			MaxViolations: 15,
 		},
 
-		tickTimes: make([]float64, timerA_tickSampleSize),
+		tickTimes: make([]float64, 0, timerA_samples),
+		averages:  make([]float64, 0, timerA_samples),
+
+		lastTickTime: time.Now(),
 	}
 }
 
@@ -60,36 +62,44 @@ func (d *TimerA) Detect(pk packet.Packet) {
 	if _, ok := pk.(*packet.PlayerAuthInput); ok {
 		curr := time.Now()
 		timeDiff := float64(time.Since(d.lastTickTime).Microseconds()) / 1000
-		d.tickTimes[d.tickTimeCount] = timeDiff
-		d.tickTimeCount++
-
-		/* if !d.mPlayer.Alive {
-			d.balance = 0
-			return
-		} */
-
-		tickDelta := 1000 / float64(d.mPlayer.Tps)
-		d.balance += timeDiff - tickDelta
-		if d.balance <= -(tickDelta * 3) {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("tps", d.mPlayer.Tps)
-			d.mPlayer.FailDetection(d, data)
-			d.balance = 0
-		}
+		d.tickTimes = append(d.tickTimes, timeDiff)
 
 		avgTickTime := 0.0
 		for _, tickTime := range d.tickTimes {
 			avgTickTime += tickTime
 		}
-		avgTickTime /= float64(d.tickTimeCount)
+		avgTickTime /= float64(len(d.tickTimes))
+
+		var avgTPS float64
+		if avgTickTime > 0 {
+			avgTPS = 20 * (50.0 / avgTickTime)
+		}
+		d.averages = append(d.averages, avgTPS)
+
+		realTPS := 0.0
+		for _, avg := range d.averages {
+			realTPS += avg
+		}
+		realTPS /= float64(len(d.averages))
+
+		tickDelta := 1000 / float64(d.mPlayer.Tps)
+		d.balance += timeDiff - tickDelta
+		if d.balance <= -(tickDelta * 3) {
+			data := orderedmap.NewOrderedMap[string, any]()
+			data.Set("expected", d.mPlayer.Tps)
+			data.Set("actual", avgTPS)
+			d.mPlayer.FailDetection(d, data)
+			d.balance = 0
+		}
 
 		d.mPlayer.Dbg.Notify(
 			player.DebugModeTimerA,
 			true,
-			"balance=%.4f delta=%.4fms avg=%.4f cTick=%d sTick=%d",
+			"balance=%.4f delta=%.4fms avg=%.4f real=%.2f cTick=%d sTick=%d",
 			d.balance,
 			timeDiff,
 			avgTickTime,
+			avgTPS,
 			d.mPlayer.ClientTick,
 			d.mPlayer.ServerTick,
 		)
@@ -103,17 +113,37 @@ func (d *TimerA) Detect(pk packet.Packet) {
 				"timer balance reset due to conditions",
 			)
 			d.balance = 0
-			for i := 0; i < 10; i++ {
-				d.tickTimes[i] = 0.0
-			}
+			d.resetTickTimes()
 		}
 
 		d.lastTickTime = curr
-		if d.tickTimeCount == 10 {
-			for i := 1; i < 10; i++ {
-				d.tickTimes[i-1] = d.tickTimes[i]
-			}
-			d.tickTimeCount--
-		}
+		d.shiftTickTimes()
+	}
+}
+
+func (d *TimerA) shiftTickTimes() {
+	if len(d.tickTimes) != len(d.averages) {
+		panic("mismatched timer samples")
+	}
+	if len(d.tickTimes) != timerA_samples || len(d.averages) != timerA_samples {
+		return
+	}
+
+	for i := 1; i < len(d.tickTimes); i++ {
+		d.tickTimes[i-1] = d.tickTimes[i]
+	}
+	d.tickTimes = d.tickTimes[:timerA_samples-1]
+	for i := 1; i < len(d.averages); i++ {
+		d.averages[i-1] = d.averages[i]
+	}
+	d.averages = d.averages[:timerA_samples-1]
+}
+
+func (d *TimerA) resetTickTimes() {
+	for i := 0; i < len(d.tickTimes); i++ {
+		d.tickTimes[i] = 50.0
+	}
+	for i := 0; i < len(d.averages); i++ {
+		d.averages[i] = 20.0
 	}
 }
