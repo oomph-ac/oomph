@@ -120,6 +120,10 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			cancel = true
 		}
 
+		if !p.worldUpdater.ValidateInteraction(pk) {
+			p.SyncWorld()
+			return true
+		}
 		if !p.worldUpdater.AttemptBlockPlacement(pk) {
 			return false
 		}
