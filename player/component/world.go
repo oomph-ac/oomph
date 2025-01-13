@@ -127,7 +127,11 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return true
 	}
 
-	dat := pk.TransactionData.(*protocol.UseItemTransactionData)
+	dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
+	if !ok {
+		return true
+	}
+
 	if dat.ActionType != protocol.UseItemActionClickBlock {
 		c.initalInteractionAccepted = true
 		return true

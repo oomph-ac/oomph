@@ -30,7 +30,7 @@ func (ack *ChunkUpdate) Run() {
 		ack.mPlayer.Log().Errorf("failed to decode chunk: %v", err)
 		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "failed to decode chunk: %v", err)
 	} else if !insertedToCache {
-		ack.mPlayer.Log().Warnf("took too long to process a chunk cache request (x=%v, z=%v)", ack.pk.Position.X(), ack.pk.Position.Z())
+		ack.mPlayer.Log().Warnf("could not insert chunk into cache (x=%v, z=%v)", ack.pk.Position.X(), ack.pk.Position.Z())
 	}
 }
 
