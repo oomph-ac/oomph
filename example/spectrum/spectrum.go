@@ -63,7 +63,6 @@ func main() {
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
-				proc.Player().Close()
 				s.Disconnect(err.Error())
 				if !errors.Is(err, context.Canceled) {
 					logger.Error("failed to login session", "err", err)

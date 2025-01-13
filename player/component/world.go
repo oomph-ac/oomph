@@ -61,10 +61,6 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	if !ok {
 		return true
 	}
-
-	/* if !c.validateInteraction(pk) {
-		return false
-	} */
 	c.prevPlaceRequest = dat
 
 	// Validate action type.
@@ -126,13 +122,13 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	return true
 }
 
-func (c *WorldUpdaterComponent) validateInteraction(pk *packet.InventoryTransaction) bool {
+func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransaction) bool {
 	if gamemode := c.mPlayer.GameMode; gamemode != packet.GameTypeSurvival && gamemode != packet.GameTypeAdventure {
 		return true
 	}
 
 	dat := pk.TransactionData.(*protocol.UseItemTransactionData)
-	if dat.ActionType != protocol.UseItemActionClickBlock || dat.ClickedPosition.Len() > 1 { // No point in validating an air click...
+	if dat.ActionType != protocol.UseItemActionClickBlock {
 		c.initalInteractionAccepted = true
 		return true
 	}
@@ -150,7 +146,7 @@ func (c *WorldUpdaterComponent) validateInteraction(pk *packet.InventoryTransact
 	if c.mPlayer.Conn().Proto().ID() >= player.GameVersion1_21_20 {
 		isInitalInput = dat.TriggerType == protocol.TriggerTypePlayerInput
 	} else {
-		isInitalInput = dat.ClickedPosition.LenSqr() > 0
+		isInitalInput = dat.ClickedPosition[0] > 1 || dat.ClickedPosition[1] > 1 || dat.ClickedPosition[2] > 1
 	}
 
 	if !isInitalInput {

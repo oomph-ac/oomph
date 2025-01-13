@@ -19,6 +19,8 @@ type WorldUpdaterComponent interface {
 	// AttemptBlockPlacement attempts a block placement request from the client. It returns false if the simulation is unable
 	// to place a block at the given position.
 	AttemptBlockPlacement(pk *packet.InventoryTransaction) bool
+	// ValidateInteraction validates if a player is allowed to perform an action on an interactable block.
+	ValidateInteraction(pk *packet.InventoryTransaction) bool
 
 	// SetChunkRadius sets the chunk radius of the world updater component.
 	SetChunkRadius(radius int32)
@@ -49,7 +51,7 @@ func (p *Player) SyncWorld() {
 				int32(blockResult.Position[2]),
 			},
 			NewBlockRuntimeID: world.BlockRuntimeID(blockResult.Block),
-			Flags:             packet.BlockUpdatePriority,
+			Flags:             packet.BlockUpdateNeighbours,
 			Layer:             0, // TODO: Implement and account for multi-layer blocks.
 		})
 	}
