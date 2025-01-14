@@ -51,15 +51,15 @@ func main() {
 
 		go func(s *session.Session) {
 			// Disable auto-login so that Oomph's processor can modify the StartGame data to allow server-authoritative movement.
-			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), oomphLog)
-			f, err := os.OpenFile(fmt.Sprintf("./logs/%s.log", proc.Player().Conn().IdentityData().DisplayName), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0744)
+			f, err := os.OpenFile(fmt.Sprintf("./logs/%s.log", s.Client().IdentityData().DisplayName), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0744)
 			if err != nil {
 				s.Disconnect("failed to create log file")
-				proc.Player().Close()
 				return
 			}
+			playerLog := logrus.New()
+			playerLog.SetOutput(f)
 
-			proc.Player().Log().SetOutput(f)
+			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
