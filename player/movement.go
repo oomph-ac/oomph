@@ -124,6 +124,11 @@ type MovementComponent interface {
 	// SetGravity sets the gravity of the movement component.
 	SetGravity(gravity float32)
 
+	// FallDistance returns the fall distance of the movement component.
+	FallDistance() float32
+	// SetFallDistance sets the fall distance of the movement component.
+	SetFallDistance(fallDistance float32)
+
 	// MovementSpeed returns the movement speed of the movement component.
 	MovementSpeed() float32
 	// SetMovementSpeed sets the movement speed of the movement component.
@@ -170,6 +175,11 @@ type MovementComponent interface {
 	NoClip() bool
 	// SetNoClip sets wether or not the movement component has no collisions.
 	SetNoClip(noClip bool)
+
+	// Gliding returns true if the movement component is gliding.
+	Gliding() bool
+	// SetGliding sets wether or not movement component has no collisions.
+	SetGliding(gliding bool)
 
 	// CanSimulate returns true if the movement component can be simulated by the server for the current frame.
 	CanSimulate() bool

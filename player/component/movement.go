@@ -72,8 +72,9 @@ type AuthoritativeMovementComponent struct {
 	impulse     mgl32.Vec2
 	size        mgl32.Vec2
 
-	gravity    float32
-	jumpHeight float32
+	gravity      float32
+	jumpHeight   float32
+	fallDistance float32
 
 	movementSpeed        float32
 	defaultMovementSpeed float32
@@ -101,6 +102,7 @@ type AuthoritativeMovementComponent struct {
 
 	immobile bool
 	noClip   bool
+	gliding  bool
 
 	canSimulate            bool
 	flying, trustFlyStatus bool
@@ -385,6 +387,16 @@ func (mc *AuthoritativeMovementComponent) SetJumpHeight(jumpHeight float32) {
 	mc.jumpHeight = jumpHeight
 }
 
+// FallDistance returns the fall distance of the movement component.
+func (mc *AuthoritativeMovementComponent) FallDistance() float32 {
+	return mc.fallDistance
+}
+
+// SetFallDistance sets the fall distance of the movement component.
+func (mc *AuthoritativeMovementComponent) SetFallDistance(fallDistance float32) {
+	mc.fallDistance = fallDistance
+}
+
 // MovementSpeed returns the movement speed of the movement component.
 func (mc *AuthoritativeMovementComponent) MovementSpeed() float32 {
 	return mc.movementSpeed
@@ -470,6 +482,16 @@ func (mc *AuthoritativeMovementComponent) NoClip() bool {
 // SetNoClip sets wether or not the movement component has collisions.
 func (mc *AuthoritativeMovementComponent) SetNoClip(noClip bool) {
 	mc.noClip = noClip
+}
+
+// Gliding returns if the movement component is gliding.
+func (mc *AuthoritativeMovementComponent) Gliding() bool {
+	return mc.gliding
+}
+
+// SetGliding sets wether or not the movement component is gliding.
+func (mc *AuthoritativeMovementComponent) SetGliding(gliding bool) {
+	mc.gliding = gliding
 }
 
 // CanSimulate returns true if the movement component can be simulated by the server for the current frame.
@@ -587,6 +609,12 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.jumpDelay = 0
 	}
 	mc.gravity = game.NormalGravity
+
+	if pk.InputData.Load(packet.InputFlagStartGliding) {
+		mc.gliding = true
+	} else if pk.InputData.Load(packet.InputFlagStopGliding) {
+		mc.gliding = false
+	}
 
 	// Run the movement simulation after the states of the movement component have been updated.
 	mc.Simulate()

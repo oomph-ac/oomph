@@ -188,6 +188,10 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		))
 	case *packet.ChunkRadiusUpdated:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
+	case *packet.InventorySlot:
+		p.inventory.HandleInventorySlot(pk)
+	case *packet.InventoryContent:
+		p.inventory.HandleInventoryContent(pk)
 	case *packet.LevelChunk:
 		p.worldUpdater.HandleLevelChunk(pk)
 	case *packet.MobEffect:
