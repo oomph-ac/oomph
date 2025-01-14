@@ -15,4 +15,5 @@ func Register(p *player.Player) {
 	p.SetMovement(NewAuthoritativeMovementComponent(p))
 	p.SetWorldUpdater(NewWorldUpdaterComponent(p))
 	p.SetGamemodeHandle(NewGamemodeComponent(p))
+	p.SetInventory(NewInventoryComponent(p))
 }
