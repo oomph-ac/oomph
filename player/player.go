@@ -114,6 +114,8 @@ type Player struct {
 	movement MovementComponent
 	// worldUpdater is a component that handles chunk and block updates in the world for the player
 	worldUpdater WorldUpdaterComponent // TODO: figure out a better name for this shit.
+	// inventory is a component that handles inventory-related actions.
+	inventory InventoryComponent
 
 	// entTracker is an entity tracker for server-sided view of entities. It does not rely on the client sending back
 	// acknowledgments to update positions and states of the entity.
