@@ -36,38 +36,6 @@ func NewEntityTrackerComponent(p *player.Player, ackDependent bool) *EntityTrack
 // AddEntity adds an entity to the entity tracker component.
 func (c *EntityTrackerComponent) AddEntity(rid uint64, ent *entity.Entity) {
 	c.entities[rid] = ent
-	if !c.ackDependent || ent.IsPlayer {
-		return
-	}
-
-	// Check if the current entity is a firework and will in turn, end up giving the player a boost while gliding.
-	/* if ent.Type == entity.TypeFireworksRocket {
-		ownerID, hasMetadata := ent.Metadata[entity.DataKeyOwnerID]
-		metadata, hasOwner := ent.Metadata[entity.DataKeyFireworkMetadata]
-		if !hasMetadata || !hasOwner {
-			return
-		}
-
-		if ownerID.(int64) != int64(c.mPlayer.RuntimeId) {
-			return
-		}
-
-		var flightTime uint8
-		fireworkData := ((metadata.(map[string]any))["Fireworks"]).(map[string]any)
-		if flight, ok := fireworkData["Flight"]; ok {
-			flightTime = flight.(uint8)
-		} else {
-			flightTime = 1
-		}
-
-		// Firework boosters are usually already predicted client side FFS
-		c.mPlayer.ACKs().Add(acknowledgement.NewGlideBoostACK(
-			c.mPlayer,
-			rid,
-			(int64(flightTime) * 10),
-			true,
-		))
-	} */
 }
 
 // RemoveEntity removes an entity from the entity tracker component.
