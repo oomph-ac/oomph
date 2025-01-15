@@ -5,6 +5,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/entity"
@@ -118,6 +119,18 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			p.combat.Attack(pk)
 			p.clientCombat.Attack(pk)
 			cancel = true
+		}
+
+		// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
+		// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
+		if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && tr.ActionType == protocol.UseItemActionClickAir && p.Movement().Gliding() {
+			heldItem, _ := df_world.ItemByRuntimeID(tr.HeldItem.Stack.NetworkID, int16(tr.HeldItem.Stack.MetadataValue))
+			if _, isFireworks := heldItem.(item.Firework); isFireworks {
+				// TODO: Add validation here so that cheat clients cannot abuse this for an Elytra fly.
+				// TODO: Check w/ server-authoritative item the real expected duration of this glide boost.
+				p.movement.SetGlideBoost(20)
+				p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
+			}
 		}
 
 		if !p.worldUpdater.ValidateInteraction(pk) {
