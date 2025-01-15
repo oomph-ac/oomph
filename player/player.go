@@ -113,7 +113,7 @@ type Player struct {
 	// movement is a component that handles updating movement states for the player and validating their movement.
 	movement MovementComponent
 	// worldUpdater is a component that handles chunk and block updates in the world for the player
-	worldUpdater WorldUpdaterComponent // TODO: figure out a better name for this shit.
+	worldUpdater WorldUpdaterComponent // TODO: figure out a better name for this [sugar honey iced tea].
 	// inventory is a component that handles inventory-related actions.
 	inventory InventoryComponent
 

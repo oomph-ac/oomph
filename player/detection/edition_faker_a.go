@@ -112,7 +112,7 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 			return
 		}
 
-		// Ugly & shitty hack for BedrockTogether - why do console versions need external solutions to join servers anyway?
+		// Ugly & much [sugar honey iced tea] hack for BedrockTogether - why do console versions need external solutions to join servers anyway?
 		if titleID == "1739947436" && (deviceOS == protocol.DeviceOrbis || deviceOS == protocol.DeviceXBOX) {
 			return
 		}

@@ -180,12 +180,10 @@ type MovementComponent interface {
 	Gliding() bool
 	// SetGliding sets wether or not movement component has no collisions.
 	SetGliding(gliding bool)
-	// AddGlideBooster adds a glide booster to the glide booster list.
-	AddGlideBooster(eid uint64, flightTicks int64)
-	// GlideBoosters returns how many glide boosts should be applied to the movement component in the current simulation frame.
-	GlideBoosters() (boosters int)
-	// RemoveGlideBooster removes a glide booster to the glide booster list.
-	RemoveGlideBooster(eid uint64)
+	// GlideBoost returns the amount of ticks the movement component has a gliding boost for.
+	GlideBoost() (boostTicks int64)
+	// SetGlideBoost sets the amount of ticks the movement component should apply a gliding boost for.
+	SetGlideBoost(boostTicks int64)
 
 	// CanSimulate returns true if the movement component can be simulated by the server for the current frame.
 	CanSimulate() bool

@@ -127,28 +127,3 @@ func NewKnockbackACK(p *player.Player, knockback mgl32.Vec3) *Knockback {
 func (ack *Knockback) Run() {
 	ack.mPlayer.Movement().SetKnockback(ack.knockback)
 }
-
-// GlideBoost is an acknowledgment that adds or removes a glide booster to a player.
-type GlideBoost struct {
-	mPlayer    *player.Player
-	eid        uint64
-	flightTime int64
-	add        bool
-}
-
-func NewGlideBoostACK(p *player.Player, eid uint64, flightTime int64, add bool) *GlideBoost {
-	return &GlideBoost{
-		mPlayer:    p,
-		eid:        eid,
-		flightTime: flightTime,
-		add:        add,
-	}
-}
-
-func (ack *GlideBoost) Run() {
-	if ack.add {
-		ack.mPlayer.Movement().AddGlideBooster(ack.eid, ack.flightTime)
-	} else {
-		ack.mPlayer.Movement().RemoveGlideBooster(ack.eid)
-	}
-}
