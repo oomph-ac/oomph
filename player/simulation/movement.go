@@ -36,6 +36,9 @@ func SimulatePlayerMovement(p *player.Player) {
 		return
 	}
 
+	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move final velocity: %v", movement.Vel())
+	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "client final velocity: %v", movement.Client().Vel())
+
 	blockUnder := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
 	blockFriction := game.DefaultAirFriction
 
@@ -61,11 +64,6 @@ func SimulatePlayerMovement(p *player.Player) {
 		movement.SetVel(mgl32.Vec3{})
 	}
 
-	// Apply knockback if applicable.
-	p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied: %v", movement.Vel())
-	// Attempt jump velocity if applicable.
-	p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(movement), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
-
 	moveRelativeSpeed := movement.AirSpeed()
 	if movement.OnGround() {
 		blockFriction *= utils.BlockFriction(blockUnder)
@@ -75,6 +73,15 @@ func SimulatePlayerMovement(p *player.Player) {
 	if movement.Gliding() {
 		_, hasElytra := p.Inventory().Chestplate().(item.Elytra)
 		if hasElytra {
+			vel := movement.Vel()
+			dirVec := game.DirectionVector(movement.Rotation().Z(), movement.Rotation().X())
+			for i := 0; i < movement.GlideBoosters(); i++ {
+				vel[0] += dirVec[0]*0.1 + (dirVec[0]*1.5-vel[0])*0.5
+				vel[1] += dirVec[1]*0.1 + (dirVec[1]*1.5-vel[1])*0.5
+				vel[2] += dirVec[2]*0.1 + (dirVec[2]*1.5-vel[2])*0.5
+			}
+			movement.SetVel(vel)
+
 			movement.SetOnGround(false)
 			simulateGlide(p, movement)
 			movement.SetMov(movement.Vel())
@@ -82,6 +89,11 @@ func SimulatePlayerMovement(p *player.Player) {
 			p.Dbg.Notify(player.DebugModeMovementSim, true, "client wants glide, but has no elytra - forcing normal movement")
 		}
 	} else {
+		// Apply knockback if applicable.
+		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied: %v", movement.Vel())
+		// Attempt jump velocity if applicable.
+		p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(movement), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
+
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "blockUnder=%s, blockFriction=%v, speed=%v", utils.BlockName(blockUnder), blockFriction, moveRelativeSpeed)
 		moveRelative(movement, moveRelativeSpeed)
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "moveRelative force applied (vel=%v)", movement.Vel())
@@ -159,7 +171,6 @@ func SimulatePlayerMovement(p *player.Player) {
 
 		movement.SetVel(newVel)
 	}
-	p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move final velocity: %v", movement.Vel())
 }
 
 func simulateGlide(p *player.Player, movement player.MovementComponent) {

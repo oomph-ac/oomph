@@ -4,6 +4,7 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/assert"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
@@ -102,7 +103,9 @@ type AuthoritativeMovementComponent struct {
 
 	immobile bool
 	noClip   bool
-	gliding  bool
+
+	glideBoosters map[uint64]int64 // map[entityID]glideBoostTicks
+	gliding       bool
 
 	canSimulate            bool
 	flying, trustFlyStatus bool
@@ -119,6 +122,8 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		validationThreshold: 0.3,
 
 		defaultMovementSpeed: 0.1,
+
+		glideBoosters: make(map[uint64]int64),
 	}
 }
 
@@ -494,6 +499,21 @@ func (mc *AuthoritativeMovementComponent) SetGliding(gliding bool) {
 	mc.gliding = gliding
 }
 
+// AddGlideBooster adds a glide booster to the glide booster list.
+func (mc *AuthoritativeMovementComponent) AddGlideBooster(eid uint64, flightTicks int64) {
+	mc.glideBoosters[eid] = flightTicks
+}
+
+// TickGlideBoosters ticks all glide boosters ensuring they're valid and returns the amount of glide boosts to be applied.
+func (mc *AuthoritativeMovementComponent) GlideBoosters() int {
+	return len(mc.glideBoosters)
+}
+
+// RemoveGlideBooster removes a glide booster to the glide booster list.
+func (mc *AuthoritativeMovementComponent) RemoveGlideBooster(eid uint64) {
+	delete(mc.glideBoosters, eid)
+}
+
 // CanSimulate returns true if the movement component can be simulated by the server for the current frame.
 func (mc *AuthoritativeMovementComponent) CanSimulate() bool {
 	return mc.canSimulate
@@ -614,6 +634,21 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.gliding = true
 	} else if pk.InputData.Load(packet.InputFlagStopGliding) {
 		mc.gliding = false
+	}
+
+	// Tick all of the glide boosters.
+	for eid, ticks := range mc.glideBoosters {
+		ticks--
+		e := mc.mPlayer.EntityTracker().FindEntity(eid)
+		if ticks < 0 || e == nil || e.Type != entity.TypeFireworksRocket {
+			delete(mc.glideBoosters, eid)
+		}
+
+		if ticks < 0 {
+			delete(mc.glideBoosters, eid)
+		} else {
+			mc.glideBoosters[eid] = ticks
+		}
 	}
 
 	// Run the movement simulation after the states of the movement component have been updated.

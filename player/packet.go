@@ -149,6 +149,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 	case *packet.AddActor:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityType,
+			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
 			p.entTracker.MaxRewind(),
@@ -158,6 +160,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			scale,
 		))
 		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityType,
+			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
 			p.clientEntTracker.MaxRewind(),
@@ -169,6 +173,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			"",
+			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
 			p.entTracker.MaxRewind(),
@@ -178,6 +184,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			scale,
 		))
 		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			"",
+			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
 			p.clientEntTracker.MaxRewind(),
