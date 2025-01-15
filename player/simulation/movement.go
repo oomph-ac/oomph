@@ -36,9 +36,6 @@ func SimulatePlayerMovement(p *player.Player) {
 		return
 	}
 
-	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move final velocity: %v", movement.Vel())
-	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "client final velocity: %v", movement.Client().Vel())
-
 	blockUnder := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
 	blockFriction := game.DefaultAirFriction
 
@@ -72,22 +69,17 @@ func SimulatePlayerMovement(p *player.Player) {
 
 	if movement.Gliding() {
 		_, hasElytra := p.Inventory().Chestplate().(item.Elytra)
-		if hasElytra {
-			vel := movement.Vel()
-			dirVec := game.DirectionVector(movement.Rotation().Z(), movement.Rotation().X())
-			for i := 0; i < movement.GlideBoosters(); i++ {
-				vel[0] += dirVec[0]*0.1 + (dirVec[0]*1.5-vel[0])*0.5
-				vel[1] += dirVec[1]*0.1 + (dirVec[1]*1.5-vel[1])*0.5
-				vel[2] += dirVec[2]*0.1 + (dirVec[2]*1.5-vel[2])*0.5
-			}
-			movement.SetVel(vel)
-
+		if hasElytra && !movement.OnGround() {
 			movement.SetOnGround(false)
 			simulateGlide(p, movement)
 			movement.SetMov(movement.Vel())
 		} else {
-			p.Dbg.Notify(player.DebugModeMovementSim, true, "client wants glide, but has no elytra - forcing normal movement")
+			if movement.OnGround() {
+				movement.SetGliding(false)
+			}
+			p.Dbg.Notify(player.DebugModeMovementSim, true, "client wants glide, but has no elytra (or is on-ground) - forcing normal movement")
 		}
+		return
 	} else {
 		// Apply knockback if applicable.
 		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied: %v", movement.Vel())
@@ -170,6 +162,7 @@ func SimulatePlayerMovement(p *player.Player) {
 		}
 
 		movement.SetVel(newVel)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "serverPos=%v clientPos=%v, diff=%v", movement.Pos(), movement.Client().Pos(), movement.Pos().Sub(movement.Client().Pos()))
 	}
 }
 
@@ -182,7 +175,7 @@ func simulateGlide(p *player.Player, movement player.MovementComponent) {
 	pitchSin := game.MCSin(pitch)
 
 	lookX := yawSin * -pitchCos
-	//lookY := -pitchSin
+	lookY := -pitchSin
 	lookZ := yawCos * -pitchCos
 
 	vel := movement.Vel()
@@ -208,14 +201,30 @@ func simulateGlide(p *player.Player, movement player.MovementComponent) {
 		vel[2] += (lookZ/lookHz*velHz - vel[2]) * 0.1
 	}
 
+	// Although this should be applied when a fireworks entity is ticked (BECAUSE THIS IS WHAT EVERY SINGLE DECOMPILATION OF EVERY SINGLE
+	// VERSION OF BOTH MCBE AND MCJE SHOWS), putting the logic here allowed Oomph's prediction to be accurate...
+	// Furthermore, it seems that the client only likes to have one active boost at a time (although this seems to defy)
+	// the logic provided by *EVERY SINGLE DECOMPILATION OF EVERY SINGLE VERSION OF BOTH MCBE AND MCJE*
+	// Spending too many hours on stupid [sugar honey iced tea] like this better be making me bank in the near future.
+	if movement.GlideBoost() > 0 {
+		oldVel := vel
+		vel[0] += (lookX * 0.1) + (((lookX * 1.5) - vel[0]) * 0.5)
+		vel[1] += (lookY * 0.1) + (((lookY * 1.5) - vel[1]) * 0.5)
+		vel[2] += (lookZ * 0.1) + (((lookZ * 1.5) - vel[2]) * 0.5)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "applied glide boost (old=%v new=%v)", oldVel, vel)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "glide boost dirVec=[%f %f %f]", lookX, lookY, lookZ)
+	}
+
 	vel[0] *= 0.99
 	vel[1] *= 0.98
 	vel[2] *= 0.99
+
 	movement.SetVel(vel)
 
 	oldVel := vel
 	tryCollisions(movement, p.World, p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60))
-	p.Dbg.Notify(player.DebugModeMovementSim, true, "(glide) oldVel=%v, collisions=%v diff=%v", oldVel, movement.Vel(), movement.Pos().Sub(movement.Client().Pos()))
+	velDiff := movement.Vel().Sub(movement.Client().Vel())
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "(glide) oldVel=%v, collisions=%v diff=%v", oldVel, movement.Vel(), velDiff)
 }
 
 func walkOnBlock(movement player.MovementComponent, blockUnder df_world.Block) {

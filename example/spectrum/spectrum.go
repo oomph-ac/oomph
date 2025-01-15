@@ -60,6 +60,7 @@ func main() {
 			playerLog.SetOutput(f)
 
 			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
+			proc.Player().Movement().SetValidationThreshold(0.005)
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
