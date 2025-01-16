@@ -37,8 +37,9 @@ func main() {
 
 	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery("127.0.0.1:"+os.Args[2], ""), logger, opts, nil)
 	if err := proxy.Listen(minecraft.ListenConfig{
-		StatusProvider: util.NewStatusProvider("Spectrum Proxy", "Spectrum"),
-		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
+		StatusProvider:    util.NewStatusProvider("Spectrum Proxy", "Spectrum"),
+		FlushRate:         -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
+		AcceptedProtocols: []minecraft.Protocol{},
 	}); err != nil {
 		panic(err)
 	}
