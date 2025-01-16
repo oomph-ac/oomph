@@ -81,7 +81,7 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 		m.Violations++
 	}
 
-	ctx := event.C()
+	ctx := event.C(p)
 	p.EventHandler().HandleFlag(ctx, d, extraData)
 	if ctx.Cancelled() {
 		m.Violations = oldVl
@@ -112,7 +112,7 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 	}
 
 	if d.Punishable() && m.Violations >= m.MaxViolations {
-		ctx = event.C()
+		ctx = event.C(p)
 		message := DETECTION_DEFAULT_KICK_MESSAGE
 		p.EventHandler().HandlePunishment(ctx, d, &message)
 		if ctx.Cancelled() {
