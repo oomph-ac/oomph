@@ -8,4 +8,5 @@ const (
 	TYPE_KILLAURA      = "Killaura"
 	TYPE_REACH         = "Reach"
 	TYPE_TIMER         = "Timer"
+	TYPE_VELOCITY      = "Velocity"
 )

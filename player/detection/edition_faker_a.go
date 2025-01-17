@@ -126,6 +126,4 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 		d.mPlayer.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
 		d.mPlayer.Log().Warnf("unknown title ID %s with OS %v", titleID, deviceOS)
 	}
-
-	return
 }
