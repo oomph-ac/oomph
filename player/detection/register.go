@@ -28,4 +28,7 @@ func Register(p *player.Player) {
 
 	// timer detections
 	p.RegisterDetection(New_TimerA(p))
+
+	// velocity detections
+	p.RegisterDetection(New_VelocityA(p))
 }
