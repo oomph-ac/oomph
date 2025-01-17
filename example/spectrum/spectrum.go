@@ -23,7 +23,7 @@ func main() {
 	oomphLog.SetLevel(logrus.DebugLevel)
 
 	if len(os.Args) < 3 {
-		oomphLog.Fatal("Usage: ./oomph-bin <local_port> <remort_port> <optional: spectrum_token>")
+		oomphLog.Fatal("Usage: ./oomph-bin <local_port> <remote_addr> <optional: spectrum_token>")
 		return
 	}
 
@@ -35,9 +35,14 @@ func main() {
 		opts.Token = os.Args[3]
 	}
 
-	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery("127.0.0.1:"+os.Args[2], ""), logger, opts, nil)
+	statusProvider, err := minecraft.NewForeignStatusProvider(os.Args[2])
+	if err != nil {
+		panic(err)
+	}
+
+	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery(os.Args[2], ""), logger, opts, nil)
 	if err := proxy.Listen(minecraft.ListenConfig{
-		StatusProvider:    util.NewStatusProvider("Spectrum Proxy", "Spectrum"),
+		StatusProvider:    statusProvider,
 		FlushRate:         -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
 		AcceptedProtocols: []minecraft.Protocol{},
 	}); err != nil {
@@ -61,7 +66,7 @@ func main() {
 			playerLog.SetOutput(f)
 
 			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
-			proc.Player().Movement().SetValidationThreshold(0.005)
+			proc.Player().Movement().SetValidationThreshold(0.3)
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {

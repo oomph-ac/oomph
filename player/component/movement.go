@@ -660,6 +660,15 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		}
 	}
 
+	// Notify any detections that need to handle knockback.
+	if mc.HasKnockback() {
+		for _, d := range mc.mPlayer.Detections() {
+			if d, ok := d.(interface{ HandleKnockback() }); ok {
+				d.HandleKnockback()
+			}
+		}
+	}
+
 	mc.glideBoostTicks--
 	mc.ticksSinceKb++
 	mc.ticksSinceTeleport++
