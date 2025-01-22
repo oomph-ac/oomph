@@ -9,12 +9,15 @@ import (
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 )
 
 var DecodeClientPackets = []uint32{
+	packet.IDClientCacheStatus,
+	packet.IDClientCacheBlobStatus,
 	packet.IDScriptMessage,
 	packet.IDText,
 	packet.IDPlayerAuthInput,
@@ -34,6 +37,12 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 
 	cancel := false
 	switch pk := pk.(type) {
+	case *packet.ClientCacheStatus:
+		if p.identifier != nil && !pk.Enabled {
+			p.Disconnect(game.ErrorDeviceNotSupported)
+		}
+	case *packet.ClientCacheBlobStatus:
+		p.identifier.HandleResponse(pk)
 	case *packet.ScriptMessage:
 		if strings.Contains(pk.Identifier, "oomph:") {
 			p.Disconnect("\t")
@@ -91,8 +100,12 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			return true
 		}
 	case *packet.PlayerAuthInput:
-		p.InputMode = pk.InputMode
+		if i := p.identifier; i != nil && !i.Tick() {
+			p.Disconnect(game.ErrorNetworkTimeout)
+			return true
+		}
 
+		p.InputMode = pk.InputMode
 		missedSwing := false
 		if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
 			missedSwing = true

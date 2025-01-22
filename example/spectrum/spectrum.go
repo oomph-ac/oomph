@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/cooldogedev/spectrum"
 	"github.com/cooldogedev/spectrum/server"
@@ -13,6 +14,7 @@ import (
 	"github.com/cooldogedev/spectrum/util"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/player/component"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
 )
@@ -67,6 +69,17 @@ func main() {
 
 			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
 			proc.Player().Movement().SetValidationThreshold(0.3)
+			proc.Player().SetIdentifier(component.NewIdentifier(proc.Player()))
+
+			go func(p *player.Player) {
+				time.Sleep(time.Second * 5)
+				p.Pause()
+				if !p.Closed {
+					p.Identifier().Request()
+				}
+				p.Resume()
+			}(proc.Player())
+
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {

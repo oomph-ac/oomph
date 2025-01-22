@@ -131,6 +131,9 @@ type Player struct {
 	// and state of the entity. This component is used for detections to alert staff members when someone is using reach.
 	clientCombat CombatComponent
 
+	// identifier is the component that handles the unique idenfication of each player.
+	identifier IdentifierComponent
+
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
 
@@ -171,13 +174,13 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 	return p
 }
 
-// PauseProcessing locks the procMu to prevent any packets from being processed.
-func (p *Player) PauseProcessing() {
+// Pause locks the procMu to prevent any packets from being processed.
+func (p *Player) Pause() {
 	p.procMu.Lock()
 }
 
-// ResumeProcessing unlocks the procMu to allow packets to be processed.
-func (p *Player) ResumeProcessing() {
+// Resume unlocks the procMu to allow packets to be processed.
+func (p *Player) Resume() {
 	p.procMu.Unlock()
 }
 
