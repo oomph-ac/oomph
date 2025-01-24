@@ -6,7 +6,7 @@ toolchain go1.23.4
 
 require (
 	github.com/chewxy/math32 v1.10.1
-	github.com/cooldogedev/spectrum v0.0.35-0.20241220224851-5e68a26a2411
+	github.com/cooldogedev/spectrum v0.0.35-0.20250124172038-b370c70a9322
 	github.com/cooldogedev/spectrum-df v0.0.20
 	github.com/df-mc/dragonfly v0.10.1
 	github.com/elliotchance/orderedmap/v2 v2.2.0
@@ -29,13 +29,13 @@ require (
 	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
+	github.com/google/pprof v0.0.0-20250121033306-997b0b79cac0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
 	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
-	github.com/quic-go/quic-go v0.48.2 // indirect
+	github.com/quic-go/quic-go v0.49.0 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	go.uber.org/mock v0.5.0 // indirect
