@@ -82,14 +82,14 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
 func (p *Processor) ProcessPreTransfer(*session.Context, *string, *string) {
 	if pl := p.pl.Load(); pl != nil {
 		pl.PauseProcessing()
-		pl.ACKs().Invalidate()
-		pl.World.PurgeChunks()
 	}
 }
 
 func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string) {
 	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
 		pl.SetServerConn(s.Server())
+		pl.ACKs().Invalidate()
+		pl.World.PurgeChunks()
 		pl.ResumeProcessing()
 	}
 }
