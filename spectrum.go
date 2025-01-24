@@ -94,6 +94,12 @@ func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string
 	}
 }
 
+func (p *Processor) ProcessTransferFailure(_ *session.Context, origin *string, target *string) {
+	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
+		pl.ResumeProcessing()
+	}
+}
+
 func (p *Processor) ProcessDisconnection(_ *session.Context) {
 	if pl := p.pl.Load(); pl != nil {
 		_ = pl.Close()
