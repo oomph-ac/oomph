@@ -2,11 +2,12 @@ package acknowledgement
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/internal"
-	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	oworld "github.com/oomph-ac/oomph/world"
@@ -25,6 +26,11 @@ func NewChunkUpdateACK(p *player.Player, pk *packet.LevelChunk) *ChunkUpdate {
 }
 
 func (ack *ChunkUpdate) Run() {
+	if ack.pk.CacheEnabled {
+		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
+		return
+	}
+
 	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
 	if insertedToCache, err := oworld.Cache(ack.mPlayer.World, ack.pk); err != nil {
 		ack.mPlayer.Log().Errorf("failed to decode chunk: %v", err)
@@ -46,7 +52,9 @@ func NewSubChunkUpdateACK(p *player.Player, pk *packet.SubChunk) *SubChunkUpdate
 
 func (ack *SubChunkUpdate) Run() {
 	if ack.pk.CacheEnabled {
-		panic(oerror.New("subchunk caching not supported on oomph"))
+		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
+		return
+		//panic(oerror.New("subchunk caching not supported on oomph"))
 	}
 	var newChunks = map[protocol.ChunkPos]*chunk.Chunk{}
 
@@ -88,8 +96,11 @@ func (ack *SubChunkUpdate) Run() {
 			var index byte
 			sub, err := utils.DecodeSubChunk(buf, c, &index, chunk.NetworkEncoding)
 			if err != nil {
-				panic(err)
+				//panic(err)
+				ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+				return
 			}
+
 			c.Sub()[index] = sub
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "decoded subchunk %d at %v", index, chunkPos)
 		}
