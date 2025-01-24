@@ -2,7 +2,6 @@ package entity
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/assert"
 )
 
 // HistoricalPosition is a position of an entity that was recorded at a certain tick.
@@ -42,6 +41,6 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 		}
 	}
 
-	assert.IsTrue(delta != 1_000_000, "result for rewind at end-of-function should be found, but is not")
-	return result, true
+	//assert.IsTrue(delta != 1_000_000, "result for rewind at end-of-function should be found, but is not")
+	return result, len(e.PositionHistory) > 0
 }
