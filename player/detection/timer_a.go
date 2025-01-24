@@ -122,9 +122,6 @@ func (d *TimerA) Detect(pk packet.Packet) {
 }
 
 func (d *TimerA) shiftTickTimes() {
-	if len(d.tickTimes) != len(d.averages) {
-		panic("mismatched timer samples")
-	}
 	if len(d.tickTimes) != timerA_samples || len(d.averages) != timerA_samples {
 		return
 	}

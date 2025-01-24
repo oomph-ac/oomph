@@ -1,12 +1,8 @@
 package entity
 
 import (
-	"bytes"
-	"encoding/json"
-
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/utils"
 )
 
 const (
@@ -65,65 +61,6 @@ func New(entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySi
 		e.InterpolationTicks = EntityPlayerInterpolationTicks
 	}
 
-	return e
-}
-
-func (e *Entity) Encode(buf *bytes.Buffer) {
-	utils.WriteVec32(buf, e.Position)
-	utils.WriteVec32(buf, e.PrevPosition)
-	utils.WriteVec32(buf, e.RecvPosition)
-	utils.WriteVec32(buf, e.PrevRecvPosition)
-
-	utils.WriteVec32(buf, e.Velocity)
-	utils.WriteVec32(buf, e.PrevVelocity)
-	utils.WriteVec32(buf, e.RecvVelocity)
-	utils.WriteVec32(buf, e.PrevRecvVelocity)
-
-	utils.WriteLInt32(buf, int32(e.HistorySize))
-	enc, err := json.Marshal(e.PositionHistory)
-	if err != nil {
-		panic(err)
-	}
-
-	utils.WriteLInt32(buf, int32(len(enc)))
-	buf.Write(enc)
-
-	utils.WriteLInt32(buf, int32(e.InterpolationTicks))
-	utils.WriteLInt32(buf, int32(e.TicksSinceTeleport))
-
-	utils.WriteLFloat32(buf, e.Width)
-	utils.WriteLFloat32(buf, e.Height)
-
-	utils.WriteBool(buf, e.IsPlayer)
-}
-
-func Decode(buf *bytes.Buffer) *Entity {
-	e := &Entity{}
-	e.Position = utils.ReadVec32(buf.Next(12))
-	e.PrevPosition = utils.ReadVec32(buf.Next(12))
-	e.RecvPosition = utils.ReadVec32(buf.Next(12))
-	e.PrevRecvPosition = utils.ReadVec32(buf.Next(12))
-
-	e.Velocity = utils.ReadVec32(buf.Next(12))
-	e.PrevVelocity = utils.ReadVec32(buf.Next(12))
-	e.RecvVelocity = utils.ReadVec32(buf.Next(12))
-	e.PrevRecvVelocity = utils.ReadVec32(buf.Next(12))
-
-	e.HistorySize = int(utils.LInt32(buf.Next(4)))
-
-	len := int(utils.LInt32(buf.Next(4)))
-	err := json.Unmarshal(buf.Next(len), &e.PositionHistory)
-	if err != nil {
-		panic(err)
-	}
-
-	e.InterpolationTicks = int(utils.LInt32(buf.Next(4)))
-	e.TicksSinceTeleport = int(utils.LInt32(buf.Next(4)))
-
-	e.Width = utils.LFloat32(buf.Next(4))
-	e.Height = utils.LFloat32(buf.Next(4))
-
-	e.IsPlayer = utils.Bool(buf.Next(1))
 	return e
 }
 

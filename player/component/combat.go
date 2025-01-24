@@ -7,7 +7,6 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/assert"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
@@ -75,7 +74,12 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	}
 
 	if input == nil {
-		assert.IsTrue(!c.ackDependent, "ack-dependent combat component is should not calculate misprediction")
+		//assert.IsTrue(!c.ackDependent, "ack-dependent combat component is should not calculate misprediction")
+		if c.ackDependent {
+			c.mPlayer.Disconnect(game.ErrorInternalUnexpectedNullInput)
+			return
+		}
+
 		c.checkMisprediction = true
 		return
 	}

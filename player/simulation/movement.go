@@ -8,7 +8,6 @@ import (
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/assert"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -21,7 +20,12 @@ import (
 // SimulatePlayerMovement is a function that runs a movement simulation for
 func SimulatePlayerMovement(p *player.Player) {
 	movement := p.Movement()
-	assert.IsTrue(movement != nil, "movement component should be non-nil for simulation")
+	if movement == nil {
+		p.Disconnect(game.ErrorInternalMissingMovementComponent)
+		return
+	}
+
+	//assert.IsTrue(movement != nil, "movement component should be non-nil for simulation")
 
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "BEGIN movement sim for frame %d", p.SimulationFrame)
 	defer p.Dbg.Notify(player.DebugModeMovementSim, true, "END movement sim for frame %d", p.SimulationFrame)

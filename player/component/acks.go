@@ -2,11 +2,9 @@ package component
 
 import (
 	"math/rand/v2"
-	"sync"
 	"time"
 
-	"github.com/oomph-ac/oomph/assert"
-	"github.com/oomph-ac/oomph/oerror"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -17,12 +15,6 @@ const (
 	ACK_DIVIDER              = 1_000
 	MAX_ALLOWED_PENDING_ACKS = 200
 )
-
-var batchPool = sync.Pool{
-	New: func() any {
-		return &ackBatch{acks: make([]player.Acknowledgment, 0), timestamp: 0}
-	},
-}
 
 // ACKComponent is the component of the player that is responsible for sending and handling
 // acknowledgments to the player. This is vital for ensuring lag-compensated player experiences.
@@ -50,7 +42,10 @@ func NewACKComponent(p *player.Player) *ACKComponent {
 
 // Add adds an acknowledgment to the current acknowledgment list of the ack component.
 func (ackC *ACKComponent) Add(ack player.Acknowledgment) {
-	assert.IsTrue(ackC.currentBatch != nil, "no batch initalized for %d", ackC.currentBatch.timestamp)
+	if ackC.currentBatch == nil {
+		ackC.Refresh()
+	}
+	//assert.IsTrue(ackC.currentBatch != nil, "no batch initalized for %d", ackC.currentBatch.timestamp)
 	ackC.currentBatch.acks = append(ackC.currentBatch.acks, ack)
 }
 
@@ -77,21 +72,16 @@ func (ackC *ACKComponent) Execute(ackID int64) bool {
 	if index == -1 {
 		return false
 	}
-	assert.IsTrue(index < len(ackC.pending) && index >= 0, "found index (%d) out of bounds of 0-%d", index, len(ackC.pending)-1)
+	//assert.IsTrue(index < len(ackC.pending) && index >= 0, "found index (%d) out of bounds of 0-%d", index, len(ackC.pending)-1)
 
 	// Iterate through all the ACK batches up until the matching one and run them.
 	for _, batch := range ackC.pending[:index+1] {
-		assert.IsTrue(batch.timestamp != 0, "batch timestamp should never be zero")
+		//assert.IsTrue(batch.timestamp != 0, "batch timestamp should never be zero")
 
 		// Run all the acknowledgments in the batch
 		for _, a := range batch.acks {
 			a.Run()
 		}
-
-		// Put the batch back in the pool to eventually be reused.
-		batch.acks = batch.acks[:0]
-		batch.timestamp = 0
-		batchPool.Put(batch)
 	}
 
 	// Delete all previous ACKs that were sent before the one we got back from the client.
@@ -110,7 +100,7 @@ func (ackC *ACKComponent) Timestamp() int64 {
 // SetTimestamp manually sets the timestamp of the acknowledgment component to be sent later to the member
 // player. This is likely to be used in Oomph recodings/replays.
 func (ackC *ACKComponent) SetTimestamp(timestamp int64) {
-	assert.IsTrue(timestamp > 0, "timestamp is < 0 (%d)", timestamp)
+	//assert.IsTrue(timestamp > 0, "timestamp is < 0 (%d)", timestamp)
 	ackC.currentBatch.timestamp = timestamp
 }
 
@@ -144,7 +134,10 @@ func (ackC *ACKComponent) Tick() {
 	for _, batch := range ackC.pending {
 		_, exists := knownTimestamps[batch.timestamp]
 		knownTimestamps[batch.timestamp] = struct{}{}
-		assert.IsTrue(!exists, "multiple acks found with timestamp %d", batch.timestamp)
+		if exists {
+			ackC.mPlayer.Disconnect(game.ErrorInternalDuplicateACK)
+			break
+		}
 	}
 
 	if len(ackC.pending) > 0 && ackC.mPlayer.ServerConn() != nil {
@@ -157,8 +150,11 @@ func (ackC *ACKComponent) Tick() {
 // Flush sends the acknowledgment packet to the client and stores all of the current acknowledgments
 // to be handled later.
 func (ackC *ACKComponent) Flush() {
-	assert.IsTrue(ackC.currentBatch.acks != nil, "no buffer for current timestamp to flush %d", ackC.currentBatch.timestamp)
-	if len(ackC.currentBatch.acks) == 0 {
+	//assert.IsTrue(ackC.currentBatch.acks != nil, "no buffer for current timestamp to flush %d", ackC.currentBatch.timestamp)
+	if ackC.currentBatch == nil {
+		ackC.mPlayer.Disconnect(game.ErrorInternalACKIsNull)
+		return
+	} else if len(ackC.currentBatch.acks) == 0 {
 		return
 	}
 
@@ -178,24 +174,15 @@ func (ackC *ACKComponent) Flush() {
 // Invalidate drops and clears all current acknowledgments. This should only be called when the player is
 // in the process of being transfered to another server.
 func (ackC *ACKComponent) Invalidate() {
-	for _, b := range ackC.pending {
-		b.acks = b.acks[:0]
-		b.timestamp = 0
-		batchPool.Put(b)
-	}
 	ackC.pending = ackC.pending[:0]
 	ackC.mPlayer.Log().Info("invalidated ACKs due to transfer")
 }
 
 // Refresh resets the current timestamp of the acknowledgment component.
 func (ackC *ACKComponent) Refresh() {
-	newBatch := batchPool.Get().(*ackBatch)
-	newBatch.acks = newBatch.acks[:0]
-	newBatch.timestamp = 0
-	ackC.currentBatch = newBatch
-
+	ackC.currentBatch = &ackBatch{timestamp: 0, acks: make([]player.Acknowledgment, 0)}
 	// Create a random timestamp, and ensure that it is not already being used.
-	for i := 0; i < 3; i++ {
+	for {
 		ackC.SetTimestamp(int64(rand.Uint32()))
 		if ackC.legacyMode {
 			// On older versions of the game, timestamps in NetworkStackLatency were sent to the nearest thousand.
@@ -215,7 +202,7 @@ func (ackC *ACKComponent) Refresh() {
 		}
 	}
 
-	panic(oerror.New("unable to find new ack ID after multiple attempts"))
+	//panic(oerror.New("unable to find new ack ID after multiple attempts"))
 }
 
 type ackBatch struct {

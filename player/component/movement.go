@@ -1,11 +1,11 @@
 package component
 
 import (
+	"fmt"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/assert"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/player/simulation"
@@ -538,9 +538,9 @@ func (mc *AuthoritativeMovementComponent) SetTrustFlyStatus(trust bool) {
 
 // Update updates the states of the movement component from the given input.
 func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
-	assert.IsTrue(mc.mPlayer != nil, "parent player is null")
-	assert.IsTrue(pk != nil, "given player input is nil")
-	assert.IsTrue(mc.nonAuthoritative != nil, "non-authoritative data is null")
+	//assert.IsTrue(mc.mPlayer != nil, "parent player is null")
+	//assert.IsTrue(pk != nil, "given player input is nil")
+	//assert.IsTrue(mc.nonAuthoritative != nil, "non-authoritative data is null")
 
 	mc.nonAuthoritative.lastPos = mc.nonAuthoritative.pos
 	mc.nonAuthoritative.pos = pk.Position.Sub(playerHeightOffset)
@@ -703,7 +703,8 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 	case *packet.UpdateAttributes:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateAttributesACK(mc.mPlayer, pk.Attributes))
 	default:
-		panic(oerror.New("movement component cannot handle %T", pk))
+		mc.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalInvalidPacketForMovementComponent, pk))
+		//panic(oerror.New("movement component cannot handle %T", pk))
 	}
 }
 
