@@ -40,6 +40,31 @@ func SimulatePlayerMovement(p *player.Player) {
 		return
 	}
 
+	// We need to cap the velocity here to prevent Oomph from exhausting the server's resources.
+	clampedVel := movement.Vel()
+	clamped := false
+	if math32.Abs(clampedVel.X()) > 10 {
+		clamped = true
+		clampedVel[0] = game.ClampFloat(clampedVel.X(), -10, 10)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped xVel to %f", clampedVel.X())
+	}
+	if math32.Abs(clampedVel.Y()) > 10 {
+		clamped = true
+		clampedVel[1] = game.ClampFloat(clampedVel.Y(), -10, 10)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped yVel to %f", clampedVel.Y())
+	}
+	if math32.Abs(clampedVel.Z()) > 10 {
+		clamped = true
+		clampedVel[2] = game.ClampFloat(clampedVel.Z(), -10, 10)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped zVel to %f", clampedVel.Z())
+	}
+
+	// Notify the player if their movement has been limited.
+	if clamped {
+		p.NMessage("<red>Movement limited to prevent server exhuastion.</red>")
+		movement.SetVel(clampedVel)
+	}
+
 	blockUnder := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
 	blockFriction := game.DefaultAirFriction
 

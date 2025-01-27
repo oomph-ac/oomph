@@ -51,7 +51,7 @@ func (d *VelocityB) Detect(pk packet.Packet) {}
 
 func (d *VelocityB) HandleKnockback() {
 	movement := d.mPlayer.Movement()
-	if movement.Gliding() {
+	if movement.Gliding() || movement.HasTeleport() {
 		return
 	}
 
