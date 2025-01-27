@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	for i := 0; i < runtime.NumCPU()-1; i++ {
+	for i := 0; i < runtime.NumCPU()*2; i++ {
 		go cacheWorker()
 	}
 	go clearCacheWorker()
@@ -60,9 +60,7 @@ func (sc *CachedChunk) Subscribe() {
 }
 
 func (sc *CachedChunk) Unsubscribe() {
-	if newSubs := sc.subs.Add(-1); newSubs < 0 {
-		panic(oerror.New("CachedChunk subscriber count below zero"))
-	}
+	sc.subs.Add(-1)
 }
 
 func (sc *CachedChunk) Block(x uint8, y int16, z uint8, layer uint8) (rid uint32) {
@@ -75,13 +73,21 @@ type addChunkRequest struct {
 }
 
 func clearCacheWorker() {
-	t := time.NewTicker(time.Minute)
+	t := time.NewTicker(time.Second)
 	defer t.Stop()
+
+	defer func() {
+		if err := recover(); err != nil {
+			hub := sentry.CurrentHub().Clone()
+			hub.Recover(err)
+			hub.Flush(time.Second * 5)
+		}
+	}()
 
 	for range t.C {
 		cMu.Lock()
 		for chunkHash, cachedChunk := range chunkCache {
-			if cachedChunk.subs.Load() == 0 {
+			if cachedChunk.subs.Load() <= 0 {
 				delete(chunkCache, chunkHash)
 			}
 		}
@@ -106,12 +112,14 @@ func cacheWorker() {
 
 		// First, get the SHA-256 chunkHash of the packet's chunk payload.
 		chunkHash := sha256.Sum256(req.input.RawPayload)
-		// Then, check if the current chunk is already in the cache. If it is, add it to the player's world.
-		if cached, found := findCachedChunk(chunkHash); found {
-			cached.Subscribe()
-			req.target.AddChunk(req.input.Position, cached)
-		} else {
-			// If the chunk is not in the cache, then we must decode the chunk accordingly.
+
+		// We can't just do a read-lock on the cache mutex because there could be a race condition where
+		// the chunk is not found and then in another worker, a chunk with the same hash is cached.
+		cMu.Lock()
+		// Lookup the chunk in the cache.
+		cachedChunk, found := chunkCache[chunkHash]
+		// If the chunk is not found in the cache, we can create it and insert it into the cache.
+		if !found {
 			c, err := chunk.NetworkDecode(
 				AirRuntimeID,
 				req.input.RawPayload,
@@ -123,28 +131,14 @@ func cacheWorker() {
 			}
 			c.Compact()
 
-			// Create a new cached chunk and add a subscriber to it.
-			cachedChunk := &CachedChunk{c: c}
-			cachedChunk.subs.Store(1)
-
-			// Add the new cached chunk to the cache.
-			cMu.Lock()
+			cachedChunk = &CachedChunk{c: c}
 			chunkCache[chunkHash] = cachedChunk
-			cMu.Unlock()
-
-			// Add the new cached chunk into the player's world.
-			req.target.AddChunk(req.input.Position, cachedChunk)
 		}
+		// Subscribe to the cached chunk and add it into the player's world.
+		cachedChunk.Subscribe()
+		req.target.AddChunk(req.input.Position, cachedChunk)
+		cMu.Unlock()
 	}
 
 	logrus.Warnf("cache worker shutdown")
-}
-
-// findCachedChunk returns a chunk at the given position that has the same hash as the one
-func findCachedChunk(hash [32]byte) (*CachedChunk, bool) {
-	cMu.RLock()
-	cachedChunk, found := chunkCache[hash]
-	cMu.RUnlock()
-
-	return cachedChunk, found
 }
