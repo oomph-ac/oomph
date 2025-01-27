@@ -31,4 +31,5 @@ func Register(p *player.Player) {
 
 	// velocity detections
 	p.RegisterDetection(New_VelocityA(p))
+	p.RegisterDetection(New_VelocityB(p))
 }
