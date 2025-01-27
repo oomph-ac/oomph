@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/cooldogedev/spectrum"
@@ -15,6 +16,8 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sirupsen/logrus"
+
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -25,6 +28,10 @@ func main() {
 	if len(os.Args) < 3 {
 		oomphLog.Fatal("Usage: ./oomph-bin <local_port> <remote_addr> <optional: spectrum_token>")
 		return
+	}
+
+	if os.Getenv("PPROF_ENABLED") != "" {
+		go http.ListenAndServe("localhost:8080", nil)
 	}
 
 	opts := util.DefaultOpts()
