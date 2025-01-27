@@ -1,13 +1,15 @@
 package detection
 
 import (
-	"fmt"
-
 	"github.com/chewxy/math32"
+	"github.com/elliotchance/orderedmap/v2"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+// Please note that this check isn't actually neccessary, and is only used as a mitigation alert. Any type of
+// Velocity will be mitigated due to the authoritative movement system.
 type VelocityA struct {
 	mPlayer  *player.Player
 	metadata *player.DetectionMetadata
@@ -17,8 +19,8 @@ func New_VelocityA(p *player.Player) *VelocityA {
 	return &VelocityA{
 		mPlayer: p,
 		metadata: &player.DetectionMetadata{
-			FailBuffer:    2,
-			MaxBuffer:     4,
+			FailBuffer:    4,
+			MaxBuffer:     8,
 			TrustDuration: player.TicksPerSecond * 30,
 			MaxViolations: 10,
 		},
@@ -60,5 +62,10 @@ func (d *VelocityA) HandleKnockback() {
 		return
 	}
 
-	fmt.Println(clientVel/serverVel, clientVel, serverVel)
+	pct := (clientVel / serverVel) * 100
+	if pct < 99.9 || pct > 105 {
+		data := orderedmap.NewOrderedMap[string, any]()
+		data.Set("pct", game.Round32(pct, 4))
+		d.mPlayer.FailDetection(d, data)
+	}
 }
