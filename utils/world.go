@@ -66,8 +66,8 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 	return oneWayBlocks
 }
 
-// BlockBoxes returns the bounding boxes of the given block based on it's name.
-func BlockBoxes(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
+// BlockCollisions returns the bounding boxes of the given block based on it's name.
+func BlockCollisions(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.BBox {
 	var blockModel world.BlockModel
 	switch BlockName(b) {
 	case "minecraft:portal", "minecraft:end_portal":
@@ -200,7 +200,7 @@ func GetNearbyBBoxes(aabb cube.BBox, w *oomph_world.World) []cube.BBox {
 				pos := cube.Pos{x, y, z}
 				block := w.Block(df_cube.Pos(pos))
 
-				for _, box := range BlockBoxes(block, pos, w) {
+				for _, box := range BlockCollisions(block, pos, w) {
 					b := box.Translate(pos.Vec3())
 					if !b.IntersectsWith(aabb) || CanPassBlock(block) {
 						continue

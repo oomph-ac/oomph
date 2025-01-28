@@ -540,7 +540,7 @@ func blocksInside(movement player.MovementComponent, w *world.World) ([]df_world
 	for _, result := range utils.GetNearbyBlocks(bb, false, true, w) {
 		pos := result.Position
 		block := result.Block
-		boxes := utils.BlockBoxes(block, pos, w)
+		boxes := utils.BlockCollisions(block, pos, w)
 
 		for _, box := range boxes {
 			if bb.IntersectsWith(box.Translate(pos.Vec3())) {

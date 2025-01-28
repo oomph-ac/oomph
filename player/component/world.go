@@ -98,7 +98,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	}
 
 	// Make a list of BBoxes the block will occupy.
-	boxes := utils.BlockBoxes(b, replacePos, c.mPlayer.World)
+	boxes := utils.BlockCollisions(b, replacePos, c.mPlayer.World)
 	for index, blockBox := range boxes {
 		boxes[index] = blockBox.Translate(replacePos.Vec3())
 	}
@@ -161,7 +161,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	interactedBlock := c.mPlayer.World.Block(df_cube.Pos(blockPos))
 	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
 
-	if len(utils.BlockBoxes(interactedBlock, blockPos, c.mPlayer.World)) == 0 {
+	if len(utils.BlockCollisions(interactedBlock, blockPos, c.mPlayer.World)) == 0 {
 		c.initalInteractionAccepted = true
 		return true
 	}
@@ -188,7 +188,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		}
 
 		intersectingBlock := c.mPlayer.World.Block(flooredPos)
-		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World)
+		iBBs := utils.BlockCollisions(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World)
 		if len(iBBs) == 0 {
 			continue
 		}
