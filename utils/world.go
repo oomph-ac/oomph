@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"math"
 	_ "unsafe"
 
@@ -14,6 +15,8 @@ import (
 	oomph_world "github.com/oomph-ac/oomph/world"
 	"github.com/oomph-ac/oomph/world/blockmodel"
 )
+
+const MaxSearchBlocks = 1024
 
 type BlockSearchResult struct {
 	Block    world.Block
@@ -148,7 +151,7 @@ func BlockCollisions(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.B
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oomph_world.World) []BlockSearchResult {
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oomph_world.World) ([]BlockSearchResult, error) {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
@@ -161,14 +164,12 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oo
 				pos := cube.Pos{x, y, z}
 				b := w.Block(df_cube.Pos(pos))
 				if _, isAir := b.(block.Air); !includeAir && isAir {
-					b = nil
 					continue
 				}
 
 				// If the hash is MaxUint64, then the block is unknown to dragonfly.
 				bHash, _ := b.Hash()
 				if !includeUnknown && bHash == math.MaxUint64 {
-					b = nil
 					continue
 				}
 
@@ -177,12 +178,14 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oo
 					Block:    b,
 					Position: pos,
 				})
-				b = nil
+				if len(blocks) >= MaxSearchBlocks {
+					return nil, fmt.Errorf("exceeded max search blocks (startPos=%v endPos=%v)", min, max)
+				}
 			}
 		}
 	}
 
-	return blocks
+	return blocks, nil
 }
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.

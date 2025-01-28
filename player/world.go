@@ -5,6 +5,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -43,7 +44,14 @@ func (p *Player) WorldUpdater() WorldUpdaterComponent {
 
 func (p *Player) SyncWorld() {
 	// Update the blocks in the world so the client can sync itself properly.
-	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World) {
+	nearbyBlocks, err := utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World)
+	if err != nil {
+		p.Log().Error(err.Error())
+		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+		return
+	}
+
+	for _, blockResult := range nearbyBlocks {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: protocol.BlockPos{
 				int32(blockResult.Position[0]),

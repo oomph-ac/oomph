@@ -40,31 +40,6 @@ func SimulatePlayerMovement(p *player.Player) {
 		return
 	}
 
-	// We need to cap the velocity here to prevent Oomph from exhausting the server's resources.
-	clampedVel := movement.Vel()
-	clamped := false
-	if math32.Abs(clampedVel.X()) > 10 {
-		clamped = true
-		clampedVel[0] = game.ClampFloat(clampedVel.X(), -10, 10)
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped xVel to %f", clampedVel.X())
-	}
-	if math32.Abs(clampedVel.Y()) > 10 {
-		clamped = true
-		clampedVel[1] = game.ClampFloat(clampedVel.Y(), -10, 10)
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped yVel to %f", clampedVel.Y())
-	}
-	if math32.Abs(clampedVel.Z()) > 10 {
-		clamped = true
-		clampedVel[2] = game.ClampFloat(clampedVel.Z(), -10, 10)
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped zVel to %f", clampedVel.Z())
-	}
-
-	// Notify the player if their movement has been limited.
-	if clamped {
-		p.NMessage("<red>Movement limited to prevent server exhuastion.</red>")
-		movement.SetVel(clampedVel)
-	}
-
 	blockUnder := p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
 	blockFriction := game.DefaultAirFriction
 
@@ -135,7 +110,7 @@ func SimulatePlayerMovement(p *player.Player) {
 			movement.SetVel(newVel)
 		}
 
-		blocksInside, isInsideBlock := blocksInside(movement, p.World)
+		blocksInside, isInsideBlock := blocksInside(movement, p)
 		inCobweb := false
 		if isInsideBlock {
 			for _, b := range blocksInside {
@@ -159,7 +134,7 @@ func SimulatePlayerMovement(p *player.Player) {
 		avoidEdge(movement, p.World)
 
 		oldVel := movement.Vel()
-		tryCollisions(movement, p.World, p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60))
+		tryCollisions(movement, p, p.VersionInRange(-1, player.GameVersion1_20_60))
 		walkOnBlock(movement, blockUnder)
 		movement.SetMov(movement.Vel())
 
@@ -251,7 +226,7 @@ func simulateGlide(p *player.Player, movement player.MovementComponent) {
 	movement.SetVel(vel)
 
 	oldVel := vel
-	tryCollisions(movement, p.World, p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60))
+	tryCollisions(movement, p, p.VersionInRange(-1, player.GameVersion1_20_60))
 	velDiff := movement.Vel().Sub(movement.Client().Vel())
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "(glide) oldVel=%v, collisions=%v diff=%v", oldVel, movement.Vel(), velDiff)
 }
@@ -283,7 +258,14 @@ func simulationIsReliable(p *player.Player) bool {
 		return true
 	}
 
-	for _, b := range utils.GetNearbyBlocks(movement.BoundingBox(), false, true, p.World) {
+	nearbyBlocks, err := utils.GetNearbyBlocks(movement.BoundingBox(), false, true, p.World)
+	if err != nil {
+		p.Log().Error(err.Error())
+		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+		return false
+	}
+
+	for _, b := range nearbyBlocks {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
 			return false
 		}
@@ -335,13 +317,46 @@ func setPostCollisionMotion(movement player.MovementComponent, old mgl32.Vec3, c
 	movement.SetVel(newVel)
 }
 
-func tryCollisions(movement player.MovementComponent, w *world.World, dbg *player.Debugger, useSlideOffset bool) {
-	var completedStep bool
+func tryCollisions(movement player.MovementComponent, p *player.Player, useSlideOffset bool) {
+	w := p.World
+	dbg := p.Dbg
 
+	// We need to cap the velocity here to prevent Oomph from exhausting the server's resources.
+	clampedVel := movement.Vel()
+	clamped := false
+	if math32.Abs(clampedVel.X()) > 15 {
+		clamped = true
+		clampedVel[0] = game.ClampFloat(clampedVel.X(), -10, 10)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped xVel to %f", clampedVel.X())
+	}
+	if math32.Abs(clampedVel.Y()) > 15 {
+		clamped = true
+		clampedVel[1] = game.ClampFloat(clampedVel.Y(), -10, 10)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped yVel to %f", clampedVel.Y())
+	}
+	if math32.Abs(clampedVel.Z()) > 15 {
+		clamped = true
+		clampedVel[2] = game.ClampFloat(clampedVel.Z(), -10, 10)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "capped zVel to %f", clampedVel.Z())
+	}
+
+	// Notify the player if their movement has been limited.
+	if clamped {
+		p.NMessage("<red>Movement limited to prevent server exhuastion.</red>")
+		movement.SetVel(clampedVel)
+	}
+
+	var completedStep bool
 	collisionBB := movement.BoundingBox()
 	currVel := movement.Vel()
 	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(currVel), w)
-	oneWayBlocks := utils.OneWayCollisionBlocks(utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w))
+	nearbyBlocks, err := utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w)
+	if err != nil {
+		p.Log().Error(err.Error())
+		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+		return
+	}
+	oneWayBlocks := utils.OneWayCollisionBlocks(nearbyBlocks)
 
 	// TODO: determine more blocks that are considered to be one-way physics blocks, and
 	// figure out how to calculate ActorCollision::isStuckItem()
@@ -533,14 +548,21 @@ func avoidEdge(movement player.MovementComponent, w *world.World) {
 	movement.SetVel(newVel)
 }
 
-func blocksInside(movement player.MovementComponent, w *world.World) ([]df_world.Block, bool) {
+func blocksInside(movement player.MovementComponent, p *player.Player) ([]df_world.Block, bool) {
 	bb := movement.BoundingBox()
 	blocks := []df_world.Block{}
 
-	for _, result := range utils.GetNearbyBlocks(bb, false, true, w) {
+	nearbyBlocks, err := utils.GetNearbyBlocks(bb, false, true, p.World)
+	if err != nil {
+		p.Log().Error(err.Error())
+		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+		return blocks, false
+	}
+
+	for _, result := range nearbyBlocks {
 		pos := result.Position
 		block := result.Block
-		boxes := utils.BlockCollisions(block, pos, w)
+		boxes := utils.BlockCollisions(block, pos, p.World)
 
 		for _, box := range boxes {
 			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
