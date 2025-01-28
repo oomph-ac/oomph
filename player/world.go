@@ -44,14 +44,13 @@ func (p *Player) WorldUpdater() WorldUpdaterComponent {
 
 func (p *Player) SyncWorld() {
 	// Update the blocks in the world so the client can sync itself properly.
-	nearbyBlocks, err := utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World)
-	if err != nil {
-		p.Log().Error(err.Error())
-		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
-		return
-	}
+	for err, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World) {
+		if err != nil {
+			p.Log().Error(err.Error())
+			p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+			return
+		}
 
-	for _, blockResult := range nearbyBlocks {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: protocol.BlockPos{
 				int32(blockResult.Position[0]),

@@ -1,6 +1,8 @@
 package simulation
 
 import (
+	"iter"
+
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -11,7 +13,6 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
-	"github.com/oomph-ac/oomph/world"
 	oomph_block "github.com/oomph-ac/oomph/world/block"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -110,14 +111,11 @@ func SimulatePlayerMovement(p *player.Player) {
 			movement.SetVel(newVel)
 		}
 
-		blocksInside, isInsideBlock := blocksInside(movement, p)
 		inCobweb := false
-		if isInsideBlock {
-			for _, b := range blocksInside {
-				if utils.BlockName(b) == "minecraft:web" {
-					inCobweb = true
-					break
-				}
+		for _, b := range blocksInside(movement, p) {
+			if utils.BlockName(b) == "minecraft:web" {
+				inCobweb = true
+				break
 			}
 		}
 
@@ -131,7 +129,7 @@ func SimulatePlayerMovement(p *player.Player) {
 		}
 
 		// Avoid edges if the player is sneaking on the edge of a block.
-		avoidEdge(movement, p.World)
+		avoidEdge(movement, p)
 
 		oldVel := movement.Vel()
 		tryCollisions(movement, p, p.VersionInRange(-1, player.GameVersion1_20_60))
@@ -258,14 +256,13 @@ func simulationIsReliable(p *player.Player) bool {
 		return true
 	}
 
-	nearbyBlocks, err := utils.GetNearbyBlocks(movement.BoundingBox(), false, true, p.World)
-	if err != nil {
-		p.Log().Error(err.Error())
-		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
-		return false
-	}
+	for err, b := range utils.GetNearbyBlocks(movement.BoundingBox(), false, true, p.World) {
+		if err != nil {
+			p.Log().Error(err.Error())
+			p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+			break
+		}
 
-	for _, b := range nearbyBlocks {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
 			return false
 		}
@@ -346,21 +343,32 @@ func tryCollisions(movement player.MovementComponent, p *player.Player, useSlide
 		movement.SetVel(clampedVel)
 	}
 
-	var completedStep bool
+	var completedStep, hasOneWayBlocks bool
 	collisionBB := movement.BoundingBox()
 	currVel := movement.Vel()
+
 	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(currVel), w)
-	nearbyBlocks, err := utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w)
-	if err != nil {
-		p.Log().Error(err.Error())
-		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
-		return
+	for err := range bbList {
+		if err != nil {
+			p.Log().Error(err.Error())
+			p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+			return
+		}
 	}
-	oneWayBlocks := utils.OneWayCollisionBlocks(nearbyBlocks)
+
+	oneWayBlocks := utils.OneWayCollisionBlocks(utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w))
+	for err := range oneWayBlocks {
+		hasOneWayBlocks = true
+		if err != nil {
+			p.Log().Error(err.Error())
+			p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
+			return
+		}
+	}
 
 	// TODO: determine more blocks that are considered to be one-way physics blocks, and
 	// figure out how to calculate ActorCollision::isStuckItem()
-	useOneWayCollisions := len(oneWayBlocks) != 0 || movement.StuckInCollider()
+	useOneWayCollisions := hasOneWayBlocks || movement.StuckInCollider()
 	penetration := mgl32.Vec3{}
 	dbg.Notify(player.DebugModeMovementSim, useOneWayCollisions, "one-way collisions are used for this simulation")
 
@@ -424,12 +432,16 @@ func tryCollisions(movement player.MovementComponent, p *player.Player, useSlide
 		stepBB = stepBB.Translate(inverseYStepVel)
 		yStepVel = yStepVel.Add(inverseYStepVel)
 
+		var hasCollision bool
 		stepVel := yStepVel.Add(zStepVel).Add(xStepVel)
 		newBBList := utils.GetNearbyBBoxes(stepBB, w)
-		dbg.Notify(player.DebugModeMovementSim, true, "newBBList count: %d", len(newBBList))
-		dbg.Notify(player.DebugModeMovementSim, true, "stepVel=%v collisionVel=%v", stepVel, collisionVel)
+		for range newBBList {
+			hasCollision = true
+			break
+		}
 
-		if len(newBBList) == 0 && game.Vec3HzDistSqr(collisionVel) < game.Vec3HzDistSqr(stepVel) {
+		dbg.Notify(player.DebugModeMovementSim, true, "stepVel=%v collisionVel=%v", stepVel, collisionVel)
+		if hasCollision && game.Vec3HzDistSqr(collisionVel) < game.Vec3HzDistSqr(stepVel) {
 			collisionVel = stepVel
 			collisionBB = stepBB
 
@@ -489,7 +501,7 @@ func tryCollisions(movement player.MovementComponent, p *player.Player, useSlide
 }
 
 // avoidEdge is the function that helps the movement component remain at the edge of a block when sneaking.
-func avoidEdge(movement player.MovementComponent, w *world.World) {
+func avoidEdge(movement player.MovementComponent, p *player.Player) {
 	if !movement.Sneaking() || !movement.OnGround() || movement.Vel().Y() > 0 {
 		return
 	}
@@ -499,13 +511,20 @@ func avoidEdge(movement player.MovementComponent, w *world.World) {
 		// binary shows that on Bedrock the edge boundry is 0.025 on the X and Z axis.
 		edgeBoundry float32 = 0.025
 		offset      float32 = 0.05
+
+		w = p.World
 	)
 
 	newVel := movement.Vel()
 	bb := movement.BoundingBox().GrowVec3(mgl32.Vec3{-edgeBoundry, 0, -edgeBoundry})
 	xMov, zMov := newVel.X(), newVel.Z()
 
-	for xMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, 0}), w)) == 0 {
+	for xMov != 0.0 {
+		// If there is more than one bounding box in this iteration, we can break out of the loop
+		for range utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, 0}), w) {
+			break
+		}
+
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -515,7 +534,12 @@ func avoidEdge(movement player.MovementComponent, w *world.World) {
 		}
 	}
 
-	for zMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight * 1.01, zMov}), w)) == 0 {
+	for zMov != 0.0 {
+		// If there is more than one bounding box in this iteration, we can break out of the loop
+		for range utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight * 1.01, zMov}), w) {
+			break
+		}
+
 		if zMov < offset && zMov >= -offset {
 			zMov = 0
 		} else if zMov > 0 {
@@ -525,7 +549,12 @@ func avoidEdge(movement player.MovementComponent, w *world.World) {
 		}
 	}
 
-	for xMov != 0.0 && zMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, zMov}), w)) == 0 {
+	for xMov != 0.0 && zMov != 0.0 {
+		// If there is more than one bounding box in this iteration, we can break out of the loop
+		for range utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, zMov}), w) {
+			break
+		}
+
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -548,30 +577,23 @@ func avoidEdge(movement player.MovementComponent, w *world.World) {
 	movement.SetVel(newVel)
 }
 
-func blocksInside(movement player.MovementComponent, p *player.Player) ([]df_world.Block, bool) {
-	bb := movement.BoundingBox()
-	blocks := []df_world.Block{}
+func blocksInside(movement player.MovementComponent, p *player.Player) iter.Seq2[error, df_world.Block] {
+	return func(yield func(error, df_world.Block) bool) {
+		bb := movement.BoundingBox()
+		for err, result := range utils.GetNearbyBlocks(bb, false, true, p.World) {
+			pos := result.Position
+			block := result.Block
+			boxes := utils.BlockCollisions(block, pos, p.World)
 
-	nearbyBlocks, err := utils.GetNearbyBlocks(bb, false, true, p.World)
-	if err != nil {
-		p.Log().Error(err.Error())
-		p.Disconnect(game.ErrorInternalBlockSearchLimitExceeded)
-		return blocks, false
-	}
-
-	for _, result := range nearbyBlocks {
-		pos := result.Position
-		block := result.Block
-		boxes := utils.BlockCollisions(block, pos, p.World)
-
-		for _, box := range boxes {
-			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
-				blocks = append(blocks, block)
+			for _, box := range boxes {
+				if bb.IntersectsWith(box.Translate(pos.Vec3())) {
+					if !yield(err, block) {
+						return
+					}
+				}
 			}
 		}
 	}
-
-	return blocks, len(blocks) > 0
 }
 
 func moveRelative(movement player.MovementComponent, moveRelativeSpeed float32) {

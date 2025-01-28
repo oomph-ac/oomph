@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"iter"
 	"math"
 	_ "unsafe"
 
@@ -58,15 +59,18 @@ func CanPassBlock(b world.Block) bool {
 }
 
 // OneWayCollisionBlocks returns an array of blocks that utilize one-way physics.
-func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
-	oneWayBlocks := []world.Block{}
-	for _, b := range blocks {
-		if BlockClimbable(b.Block) {
-			oneWayBlocks = append(oneWayBlocks, b.Block)
+func OneWayCollisionBlocks(blockIter iter.Seq2[error, BlockSearchResult]) iter.Seq2[error, BlockSearchResult] {
+	return func(yield func(error, BlockSearchResult) bool) {
+		for err, b := range blockIter {
+			if !BlockClimbable(b.Block) {
+				continue
+			}
+
+			if !yield(err, b) {
+				return
+			}
 		}
 	}
-
-	return oneWayBlocks
 }
 
 // BlockCollisions returns the bounding boxes of the given block based on it's name.
@@ -151,71 +155,79 @@ func BlockCollisions(b world.Block, pos cube.Pos, w *oomph_world.World) []cube.B
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oomph_world.World) ([]BlockSearchResult, error) {
-	grown := aabb.Grow(0.5)
-	min, max := grown.Min(), grown.Max()
-	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
-	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *oomph_world.World) iter.Seq2[error, BlockSearchResult] {
+	return func(yield func(error, BlockSearchResult) bool) {
+		var err error
+		blockCount := 0
+		grown := aabb.Grow(0.5)
+		min, max := grown.Min(), grown.Max()
+		minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
+		maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 
-	blocks := make([]BlockSearchResult, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
-	for y := minY; y <= maxY; y++ {
-		for x := minX; x <= maxX; x++ {
-			for z := minZ; z <= maxZ; z++ {
-				pos := cube.Pos{x, y, z}
-				b := w.Block(df_cube.Pos(pos))
-				if _, isAir := b.(block.Air); !includeAir && isAir {
-					continue
-				}
-
-				// If the hash is MaxUint64, then the block is unknown to dragonfly.
-				bHash, _ := b.Hash()
-				if !includeUnknown && bHash == math.MaxUint64 {
-					continue
-				}
-
-				// Add the block to the list of block search results.
-				blocks = append(blocks, BlockSearchResult{
-					Block:    b,
-					Position: pos,
-				})
-				if len(blocks) >= MaxSearchBlocks {
-					return nil, fmt.Errorf("exceeded max search blocks (startPos=%v endPos=%v)", min, max)
-				}
-			}
-		}
-	}
-
-	return blocks, nil
-}
-
-// GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
-func GetNearbyBBoxes(aabb cube.BBox, w *oomph_world.World) []cube.BBox {
-	grown := aabb.Grow(0.5)
-	min, max := grown.Min(), grown.Max()
-	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
-	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
-
-	// A prediction of one BBox per block, plus an additional 2, in case
-	var bboxList []cube.BBox
-	for y := minY; y <= maxY; y++ {
-		for x := minX; x <= maxX; x++ {
-			for z := minZ; z <= maxZ; z++ {
-				pos := cube.Pos{x, y, z}
-				block := w.Block(df_cube.Pos(pos))
-
-				for _, box := range BlockCollisions(block, pos, w) {
-					b := box.Translate(pos.Vec3())
-					if !b.IntersectsWith(aabb) || CanPassBlock(block) {
+		for y := minY; y <= maxY; y++ {
+			for x := minX; x <= maxX; x++ {
+				for z := minZ; z <= maxZ; z++ {
+					pos := cube.Pos{x, y, z}
+					b := w.Block(df_cube.Pos(pos))
+					if _, isAir := b.(block.Air); !includeAir && isAir {
 						continue
 					}
 
-					bboxList = append(bboxList, b)
+					// If the hash is MaxUint64, then the block is unknown to dragonfly.
+					bHash, _ := b.Hash()
+					if !includeUnknown && bHash == math.MaxUint64 {
+						continue
+					}
+
+					blockCount++
+					if blockCount == MaxSearchBlocks {
+						err = fmt.Errorf("exceeded max search blocks (startPos=%v endPos=%v)", min, max)
+					}
+
+					if !yield(err, BlockSearchResult{Block: b, Position: pos}) {
+						return
+					}
 				}
 			}
 		}
 	}
+}
 
-	return bboxList
+// GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
+func GetNearbyBBoxes(aabb cube.BBox, w *oomph_world.World) iter.Seq2[error, cube.BBox] {
+	return func(yield func(error, cube.BBox) bool) {
+		boxCount := 0
+		grown := aabb.Grow(0.5)
+		min, max := grown.Min(), grown.Max()
+		minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
+		maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
+
+		var err error
+		for y := minY; y <= maxY; y++ {
+			for x := minX; x <= maxX; x++ {
+				for z := minZ; z <= maxZ; z++ {
+					pos := cube.Pos{x, y, z}
+					block := w.Block(df_cube.Pos(pos))
+
+					for _, box := range BlockCollisions(block, pos, w) {
+						box = box.Translate(pos.Vec3())
+						if !box.IntersectsWith(aabb) || CanPassBlock(block) {
+							continue
+						}
+
+						boxCount++
+						if boxCount >= MaxSearchBlocks {
+							err = fmt.Errorf("exceeded max search blocks (startPos=%v endPos=%v)", min, max)
+						}
+
+						if !yield(err, box) {
+							return
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // BlockClimbable returns whether the given block is climbable.
