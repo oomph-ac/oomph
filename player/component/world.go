@@ -181,7 +181,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 
 	// Check for all the blocks in between the interaction position and the player's eye position. If any blocks intersect
 	// with the line between the player's eye position and the interaction position, the interaction is cancelled.
-	for _, intersectingBlockPos := range game.BlocksBetween(eyePos, interactPos) {
+	for intersectingBlockPos := range game.BlocksBetween(eyePos, interactPos) {
 		flooredPos := df_cube.Pos{int(intersectingBlockPos[0]), int(intersectingBlockPos[1]), int(intersectingBlockPos[2])}
 		if flooredPos == df_cube.Pos(blockPos) {
 			continue
