@@ -258,7 +258,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 
 	check_blocks_between_ray:
-		for _, blockPos := range game.BlocksBetween(start, end) {
+		for blockPos := range game.BlocksBetween(start, end) {
 			flooredBlockPos := cube.PosFromVec3(blockPos)
 			blockInWay := c.mPlayer.World.Block(df_cube.Pos(flooredBlockPos))
 			if utils.IsBlockPassInteraction(blockInWay) {
