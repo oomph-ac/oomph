@@ -27,7 +27,7 @@ func Register(p *player.Player) {
 	p.RegisterDetection(New_ReachB(p))
 
 	// timer detections
-	p.RegisterDetection(New_TimerA(p))
+	//p.RegisterDetection(New_TimerA(p))
 
 	// velocity detections
 	p.RegisterDetection(New_VelocityA(p))
