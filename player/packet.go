@@ -110,7 +110,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		p.clientCombat.Calculate()
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {
-			return false
+			return true
 		}
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
