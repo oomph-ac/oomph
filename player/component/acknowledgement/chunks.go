@@ -59,7 +59,7 @@ func (ack *SubChunkUpdate) Run() {
 	var newChunks = map[protocol.ChunkPos]*chunk.Chunk{}
 
 	for _, entry := range ack.pk.SubChunkEntries {
-		if entry.Result != protocol.SubChunkResultSuccess && entry.Result != protocol.SubChunkResultSuccessAllAir {
+		if entry.Result != protocol.SubChunkResultSuccess {
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "unhandled subchunk result %d @ %v", entry.Result, ack.pk.Position)
 			continue
 		}
@@ -70,11 +70,7 @@ func (ack *SubChunkUpdate) Run() {
 		}
 
 		var c *chunk.Chunk
-		if entry.Result == protocol.SubChunkResultSuccessAllAir {
-			c = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
-			newChunks[chunkPos] = c
-			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all air at %v", chunkPos)
-		} else if new, ok := newChunks[chunkPos]; ok {
+		if new, ok := newChunks[chunkPos]; ok {
 			c = new
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "reusing chunk in map %v", chunkPos)
 		} else if existing := ack.mPlayer.World.GetChunk(chunkPos); existing != nil {
