@@ -564,6 +564,16 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.lastRotation = mc.rotation
 	mc.rotation = mgl32.Vec3{pk.Pitch, pk.HeadYaw, pk.Yaw}
 
+	if mc.lastRotation != mc.rotation {
+		delta := mc.rotation.Sub(mc.lastRotation)
+		mc.mPlayer.Dbg.Notify(
+			player.DebugModeRotations,
+			true,
+			"yawDelta=%f pitchDelta=%f headYawDelta=%f",
+			delta[2], delta[0], delta[1],
+		)
+	}
+
 	mc.pressingSneak = pk.InputData.Load(packet.InputFlagSneaking)
 	mc.pressingSprint = pk.InputData.Load(packet.InputFlagSprintDown)
 
