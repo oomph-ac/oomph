@@ -169,11 +169,13 @@ func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb cub
 	}
 
 	if point1 == point2 {
-		// Here, there is no possible way that any point between the two rays can intersect with the bounding box.
-		if !hit1 && !hit2 {
-			return mgl32.Vec3{}, false
+		if !hit1 {
+			if !hit2 {
+				// Here, there is no possible way that any point between the two rays can intersect with the bounding box.
+				return mgl32.Vec3{}, false
+			}
+			return point2, true
 		}
-
 		return point1, true
 	}
 
