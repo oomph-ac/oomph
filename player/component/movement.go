@@ -13,7 +13,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-var playerHeightOffset = mgl32.Vec3{0, game.PlayerHeightOffset}
+var playerHeightOffset = mgl32.Vec3{0, game.DefaultPlayerHeightOffset}
 
 // NonAuthoritativeMovementInfo represents the velocity and position that the player has sent to the server but has not validated.
 type NonAuthoritativeMovement struct {
