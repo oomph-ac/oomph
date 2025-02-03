@@ -11,8 +11,11 @@ const (
 	SlideOffsetMultiplier = float32(0.4)
 	SlimeBounceMultiplier = float32(-1)
 	BedBounceMultiplier   = float32(-0.66)
-	ClimbSpeed            = float32(0.2)
-	PlayerHeightOffset    = float32(1.62)
+	// This can be validated in Mob::ascendLadder()
+	ClimbSpeed = float32(0.2)
+
+	DefaultPlayerHeightOffset  = float32(1.62)
+	SneakingPlayerHeightOffset = float32(1.54)
 
 	JumpDelayTicks = 10
 )

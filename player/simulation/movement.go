@@ -95,18 +95,23 @@ func SimulatePlayerMovement(p *player.Player) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "moveRelative force applied (vel=%v)", movement.Vel())
 
 		nearClimable := utils.BlockClimbable(p.World.Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()))))
-		if nearClimable && !movement.PressingJump() {
+		if nearClimable {
 			newVel := movement.Vel()
-			newVel[0] = game.ClampFloat(newVel[0], -0.2, 0.2)
-			newVel[2] = game.ClampFloat(newVel[2], -0.2, 0.2)
+			//newVel[0] = game.ClampFloat(newVel[0], -0.3, 0.3)
+			//newVel[2] = game.ClampFloat(newVel[2], -0.3, 0.3)
 
-			if newVel[1] < -0.2 {
-				newVel[1] = -0.2
+			negClimbSpeed := -game.ClimbSpeed
+			if newVel[1] < negClimbSpeed {
+				newVel[1] = negClimbSpeed
+			}
+			if movement.PressingJump() || movement.XCollision() || movement.ZCollision() {
+				newVel[1] = game.ClimbSpeed
 			}
 			if movement.Sneaking() && newVel[1] < 0 {
 				newVel[1] = 0
 			}
 
+			p.Dbg.Notify(player.DebugModeMovementSim, true, "added climb velocity: %v (collided=%v pressingJump=%v)", newVel, movement.XCollision() || movement.ZCollision(), movement.PressingJump())
 			movement.SetVel(newVel)
 		}
 
@@ -146,8 +151,8 @@ func SimulatePlayerMovement(p *player.Player) {
 			}
 		}
 
-		isClimb := nearClimable && (p.Movement().XCollision() || p.Movement().ZCollision() || p.Movement().PressingJump())
-		setPostCollisionMotion(movement, oldVel, isClimb, blockUnder)
+		isPostClimb := nearClimable && (movement.XCollision() || movement.ZCollision() || movement.PressingJump())
+		setPostCollisionMotion(movement, oldVel, isPostClimb, blockUnder)
 
 		if inCobweb {
 			p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move cobweb force applied (0 vel)")
@@ -159,11 +164,6 @@ func SimulatePlayerMovement(p *player.Player) {
 		newVel[1] *= game.GravityMultiplier
 		newVel[0] *= blockFriction
 		newVel[2] *= blockFriction
-
-		if isClimb {
-			newVel[1] = game.ClimbSpeed
-			p.Dbg.Notify(player.DebugModeMovementSim, true, "upward climb applied")
-		}
 
 		movement.SetVel(newVel)
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "serverPos=%v clientPos=%v, diff=%v", movement.Pos(), movement.Client().Pos(), movement.Pos().Sub(movement.Client().Pos()))
@@ -316,11 +316,11 @@ func tryCollisions(movement player.MovementComponent, w *world.World, dbg *playe
 	collisionBB := movement.BoundingBox()
 	currVel := movement.Vel()
 	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(currVel), w)
-	oneWayBlocks := utils.OneWayCollisionBlocks(utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w))
+	//oneWayBlocks := utils.OneWayCollisionBlocks(utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w))
 
 	// TODO: determine more blocks that are considered to be one-way physics blocks, and
 	// figure out how to calculate ActorCollision::isStuckItem()
-	useOneWayCollisions := len(oneWayBlocks) != 0 || movement.StuckInCollider()
+	useOneWayCollisions := movement.StuckInCollider()
 	penetration := mgl32.Vec3{}
 	dbg.Notify(player.DebugModeMovementSim, useOneWayCollisions, "one-way collisions are used for this simulation")
 
@@ -436,8 +436,6 @@ func tryCollisions(movement player.MovementComponent, w *world.World, dbg *playe
 		yCollision,
 		math32.Abs(currVel.Z()-collisionVel.Z()) >= 1e-5, // zCollision
 	)
-
-	// Debug if the client doesn't have the same onGround state as our prediction.
 
 	// Unlike Java, bedrock seems to have a strange condition for the client to be considered on the ground. This is probably useful
 	// in cases where the client is teleporting, and the velocity (0) would still be equal to the previous velocity.
