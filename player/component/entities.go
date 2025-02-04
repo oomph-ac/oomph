@@ -131,6 +131,8 @@ func (c *EntityTrackerComponent) MaxRewind() int {
 // modes it is called when PlayerAuthInput is recieved.
 func (c *EntityTrackerComponent) Tick(tick int64) {
 	for _, e := range c.entities {
-		e.Tick(tick)
+		if e.NeedsUpdate() {
+			e.Tick(tick)
+		}
 	}
 }
