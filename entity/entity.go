@@ -25,7 +25,6 @@ type Entity struct {
 	// RecvVelocity is the velocity of the entity sent by the server in SetActorMotion.
 	RecvVelocity, PrevRecvVelocity mgl32.Vec3
 
-	HistorySize     int
 	PositionHistory []HistoricalPosition
 
 	InterpolationTicks int
@@ -52,8 +51,9 @@ func New(entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySi
 		Height: height,
 		Scale:  scale,
 
-		HistorySize: historySize,
-		IsPlayer:    isPlayer,
+		PositionHistory: make([]HistoricalPosition, 0, historySize),
+
+		IsPlayer: isPlayer,
 	}
 
 	e.InterpolationTicks = EntityMobInterpolationTicks
@@ -88,10 +88,10 @@ func (e *Entity) UpdatePosition(hp HistoricalPosition) {
 	e.PrevVelocity = e.Velocity
 	e.Velocity = e.Position.Sub(e.PrevPosition)
 
-	e.PositionHistory = append(e.PositionHistory, hp)
-	if len(e.PositionHistory) > e.HistorySize {
+	if cap(e.PositionHistory) == len(e.PositionHistory) {
 		e.PositionHistory = e.PositionHistory[1:]
 	}
+	e.PositionHistory = append(e.PositionHistory, hp)
 }
 
 // UpdateVelocity updates the velocity of the entity.
@@ -121,19 +121,23 @@ func (e *Entity) BoxExpansion() float32 {
 
 // Tick updates the entity's position based on the interpolation ticks.
 func (e *Entity) Tick(tick int64) {
-	pos := e.Position
+	newPos := e.Position
 	if e.InterpolationTicks > 0 {
 		delta := e.RecvPosition.Sub(e.Position).Mul(1 / float32(e.InterpolationTicks))
-		pos = pos.Add(delta)
-		e.InterpolationTicks--
+		newPos = newPos.Add(delta)
 	} else {
-		pos = e.RecvPosition
+		newPos = e.RecvPosition
 	}
 
 	e.UpdatePosition(HistoricalPosition{
-		Position:     pos,
+		Position:     newPos,
 		PrevPosition: e.Position,
 		Tick:         tick,
 	})
 	e.TicksSinceTeleport++
+	e.InterpolationTicks--
+}
+
+func (e *Entity) NeedsUpdate() bool {
+	return e.InterpolationTicks >= 0
 }

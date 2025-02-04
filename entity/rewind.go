@@ -5,7 +5,6 @@ import (
 )
 
 // HistoricalPosition is a position of an entity that was recorded at a certain tick.
-// TODO: Add more fields (such as teleport).
 type HistoricalPosition struct {
 	Position     mgl32.Vec3
 	PrevPosition mgl32.Vec3
@@ -22,7 +21,7 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 
 	var (
 		result HistoricalPosition
-		delta  int64 = 1_000_000
+		delta  int64 = 1_000_000_000_000
 	)
 
 	for _, hp := range e.PositionHistory {
@@ -30,17 +29,17 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 			return hp, true
 		}
 
-		cDelta := hp.Tick - tick
-		if cDelta < 0 {
-			cDelta *= -1
+		currentDelta := hp.Tick - tick
+		neg := currentDelta < 0
+		if neg {
+			currentDelta *= -1
 		}
 
-		if cDelta < delta {
+		if currentDelta <= delta {
 			result = hp
-			delta = cDelta
+			delta = currentDelta
 		}
 	}
 
-	//assert.IsTrue(delta != 1_000_000, "result for rewind at end-of-function should be found, but is not")
-	return result, len(e.PositionHistory) > 0
+	return result, true
 }
