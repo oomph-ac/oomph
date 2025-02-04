@@ -30,8 +30,7 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 		}
 
 		currentDelta := hp.Tick - tick
-		neg := currentDelta < 0
-		if neg {
+		if currentDelta < 0 {
 			currentDelta *= -1
 		}
 
