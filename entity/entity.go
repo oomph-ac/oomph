@@ -121,6 +121,10 @@ func (e *Entity) BoxExpansion() float32 {
 
 // Tick updates the entity's position based on the interpolation ticks.
 func (e *Entity) Tick(tick int64) {
+	if e.InterpolationTicks < 0 {
+		return
+	}
+
 	newPos := e.Position
 	if e.InterpolationTicks > 0 {
 		delta := e.RecvPosition.Sub(e.Position).Mul(1 / float32(e.InterpolationTicks))
@@ -136,8 +140,4 @@ func (e *Entity) Tick(tick int64) {
 	})
 	e.TicksSinceTeleport++
 	e.InterpolationTicks--
-}
-
-func (e *Entity) NeedsUpdate() bool {
-	return e.InterpolationTicks >= 0
 }
