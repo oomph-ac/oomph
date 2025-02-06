@@ -13,14 +13,15 @@ import (
 
 const (
 	ACK_DIVIDER              = 1_000
-	MAX_ALLOWED_PENDING_ACKS = 200
+	MAX_ALLOWED_PENDING_ACKS = 600 // ~ 30 seconds worth of pending ACKs
 )
 
 // ACKComponent is the component of the player that is responsible for sending and handling
 // acknowledgments to the player. This is vital for ensuring lag-compensated player experiences.
 type ACKComponent struct {
-	legacyMode bool
-	mPlayer    *player.Player
+	legacyMode   bool
+	clientTicked bool
+	mPlayer      *player.Player
 
 	ticksSinceLastResponse int64
 	currentBatch           *ackBatch
@@ -33,7 +34,7 @@ func NewACKComponent(p *player.Player) *ACKComponent {
 		mPlayer:    p,
 
 		ticksSinceLastResponse: 0,
-		pending:                make([]*ackBatch, 0),
+		pending:                make([]*ackBatch, 0, MAX_ALLOWED_PENDING_ACKS),
 	}
 	c.Refresh()
 
@@ -123,7 +124,12 @@ func (ackC *ACKComponent) SetLegacy(legacy bool) {
 }
 
 // Tick ticks the acknowledgment component.
-func (ackC *ACKComponent) Tick() {
+func (ackC *ACKComponent) Tick(client bool) {
+	if client {
+		ackC.clientTicked = true
+		return
+	}
+
 	// Update the latency every second.
 	if ackC.mPlayer.ServerTick%10 == 0 {
 		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, time.Now(), ackC.mPlayer.ServerTick))
@@ -140,6 +146,13 @@ func (ackC *ACKComponent) Tick() {
 		}
 	}
 
+	// If the client hasn't sent us a PlayerAuthInput packet, we can assume that their client may be
+	// frozen. In this case, we don't increase the ticksSinceLastResponse counter.
+	if !ackC.clientTicked {
+		return
+	}
+
+	ackC.clientTicked = false
 	if len(ackC.pending) > 0 && ackC.mPlayer.ServerConn() != nil {
 		ackC.ticksSinceLastResponse++
 	} else {

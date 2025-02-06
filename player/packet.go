@@ -100,6 +100,8 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		}
 
 		p.clientEntTracker.Tick(p.ClientTick)
+		p.acks.Tick(true)
+
 		p.handleBlockActions(pk)
 		p.handlePlayerMovementInput(pk)
 

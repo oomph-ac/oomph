@@ -21,8 +21,9 @@ type AcknowledgmentComponent interface {
 	// SetLegacy sets wether or not the acknowledgment component should use legacy mode.
 	SetLegacy(legacy bool)
 
-	// Tick ticks the acknowledgment component.
-	Tick()
+	// Tick ticks the acknowledgment component. The client parameter is true if the tick is triggered
+	// by the member player sending a PlayerAuthInput packet (see packet.go)
+	Tick(client bool)
 	// Flush sends the acknowledgment packet to the client and stores all of the current acknowledgments
 	// to be handled later.
 	Flush()
