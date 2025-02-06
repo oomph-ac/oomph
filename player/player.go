@@ -407,7 +407,7 @@ func (p *Player) tick() bool {
 	}
 
 	p.EntityTracker().Tick(p.ServerTick)
-	p.ACKs().Tick()
+	p.ACKs().Tick(false)
 	if !p.ACKs().Responsive() {
 		p.Disconnect(game.ErrorNetworkTimeout)
 		return false
