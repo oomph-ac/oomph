@@ -31,13 +31,13 @@ func (ack *ChunkUpdate) Run() {
 		return
 	}
 
-	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
-	if insertedToCache, err := oworld.Cache(ack.mPlayer.World, ack.pk); err != nil {
+	c, err := oworld.Cache(ack.pk)
+	if err != nil {
 		ack.mPlayer.Log().Errorf("failed to decode chunk: %v", err)
 		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "failed to decode chunk: %v", err)
-	} else if !insertedToCache {
-		ack.mPlayer.Log().Warnf("could not insert chunk into cache (x=%v, z=%v)", ack.pk.Position.X(), ack.pk.Position.Z())
 	}
+	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
+	ack.mPlayer.World.AddChunk(ack.pk.Position, c)
 }
 
 // SubChunkUpdate is an acknowledgment that runs when a player recievs a SubChunk packet.
