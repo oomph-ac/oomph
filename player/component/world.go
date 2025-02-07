@@ -88,7 +88,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
 	replacingBlock := c.mPlayer.World.Block(df_cube.Pos(replacePos))
 	if _, ok := replacingBlock.(block.Activatable); ok && !c.mPlayer.Movement().PressingSneak() {
-		c.mPlayer.SyncWorld()
+		//c.mPlayer.SyncWorld()
 		return false
 	}
 
@@ -106,14 +106,14 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
 	if cube.AnyIntersections(boxes, c.mPlayer.Movement().BoundingBox()) {
-		c.mPlayer.SyncWorld()
+		//c.mPlayer.SyncWorld()
 		return false
 	}
 
 	// Check if any entity is in the way of the block being placed.
 	for _, e := range c.mPlayer.EntityTracker().All() {
 		if cube.AnyIntersections(boxes, e.Box(e.Position)) {
-			c.mPlayer.SyncWorld()
+			//c.mPlayer.SyncWorld()
 			return false
 		}
 	}

@@ -268,10 +268,6 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 }
 
 func (p *Player) correctMovement() {
-	// We never want to send a correction while the player is in the middle of the teleport.
-	// Any discrepencies between the client and the server will be corrected in the next frame where a
-	// teleport is not occuring.
-
 	// Update the blocks in the world so the client can sync itself properly.
 	p.SyncWorld()
 
