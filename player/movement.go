@@ -265,7 +265,7 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 		threshold := p.movement.AcceptanceThreshold()
 
 		posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
-		posDiff[1] = game.ClampFloat(posDiff[1], -threshold, threshold)
+		posDiff[1] = 0
 		posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
 
 		p.movement.SetPos(p.movement.Pos().Sub(posDiff))
