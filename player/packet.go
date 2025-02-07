@@ -135,10 +135,10 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			}
 		}
 
-		if !p.worldUpdater.ValidateInteraction(pk) {
+		/* if !p.worldUpdater.ValidateInteraction(pk) {
 			p.SyncWorld()
 			return true
-		}
+		} */
 		if !p.worldUpdater.AttemptBlockPlacement(pk) {
 			return false
 		}
