@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -204,6 +205,13 @@ type MovementComponent interface {
 	// ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
 	ServerUpdate(pk packet.Packet)
 
+	// SetAcceptanceThreshold sets the amount of blocks the server's position can adjust itself to the client's position
+	// every simulation if both the client and server velocities are roughly the same.
+	SetAcceptanceThreshold(threshold float32)
+	// AcceptanceThreshold returns the amount of blocks the server's position can adjust itself to the client's position
+	// every simulation if both the client and server velocities are roughly the same.
+	AcceptanceThreshold() float32
+
 	// SetValidationThreshold sets the amount of blocks the client's position can deviate from the simulated one before a correction is required.
 	SetValidationThreshold(threshold float32)
 	// ValidationThreshold returnsr the amount of blocks the client's position can deviate from the simmulated one before a correction is required.
@@ -249,6 +257,26 @@ func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
 	// If the client's prediction of movement deviates from the server, we send a correction so that the client can re-sync.
 	if !p.movement.Validate() {
 		p.correctMovement()
+	} else if p.movement.Vel().Sub(p.movement.Client().Vel()).Len() < 1e-5 {
+		// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
+		// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
+		// the client and server position is desynced consistently without going above the correction threshold.
+		posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
+		threshold := p.movement.AcceptanceThreshold()
+
+		posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
+		posDiff[1] = game.ClampFloat(posDiff[1], -threshold, threshold)
+		posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
+
+		p.movement.SetPos(p.movement.Pos().Sub(posDiff))
+		p.Dbg.Notify(
+			DebugModeMovementSim,
+			posDiff.Len() >= 5e-4,
+			"shifted server position by %v (newPos=%v diff=%v)",
+			posDiff,
+			p.movement.Pos(),
+			p.movement.Pos().Sub(p.movement.Client().Pos()),
+		)
 	}
 
 	// To prevent the server never accepting our position (PMMP), we will always set our position to the final teleport position if a teleport is in progress.
