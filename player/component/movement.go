@@ -109,18 +109,19 @@ type AuthoritativeMovementComponent struct {
 	canSimulate            bool
 	flying, trustFlyStatus bool
 
-	validationThreshold float32
+	validationThreshold    float32
+	maxAcceptanceThreshold float32
 }
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
 	return &AuthoritativeMovementComponent{
-		mPlayer:          p,
-		nonAuthoritative: &NonAuthoritativeMovement{},
-
-		canSimulate:         true,
-		validationThreshold: 0.3,
-
+		mPlayer:              p,
+		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
+		canSimulate:          true,
+
+		maxAcceptanceThreshold: 0.002,
+		validationThreshold:    0.3,
 	}
 }
 
@@ -716,6 +717,18 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 		mc.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalInvalidPacketForMovementComponent, pk))
 		//panic(oerror.New("movement component cannot handle %T", pk))
 	}
+}
+
+// SetAcceptanceThreshold sets the amount of blocks the server's position can adjust itself to the client's position
+// every simulation if both the client and server velocities are roughly the same.
+func (mc *AuthoritativeMovementComponent) SetAcceptanceThreshold(threshold float32) {
+	mc.maxAcceptanceThreshold = threshold
+}
+
+// AcceptanceThreshold returns the amount of blocks the server's position can adjust itself to the client's position
+// every simulation if both the client and server velocities are roughly the same.
+func (mc *AuthoritativeMovementComponent) AcceptanceThreshold() float32 {
+	return mc.maxAcceptanceThreshold
 }
 
 // SetValidationThreshold sets the amount of blocks the client's position can deviate from the simulated one before a correction is required.
