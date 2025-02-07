@@ -44,7 +44,7 @@ func SimulatePlayerMovement(p *player.Player) {
 	blockFriction := game.DefaultAirFriction
 
 	// If a teleport was able to be handled, do not continue with the simulation.
-	if attemptTeleport(movement) {
+	if attemptTeleport(movement, p.Dbg) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
 		if attemptKnockback(movement) {
 			p.Dbg.Notify(player.DebugModeMovementSim, true, "knockback applied: %v", movement.Vel())
@@ -88,7 +88,7 @@ func SimulatePlayerMovement(p *player.Player) {
 		// Apply knockback if applicable.
 		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied: %v", movement.Vel())
 		// Attempt jump velocity if applicable.
-		p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(movement), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
+		p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(movement, p.Dbg), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
 
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "blockUnder=%s, blockFriction=%v, speed=%v", utils.BlockName(blockUnder), blockFriction, moveRelativeSpeed)
 		moveRelative(movement, moveRelativeSpeed)
@@ -551,10 +551,9 @@ func attemptKnockback(movement player.MovementComponent) bool {
 	return false
 }
 
-func attemptJump(movement player.MovementComponent) bool {
+func attemptJump(movement player.MovementComponent, dbg *player.Debugger) bool {
 	if !movement.Jumping() || !movement.OnGround() || movement.JumpDelay() > 0 {
-		return false
-	} else if movement.SlideOffset().Y() > 0 && movement.Vel().Y() > 0 {
+		dbg.Notify(player.DebugModeMovementSim, movement.Jumping(), "rejected jump from client (onGround=%v jumpDelay=%d)", movement.OnGround(), movement.JumpDelay())
 		return false
 	}
 
@@ -572,7 +571,7 @@ func attemptJump(movement player.MovementComponent) bool {
 	return true
 }
 
-func attemptTeleport(movement player.MovementComponent) bool {
+func attemptTeleport(movement player.MovementComponent, dbg *player.Debugger) bool {
 	if !movement.HasTeleport() {
 		return false
 	}
@@ -581,7 +580,7 @@ func attemptTeleport(movement player.MovementComponent) bool {
 		movement.SetPos(movement.TeleportPos())
 		movement.SetVel(mgl32.Vec3{})
 		movement.SetJumpDelay(0)
-		attemptJump(movement)
+		attemptJump(movement, dbg)
 		return true
 	}
 
