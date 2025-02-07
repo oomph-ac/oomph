@@ -100,6 +100,13 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	// Make a list of BBoxes the block will occupy.
 	boxes := utils.BlockBoxes(b, replacePos, c.mPlayer.World)
 	for index, blockBox := range boxes {
+		if blockBox.Width() != 1 || blockBox.Length() != 1 || blockBox.Height() != 1 {
+			// FIXME: Dragonfly has built in functions to check if a block can be placed against
+			// another, but it requires world transactions (instead of using BlockSource). This is a temporary
+			// workaround against this issue.
+			return true
+		}
+
 		boxes[index] = blockBox.Translate(replacePos.Vec3())
 	}
 
