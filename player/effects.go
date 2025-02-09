@@ -1,8 +1,6 @@
 package player
 
 import (
-	"time"
-
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -10,14 +8,23 @@ import (
 type EffectsComponent interface {
 	// Get returns an effect from the effect component from the passed effect ID. If the effect
 	// is not found, false is returned along with an empty effect.
-	Get(effectID int32) (effect.Effect, bool)
+	Get(effectID int32) (Effect, bool)
 	// Add adds an effect to the effect component.
-	Add(effectID int32, e effect.Effect)
+	Add(effectID int32, e Effect)
 	// Remove removes an effect from the effect component, removing the effect that matches with
 	// the passed effect ID.
 	Remove(effectID int32)
 	// Tick ticks all the effects, and removes those effects in which the duration has expired.
 	Tick()
+}
+
+type Effect struct {
+	Amplifier int32
+	Duration  int32
+}
+
+func NewEffect(level, duration int32) Effect {
+	return Effect{Amplifier: level, Duration: duration}
 }
 
 // SetEffects sets the effects component of the player.
@@ -43,8 +50,8 @@ func (p *Player) handleEffectsPacket(pk *packet.MobEffect) {
 			return
 		}
 
-		if e, ok := t.(effect.LastingType); ok {
-			p.effects.Add(pk.EffectType, effect.New(e, int(pk.Amplifier)+1, time.Duration(pk.Duration*50)*time.Millisecond))
+		if _, ok := t.(effect.LastingType); ok {
+			p.effects.Add(pk.EffectType, NewEffect(pk.Amplifier, pk.Duration))
 		}
 	case packet.MobEffectRemove:
 		p.effects.Remove(pk.EffectType)

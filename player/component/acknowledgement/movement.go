@@ -44,12 +44,12 @@ func NewUpdateAbilitiesACK(p *player.Player, data protocol.AbilityData) *UpdateA
 
 func (ack *UpdateAbilities) Run() {
 	for _, l := range ack.data.Layers {
-		mayFly := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
-		ack.mPlayer.Movement().SetFlying(utils.HasFlag(uint64(l.Values), protocol.AbilityFlying))
+		flying := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly) || utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
+		ack.mPlayer.Movement().SetFlying(flying)
 		ack.mPlayer.Movement().SetNoClip(utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip))
 
 		if ack.mPlayer.Movement().Client().ToggledFly() {
-			ack.mPlayer.Movement().SetTrustFlyStatus(ack.mPlayer.Movement().Flying() || mayFly)
+			ack.mPlayer.Movement().SetTrustFlyStatus(flying)
 			ack.mPlayer.Movement().Client().SetToggledFly(false)
 		}
 	}
