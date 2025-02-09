@@ -56,7 +56,7 @@ func (d *KillauraA) Detect(pk packet.Packet) {
 		tickDiff := int64(currentTick) - lastSwung
 		var maxTickDiff int64 = 10
 		if miningFatigue, ok := d.mPlayer.Effects().Get(packet.EffectMiningFatigue); ok {
-			maxTickDiff += int64(miningFatigue.Level())
+			maxTickDiff += int64(miningFatigue.Amplifier)
 		}
 
 		if tickDiff > maxTickDiff {

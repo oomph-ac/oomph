@@ -624,7 +624,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.pressingJump = pk.InputData.Load(packet.InputFlagJumping)
 	mc.jumpHeight = game.DefaultJumpHeight
 	if jumpBoost, ok := mc.mPlayer.Effects().Get(packet.EffectJumpBoost); ok {
-		mc.jumpHeight += float32(jumpBoost.Level()) * 0.1
+		mc.jumpHeight += float32(jumpBoost.Amplifier) * 0.1
 	}
 
 	// Jump timer resets if the jump button is not held down.
