@@ -16,20 +16,6 @@ func Register(p *player.Player) {
 	p.RegisterDetection(New_EditionFakerB(p))
 	p.RegisterDetection(New_EditionFakerC(p))
 
-	// hitbox detections
-	p.RegisterDetection(New_HitboxA(p))
-
 	// killaura detections
 	p.RegisterDetection(New_KillauraA(p))
-
-	// reach detections
-	p.RegisterDetection(New_ReachA(p))
-	p.RegisterDetection(New_ReachB(p))
-
-	// timer detections
-	//p.RegisterDetection(New_TimerA(p))
-
-	// velocity detections
-	p.RegisterDetection(New_VelocityA(p))
-	p.RegisterDetection(New_VelocityB(p))
 }
