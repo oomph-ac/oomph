@@ -50,7 +50,7 @@ func (d *KillauraA) Detect(pk packet.Packet) {
 		return
 	}
 
-	lastSwung := d.mPlayer.ClientCombat().LastSwing()
+	lastSwung := d.mPlayer.Combat().LastSwing()
 	if data, ok := tpk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && data.ActionType == protocol.UseItemOnEntityActionAttack {
 		currentTick := d.mPlayer.SimulationFrame
 		tickDiff := int64(currentTick) - lastSwung

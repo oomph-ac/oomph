@@ -46,15 +46,11 @@ type AuthoritativeCombatComponent struct {
 	attackInput *packet.InventoryTransaction
 	// checkMisprediction is true if the client swings in the air and the combat component is not ACK dependent.
 	checkMisprediction bool
-	// ackDependent is true if the combat component should rely on client-ACK'ed entities to verify combat.
-	ackDependent bool
 }
 
-func NewAuthoritativeCombatComponent(p *player.Player, ackDependent bool) *AuthoritativeCombatComponent {
+func NewAuthoritativeCombatComponent(p *player.Player) *AuthoritativeCombatComponent {
 	return &AuthoritativeCombatComponent{
-		mPlayer:      p,
-		ackDependent: ackDependent,
-
+		mPlayer:        p,
 		raycastResults: make([]float32, 0, COMBAT_LERP_POSITION_STEPS*2),
 		rawResults:     make([]float32, 0, COMBAT_LERP_POSITION_STEPS),
 		hooks:          []player.CombatHook{},
@@ -74,50 +70,29 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	}
 
 	if input == nil {
-		//assert.IsTrue(!c.ackDependent, "ack-dependent combat component is should not calculate misprediction")
-		if c.ackDependent {
-			c.mPlayer.Disconnect(game.ErrorInternalUnexpectedNullInput)
-			return
-		}
-
 		c.checkMisprediction = true
 		return
 	}
 
 	data := input.TransactionData.(*protocol.UseItemOnEntityTransactionData)
-	if c.ackDependent {
-		e := c.mPlayer.ClientEntityTracker().FindEntity(data.TargetEntityRuntimeID)
-		if e == nil {
-			return
-		}
-		c.targetedEntity = e
-
-		c.startAttackPos = c.mPlayer.Movement().Client().LastPos()
-		c.endAttackPos = c.mPlayer.Movement().Client().Pos()
-
-		c.startEntityPos = e.PrevPosition
-		c.endEntityPos = e.Position
-		c.entityBB = e.Box(mgl32.Vec3{})
-	} else {
-		e := c.mPlayer.EntityTracker().FindEntity(data.TargetEntityRuntimeID)
-		if e == nil {
-			return
-		}
-		c.targetedEntity = e
-
-		rewindPos, ok := e.Rewind(c.mPlayer.ClientTick)
-		if !ok {
-			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no rewind positions available for entity %d", data.TargetEntityRuntimeID)
-			return
-		}
-
-		c.startAttackPos = c.mPlayer.Movement().LastPos()
-		c.endAttackPos = c.mPlayer.Movement().Pos()
-
-		c.startEntityPos = rewindPos.PrevPosition
-		c.endEntityPos = rewindPos.Position
-		c.entityBB = e.Box(mgl32.Vec3{})
+	e := c.mPlayer.EntityTracker().FindEntity(data.TargetEntityRuntimeID)
+	if e == nil {
+		return
 	}
+	c.targetedEntity = e
+
+	rewindPos, ok := e.Rewind(c.mPlayer.ClientTick)
+	if !ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no rewind positions available for entity %d", data.TargetEntityRuntimeID)
+		return
+	}
+
+	c.startAttackPos = c.mPlayer.Movement().LastPos()
+	c.endAttackPos = c.mPlayer.Movement().Pos()
+
+	c.startEntityPos = rewindPos.PrevPosition
+	c.endEntityPos = rewindPos.Position
+	c.entityBB = e.Box(mgl32.Vec3{})
 
 	if c.mPlayer.Movement().Sneaking() {
 		c.startAttackPos[1] += 1.54
@@ -143,7 +118,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	t := time.Now()
 	defer func() {
 		delta := float64(time.Since(t).Nanoseconds()) / 1_000_000.0
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "took %fms to process [ackDependent=%v]", delta, c.ackDependent)
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "took %.4fms to process", delta)
 	}()
 
 	var (
@@ -171,18 +146,6 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	c.startRotation = c.mPlayer.Movement().LastRotation()
 	c.endRotation = c.mPlayer.Movement().Rotation()
 
-	var (
-		altStartEntityPos mgl32.Vec3
-		altEndEntityPos   mgl32.Vec3
-		altPosDelta       mgl32.Vec3
-	)
-
-	if c.ackDependent {
-		altStartEntityPos = c.targetedEntity.PrevPosition
-		altEndEntityPos = c.targetedEntity.Position
-		altPosDelta = altEndEntityPos.Sub(altStartEntityPos)
-	}
-
 	hitValid := false
 	stepAmt := 1.0 / float32(COMBAT_LERP_POSITION_STEPS)
 	for partialTicks := float32(0.0); partialTicks <= 1; partialTicks += stepAmt {
@@ -209,36 +172,6 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 					lerpedAtClosest = lerpedResult
 				}
 			}
-
-			// Check a possible alternative position for a race condition where minecraft is casting a ray but the
-			// entity has already been ticked. This should only be done if the combat component is acknowledgment dependent.
-			if c.ackDependent {
-				if c.ackDependent && hasNonSmoothTeleport {
-					c.startAttackPos = c.mPlayer.Movement().Client().LastPos()
-				}
-
-				altLerpedPos := altStartEntityPos.Add(altPosDelta)
-				altEntityBB := c.entityBB.Translate(altLerpedPos).Grow(0.1)
-
-				if altEntityBB.Vec3Within(lerpedResult.attackPos) {
-					closestRaycastDist = 0
-					hitValid = true
-					c.raycastResults = append(c.raycastResults, 0.0)
-					continue
-				}
-
-				if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
-					raycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
-					hitValid = hitValid || raycastDist <= COMBAT_SURVIVAL_REACH
-					c.raycastResults = append(c.raycastResults, raycastDist)
-
-					if raycastDist < closestRaycastDist {
-						closestRaycastDist = raycastDist
-						closestHitResult = hitResult
-						lerpedAtClosest = lerpedResult
-					}
-				}
-			}
 		}
 
 		rawDist := lerpedResult.attackPos.Sub(game.ClosestPointToBBox(lerpedResult.attackPos, entityBB.Grow(0.1))).Len()
@@ -254,7 +187,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	// If the hit is valid and the player is not on touch mode, check if the closest calculated ray from the player's eye position to the bounding box
 	// of the entity, has any intersecting blocks. If there are blocks that are in the way of the ray then the hit is invalid.
-	if !c.ackDependent && hitValid && c.mPlayer.InputMode != packet.InputModeTouch && closestRaycastDist > 0 {
+	if hitValid && c.mPlayer.InputMode != packet.InputModeTouch && closestRaycastDist > 0 {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 
 	check_blocks_between_ray:
@@ -276,15 +209,13 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			}
 		}
 	}
-	c.mPlayer.Dbg.Notify(player.DebugModeCombat, !hitValid && !c.checkMisprediction, "<red>hit was invalidated due to distance check</red> [ackDependent=%v] (raycast=%f, raw=%f)", c.ackDependent, closestRaycastDist, closestRawDist)
+	c.mPlayer.Dbg.Notify(player.DebugModeCombat, !hitValid && !c.checkMisprediction, "<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f)", closestRaycastDist, closestRawDist)
 
 	// If this is the full-authoritative combat component, and the hit is valid, send the attack packet to the server.
 	if hitValid {
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "<green>hit sent to the server</green> (raycast=%f raw=%f)", closestRaycastDist, closestRawDist)
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, c.checkMisprediction, "<yellow>client mispredicted air hit, but actually attacked entity</yellow>")
-		if !c.ackDependent {
-			c.mPlayer.SendPacketToServer(c.attackInput)
-		}
+		c.mPlayer.SendPacketToServer(c.attackInput)
 	}
 
 	for _, hook := range c.hooks {

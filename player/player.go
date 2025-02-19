@@ -120,16 +120,10 @@ type Player struct {
 	// entTracker is an entity tracker for server-sided view of entities. It does not rely on the client sending back
 	// acknowledgments to update positions and states of the entity.
 	entTracker EntityTrackerComponent
-	// clientEntTracker is an entity tracker for the client-sided view of entities. It relies on the client sending
-	// back acknowledgments to update the positions and states of the entity.
-	clientEntTracker EntityTrackerComponent
 
 	// combat is the component that handles validating combat. This combat component does not rely on client ACKs to determine the position
 	// and state of the entity. This component determines wether or not an attack should be sent to the server.
 	combat CombatComponent
-	// clientCombat is the component that handles validating combat. This combat component relies on client ACKs to determine the position
-	// and state of the entity. This component is used for detections to alert staff members when someone is using reach.
-	clientCombat CombatComponent
 
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler

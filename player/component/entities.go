@@ -4,7 +4,6 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/player"
-	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -20,16 +19,14 @@ type EntityTrackerComponent struct {
 
 	entities       map[uint64]*entity.Entity
 	maxRewindTicks int
-	ackDependent   bool
 }
 
-func NewEntityTrackerComponent(p *player.Player, ackDependent bool) *EntityTrackerComponent {
+func NewEntityTrackerComponent(p *player.Player) *EntityTrackerComponent {
 	return &EntityTrackerComponent{
 		mPlayer: p,
 
 		entities:       make(map[uint64]*entity.Entity),
 		maxRewindTicks: DEFAULT_MAX_REWIND_TICKS,
-		ackDependent:   ackDependent,
 	}
 }
 
@@ -70,48 +67,12 @@ func (c *EntityTrackerComponent) MoveEntity(rid uint64, tick int64, pos mgl32.Ve
 
 // HandleMovePlayer is a function that handles entity position updates sent with MovePlayerPacket.
 func (c *EntityTrackerComponent) HandleMovePlayer(pk *packet.MovePlayer) {
-	if c.ackDependent {
-		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateEntityPositionACK(
-			c.mPlayer,
-			pk.Position,
-			pk.EntityRuntimeID,
-			c.mPlayer.ServerTick,
-			pk.Mode == packet.MoveModeTeleport,
-			false,
-		))
-	} else {
-		acknowledgement.NewUpdateEntityPositionACK(
-			c.mPlayer,
-			pk.Position,
-			pk.EntityRuntimeID,
-			c.mPlayer.ServerTick,
-			pk.Mode == packet.MoveModeTeleport,
-			true,
-		).Run()
-	}
+	c.MoveEntity(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
 }
 
 // HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute) {
-	if c.ackDependent {
-		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateEntityPositionACK(
-			c.mPlayer,
-			pk.Position,
-			pk.EntityRuntimeID,
-			c.mPlayer.ServerTick,
-			utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport),
-			false,
-		))
-	} else {
-		acknowledgement.NewUpdateEntityPositionACK(
-			c.mPlayer,
-			pk.Position,
-			pk.EntityRuntimeID,
-			c.mPlayer.ServerTick,
-			utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport),
-			true,
-		).Run()
-	}
+	c.MoveEntity(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
 }
 
 // SetMaxRewind sets the maximum amount of ticks that entities are allowed to be

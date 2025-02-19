@@ -98,18 +98,15 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			missedSwing = true
 			p.combat.Attack(nil)
 		}
-
-		p.clientEntTracker.Tick(p.ClientTick)
 		p.acks.Tick(true)
 
 		p.handleBlockActions(pk)
-		p.handlePlayerMovementInput(pk)
+		p.handleMovement(pk)
 
 		serverVerifiedHit := p.combat.Calculate()
 		if serverVerifiedHit && missedSwing {
 			pk.InputData.Unset(packet.InputFlagMissedSwing)
 		}
-		p.clientCombat.Calculate()
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {
 			return true
@@ -119,7 +116,6 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 	case *packet.InventoryTransaction:
 		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.combat.Attack(pk)
-			p.clientCombat.Attack(pk)
 			cancel = true
 		}
 
@@ -146,7 +142,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		p.LastEquipmentData = pk
 	case *packet.Animate:
 		if pk.ActionType == packet.AnimateActionSwingArm {
-			p.ClientCombat().Swing()
+			p.Combat().Swing()
 		}
 	}
 
@@ -174,17 +170,6 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			height,
 			scale,
 		))
-		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
-			pk.EntityType,
-			pk.EntityMetadata,
-			pk.Position,
-			pk.Velocity,
-			p.clientEntTracker.MaxRewind(),
-			false,
-			width,
-			height,
-			scale,
-		))
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
@@ -193,17 +178,6 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			pk.Position,
 			pk.Velocity,
 			p.entTracker.MaxRewind(),
-			true,
-			width,
-			height,
-			scale,
-		))
-		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
-			"",
-			pk.EntityMetadata,
-			pk.Position,
-			pk.Velocity,
-			p.clientEntTracker.MaxRewind(),
 			true,
 			width,
 			height,
@@ -223,7 +197,6 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMoveActorAbsolute(pk)
-			p.clientEntTracker.HandleMoveActorAbsolute(pk)
 		} else {
 			p.movement.ServerUpdate(pk)
 		}
@@ -231,20 +204,15 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		pk.Tick = 0
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMovePlayer(pk)
-			p.clientEntTracker.HandleMovePlayer(pk)
 		} else {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.RemoveActor:
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
-		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 	case *packet.SetActorData:
 		pk.Tick = 0
 		if pk.EntityRuntimeID != p.RuntimeId {
 			if e := p.entTracker.FindEntity(pk.EntityRuntimeID); e != nil {
-				e.Width, e.Height, e.Scale = calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
-			}
-			if e := p.clientEntTracker.FindEntity(pk.EntityRuntimeID); e != nil {
 				e.Width, e.Height, e.Scale = calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
 			}
 		} else {
