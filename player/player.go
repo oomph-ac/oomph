@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/utils"
-	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -71,9 +71,6 @@ type Player struct {
 	StackLatency    time.Duration
 	LastServerTick  time.Time
 
-	// World is the world of the player.
-	World *world.World
-
 	// GameMode is the gamemode of the player. The player is exempt from movement predictions
 	// if they are not in survival or adventure mode.
 	GameMode int32
@@ -87,6 +84,9 @@ type Player struct {
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn       *minecraft.Conn
 	serverConn ServerConn
+
+	world       *world.World
+	worldLoader *world.Loader
 
 	// listener is the Gophertunnel listener
 	listener *minecraft.Listener
@@ -133,14 +133,14 @@ type Player struct {
 
 	// log is the logger of the player.
 	log *logrus.Logger
+
+	world.NopViewer
 }
 
 // New creates and returns a new Player instance.
 func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listener) *Player {
 	p := &Player{
 		MState: mState,
-
-		World: world.New(),
 
 		ClientTick:      0,
 		SimulationFrame: 0,
@@ -161,6 +161,17 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 		listener: listener,
 	}
+
+	p.world = world.Config{
+		ReadOnly:        true,
+		SaveInterval:    -1,
+		RandomTickSpeed: -1,
+		Dim:             world.Overworld,
+	}.New()
+	p.world.StopWeatherCycle()
+	p.world.StopTime()
+	p.worldLoader = world.NewLoader(16, p.world, p)
+
 	p.Dbg = NewDebugger(p)
 	return p
 }
@@ -343,7 +354,6 @@ func (p *Player) Close() error {
 		if evHandler := p.eventHandler; evHandler != nil {
 			evHandler.HandleQuit()
 		}
-		p.World.PurgeChunks()
 
 		if !p.MState.IsReplay {
 			if c := p.conn; c != nil {

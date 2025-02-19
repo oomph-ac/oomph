@@ -1,7 +1,6 @@
 package player
 
 import (
-	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
@@ -41,9 +40,17 @@ func (p *Player) WorldUpdater() WorldUpdaterComponent {
 	return p.worldUpdater
 }
 
+func (p *Player) World() *world.World {
+	return p.world
+}
+
+func (p *Player) WorldLoader() *world.Loader {
+	return p.worldLoader
+}
+
 func (p *Player) SyncWorld() {
 	// Update the blocks in the world so the client can sync itself properly.
-	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World) {
+	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World()) {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: protocol.BlockPos{
 				int32(blockResult.Position[0]),
@@ -58,10 +65,10 @@ func (p *Player) SyncWorld() {
 }
 
 func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
-	chunkPos := protocol.ChunkPos{
+	/* chunkPos := protocol.ChunkPos{
 		int32(math32.Floor(p.movement.Pos().X())) >> 4,
 		int32(math32.Floor(p.movement.Pos().Z())) >> 4,
-	}
+	} */
 
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
 		for _, action := range pk.BlockActions {
@@ -75,11 +82,13 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				p.World.SetBlock(df_cube.Pos{
-					int(action.BlockPos.X()),
-					int(action.BlockPos.Y()),
-					int(action.BlockPos.Z()),
-				}, block.Air{}, nil)
+				<-p.world.Exec(func(tx *world.Tx) {
+					tx.SetBlock(df_cube.Pos{
+						int(action.BlockPos.X()),
+						int(action.BlockPos.Y()),
+						int(action.BlockPos.Z()),
+					}, block.Air{}, nil)
+				})
 			case protocol.PlayerActionStartBreak:
 				if p.worldUpdater.BlockBreakPos() != nil {
 					continue
@@ -99,17 +108,18 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				p.World.SetBlock(df_cube.Pos{
-					int(p.worldUpdater.BlockBreakPos().X()),
-					int(p.worldUpdater.BlockBreakPos().Y()),
-					int(p.worldUpdater.BlockBreakPos().Z()),
-				}, block.Air{}, nil)
-				//p.worldUpdater.BlockBreakPos() = nil
+				<-p.world.Exec(func(tx *world.Tx) {
+					tx.SetBlock(df_cube.Pos{
+						int(p.worldUpdater.BlockBreakPos().X()),
+						int(p.worldUpdater.BlockBreakPos().Y()),
+						int(p.worldUpdater.BlockBreakPos().Z()),
+					}, block.Air{}, nil)
+				})
 			}
 		}
 	}
 
-	if p.Ready {
-		p.World.CleanChunks(p.worldUpdater.ChunkRadius(), chunkPos)
-	}
+	/* if p.Ready {
+		p.World().CleanChunks(p.worldUpdater.ChunkRadius(), chunkPos)
+	} */
 }
