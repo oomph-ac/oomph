@@ -31,13 +31,13 @@ func (ack *ChunkUpdate) Run() {
 		return
 	}
 
-	c, err := oworld.Cache(ack.pk)
+	c, err := chunk.NetworkDecode(oworld.AirRuntimeID, ack.pk.RawPayload, int(ack.pk.SubChunkCount), world.Overworld.Range())
 	if err != nil {
-		ack.mPlayer.Log().Errorf("failed to decode chunk: %v", err)
-		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "failed to decode chunk: %v", err)
+		ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+		return
 	}
-	ack.mPlayer.World.ExemptChunk(ack.pk.Position)
-	ack.mPlayer.World.AddChunk(ack.pk.Position, c)
+
+	fmt.Println(c)
 }
 
 // SubChunkUpdate is an acknowledgment that runs when a player recievs a SubChunk packet.
@@ -54,7 +54,6 @@ func (ack *SubChunkUpdate) Run() {
 	if ack.pk.CacheEnabled {
 		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
 		return
-		//panic(oerror.New("subchunk caching not supported on oomph"))
 	}
 	var newChunks = map[protocol.ChunkPos]*chunk.Chunk{}
 
@@ -73,7 +72,7 @@ func (ack *SubChunkUpdate) Run() {
 		if new, ok := newChunks[chunkPos]; ok {
 			c = new
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "reusing chunk in map %v", chunkPos)
-		} else if existing := ack.mPlayer.World.GetChunk(chunkPos); existing != nil {
+		} else if existing := ack.mPlayer.World().GetChunk(chunkPos); existing != nil {
 			// We assume that the existing chunk is not cached because the cache does not support SubChunks for the time being.
 			c = existing.(*chunk.Chunk)
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "using existing chunk %v", chunkPos)
@@ -104,7 +103,7 @@ func (ack *SubChunkUpdate) Run() {
 	}
 
 	for pos, newC := range newChunks {
-		ack.mPlayer.World.AddChunk(pos, newC)
+		ack.mPlayer.World().AddChunk(pos, newC)
 		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "(sub) added chunk at %v", pos)
 	}
 }
