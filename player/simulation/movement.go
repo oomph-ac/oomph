@@ -150,9 +150,7 @@ func SimulatePlayerMovement(p *player.Player) {
 				blockUnder = b
 			}
 		}
-
-		isPostClimb := nearClimable && (movement.XCollision() || movement.ZCollision() || movement.PressingJump())
-		setPostCollisionMotion(movement, oldVel, isPostClimb, blockUnder)
+		setPostCollisionMotion(movement, oldVel, blockUnder)
 
 		if inCobweb {
 			p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move cobweb force applied (0 vel)")
@@ -291,15 +289,10 @@ func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder d
 	movement.SetVel(newVel)
 }
 
-func setPostCollisionMotion(movement player.MovementComponent, old mgl32.Vec3, climb bool, blockUnder df_world.Block) {
-	if climb {
-		return
-	}
-
+func setPostCollisionMotion(movement player.MovementComponent, old mgl32.Vec3, blockUnder df_world.Block) {
 	if movement.YCollision() {
 		landOnBlock(movement, old, blockUnder)
 	}
-
 	newVel := movement.Vel()
 	if movement.XCollision() {
 		newVel[0] = 0
