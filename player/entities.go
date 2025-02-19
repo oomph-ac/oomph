@@ -45,11 +45,3 @@ func (p *Player) SetEntityTracker(et EntityTrackerComponent) {
 func (p *Player) EntityTracker() EntityTrackerComponent {
 	return p.entTracker
 }
-
-func (p *Player) SetClientEntityTracker(et EntityTrackerComponent) {
-	p.clientEntTracker = et
-}
-
-func (p *Player) ClientEntityTracker() EntityTrackerComponent {
-	return p.clientEntTracker
-}

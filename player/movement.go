@@ -247,7 +247,7 @@ func (p *Player) Movement() MovementComponent {
 	return p.movement
 }
 
-func (p *Player) handlePlayerMovementInput(pk *packet.PlayerAuthInput) {
+func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	p.SimulationFrame = pk.Tick
 	p.ClientTick++
 
