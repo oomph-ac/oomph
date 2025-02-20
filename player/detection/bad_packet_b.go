@@ -1,7 +1,6 @@
 package detection
 
 import (
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -10,8 +9,6 @@ import (
 type BadPacketB struct {
 	mPlayer  *player.Player
 	metadata *player.DetectionMetadata
-
-	last, tick int
 }
 
 func New_BadPacketB(p *player.Player) *BadPacketB {
@@ -35,7 +32,7 @@ func (*BadPacketB) SubType() string {
 }
 
 func (*BadPacketB) Description() string {
-	return "Checks if a player is consistently sending MovePlayer packets rather than PlayerAuthInput."
+	return "Checks if a player is if the user is hitting themselves."
 }
 
 func (*BadPacketB) Punishable() bool {
@@ -47,20 +44,9 @@ func (d *BadPacketB) Metadata() *player.DetectionMetadata {
 }
 
 func (d *BadPacketB) Detect(pk packet.Packet) {
-	switch pk := pk.(type) {
-	case *packet.MovePlayer:
-		speed := d.tick - d.last
-		if speed < 2 && !d.mPlayer.Movement().Immobile() && d.mPlayer.World.GetChunk(protocol.ChunkPos{
-			int32(pk.Position.X()) >> 4,
-			int32(pk.Position.Z()) >> 4,
-		}) != nil {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("speed", speed)
-			d.mPlayer.FailDetection(d, data)
+	if t, ok := pk.(*packet.InventoryTransaction); ok {
+		if dat, ok := t.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && dat.ActionType == protocol.UseItemOnEntityActionAttack && d.mPlayer.RuntimeId == dat.TargetEntityRuntimeID {
+			d.mPlayer.FailDetection(d, nil)
 		}
-
-		d.last = d.tick
-	case *packet.PlayerAuthInput:
-		d.tick++
 	}
 }

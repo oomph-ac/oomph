@@ -1,8 +1,6 @@
 package component
 
 import (
-	"fmt"
-
 	"github.com/oomph-ac/oomph/player"
 )
 
@@ -50,8 +48,6 @@ func (ec *EffectsComponent) Tick() {
 			delete(ec.effects, id)
 			continue
 		}
-
-		fmt.Println(id, e.Duration)
 		ec.effects[id] = e
 	}
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/oerror"
+	_ "github.com/oomph-ac/oomph/world/block"
 )
 
 var AirRuntimeID uint32

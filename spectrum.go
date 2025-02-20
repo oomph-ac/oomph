@@ -55,15 +55,15 @@ func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameDat
 	gd.PlayerMovementSettings.RewindHistorySize = 40
 }
 
-func (p *Processor) ProcessServer(ctx *session.Context, pk packet.Packet) {
+func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {
 	if pl := p.pl.Load(); pl != nil {
-		pl.HandleServerPacket(pk)
+		pl.HandleServerPacket(*pk)
 	}
 }
 
-func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
+func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 	if os.Getenv("DBG") != "" {
-		if txt, ok := pk.(*packet.Text); ok && txt.Message == "transferme" {
+		if txt, ok := (*pk).(*packet.Text); ok && txt.Message == "transferme" {
 			if !p.dbgTransfer {
 				p.registry.GetSession(p.identity.XUID).Transfer("127.0.0.1:20002")
 				p.dbgTransfer = true
@@ -74,7 +74,7 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk packet.Packet) {
 		}
 	}
 
-	if pl := p.pl.Load(); pl != nil && pl.HandleClientPacket(pk) {
+	if pl := p.pl.Load(); pl != nil && pl.HandleClientPacket(*pk) {
 		ctx.Cancel()
 	}
 }
@@ -89,7 +89,7 @@ func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string
 	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
 		pl.SetServerConn(s.Server())
 		pl.ACKs().Invalidate()
-		pl.World.PurgeChunks()
+		pl.RegenerateWorld()
 		pl.ResumeProcessing()
 	}
 }

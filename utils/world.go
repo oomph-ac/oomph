@@ -66,7 +66,7 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 }
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
-func BlockBoxes(b world.Block, pos cube.Pos, w *world.World) []cube.BBox {
+func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
 	var blockModel world.BlockModel
 	switch BlockName(b) {
 	case "minecraft:portal", "minecraft:end_portal":
@@ -140,83 +140,75 @@ func BlockBoxes(b world.Block, pos cube.Pos, w *world.World) []cube.BBox {
 	}
 
 	var boxes []cube.BBox
-	<-w.Exec(func(tx *world.Tx) {
-		dfBoxes := blockModel.BBox(df_cube.Pos(pos), tx)
-		boxes = make([]cube.BBox, len(dfBoxes))
-		for i, bb := range dfBoxes {
-			boxes[i] = game.DFBoxToCubeBox(bb)
-		}
-	})
+	dfBoxes := blockModel.BBox(df_cube.Pos(pos), tx)
+	boxes = make([]cube.BBox, len(dfBoxes))
+	for i, bb := range dfBoxes {
+		boxes[i] = game.DFBoxToCubeBox(bb)
+	}
 	return boxes
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, w *world.World) []BlockSearchResult {
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, tx *world.Tx) []BlockSearchResult {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 	blocks := make([]BlockSearchResult, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
 
-	<-w.Exec(func(tx *world.Tx) {
-		for y := minY; y <= maxY; y++ {
-			for x := minX; x <= maxX; x++ {
-				for z := minZ; z <= maxZ; z++ {
-					pos := cube.Pos{x, y, z}
-					b := tx.Block(df_cube.Pos(pos))
-					if _, isAir := b.(block.Air); !includeAir && isAir {
-						b = nil
-						continue
-					}
-
-					// If the hash is MaxUint64, then the block is unknown to dragonfly.
-					bHash, _ := b.Hash()
-					if !includeUnknown && bHash == math.MaxUint64 {
-						b = nil
-						continue
-					}
-
-					// Add the block to the list of block search results.
-					blocks = append(blocks, BlockSearchResult{
-						Block:    b,
-						Position: pos,
-					})
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			for z := minZ; z <= maxZ; z++ {
+				pos := cube.Pos{x, y, z}
+				b := tx.Block(df_cube.Pos(pos))
+				if _, isAir := b.(block.Air); !includeAir && isAir {
 					b = nil
+					continue
 				}
+
+				// If the hash is MaxUint64, then the block is unknown to dragonfly.
+				bHash, _ := b.Hash()
+				if !includeUnknown && bHash == math.MaxUint64 {
+					b = nil
+					continue
+				}
+
+				// Add the block to the list of block search results.
+				blocks = append(blocks, BlockSearchResult{
+					Block:    b,
+					Position: pos,
+				})
 			}
 		}
-	})
+	}
 
 	return blocks
 }
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
-func GetNearbyBBoxes(aabb cube.BBox, w *world.World) []cube.BBox {
+func GetNearbyBBoxes(aabb cube.BBox, tx *world.Tx) []cube.BBox {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 	bboxList := make([]cube.BBox, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
 
-	<-w.Exec(func(tx *world.Tx) {
-		for y := minY; y <= maxY; y++ {
-			for x := minX; x <= maxX; x++ {
-				for z := minZ; z <= maxZ; z++ {
-					pos := cube.Pos{x, y, z}
-					block := tx.Block(df_cube.Pos(pos))
-					for _, box := range BlockBoxes(block, pos, w) {
-						b := box.Translate(pos.Vec3())
-						if !b.IntersectsWith(aabb) || CanPassBlock(block) {
-							continue
-						}
-
-						bboxList = append(bboxList, b)
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			for z := minZ; z <= maxZ; z++ {
+				pos := cube.Pos{x, y, z}
+				block := tx.Block(df_cube.Pos(pos))
+				for _, box := range BlockBoxes(block, pos, tx) {
+					b := box.Translate(pos.Vec3())
+					if !b.IntersectsWith(aabb) || CanPassBlock(block) {
+						continue
 					}
+
+					bboxList = append(bboxList, b)
 				}
 			}
 		}
-	})
-
+	}
 	return bboxList
 }
 
