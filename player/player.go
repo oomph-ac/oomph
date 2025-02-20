@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 
@@ -87,6 +88,7 @@ type Player struct {
 
 	world       *world.World
 	worldLoader *world.Loader
+	worldTx     *world.Tx
 
 	// listener is the Gophertunnel listener
 	listener *minecraft.Listener
@@ -162,16 +164,7 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 		listener: listener,
 	}
 
-	p.world = world.Config{
-		ReadOnly:        true,
-		SaveInterval:    -1,
-		RandomTickSpeed: -1,
-		Dim:             world.Overworld,
-	}.New()
-	p.world.StopWeatherCycle()
-	p.world.StopTime()
-	p.worldLoader = world.NewLoader(16, p.world, p)
-
+	p.RegenerateWorld()
 	p.Dbg = NewDebugger(p)
 	return p
 }
@@ -370,7 +363,10 @@ func (p *Player) Close() error {
 			}
 		}
 		p.Dbg.target = nil
+		p.world.Close()
 		close(p.CloseChan)
+
+		go runtime.GC()
 	})
 
 	return nil

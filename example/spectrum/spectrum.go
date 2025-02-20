@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
+	"runtime/debug"
 
 	"github.com/cooldogedev/spectrum"
 	"github.com/cooldogedev/spectrum/server"
 	"github.com/cooldogedev/spectrum/session"
 	"github.com/cooldogedev/spectrum/util"
+	"github.com/go-echarts/statsview"
+	"github.com/go-echarts/statsview/viewer"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -31,8 +33,16 @@ func main() {
 	}
 
 	if os.Getenv("PPROF_ENABLED") != "" {
-		go http.ListenAndServe("localhost:8080", nil)
+		// set configurations before calling `statsview.New()` method
+		viewer.SetConfiguration(viewer.WithTheme(viewer.ThemeWesteros), viewer.WithAddr("localhost:8080"))
+
+		mgr := statsview.New()
+		go mgr.Start()
+		//go http.ListenAndServe("localhost:8080", nil)
 	}
+
+	debug.SetGCPercent(-1)
+	debug.SetMemoryLimit(1024 * 1024 * 1024) // 1GB
 
 	opts := util.DefaultOpts()
 	opts.ClientDecode = player.DecodeClientPackets

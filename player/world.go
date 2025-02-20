@@ -4,7 +4,10 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/utils"
+	oworld "github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -26,10 +29,24 @@ type WorldUpdaterComponent interface {
 	// ChunkRadius returns the chunk radius of the world udpater component.
 	ChunkRadius() int32
 
+	// DeferChunk defers a chunk that isn't in range of the WorldLoader.
+	DeferChunk(pos protocol.ChunkPos, c *chunk.Chunk)
+	// ChunkDeferred returns true and the chunk if the chunk is deferred.
+	ChunkDeferred(pos protocol.ChunkPos) (*chunk.Chunk, bool)
+
+	// ChunkPending returns true if a chunk position is pending.
+	ChunkPending(pos protocol.ChunkPos) bool
+	// Generate is a method used by Dragonfly to generate a chunk at a specific position for it's world. We use the world updater
+	// component to track this to know when a chunk should be set as pending.
+	GenerateChunk(pos world.ChunkPos, chunk *chunk.Chunk)
+
 	// SetBlockBreakPos sets the block breaking pos of the world updater component.
 	SetBlockBreakPos(pos *protocol.BlockPos)
 	// BlockBreakPos returns the block breaking pos of the world updater component.
 	BlockBreakPos() *protocol.BlockPos
+
+	// Tick ticks the world updater component.
+	Tick()
 }
 
 func (p *Player) SetWorldUpdater(c WorldUpdaterComponent) {
@@ -48,9 +65,45 @@ func (p *Player) WorldLoader() *world.Loader {
 	return p.worldLoader
 }
 
+func (p *Player) WorldTx() *world.Tx {
+	return p.worldTx
+}
+
+func (p *Player) RegenerateWorld() {
+	if p.worldTx != nil {
+		panic(oerror.New("cannot regenerate world while transaction is in effect"))
+	}
+	newWorld := world.Config{
+		ReadOnly:        true,
+		Generator:       p.worldUpdater,
+		SaveInterval:    -1,
+		RandomTickSpeed: -1,
+		Dim:             oworld.Overworld,
+	}.New()
+	newWorld.StopWeatherCycle()
+	newWorld.StopTime()
+	if w := p.world; w != nil {
+		if p.worldLoader == nil {
+			panic(oerror.New("world loader should not be null when world is not null"))
+		}
+		<-w.Exec(func(tx *world.Tx) {
+			p.worldLoader.ChangeWorld(tx, newWorld)
+		})
+		w.Close()
+		return
+	}
+
+	if p.worldLoader != nil {
+		panic(oerror.New("world loader should be null when world is null"))
+	}
+	p.world = newWorld
+	p.worldLoader = world.NewLoader(16, p.world, p)
+	p.log.Info("created world loader")
+}
+
 func (p *Player) SyncWorld() {
 	// Update the blocks in the world so the client can sync itself properly.
-	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World()) {
+	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.worldTx) {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: protocol.BlockPos{
 				int32(blockResult.Position[0]),
@@ -82,13 +135,11 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				<-p.world.Exec(func(tx *world.Tx) {
-					tx.SetBlock(df_cube.Pos{
-						int(action.BlockPos.X()),
-						int(action.BlockPos.Y()),
-						int(action.BlockPos.Z()),
-					}, block.Air{}, nil)
-				})
+				p.worldTx.SetBlock(df_cube.Pos{
+					int(action.BlockPos.X()),
+					int(action.BlockPos.Y()),
+					int(action.BlockPos.Z()),
+				}, block.Air{}, nil)
 			case protocol.PlayerActionStartBreak:
 				if p.worldUpdater.BlockBreakPos() != nil {
 					continue
@@ -108,13 +159,11 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				<-p.world.Exec(func(tx *world.Tx) {
-					tx.SetBlock(df_cube.Pos{
-						int(p.worldUpdater.BlockBreakPos().X()),
-						int(p.worldUpdater.BlockBreakPos().Y()),
-						int(p.worldUpdater.BlockBreakPos().Z()),
-					}, block.Air{}, nil)
-				})
+				p.worldTx.SetBlock(df_cube.Pos{
+					int(p.worldUpdater.BlockBreakPos().X()),
+					int(p.worldUpdater.BlockBreakPos().Y()),
+					int(p.worldUpdater.BlockBreakPos().Z()),
+				}, block.Air{}, nil)
 			}
 		}
 	}

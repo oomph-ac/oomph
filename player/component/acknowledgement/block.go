@@ -6,9 +6,10 @@ import (
 	"github.com/oomph-ac/oomph/player"
 )
 
-// UpdateBlock is an acknowledgment that is ran when a single block is updated
-// in the world of the player.
-// DEPRECATED: Not needed since block updates are done instantly.
+// UpdateBlock is an acknowledgment that is ran when a single block is updated in the world of the player.
+// TODO: Improve this acknowledgment to be more efficient (store multiple block placements). Since oomph is able to
+// control when packets are flushed, we should in theory be able to store all block updates into one packet, which woud
+// let us run only one world transaction on the Dragonfly world.
 type UpdateBlock struct {
 	mPlayer *player.Player
 	b       world.Block
@@ -20,5 +21,7 @@ func NewUpdateBlockACK(p *player.Player, pos df_cube.Pos, b world.Block) *Update
 }
 
 func (ack *UpdateBlock) Run() {
-	ack.mPlayer.World.SetBlock(ack.pos, ack.b, nil)
+	ack.mPlayer.World().Exec(func(tx *world.Tx) {
+		tx.SetBlock(ack.pos, ack.b, nil)
+	})
 }
