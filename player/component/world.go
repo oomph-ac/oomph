@@ -6,6 +6,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	df_world "github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/oomph-ac/oomph/game"
@@ -18,17 +19,24 @@ import (
 
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
 type WorldUpdaterComponent struct {
-	mPlayer          *player.Player
-	breakingBlockPos *protocol.BlockPos
-	chunkRadius      int32
+	mPlayer *player.Player
 
+	deferredChunks map[protocol.ChunkPos]*chunk.Chunk
+	pendingChunks  map[protocol.ChunkPos]struct{}
+
+	breakingBlockPos          *protocol.BlockPos
 	prevPlaceRequest          *protocol.UseItemTransactionData
+	chunkRadius               int32
 	initalInteractionAccepted bool
 }
 
 func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 	return &WorldUpdaterComponent{
-		mPlayer:     p,
+		mPlayer: p,
+
+		deferredChunks: make(map[protocol.ChunkPos]*chunk.Chunk),
+		pendingChunks:  make(map[protocol.ChunkPos]struct{}),
+
 		chunkRadius: 1024,
 	}
 }
@@ -86,9 +94,8 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	// Find the replace position of the block. This will be used if the block at the current position
 	// is replacable (e.g: water, lava, air).
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
-	replacingBlock := c.mPlayer.World.Block(df_cube.Pos(replacePos))
+	replacingBlock := c.mPlayer.WorldTx().Block(df_cube.Pos(replacePos))
 	if _, ok := replacingBlock.(block.Activatable); ok && !c.mPlayer.Movement().PressingSneak() {
-		//c.mPlayer.SyncWorld()
 		return false
 	}
 
@@ -98,7 +105,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	}
 
 	// Make a list of BBoxes the block will occupy.
-	boxes := utils.BlockBoxes(b, replacePos, c.mPlayer.World)
+	boxes := utils.BlockBoxes(b, replacePos, c.mPlayer.WorldTx())
 	for index, blockBox := range boxes {
 		if blockBox.Width() != 1 || blockBox.Length() != 1 || blockBox.Height() != 1 {
 			// FIXME: Dragonfly has built in functions to check if a block can be placed against
@@ -119,13 +126,18 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 
 	// Check if any entity is in the way of the block being placed.
 	for _, e := range c.mPlayer.EntityTracker().All() {
-		if cube.AnyIntersections(boxes, e.Box(e.Position)) {
+		rew, ok := e.Rewind(c.mPlayer.ClientTick)
+		if !ok {
+			continue
+		}
+
+		if cube.AnyIntersections(boxes, e.Box(rew.Position)) {
 			//c.mPlayer.SyncWorld()
 			return false
 		}
 	}
 
-	c.mPlayer.World.SetBlock(df_cube.Pos(replacePos), b, nil)
+	c.mPlayer.WorldTx().SetBlock(df_cube.Pos(replacePos), b, nil)
 	return true
 }
 
@@ -165,10 +177,10 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	}
 
 	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
-	interactedBlock := c.mPlayer.World.Block(df_cube.Pos(blockPos))
+	interactedBlock := c.mPlayer.WorldTx().Block(df_cube.Pos(blockPos))
 	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
 
-	if len(utils.BlockBoxes(interactedBlock, blockPos, c.mPlayer.World)) == 0 {
+	if len(utils.BlockBoxes(interactedBlock, blockPos, c.mPlayer.WorldTx())) == 0 {
 		c.initalInteractionAccepted = true
 		return true
 	}
@@ -194,8 +206,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			continue
 		}
 
-		intersectingBlock := c.mPlayer.World.Block(flooredPos)
-		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World)
+		intersectingBlock := c.mPlayer.WorldTx().Block(flooredPos)
+		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.WorldTx())
 		if len(iBBs) == 0 {
 			continue
 		}
@@ -227,6 +239,25 @@ func (c *WorldUpdaterComponent) ChunkRadius() int32 {
 	return c.chunkRadius
 }
 
+func (c *WorldUpdaterComponent) DeferChunk(pos protocol.ChunkPos, chunk *chunk.Chunk) {
+	delete(c.pendingChunks, pos)
+	c.deferredChunks[pos] = chunk
+}
+
+func (c *WorldUpdaterComponent) ChunkDeferred(pos protocol.ChunkPos) (*chunk.Chunk, bool) {
+	chunk, ok := c.deferredChunks[pos]
+	return chunk, ok
+}
+
+func (c *WorldUpdaterComponent) ChunkPending(pos protocol.ChunkPos) bool {
+	_, ok := c.pendingChunks[pos]
+	return ok
+}
+
+func (c *WorldUpdaterComponent) GenerateChunk(pos df_world.ChunkPos, chunk *chunk.Chunk) {
+	c.pendingChunks[protocol.ChunkPos(pos)] = struct{}{}
+}
+
 // SetBlockBreakPos sets the block breaking pos of the world updater component.
 func (c *WorldUpdaterComponent) SetBlockBreakPos(pos *protocol.BlockPos) {
 	c.breakingBlockPos = pos
@@ -235,4 +266,14 @@ func (c *WorldUpdaterComponent) SetBlockBreakPos(pos *protocol.BlockPos) {
 // BlockBreakPos returns the block breaking pos of the world updater component.
 func (c *WorldUpdaterComponent) BlockBreakPos() *protocol.BlockPos {
 	return c.breakingBlockPos
+}
+
+func (w *WorldUpdaterComponent) Tick() {
+	for pos, c := range w.deferredChunks {
+		worldColumn, loaded := w.mPlayer.WorldLoader().Chunk(df_world.ChunkPos(pos))
+		if loaded {
+			worldColumn.Chunk = c
+			delete(w.deferredChunks, pos)
+		}
+	}
 }

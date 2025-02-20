@@ -9,7 +9,7 @@ func Register(p *player.Player) {
 	// bad packet detections
 	p.RegisterDetection(New_BadPacketA(p))
 	p.RegisterDetection(New_BadPacketB(p))
-	p.RegisterDetection(New_BadPacketC(p))
+	p.RegisterDetection(New_BadPacketB(p))
 
 	// edition faker detections
 	p.RegisterDetection(New_EditionFakerA(p))
@@ -17,5 +17,5 @@ func Register(p *player.Player) {
 	p.RegisterDetection(New_EditionFakerC(p))
 
 	// killaura detections
-	p.RegisterDetection(New_KillauraA(p))
+	//p.RegisterDetection(New_KillauraA(p))
 }

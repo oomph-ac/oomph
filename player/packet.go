@@ -9,6 +9,7 @@ import (
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -91,22 +92,29 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			return true
 		}
 	case *packet.PlayerAuthInput:
-		p.InputMode = pk.InputMode
+		<-p.world.Exec(func(tx *df_world.Tx) {
+			p.worldTx = tx
+			p.InputMode = pk.InputMode
 
-		missedSwing := false
-		if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
-			missedSwing = true
-			p.combat.Attack(nil)
-		}
-		p.acks.Tick(true)
+			p.worldLoader.Move(tx, game.Vec32To64(p.Movement().Pos()))
+			p.worldLoader.Load(tx, int(p.worldUpdater.ChunkRadius()))
+			p.WorldUpdater().Tick()
 
-		p.handleBlockActions(pk)
-		p.handleMovement(pk)
+			missedSwing := false
+			if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
+				missedSwing = true
+				p.combat.Attack(nil)
+			}
+			p.acks.Tick(true)
 
-		serverVerifiedHit := p.combat.Calculate()
-		if serverVerifiedHit && missedSwing {
-			pk.InputData.Unset(packet.InputFlagMissedSwing)
-		}
+			p.handleBlockActions(pk)
+			p.handleMovement(pk)
+
+			serverVerifiedHit := p.combat.Calculate()
+			if serverVerifiedHit && missedSwing {
+				pk.InputData.Unset(packet.InputFlagMissedSwing)
+			}
+		})
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {
 			return true
@@ -114,28 +122,36 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
-		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-			p.combat.Attack(pk)
-			cancel = true
-		}
-
-		// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
-		// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
-		if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && tr.ActionType == protocol.UseItemActionClickAir && p.Movement().Gliding() {
-			heldItem, _ := df_world.ItemByRuntimeID(tr.HeldItem.Stack.NetworkID, int16(tr.HeldItem.Stack.MetadataValue))
-			if _, isFireworks := heldItem.(item.Firework); isFireworks {
-				// TODO: Add validation here so that cheat clients cannot abuse this for an Elytra fly.
-				// TODO: Check w/ server-authoritative item the real expected duration of this glide boost.
-				p.movement.SetGlideBoost(20)
-				p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
+		earlyCancel := false
+		<-p.world.Exec(func(tx *df_world.Tx) {
+			p.worldTx = tx
+			if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+				p.combat.Attack(pk)
+				cancel = true
 			}
-		}
 
-		/* if !p.worldUpdater.ValidateInteraction(pk) {
-			p.SyncWorld()
-			return true
-		} */
-		if !p.worldUpdater.AttemptBlockPlacement(pk) {
+			// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
+			// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
+			if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && tr.ActionType == protocol.UseItemActionClickAir && p.Movement().Gliding() {
+				heldItem, _ := df_world.ItemByRuntimeID(tr.HeldItem.Stack.NetworkID, int16(tr.HeldItem.Stack.MetadataValue))
+				if _, isFireworks := heldItem.(item.Firework); isFireworks {
+					// TODO: Add validation here so that cheat clients cannot abuse this for an Elytra fly.
+					// TODO: Check w/ server-authoritative item the real expected duration of this glide boost.
+					p.movement.SetGlideBoost(20)
+					p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
+				}
+			}
+
+			/* if !p.worldUpdater.ValidateInteraction(pk) {
+				p.SyncWorld()
+				return true
+			} */
+			if !p.worldUpdater.AttemptBlockPlacement(pk) {
+				earlyCancel = true
+			}
+		})
+
+		if earlyCancel {
 			return false
 		}
 	case *packet.MobEquipment:
@@ -243,7 +259,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			p.Log().Errorf("unable to find block with runtime ID %v", pk.NewBlockRuntimeID)
 			b = block.Air{}
 		}
-
-		p.World.SetBlock(df_cube.Pos(pos), b, nil)
+		p.world.Exec(func(tx *df_world.Tx) {
+			tx.SetBlock(df_cube.Pos(pos), b, nil)
+		})
 	}
 }
