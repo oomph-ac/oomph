@@ -2,12 +2,11 @@ module github.com/oomph-ac/oomph
 
 go 1.23.3
 
-toolchain go1.23.4
-
 require (
 	github.com/chewxy/math32 v1.10.1
-	github.com/cooldogedev/spectrum v0.0.35
-	github.com/df-mc/dragonfly v0.10.2-0.20250220025742-a38d0964c7dc
+	github.com/cooldogedev/spectrum v0.0.36-0.20250212061602-205805155461
+	github.com/cooldogedev/spectrum-df v0.0.20
+	github.com/df-mc/dragonfly v0.10.1
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
 	github.com/getsentry/sentry-go v0.27.0

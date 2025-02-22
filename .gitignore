@@ -15,3 +15,5 @@ players/*
 .vscode.code-workspace
 example/spectrum/spectrum.exe
 example/spectrum/logs/*
+example/default/logs/*
+example/default/proxy.exe
