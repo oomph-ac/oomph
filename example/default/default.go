@@ -13,7 +13,11 @@ import (
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
+
+	"github.com/go-echarts/statsview"
+	"github.com/go-echarts/statsview/viewer"
 )
 
 var (
@@ -34,13 +38,25 @@ func main() {
 		panic(err)
 	}
 	listener, err := minecraft.ListenConfig{
-		StatusProvider: p,
-		FlushRate:      -1,
+		StatusProvider:      p,
+		FlushRate:           -1,
+		AllowUnknownPackets: true,
+		AllowInvalidPackets: true,
 	}.Listen("raknet", ":"+localPort)
 	if err != nil {
 		panic(err)
 	}
 	defer listener.Close()
+
+	if os.Getenv("PPROF_ENABLED") != "" {
+		// set configurations before calling `statsview.New()` method
+		viewer.SetConfiguration(viewer.WithTheme(viewer.ThemeWesteros), viewer.WithAddr("localhost:8080"))
+
+		mgr := statsview.New()
+		go mgr.Start()
+		//go http.ListenAndServe("localhost:8080", nil)
+	}
+
 	for {
 		c, err := listener.Accept()
 		if err != nil {
@@ -91,7 +107,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 	go func() {
 		gameData := serverConn.GameData()
 		gameData.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-		gameData.PlayerMovementSettings.RewindHistorySize = 100
+		gameData.PlayerMovementSettings.RewindHistorySize = 40
 		if err := conn.StartGame(gameData); err != nil {
 			panic(err)
 		}
@@ -108,8 +124,6 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 	p.SetServerConn(serverConn)
 	go p.StartTicking()
 
-	fmt.Println(p.RuntimeId)
-
 	completion := make(chan struct{}, 1)
 	go func() {
 		defer listener.Disconnect(conn, "connection lost")
@@ -124,6 +138,12 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 				return
 			}
 
+			switch pk := pk.(type) {
+			case *packet.PlayerAuthInput, *packet.NetworkStackLatency:
+			default:
+				fmt.Printf("Client -> Server: %T\n", pk)
+			}
+
 			if cancel := p.HandleClientPacket(pk); cancel {
 				continue
 			}
@@ -131,6 +151,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 			if err := serverConn.WritePacket(pk); err != nil {
 				var disc minecraft.DisconnectError
 				if ok := errors.As(err, &disc); ok {
+					fmt.Println(err, "Client -> Server")
 					_ = listener.Disconnect(conn, disc.Error())
 				}
 				return
@@ -150,6 +171,7 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 			if err != nil {
 				var disc minecraft.DisconnectError
 				if ok := errors.As(err, &disc); ok {
+					fmt.Println(err, "Server -> Client")
 					_ = listener.Disconnect(conn, disc.Error())
 				}
 				return
@@ -161,4 +183,5 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 		}
 	}()
 	<-completion
+	fmt.Println("Connection closed.")
 }

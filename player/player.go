@@ -199,7 +199,6 @@ func (p *Player) Time() time.Time {
 	if !p.MState.IsReplay {
 		return time.Now()
 	}
-
 	return p.MState.CurrentTime
 }
 
