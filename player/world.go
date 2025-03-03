@@ -3,8 +3,10 @@ package player
 import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/utils"
 	oworld "github.com/oomph-ac/oomph/world"
@@ -98,7 +100,6 @@ func (p *Player) RegenerateWorld() {
 	}
 	p.world = newWorld
 	p.worldLoader = world.NewLoader(16, p.world, p)
-	p.log.Info("created world loader")
 }
 
 func (p *Player) SyncWorld() {
@@ -115,6 +116,45 @@ func (p *Player) SyncWorld() {
 			Layer:             0, // TODO: Implement and account for multi-layer blocks.
 		})
 	}
+}
+
+func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext) {
+	if p.worldTx == nil {
+		panic(oerror.New("attetmpted to place block w/o world transaction"))
+	}
+
+	replacingBlock := p.worldTx.Block(pos)
+	if _, isReplaceable := replacingBlock.(block.Replaceable); !isReplaceable {
+		p.Message("cannot place block at %v (not replaceable)", pos)
+		return
+	}
+
+	// Make a list of BBoxes the block will occupy.
+	boxes := utils.BlockBoxes(b, cube.Pos(pos), p.WorldTx())
+	for index, blockBox := range boxes {
+		boxes[index] = blockBox.Translate(cube.Pos(pos).Vec3())
+	}
+
+	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
+	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
+	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) {
+		//p.SyncWorld()
+		return
+	}
+
+	// Check if any entity is in the way of the block being placed.
+	for _, e := range p.EntityTracker().All() {
+		rew, ok := e.Rewind(p.ClientTick)
+		if !ok {
+			continue
+		}
+
+		if cube.AnyIntersections(boxes, e.Box(rew.Position)) {
+			//p.SyncWorld()
+			return
+		}
+	}
+	p.worldTx.SetBlock(pos, b, nil)
 }
 
 func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {

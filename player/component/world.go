@@ -5,6 +5,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -71,30 +72,27 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	}
 	c.prevPlaceRequest = dat
 
-	// Validate action type.
-	if dat.ActionType != protocol.UseItemActionClickBlock {
+	if dat.ActionType != protocol.UseItemActionClickBlock || dat.HeldItem.Stack.NetworkID == 0 || dat.HeldItem.Stack.BlockRuntimeID == 0 {
 		return true
 	}
 
-	// No item in hand.
-	if dat.HeldItem.Stack.NetworkID == 0 {
+	replacePos := utils.BlockToCubePos(dat.BlockPosition)
+	dfReplacePos := df_cube.Pos(replacePos)
+	replacingBlock := c.mPlayer.WorldTx().Block(dfReplacePos)
+
+	// Ignore the potential block placement if the player clicked air.
+	if _, isAir := replacingBlock.(block.Air); isAir {
 		return true
 	}
 
-	// BlockRuntimeIDs should be positive.
-	if dat.HeldItem.Stack.BlockRuntimeID <= 0 {
-		return true
-	}
-
+	// Ensure the block attempting to be placed is valid.
+	// TODO: Implement server-authoritative inventory on the proxy to properly account for items the player has.
 	b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID))
 	if !ok {
 		return true
 	}
 
-	// Find the replace position of the block. This will be used if the block at the current position
-	// is replacable (e.g: water, lava, air).
-	replacePos := utils.BlockToCubePos(dat.BlockPosition)
-	replacingBlock := c.mPlayer.WorldTx().Block(df_cube.Pos(replacePos))
+	// Find the replace position of the block. This will be used if the block at the current position is replacable (e.g: water, lava, air).
 	if _, ok := replacingBlock.(block.Activatable); ok && !c.mPlayer.Movement().PressingSneak() {
 		return false
 	}
@@ -104,40 +102,13 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 		replacePos = replacePos.Side(cube.Face(dat.BlockFace))
 	}
 
-	// Make a list of BBoxes the block will occupy.
-	boxes := utils.BlockBoxes(b, replacePos, c.mPlayer.WorldTx())
-	for index, blockBox := range boxes {
-		if blockBox.Width() != 1 || blockBox.Length() != 1 || blockBox.Height() != 1 {
-			// FIXME: Dragonfly has built in functions to check if a block can be placed against
-			// another, but it requires world transactions (instead of using BlockSource). This is a temporary
-			// workaround against this issue.
-			return true
-		}
-
-		boxes[index] = blockBox.Translate(replacePos.Vec3())
+	// Place the block!
+	if useable, ok := b.(item.UsableOnBlock); ok {
+		useCtx := item.UseContext{}
+		useable.UseOnBlock(dfReplacePos, df_cube.Face(dat.BlockFace), game.Vec32To64(dat.ClickedPosition), c.mPlayer.WorldTx(), c.mPlayer, &useCtx)
+	} else {
+		c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), b, nil)
 	}
-
-	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
-	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-	if cube.AnyIntersections(boxes, c.mPlayer.Movement().BoundingBox()) {
-		//c.mPlayer.SyncWorld()
-		return false
-	}
-
-	// Check if any entity is in the way of the block being placed.
-	for _, e := range c.mPlayer.EntityTracker().All() {
-		rew, ok := e.Rewind(c.mPlayer.ClientTick)
-		if !ok {
-			continue
-		}
-
-		if cube.AnyIntersections(boxes, e.Box(rew.Position)) {
-			//c.mPlayer.SyncWorld()
-			return false
-		}
-	}
-
-	c.mPlayer.WorldTx().SetBlock(df_cube.Pos(replacePos), b, nil)
 	return true
 }
 
