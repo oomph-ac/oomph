@@ -5,6 +5,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/world"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -439,7 +440,7 @@ func tryCollisions(movement player.MovementComponent, tx *df_world.Tx, dbg *play
 }
 
 // avoidEdge is the function that helps the movement component remain at the edge of a block when sneaking.
-func avoidEdge(movement player.MovementComponent, tx *df_world.Tx) {
+func avoidEdge(movement player.MovementComponent, tx *world.Tx) {
 	if !movement.Sneaking() || !movement.OnGround() || movement.Vel().Y() > 0 {
 		return
 	}
@@ -498,7 +499,7 @@ func avoidEdge(movement player.MovementComponent, tx *df_world.Tx) {
 	movement.SetVel(newVel)
 }
 
-func blocksInside(movement player.MovementComponent, tx *df_world.Tx) ([]df_world.Block, bool) {
+func blocksInside(movement player.MovementComponent, tx *world.Tx) ([]df_world.Block, bool) {
 	bb := movement.BoundingBox()
 	blocks := []df_world.Block{}
 

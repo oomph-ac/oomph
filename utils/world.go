@@ -149,7 +149,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, tx *world.Tx) []BlockSearchResult {
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src *world.Tx) []BlockSearchResult {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
@@ -160,7 +160,7 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, tx *w
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
-				b := tx.Block(df_cube.Pos(pos))
+				b := src.Block(df_cube.Pos(pos))
 				if _, isAir := b.(block.Air); !includeAir && isAir {
 					b = nil
 					continue
@@ -186,7 +186,7 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, tx *w
 }
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
-func GetNearbyBBoxes(aabb cube.BBox, tx *world.Tx) []cube.BBox {
+func GetNearbyBBoxes(aabb cube.BBox, src *world.Tx) []cube.BBox {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
@@ -197,8 +197,8 @@ func GetNearbyBBoxes(aabb cube.BBox, tx *world.Tx) []cube.BBox {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
-				block := tx.Block(df_cube.Pos(pos))
-				for _, box := range BlockBoxes(block, pos, tx) {
+				block := src.Block(df_cube.Pos(pos))
+				for _, box := range BlockBoxes(block, pos, src) {
 					b := box.Translate(pos.Vec3())
 					if !b.IntersectsWith(aabb) || CanPassBlock(block) {
 						continue
