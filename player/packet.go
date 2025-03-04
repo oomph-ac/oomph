@@ -92,6 +92,11 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			return true
 		}
 	case *packet.PlayerAuthInput:
+		if !p.movement.InputAcceptable() {
+			p.Popup("<red>input rate-limited (%d)</red>", p.SimulationFrame)
+			return false
+		}
+
 		<-p.world.Exec(func(tx *df_world.Tx) {
 			p.worldTx = tx
 			p.InputMode = pk.InputMode

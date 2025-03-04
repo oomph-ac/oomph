@@ -109,6 +109,9 @@ type AuthoritativeMovementComponent struct {
 	canSimulate            bool
 	flying, trustFlyStatus bool
 
+	allowedInputs int64
+	hasFirstInput bool
+
 	validationThreshold    float32
 	maxAcceptanceThreshold float32
 }
@@ -122,6 +125,48 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 
 		maxAcceptanceThreshold: 0.002,
 		validationThreshold:    0.3,
+	}
+}
+
+// InputAcceptable returns true if the input is within the rate-limit Oomph has imposed for the player.
+func (mc *AuthoritativeMovementComponent) InputAcceptable() bool {
+	if !mc.hasFirstInput {
+		mc.hasFirstInput = true
+	}
+
+	if mc.allowedInputs <= 0 {
+		return false
+	}
+	mc.allowedInputs--
+	return true
+}
+
+func (mc *AuthoritativeMovementComponent) Tick(elapsedTicks int64) {
+	if !mc.hasFirstInput {
+		mc.allowedInputs = 65535
+		return
+	}
+
+	latencyAllowance := mc.mPlayer.ServerTick - mc.mPlayer.ClientTick
+	if latencyAllowance < 0 {
+		latencyAllowance = 0
+	}
+	latencyAllowance += elapsedTicks
+	defaultAllowance := mc.allowedInputs
+	if defaultAllowance < 0 {
+		defaultAllowance = 0
+	}
+	defaultAllowance += elapsedTicks
+
+	if latencyAllowance < defaultAllowance {
+		mc.allowedInputs = latencyAllowance
+	} else {
+		mc.allowedInputs = defaultAllowance
+	}
+
+	// We must always accept one player input for every server tick.
+	if mc.allowedInputs < 1 {
+		mc.allowedInputs = 1
 	}
 }
 

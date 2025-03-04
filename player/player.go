@@ -291,10 +291,10 @@ func (p *Player) NMessage(msg string, args ...interface{}) {
 	})
 }
 
-func (p *Player) Popup(msg string) {
+func (p *Player) Popup(msg string, args ...interface{}) {
 	p.SendPacketToClient(&packet.Text{
 		TextType: packet.TextTypePopup,
-		Message:  msg,
+		Message:  text.Colourf(msg, args...),
 	})
 }
 
@@ -399,19 +399,20 @@ func (p *Player) tick() bool {
 	delta := time.Since(p.LastServerTick).Milliseconds()
 	p.LastServerTick = p.Time()
 
+	prevTick := p.ServerTick
 	if delta >= 100 {
 		p.ServerTick += (delta / 50) - 1
 	} else {
 		p.ServerTick++
 	}
 
+	p.Movement().Tick(p.ServerTick - prevTick)
 	p.EntityTracker().Tick(p.ServerTick)
 	p.ACKs().Tick(false)
 	if !p.ACKs().Responsive() {
 		p.Disconnect(game.ErrorNetworkTimeout)
 		return false
 	}
-
 	p.ACKs().Flush()
 
 	if err := p.conn.Flush(); err != nil {
