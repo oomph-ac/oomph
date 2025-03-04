@@ -130,7 +130,7 @@ func (ackC *ACKComponent) Tick(client bool) {
 		return
 	}
 
-	// Update the latency every second.
+	// Update the latency every half-second.
 	if ackC.mPlayer.ServerTick%10 == 0 {
 		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, time.Now(), ackC.mPlayer.ServerTick))
 	}
