@@ -11,6 +11,11 @@ import (
 // It is used for updating movement states of the player, and providing them to any other
 // component that requires it.
 type MovementComponent interface {
+	// InputAcceptable returns true if the input is within the rate-limit Oomph has imposed for the player.
+	InputAcceptable() bool
+	// Tick runs on the server tick that updates acceptable input limits for the player.
+	Tick(elapsedTicks int64)
+
 	// Client returns the non-authoritative client movement sent to the server.
 	Client() NonAuthoritativeMovementInfo
 
