@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -11,6 +12,13 @@ type InventoryComponent interface {
 	Chestplate() world.Item
 	Leggings() world.Item
 	Boots() world.Item
+
+	Slot(int) item.Stack
+	SetSlot(int, item.Stack)
+
+	HeldSlot() int32
+	SetHeldSlot(int32)
+	Holding() item.Stack
 
 	HandleInventorySlot(pk *packet.InventorySlot)
 	HandleInventoryContent(pk *packet.InventoryContent)

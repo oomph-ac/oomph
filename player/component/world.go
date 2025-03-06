@@ -6,6 +6,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/world"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -70,8 +71,8 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	if !ok {
 		return true
 	}
-	c.prevPlaceRequest = dat
 
+	c.prevPlaceRequest = dat
 	if dat.ActionType != protocol.UseItemActionClickBlock || dat.HeldItem.Stack.NetworkID == 0 || dat.HeldItem.Stack.BlockRuntimeID == 0 {
 		return true
 	}
@@ -83,31 +84,24 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	// Ignore the potential block placement if the player clicked air.
 	if _, isAir := replacingBlock.(block.Air); isAir {
 		return true
-	}
-
-	// Ensure the block attempting to be placed is valid.
-	// TODO: Implement server-authoritative inventory on the proxy to properly account for items the player has.
-	b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID))
-	if !ok {
+	} else if _, ok := replacingBlock.(block.Activatable); ok && !c.mPlayer.Movement().PressingSneak() {
 		return true
 	}
 
-	// Find the replace position of the block. This will be used if the block at the current position is replacable (e.g: water, lava, air).
-	if _, ok := replacingBlock.(block.Activatable); ok && !c.mPlayer.Movement().PressingSneak() {
-		return false
-	}
-
-	// If the block at the position is not replacable, we want to place the block on the side of the block.
-	if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
-		replacePos = replacePos.Side(cube.Face(dat.BlockFace))
-	}
-
-	// Place the block!
-	if useable, ok := b.(item.UsableOnBlock); ok {
+	heldItem := c.mPlayer.Inventory().Holding().Item()
+	switch heldItem := heldItem.(type) {
+	case nil:
+		// The player has nothing in this slot, ignore the block placement.
+		return true
+	case item.UsableOnBlock:
 		useCtx := item.UseContext{}
-		useable.UseOnBlock(dfReplacePos, df_cube.Face(dat.BlockFace), game.Vec32To64(dat.ClickedPosition), c.mPlayer.WorldTx(), c.mPlayer, &useCtx)
-	} else {
-		c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), b, nil)
+		heldItem.UseOnBlock(dfReplacePos, df_cube.Face(dat.BlockFace), game.Vec32To64(dat.ClickedPosition), c.mPlayer.WorldTx(), c.mPlayer, &useCtx)
+	case world.Block:
+		// If the block at the position is not replacable, we want to place the block on the side of the block.
+		if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(heldItem) {
+			replacePos = replacePos.Side(cube.Face(dat.BlockFace))
+		}
+		c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), heldItem, nil)
 	}
 	return true
 }
@@ -221,8 +215,8 @@ func (c *WorldUpdaterComponent) ChunkDeferred(pos protocol.ChunkPos) (*chunk.Chu
 }
 
 func (c *WorldUpdaterComponent) ChunkPending(pos protocol.ChunkPos) bool {
-	_, ok := c.pendingChunks[pos]
-	return ok
+	_, isChunkPending := c.pendingChunks[pos]
+	return isChunkPending
 }
 
 func (c *WorldUpdaterComponent) GenerateChunk(pos df_world.ChunkPos, chunk *chunk.Chunk) {
