@@ -4,6 +4,7 @@ const (
 	ErrorNotReady              = "Error: Client did not initalize correctly."
 	ErrorNetworkTimeout        = "Error: Network timed out."
 	ErrorChunkCacheUnsupported = "Error: Chunk cache is not supported."
+	ErrorInvalidInventorySlot  = "Error: Invalid inventory slot selected."
 
 	ErrorInternalDecodeChunk                       = "Unable to decode chunk: %v"
 	ErrorInternalDuplicateACK                      = "Error: Duplicated ACKs."

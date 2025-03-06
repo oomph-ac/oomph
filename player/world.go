@@ -149,10 +149,19 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 			continue
 		}
 
+		// We sync the world in this instance to avoid any possibility of a long-persisting ghost block.
 		if cube.AnyIntersections(boxes, e.Box(rew.Position)) {
-			//p.SyncWorld()
+			p.SyncWorld()
 			return
 		}
+	}
+
+	heldItem := p.inventory.Holding()
+	heldItem.Grow(-1)
+	if heldItem.Count() == 0 {
+		p.inventory.SetSlot(int(p.inventory.HeldSlot()), item.NewStack(&block.Air{}, 0))
+	} else {
+		p.inventory.SetSlot(int(p.inventory.HeldSlot()), heldItem)
 	}
 	p.worldTx.SetBlock(pos, b, nil)
 }
