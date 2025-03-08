@@ -92,6 +92,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	switch heldItem := heldItem.(type) {
 	case nil:
 		// The player has nothing in this slot, ignore the block placement.
+		c.mPlayer.NMessage("<red>Block placement denied: no item in hand.</red>")
 		return true
 	case item.UsableOnBlock:
 		useCtx := item.UseContext{}

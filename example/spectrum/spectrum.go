@@ -81,6 +81,7 @@ func main() {
 			}
 			playerLog := logrus.New()
 			playerLog.SetOutput(f)
+			playerLog.SetLevel(logrus.DebugLevel)
 
 			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
 			proc.Player().Movement().SetValidationThreshold(0.3)
