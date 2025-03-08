@@ -12,53 +12,85 @@ import (
 )
 
 const (
-	inventorySizeArmour uint32 = 4
-	inventorySizePlayer uint32 = 36
-	inventorySizeHotbar uint32 = 10
+	inventorySizeArmour  uint32 = 4
+	inventorySizePlayer  uint32 = 36
+	inventorySizeHotbar  uint32 = 10
+	inventorySizeOffhand uint32 = 1
+	inventorySizeUI      uint32 = 54
 )
 
 type InventoryComponent struct {
-	mPlayer    *player.Player
-	armour     [4]world.Item
-	pInventory [36]item.Stack
-	heldSlot   int32
+	mPlayer *player.Player
+
+	pArmour      *player.Inventory
+	pInventory   *player.Inventory
+	pOffhand     *player.Inventory
+	pUiInventory *player.Inventory
+
+	firstRequest   *invReq
+	currentRequest *invReq
+
+	heldSlot int32
 }
 
 func NewInventoryComponent(p *player.Player) *InventoryComponent {
-	emptyInv := [36]item.Stack{}
-	for index := range emptyInv {
-		emptyInv[index] = item.NewStack(&block.Air{}, 0)
-	}
 	return &InventoryComponent{
-		mPlayer:    p,
-		pInventory: emptyInv,
+		mPlayer: p,
+
+		pInventory:   player.NewInventory(inventorySizePlayer),
+		pArmour:      player.NewInventory(inventorySizeArmour),
+		pOffhand:     player.NewInventory(inventorySizeOffhand),
+		pUiInventory: player.NewInventory(inventorySizeUI),
 	}
 }
 
 func (c *InventoryComponent) Helmet() world.Item {
-	return c.armour[0]
+	return c.pArmour.Slot(0).Item()
 }
 
 func (c *InventoryComponent) Chestplate() world.Item {
-	return c.armour[1]
+	return c.pArmour.Slot(1).Item()
 }
 
 func (c *InventoryComponent) Leggings() world.Item {
-	return c.armour[2]
+	return c.pArmour.Slot(2).Item()
 }
 
 func (c *InventoryComponent) Boots() world.Item {
-	return c.armour[3]
+	return c.pArmour.Slot(3).Item()
 }
 
-func (c *InventoryComponent) Slot(slot int) item.Stack {
-	validatePlayerInventorySlot(slot)
-	return c.pInventory[slot]
+func (c *InventoryComponent) WindowFromContainerID(id int32) (*player.Inventory, bool) {
+	switch id {
+	case protocol.ContainerCraftingInput, protocol.ContainerCreatedOutput, protocol.ContainerCursor:
+		// UI inventory.
+		return c.pUiInventory, true
+	case protocol.ContainerHotBar, protocol.ContainerInventory, protocol.ContainerCombinedHotBarAndInventory:
+		// Hotbar 'inventory', rest of inventory, inventory when container is opened.
+		return c.pInventory, true
+	case protocol.ContainerOffhand:
+		return c.pOffhand, true
+	case protocol.ContainerArmor:
+		// Armour inventory.
+		return c.pArmour, true
+	default:
+		return nil, false
+	}
 }
 
-func (c *InventoryComponent) SetSlot(slot int, i item.Stack) {
-	validatePlayerInventorySlot(slot)
-	c.pInventory[slot] = i
+func (c *InventoryComponent) WindowFromWindowID(id int32) (*player.Inventory, bool) {
+	switch id {
+	case protocol.WindowIDArmour:
+		return c.pArmour, true
+	case protocol.WindowIDInventory:
+		return c.pInventory, true
+	case protocol.WindowIDOffHand:
+		return c.pOffhand, true
+	case protocol.WindowIDUI:
+		return c.pUiInventory, true
+	default:
+		return nil, false
+	}
 }
 
 func (c *InventoryComponent) HeldSlot() int32 {
@@ -74,57 +106,164 @@ func (c *InventoryComponent) SetHeldSlot(heldSlot int32) {
 }
 
 func (c *InventoryComponent) Holding() item.Stack {
-	return c.pInventory[c.heldSlot]
+	return c.pInventory.Slot(int(c.heldSlot))
 }
 
 func (c *InventoryComponent) HandleInventorySlot(pk *packet.InventorySlot) {
-	if pk.WindowID == protocol.WindowIDArmour && pk.Slot < inventorySizeArmour {
-		if pk.NewItem.Stack.NetworkID == 0 {
-			c.armour[pk.Slot] = nil
-			return
-		}
+	inv, found := c.WindowFromWindowID(int32(pk.WindowID))
+	if !found {
+		c.mPlayer.Log().Debugf("no inventory with window id %d found", pk.WindowID)
+		return
+	}
 
-		item, _ := world.ItemByRuntimeID(pk.NewItem.Stack.NetworkID, int16(pk.NewItem.Stack.MetadataValue))
-		c.armour[pk.Slot] = item
-	} else if pk.WindowID == protocol.WindowIDInventory && pk.Slot < inventorySizePlayer {
-		if pk.NewItem.Stack.NetworkID == 0 {
-			c.pInventory[pk.Slot] = item.NewStack(&block.Air{}, 0)
-			return
-		}
-
-		if i, found := world.ItemByRuntimeID(pk.NewItem.Stack.NetworkID, int16(pk.NewItem.Stack.MetadataValue)); found {
-			c.pInventory[pk.Slot] = item.NewStack(i, int(pk.NewItem.Stack.Count))
-		} else {
-			c.mPlayer.Message("could not find item with runtime id %d w/ meta %d", pk.NewItem.Stack.NetworkID, pk.NewItem.Stack.MetadataValue)
-		}
+	if pk.NewItem.Stack.NetworkID == 0 {
+		inv.SetSlot(int(pk.Slot), item.NewStack(&block.Air{}, 0))
+	} else if i, ok := world.ItemByRuntimeID(pk.NewItem.Stack.NetworkID, int16(pk.NewItem.Stack.MetadataValue)); ok {
+		inv.SetSlot(int(pk.Slot), item.NewStack(i, int(pk.NewItem.Stack.Count)))
+	} else {
+		c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", pk.NewItem.Stack.NetworkID, pk.NewItem.Stack.MetadataValue)
 	}
 }
 
 func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent) {
-	if pk.WindowID == protocol.WindowIDArmour {
-		for index, itemInstance := range pk.Content {
-			if itemInstance.Stack.NetworkID == 0 {
-				c.armour[index] = nil
-				continue
-			}
+	inv, found := c.WindowFromWindowID(int32(pk.WindowID))
+	if !found {
+		c.mPlayer.Log().Debugf("no inventory with id %d found", pk.WindowID)
+		return
+	}
 
-			item, _ := world.ItemByRuntimeID(itemInstance.Stack.NetworkID, int16(itemInstance.Stack.MetadataValue))
-			c.armour[index] = item
+	for index, itemInstance := range pk.Content {
+		if itemInstance.Stack.NetworkID == 0 {
+			inv.SetSlot(index, item.NewStack(&block.Air{}, 0))
+		} else if i, found := world.ItemByRuntimeID(itemInstance.Stack.NetworkID, int16(itemInstance.Stack.MetadataValue)); found {
+			inv.SetSlot(index, item.NewStack(i, int(itemInstance.Stack.Count)))
+		} else {
+			c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", itemInstance.Stack.NetworkID, itemInstance.Stack.MetadataValue)
 		}
-	} else if pk.WindowID == protocol.WindowIDInventory {
-		for index, itemInstance := range pk.Content {
-			if itemInstance.Stack.NetworkID == 0 {
-				c.pInventory[index] = item.NewStack(&block.Air{}, 0)
-				continue
-			}
+	}
+}
 
-			if i, found := world.ItemByRuntimeID(itemInstance.Stack.NetworkID, int16(itemInstance.Stack.MetadataValue)); found {
-				c.pInventory[index] = item.NewStack(i, int(itemInstance.Stack.Count))
+func (c *InventoryComponent) HandleItemStackRequest(pk *packet.ItemStackRequest) {
+	for _, request := range pk.Requests {
+		tx := newInvRequest(request.RequestID)
+		for _, action := range request.Actions {
+			switch action := action.(type) {
+			case *protocol.TakeStackRequestAction:
+				c.handleTransferRequest(tx, action.Source, action.Destination, int(action.Count))
+			case *protocol.PlaceStackRequestAction:
+				c.handleTransferRequest(tx, action.Source, action.Destination, int(action.Count))
+			case *protocol.SwapStackRequestAction:
+				c.handleSwapRequest(tx, action)
+			case *protocol.DestroyStackRequestAction:
+				c.handleDestroyRequest(tx, action.Source, int(action.Count), false)
+			case *protocol.DropStackRequestAction:
+				c.handleDestroyRequest(tx, action.Source, int(action.Count), true)
+			}
+		}
+		if len(tx.actions) > 0 {
+			tx.execute()
+			if c.firstRequest == nil {
+				c.firstRequest = tx
+				c.currentRequest = tx
 			} else {
-				c.mPlayer.Message("could not find item with runtime id %d w/ meta %d", itemInstance.Stack.NetworkID, itemInstance.Stack.MetadataValue)
+				tx.prev = c.currentRequest
+				c.currentRequest.next = tx
+				c.currentRequest = tx
 			}
 		}
 	}
+}
+
+func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackResponse) {
+	for _, response := range pk.Responses {
+		if response.RequestID != c.firstRequest.id {
+			c.mPlayer.Log().Debugf("received response for unknown request id %d", response.RequestID)
+			return
+		}
+
+		if response.Status == protocol.ItemStackResponseStatusOK {
+			c.mPlayer.Log().Debugf("request %d succeeded", response.RequestID)
+			c.firstRequest.accept()
+		} else {
+			c.mPlayer.Log().Debugf("request %d failed with status %d", response.RequestID, response.Status)
+			c.firstRequest.reject()
+		}
+
+		if c.firstRequest == c.currentRequest {
+			c.firstRequest = nil
+			c.currentRequest = nil
+		} else {
+			nextReq := c.firstRequest.next
+			nextReq.prev = nil
+			c.firstRequest.next = nil
+			c.firstRequest = nextReq
+		}
+	}
+}
+
+func (c *InventoryComponent) handleTransferRequest(tx *invReq, src, dst protocol.StackRequestSlotInfo, count int) {
+	srcInv, ok := c.WindowFromContainerID(int32(src.Container.ContainerID))
+	if !ok {
+		c.mPlayer.Log().Debugf("no inventory with container id %d found", src.Container.ContainerID)
+		return
+	}
+
+	dstInv, ok := c.WindowFromContainerID(int32(dst.Container.ContainerID))
+	if !ok {
+		c.mPlayer.Log().Debugf("no inventory with container id %d found", dst.Container.ContainerID)
+		return
+	}
+
+	tx.append(newInvTransferAction(
+		count,
+		int32(src.Container.ContainerID),
+		int(src.Slot),
+		srcInv.Slot(int(src.Slot)),
+		int32(dst.Container.ContainerID),
+		int(dst.Slot),
+		dstInv.Slot(int(dst.Slot)),
+		c.mPlayer,
+	))
+}
+
+func (c *InventoryComponent) handleSwapRequest(tx *invReq, action *protocol.SwapStackRequestAction) {
+	srcInv, ok := c.WindowFromContainerID(int32(action.Source.Container.ContainerID))
+	if !ok {
+		c.mPlayer.Log().Debugf("no inventory with container id %d found", action.Source.Container.ContainerID)
+		return
+	}
+
+	dstInv, ok := c.WindowFromContainerID(int32(action.Destination.Container.ContainerID))
+	if !ok {
+		c.mPlayer.Log().Debugf("no inventory with container id %d found", action.Destination.Container.ContainerID)
+		return
+	}
+
+	tx.append(newInvSwapAction(
+		int32(action.Source.Container.ContainerID),
+		srcInv.Slot(int(action.Source.Slot)),
+		int(action.Source.Slot),
+		int32(action.Destination.Container.ContainerID),
+		dstInv.Slot(int(action.Destination.Slot)),
+		int(action.Destination.Slot),
+		c.mPlayer,
+	))
+}
+
+func (c *InventoryComponent) handleDestroyRequest(tx *invReq, src protocol.StackRequestSlotInfo, count int, isDrop bool) {
+	inv, foundInv := c.WindowFromContainerID(int32(src.Container.ContainerID))
+	if !foundInv {
+		c.mPlayer.Log().Debugf("no inventory with container id %d found", src.Container.ContainerID)
+		return
+	}
+	tx.append(newDestroyAction(
+		inv.Slot(int(src.Slot)),
+		count,
+		int(src.Slot),
+		int32(src.Container.ContainerID),
+		isDrop,
+		c.mPlayer,
+	))
 }
 
 func validatePlayerInventorySlot(slot int) {

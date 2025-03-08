@@ -28,9 +28,6 @@ var DecodeClientPackets = []uint32{
 	packet.IDItemStackRequest,
 }
 
-var previousItem string = ""
-var previousSlot int32 = -1
-
 func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 	defer p.recoverError()
 
@@ -101,19 +98,6 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			return false
 		}
 
-		var n string
-		slot := p.inventory.HeldSlot()
-		if it := p.inventory.Holding().Item(); it != nil {
-			n, _ = it.EncodeItem()
-		} else {
-			n = "minecraft:air"
-		}
-		if n != previousItem || slot != previousSlot {
-			p.Message("heldItem=%s (slot %d)", n, slot)
-			previousItem = n
-			previousSlot = slot
-		}
-
 		<-p.world.Exec(func(tx *df_world.Tx) {
 			p.worldTx = tx
 			p.InputMode = pk.InputMode
@@ -161,6 +145,42 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 				}
 			} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+			} else if _, ok := pk.TransactionData.(*protocol.NormalTransactionData); ok {
+				if len(pk.Actions) != 2 {
+					p.Log().Debugf("drop action should have exactly 2 actions, got %d", len(pk.Actions))
+					if len(pk.Actions) > 5 {
+						p.Disconnect("Error: Too many actions in NormalTransactionData")
+					}
+					return
+				}
+
+				var (
+					sourceSlot           int = -1
+					droppedCount         int = -1
+					foundClientItemStack bool
+				)
+
+				for _, action := range pk.Actions {
+					if action.SourceType == protocol.InventoryActionSourceWorld && action.InventorySlot == 0 {
+						droppedCount = int(action.NewItem.Stack.Count)
+					} else if action.SourceType == protocol.InventoryActionSourceContainer && action.WindowID == protocol.WindowIDInventory {
+						sourceSlot = int(action.InventorySlot)
+						foundClientItemStack = true
+					}
+				}
+
+				if !foundClientItemStack || sourceSlot == -1 || droppedCount == -1 {
+					p.Log().Debugf("missing information for drop action (foundItem=%v sourceSlot=%d droppedCount=%d)", foundClientItemStack, sourceSlot, droppedCount)
+					return
+				}
+
+				inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
+				sourceSlotItem := inv.Slot(sourceSlot)
+				if droppedCount > sourceSlotItem.Count() {
+					p.Log().Debugf("dropped count (%d) is greater than source slot count (%d)", droppedCount, sourceSlotItem.Count())
+					return
+				}
+				inv.SetSlot(sourceSlot, sourceSlotItem.Grow(-droppedCount))
 			}
 
 			/* if !p.worldUpdater.ValidateInteraction(pk) {
@@ -183,11 +203,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			p.Combat().Swing()
 		}
 	case *packet.ItemStackRequest:
-		/* for _, req := range pk.Requests {
-			for _, action := range req.Actions {
-				p.Message("reqID=%d action=%v", req.RequestID, action)
-			}
-		} */
+		p.inventory.HandleItemStackRequest(pk)
 	}
 
 	p.RunDetections(pk)
@@ -233,6 +249,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		p.inventory.HandleInventorySlot(pk)
 	case *packet.InventoryContent:
 		p.inventory.HandleInventoryContent(pk)
+	case *packet.ItemStackResponse:
+		p.inventory.HandleItemStackResponse(pk)
 	case *packet.LevelChunk:
 		p.worldUpdater.HandleLevelChunk(pk)
 	case *packet.MobEffect:
