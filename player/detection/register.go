@@ -16,6 +16,8 @@ func Register(p *player.Player) {
 	p.RegisterDetection(New_EditionFakerB(p))
 	p.RegisterDetection(New_EditionFakerC(p))
 
+	p.RegisterDetection(New_InvMoveA(p))
+
 	// killaura detections
 	//p.RegisterDetection(New_KillauraA(p))
 }
