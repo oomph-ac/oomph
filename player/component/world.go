@@ -61,7 +61,21 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
 		return
 	}
-	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
+	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk)
+}
+
+// HandleUpdateBlock handles an UpdateBlock packet from the server.
+func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
+	pos := df_cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
+	b, ok := df_world.BlockByRuntimeID(pk.NewBlockRuntimeID)
+	if !ok {
+		c.mPlayer.Log().Errorf("unable to find block with runtime ID %v", pk.NewBlockRuntimeID)
+		b = block.Air{}
+	}
+
+	// TODO: Add a block policy to allow servers to determine wether block updates should be lag-compensated or if movement should
+	// use the latest world state instantly.
+	c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
 }
 
 // AttemptBlockPlacement attempts a block placement request from the client. It returns false if the simulation is unable
