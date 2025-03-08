@@ -3,11 +3,8 @@ package player
 import (
 	"strings"
 
-	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
-	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -299,14 +296,6 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.UpdateBlock:
-		pos := cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
-		b, ok := df_world.BlockByRuntimeID(pk.NewBlockRuntimeID)
-		if !ok {
-			p.Log().Errorf("unable to find block with runtime ID %v", pk.NewBlockRuntimeID)
-			b = block.Air{}
-		}
-		p.world.Exec(func(tx *df_world.Tx) {
-			tx.SetBlock(df_cube.Pos(pos), b, nil)
-		})
+		p.worldUpdater.HandleUpdateBlock(pk)
 	}
 }
