@@ -7,13 +7,25 @@ import (
 	"sync"
 	"time"
 
+	v589 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v589"
+	v594 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v594"
+	v618 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v618"
+	v622 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v622"
+	v630 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v630"
+	v649 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v649"
+	v662 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v662"
+	v671 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v671"
+	v686 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v686"
+	v712 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v712"
+	v729 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v729"
+	v748 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v748"
+	v766 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v766"
 	_ "github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 
 	"github.com/go-echarts/statsview"
@@ -42,6 +54,23 @@ func main() {
 		FlushRate:           -1,
 		AllowUnknownPackets: true,
 		AllowInvalidPackets: true,
+
+		AcceptedProtocols: []minecraft.Protocol{
+			v766.Protocol(),
+			v748.Protocol(),
+			v729.Protocol(),
+			v712.Protocol(),
+			v686.Protocol1(),
+			v686.Protocol2(),
+			v671.Protocol(),
+			v662.Protocol(),
+			v649.Protocol(),
+			v630.Protocol(),
+			v622.Protocol(),
+			v618.Protocol(),
+			v594.Protocol(),
+			v589.Protocol(),
+		},
 	}.Listen("raknet", ":"+localPort)
 	if err != nil {
 		panic(err)
@@ -138,11 +167,11 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 				return
 			}
 
-			switch pk := pk.(type) {
+			/* switch pk := pk.(type) {
 			case *packet.PlayerAuthInput, *packet.NetworkStackLatency:
 			default:
 				fmt.Printf("Client -> Server: %T\n", pk)
-			}
+			} */
 
 			if cancel := p.HandleClientPacket(pk); cancel {
 				continue

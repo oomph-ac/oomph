@@ -269,9 +269,13 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 		posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
 		threshold := p.movement.AcceptanceThreshold()
 
-		posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
+		if !p.movement.XCollision() {
+			posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
+		}
 		posDiff[1] = 0
-		posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
+		if !p.movement.ZCollision() {
+			posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
+		}
 
 		p.movement.SetPos(p.movement.Pos().Sub(posDiff))
 		p.Dbg.Notify(
