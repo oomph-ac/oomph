@@ -61,7 +61,7 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
 		return
 	}
-	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk)
+	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
 }
 
 // HandleUpdateBlock handles an UpdateBlock packet from the server.
