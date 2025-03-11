@@ -87,7 +87,10 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	}
 
 	c.prevPlaceRequest = dat
-	if dat.ActionType != protocol.UseItemActionClickBlock || dat.HeldItem.Stack.NetworkID == 0 || dat.HeldItem.Stack.BlockRuntimeID == 0 {
+	if dat.ActionType != protocol.UseItemActionClickBlock || dat.HeldItem.Stack.NetworkID == 0 ||
+		dat.HeldItem.Stack.BlockRuntimeID == 0 || c.mPlayer.GameMode == packet.GameTypeCreative ||
+		c.mPlayer.GameMode == packet.GameTypeCreativeSpectator {
+		// Allow any block placements for creative mode players.
 		return true
 	}
 
@@ -106,7 +109,9 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	switch heldItem := heldItem.(type) {
 	case nil:
 		// The player has nothing in this slot, ignore the block placement.
-		c.mPlayer.NMessage("<red>Block placement denied: no item in hand.</red>")
+		// FIXME: It seems some blocks aren't implemented by Dragonfly and will therefore seem to be air when
+		// it is actually a valid block.
+		//c.mPlayer.NMessage("<red>Block placement denied: no item in hand.</red>")
 		return true
 	case item.UsableOnBlock:
 		useCtx := item.UseContext{}

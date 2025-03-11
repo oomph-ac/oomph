@@ -139,6 +139,8 @@ func SimulatePlayerMovement(p *player.Player) {
 		avoidEdge(movement, p.WorldTx())
 
 		oldVel := movement.Vel()
+		oldOnGround := movement.OnGround()
+
 		tryCollisions(movement, p.WorldTx(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60))
 		walkOnBlock(movement, blockUnder)
 		movement.SetMov(movement.Vel())
@@ -150,7 +152,7 @@ func SimulatePlayerMovement(p *player.Player) {
 				blockUnder = b
 			}
 		}
-		setPostCollisionMotion(movement, oldVel, blockUnder)
+		setPostCollisionMotion(movement, oldVel, oldOnGround, blockUnder)
 
 		if inCobweb {
 			p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move cobweb force applied (0 vel)")
@@ -272,7 +274,7 @@ func simulationIsReliable(p *player.Player) bool {
 
 func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder df_world.Block) {
 	newVel := movement.Vel()
-	if movement.OnGround() || old.Y() >= 0 || movement.PressingSneak() {
+	if old.Y() >= 0 || movement.PressingSneak() {
 		newVel[1] = 0
 		movement.SetVel(newVel)
 		return
@@ -282,17 +284,18 @@ func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder d
 	case "minecraft:slime":
 		newVel[1] = game.SlimeBounceMultiplier * old.Y()
 	case "minecraft:bed":
-		newVel[1] = game.BedBounceMultiplier * old.Y()
+		newVel[1] = math32.Max(1.0, game.BedBounceMultiplier*old.Y())
 	default:
 		newVel[1] = 0
 	}
 	movement.SetVel(newVel)
 }
 
-func setPostCollisionMotion(movement player.MovementComponent, old mgl32.Vec3, blockUnder df_world.Block) {
-	if movement.YCollision() {
-		landOnBlock(movement, old, blockUnder)
+func setPostCollisionMotion(movement player.MovementComponent, oldVel mgl32.Vec3, oldOnGround bool, blockUnder df_world.Block) {
+	if !oldOnGround && movement.YCollision() {
+		landOnBlock(movement, oldVel, blockUnder)
 	}
+
 	newVel := movement.Vel()
 	if movement.XCollision() {
 		newVel[0] = 0
