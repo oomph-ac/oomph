@@ -14,6 +14,19 @@ import (
 	"github.com/cooldogedev/spectrum/util"
 	"github.com/go-echarts/statsview"
 	"github.com/go-echarts/statsview/viewer"
+	v589 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v589"
+	v594 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v594"
+	v618 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v618"
+	v622 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v622"
+	v630 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v630"
+	v649 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v649"
+	v662 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v662"
+	v671 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v671"
+	v686 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v686"
+	v712 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v712"
+	v729 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v729"
+	v748 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v748"
+	v766 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v766"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -59,9 +72,24 @@ func main() {
 
 	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery(os.Args[2], ""), logger, opts, nil)
 	if err := proxy.Listen(minecraft.ListenConfig{
-		StatusProvider:    statusProvider,
-		FlushRate:         -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
-		AcceptedProtocols: []minecraft.Protocol{},
+		StatusProvider: statusProvider,
+		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
+		AcceptedProtocols: []minecraft.Protocol{
+			v766.Protocol(),
+			v748.Protocol(),
+			v729.Protocol(),
+			v712.Protocol(),
+			v686.Protocol1(),
+			v686.Protocol2(),
+			v671.Protocol(),
+			v662.Protocol(),
+			v649.Protocol(),
+			v630.Protocol(),
+			v622.Protocol(),
+			v618.Protocol(),
+			v594.Protocol(),
+			v589.Protocol(),
+		},
 	}); err != nil {
 		panic(err)
 	}
