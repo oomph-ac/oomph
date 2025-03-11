@@ -550,8 +550,15 @@ func attemptJump(movement player.MovementComponent, dbg *player.Debugger) bool {
 		return false
 	}
 
+	// FIXME: The client seems to sometimes prevent it's own jump from happening - it is unclear how it is determined, however.
+	// This is a temporary hack to get around this issue for now.
+	clientJump := movement.Client().Pos().Y() - movement.Client().LastPos().Y()
+	if clientJump == 0.0 && !movement.HasKnockback() && !movement.HasTeleport() {
+		movement.SetJumpHeight(0.0)
+	}
+
 	newVel := movement.Vel()
-	newVel[1] = movement.JumpHeight()
+	newVel[1] = math32.Max(movement.JumpHeight(), newVel[1])
 	movement.SetJumpDelay(game.JumpDelayTicks)
 
 	if movement.Sprinting() {
