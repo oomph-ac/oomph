@@ -8,6 +8,7 @@ import (
 	"github.com/cooldogedev/spectrum/session"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
+	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -61,8 +62,32 @@ func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {
 		return
 	}
 
-	for _, latest := range pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn()) {
-		pl.HandleServerPacket(latest)
+	var (
+		latestPk  *packet.Packet
+		latestVer bool
+	)
+
+	if !pl.IsVersion(minecraft.DefaultProtocol.ID()) {
+		latestPks := pl.Conn().Proto().ConvertFromLatest(*pk, pl.Conn())
+		if len(latestPks) == 0 {
+			return
+		}
+		latestPk = &latestPks[0]
+	} else {
+		latestPk = pk
+		latestVer = true
+	}
+
+	pkCtx := context.NewHandlePacketContext(latestPk)
+	pl.HandleServerPacket(pkCtx)
+	if pkCtx.Cancelled() {
+		ctx.Cancel()
+		return
+	}
+
+	if !latestVer && pkCtx.Modified() {
+		upgradedPks := pl.Conn().Proto().ConvertToLatest(*latestPk, pl.Conn())
+		*pk = upgradedPks[0]
 	}
 }
 
@@ -80,14 +105,39 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 	}
 
 	pl := p.pl.Load()
-	if pl == nil {
+	if pl == nil || pl.Conn() == nil {
 		return
 	}
 
-	for _, latest := range pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn()) {
-		if pl.HandleClientPacket(latest) {
-			ctx.Cancel()
+	// As far as we know at the moment, none of the packets require multiple conversions.
+	var (
+		upgradedPk *packet.Packet
+		latestVer  bool
+	)
+	if !pl.IsVersion(minecraft.DefaultProtocol.ID()) {
+		upgradedPks := pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn())
+		if len(upgradedPks) == 0 {
+			return
 		}
+		upgradedPk = &upgradedPks[0]
+	} else {
+		upgradedPk = pk
+		latestVer = true
+	}
+
+	pkCtx := context.NewHandlePacketContext(upgradedPk)
+	pl.HandleClientPacket(pkCtx)
+
+	if pkCtx.Cancelled() {
+		ctx.Cancel()
+		return
+	}
+
+	// If the packet was modified, and the player is not on the latest version, we need to convert it back and then
+	// modify the value of the pointer to the original packet.
+	if !latestVer && pkCtx.Modified() {
+		downgradedPks := pl.Conn().Proto().ConvertFromLatest(*upgradedPk, pl.Conn())
+		*pk = downgradedPks[0] // We know for a fact here that the packet can be downgraded because it was able to be upgraded.
 	}
 }
 

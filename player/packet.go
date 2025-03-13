@@ -7,6 +7,7 @@ import (
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/player/context"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -25,25 +26,30 @@ var DecodeClientPackets = []uint32{
 	packet.IDItemStackRequest,
 }
 
-func (p *Player) HandleClientPacket(pk packet.Packet) bool {
+func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	defer p.recoverError()
 
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
-	cancel := false
+	p.pkCtx = ctx
+	pk := *(ctx.Packet())
+
 	switch pk := pk.(type) {
 	case *packet.ScriptMessage:
+		// TODO: Implement a better way to send messages to remote servers w/o abuse of ScriptMessagePacket.
 		if strings.Contains(pk.Identifier, "oomph:") {
 			p.Disconnect("\t")
-			return true
+			return
 		}
 	case *packet.Text:
 		args := strings.Split(pk.Message, " ")
 		if args[0] == "!oomph_debug" {
+			// If a player is running an oomph debug command, we don't want to leak that command into the chat.
+			ctx.Cancel()
 			if len(args) < 2 {
 				p.Message("Usage: !oomph_debug <mode>")
-				return true
+				return
 			}
 
 			var mode int
@@ -52,12 +58,12 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 				p.Log().SetLevel(logrus.DebugLevel)
 				p.Dbg.LoggingType = LoggingTypeLogFile
 				p.Message("Set debug logging type to <green>log file</green>.")
-				return true
+				return
 			case "type:message":
 				p.Log().SetLevel(logrus.InfoLevel)
 				p.Dbg.LoggingType = LoggingTypeMessage
 				p.Message("Set debug logging type to <green>message</green>.")
-				return true
+				return
 			case "acks":
 				mode = DebugModeACKs
 			case "rotations":
@@ -78,7 +84,7 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 				mode = DebugModeTimerA
 			default:
 				p.Message("Unknown debug mode: %s", args[1])
-				return true
+				return
 			}
 
 			p.Dbg.Toggle(mode)
@@ -87,13 +93,18 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 			} else {
 				p.Message("<red>Disabled</red> debug mode: %s", args[1])
 			}
-			return true
+			return
 		}
 	case *packet.PlayerAuthInput:
 		if !p.movement.InputAcceptable() {
 			p.Popup("<red>input rate-limited (%d)</red>", p.SimulationFrame)
-			return false
+			ctx.Cancel()
+			return
 		}
+
+		// Since Oomph utilizes a full-authoritative system for movement, we are always modifying the position in PlayerAuthInput packet
+		// to Oomph's predicted position.
+		ctx.SetModified()
 
 		<-p.world.Exec(func(tx *df_world.Tx) {
 			p.worldTx = tx
@@ -120,17 +131,20 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 		})
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {
-			return true
+			ctx.Cancel()
+			return
 		}
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
-		earlyCancel := false
 		<-p.world.Exec(func(tx *df_world.Tx) {
 			p.worldTx = tx
 			if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+				// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
+				// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
 				p.combat.Attack(pk)
-				cancel = true
+				ctx.Cancel()
+				return
 			} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && tr.ActionType == protocol.UseItemActionClickAir && p.Movement().Gliding() {
 				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 
@@ -185,13 +199,9 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 				return true
 			} */
 			if !p.worldUpdater.AttemptBlockPlacement(pk) {
-				earlyCancel = true
+				ctx.Cancel()
 			}
 		})
-
-		if earlyCancel {
-			return false
-		}
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
 		p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
@@ -204,14 +214,16 @@ func (p *Player) HandleClientPacket(pk packet.Packet) bool {
 	}
 
 	p.RunDetections(pk)
-	return cancel
 }
 
-func (p *Player) HandleServerPacket(pk packet.Packet) {
+func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	defer p.recoverError()
 
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
+
+	p.pkCtx = ctx
+	pk := *(ctx.Packet())
 
 	switch pk := pk.(type) {
 	case *packet.AddActor:
@@ -252,6 +264,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		p.worldUpdater.HandleLevelChunk(pk)
 	case *packet.MobEffect:
 		pk.Tick = 0
+		ctx.SetModified()
+
 		p.handleEffectsPacket(pk)
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
@@ -261,6 +275,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		}
 	case *packet.MovePlayer:
 		pk.Tick = 0
+		ctx.SetModified()
+
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMovePlayer(pk)
 		} else {
@@ -270,6 +286,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 	case *packet.SetActorData:
 		pk.Tick = 0
+		ctx.SetModified()
+
 		if pk.EntityRuntimeID != p.RuntimeId {
 			if e := p.entTracker.FindEntity(pk.EntityRuntimeID); e != nil {
 				e.Width, e.Height, e.Scale = calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
@@ -279,6 +297,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		}
 	case *packet.SetActorMotion:
 		pk.Tick = 0
+		ctx.SetModified()
+
 		if pk.EntityRuntimeID == p.RuntimeId {
 			p.movement.ServerUpdate(pk)
 		}
@@ -292,6 +312,8 @@ func (p *Player) HandleServerPacket(pk packet.Packet) {
 		}
 	case *packet.UpdateAttributes:
 		pk.Tick = 0
+		ctx.SetModified()
+
 		if pk.EntityRuntimeID == p.RuntimeId {
 			p.movement.ServerUpdate(pk)
 		}
