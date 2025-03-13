@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"runtime/debug"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -61,10 +63,10 @@ func main() {
 	opts.ClientDecode = player.DecodeClientPackets
 	opts.AutoLogin = false
 	opts.Addr = ":" + os.Args[1]
+	opts.SyncProtocol = true
 	if len(os.Args) >= 4 {
 		opts.Token = os.Args[3]
 	}
-
 	statusProvider, err := minecraft.NewForeignStatusProvider(os.Args[2])
 	if err != nil {
 		panic(err)
@@ -89,6 +91,9 @@ func main() {
 			v618.Protocol(),
 			v594.Protocol(),
 			v589.Protocol(),
+		},
+		PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
+			//fmt.Printf("pkID: %d, src: %s, dst: %s\n", header.PacketID, src.String(), dst.String())
 		},
 	}); err != nil {
 		panic(err)
