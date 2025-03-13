@@ -56,8 +56,13 @@ func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameDat
 }
 
 func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {
-	if pl := p.pl.Load(); pl != nil {
-		pl.HandleServerPacket(*pk)
+	pl := p.pl.Load()
+	if pl == nil {
+		return
+	}
+
+	for _, latest := range pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn()) {
+		pl.HandleServerPacket(latest)
 	}
 }
 
@@ -74,8 +79,15 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 		}
 	}
 
-	if pl := p.pl.Load(); pl != nil && pl.HandleClientPacket(*pk) {
-		ctx.Cancel()
+	pl := p.pl.Load()
+	if pl == nil {
+		return
+	}
+
+	for _, latest := range pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn()) {
+		if pl.HandleClientPacket(latest) {
+			ctx.Cancel()
+		}
 	}
 }
 
