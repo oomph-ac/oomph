@@ -23,6 +23,7 @@ import (
 	_ "github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
+	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -172,8 +173,9 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 			default:
 				fmt.Printf("Client -> Server: %T\n", pk)
 			} */
-
-			if cancel := p.HandleClientPacket(pk); cancel {
+			pkCtx := context.NewHandlePacketContext(&pk)
+			p.HandleClientPacket(pkCtx)
+			if pkCtx.Cancelled() {
 				continue
 			}
 
@@ -185,7 +187,6 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 				}
 				return
 			}
-			serverConn.Flush()
 		}
 	}()
 	go func() {
@@ -205,9 +206,13 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 				}
 				return
 			}
-			p.HandleServerPacket(pk)
-			if err := conn.WritePacket(pk); err != nil {
-				return
+
+			pkCtx := context.NewHandlePacketContext(&pk)
+			p.HandleServerPacket(pkCtx)
+			if !pkCtx.Cancelled() {
+				if err := conn.WritePacket(pk); err != nil {
+					return
+				}
 			}
 		}
 	}()
