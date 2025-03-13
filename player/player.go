@@ -12,6 +12,7 @@ import (
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
+	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -136,6 +137,8 @@ type Player struct {
 	// log is the logger of the player.
 	log *logrus.Logger
 
+	pkCtx *context.HandlePacketContext
+
 	world.NopViewer
 }
 
@@ -167,6 +170,12 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 	p.RegenerateWorld()
 	p.Dbg = NewDebugger(p)
 	return p
+}
+
+func (p *Player) WithPacketCtx(f func(*context.HandlePacketContext)) {
+	if p.pkCtx == nil {
+		f(p.pkCtx)
+	}
 }
 
 // PauseProcessing locks the procMu to prevent any packets from being processed.
