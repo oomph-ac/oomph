@@ -33,6 +33,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	defer p.procMu.Unlock()
 
 	p.pkCtx = ctx
+	defer func() {
+		p.pkCtx = nil
+	}()
+
 	pk := *(ctx.Packet())
 
 	switch pk := pk.(type) {
@@ -223,8 +227,11 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	defer p.procMu.Unlock()
 
 	p.pkCtx = ctx
-	pk := *(ctx.Packet())
+	defer func() {
+		p.pkCtx = nil
+	}()
 
+	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
 	case *packet.AddActor:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
