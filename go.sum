@@ -19,8 +19,6 @@ github.com/chewxy/math32 v1.10.1/go.mod h1:dOB2rcuFrCn6UHrze36WSLVPKtzPMRAQvBvUw
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cooldogedev/spectral v0.0.5 h1:VTWbJkqwDqg/eeDwIXwC6+jpXEGlOzu6QzP1hSEUhIM=
 github.com/cooldogedev/spectral v0.0.5/go.mod h1:Oq9dVLgqaRiS/hZvKvLk/XWXFOZmmTKM29u6o4GBe84=
-github.com/cooldogedev/spectrum v0.0.37-0.20250302204654-28111dbf25f0 h1:zgeL9Jio2knV4gwJVsiQhPxm3OCFdyKI2lU/9Ts5DMA=
-github.com/cooldogedev/spectrum v0.0.37-0.20250302204654-28111dbf25f0/go.mod h1:RCsYvS4kEy3rDTHR9JNXYvepnLKqH9zPOuoxj6QIPZ4=
 github.com/coreos/go-systemd v0.0.0-20181012123002-c6f51f82210d/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -120,8 +118,6 @@ github.com/onsi/ginkgo/v2 v2.22.2/go.mod h1:oeMosUL+8LtarXBHu/c0bx2D/K9zyQ6uX3cT
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.36.2 h1:koNYke6TVk6ZmnyHrCXba/T/MoLBXFjeC1PtvYgw0A8=
 github.com/onsi/gomega v1.36.2/go.mod h1:DdwyADRjrc825LhMEkD76cHR5+pUnjhUN8GlHlRPHzY=
-github.com/oomph-ac/dragonfly v0.0.0-20250220151023-85476f959f18 h1:nL5CrY4dETkevrjwoCVvJEXr/O6YP2FURE9GjFCJlfg=
-github.com/oomph-ac/dragonfly v0.0.0-20250220151023-85476f959f18/go.mod h1:lApyu8ev9xY7S1J9g1mMzTRm4QE30d6AS6LihpXQrqY=
 github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1 h1:a42UCvnXsthmENf9FxsK6tDh8/9Bc0BZ8NHwuGVjDSs=
 github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1/go.mod h1:5ILbIEMMRezkSUtydR18M++l2v9UN0ZbdJM2qn6Wdno=
 github.com/openzipkin/zipkin-go v0.1.1/go.mod h1:NtoC/o8u3JlF1lSlyPNswIbeQH9bJTmOf0Erfk+hxe8=
