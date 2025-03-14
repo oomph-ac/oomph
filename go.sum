@@ -20,11 +20,6 @@ github.com/chewxy/math32 v1.10.1/go.mod h1:dOB2rcuFrCn6UHrze36WSLVPKtzPMRAQvBvUw
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cooldogedev/spectral v0.0.5 h1:VTWbJkqwDqg/eeDwIXwC6+jpXEGlOzu6QzP1hSEUhIM=
 github.com/cooldogedev/spectral v0.0.5/go.mod h1:Oq9dVLgqaRiS/hZvKvLk/XWXFOZmmTKM29u6o4GBe84=
-github.com/cooldogedev/spectrum v0.0.36-0.20250212061602-205805155461 h1:kC+eki3l21DtD3XAcWhy8zJJQzNwZfRBh7OwMTn8CZg=
-github.com/cooldogedev/spectrum v0.0.36-0.20250212061602-205805155461/go.mod h1:TBMBjrA02GnnYCc4T25t68Ti4EAuvO2C376NA9ZGdXg=
-github.com/cooldogedev/spectrum v0.0.37-0.20250302204654-28111dbf25f0 h1:zgeL9Jio2knV4gwJVsiQhPxm3OCFdyKI2lU/9Ts5DMA=
-github.com/cooldogedev/spectrum v0.0.37-0.20250302204654-28111dbf25f0/go.mod h1:RCsYvS4kEy3rDTHR9JNXYvepnLKqH9zPOuoxj6QIPZ4=
-github.com/cooldogedev/spectrum-df v0.0.20/go.mod h1:VxNWTOEY7n+fBvq1QjbtbwbcXCLVyCHJH2AXeXO7Qj0=
 github.com/coreos/go-systemd v0.0.0-20181012123002-c6f51f82210d/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -126,8 +121,6 @@ github.com/onsi/ginkgo/v2 v2.22.2/go.mod h1:oeMosUL+8LtarXBHu/c0bx2D/K9zyQ6uX3cT
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.36.2 h1:koNYke6TVk6ZmnyHrCXba/T/MoLBXFjeC1PtvYgw0A8=
 github.com/onsi/gomega v1.36.2/go.mod h1:DdwyADRjrc825LhMEkD76cHR5+pUnjhUN8GlHlRPHzY=
-github.com/oomph-ac/dragonfly v0.0.0-20250220151023-85476f959f18 h1:nL5CrY4dETkevrjwoCVvJEXr/O6YP2FURE9GjFCJlfg=
-github.com/oomph-ac/dragonfly v0.0.0-20250220151023-85476f959f18/go.mod h1:lApyu8ev9xY7S1J9g1mMzTRm4QE30d6AS6LihpXQrqY=
 github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1 h1:a42UCvnXsthmENf9FxsK6tDh8/9Bc0BZ8NHwuGVjDSs=
 github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1/go.mod h1:5ILbIEMMRezkSUtydR18M++l2v9UN0ZbdJM2qn6Wdno=
 github.com/openzipkin/zipkin-go v0.1.1/go.mod h1:NtoC/o8u3JlF1lSlyPNswIbeQH9bJTmOf0Erfk+hxe8=
@@ -146,17 +139,10 @@ github.com/prometheus/client_golang v0.8.0/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXP
 github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910/go.mod h1:MbSGuTsp3dbXC40dX6PRTWyKYBIrTGTE9sqQNg2J8bo=
 github.com/prometheus/common v0.0.0-20180801064454-c7de2306084e/go.mod h1:daVV7qP5qjZbuso7PdcryaAu0sAZbrN9i7WWcTMWvro=
 github.com/prometheus/procfs v0.0.0-20180725123919-05ee40e3a273/go.mod h1:c3At6R/oaqEKCNdg8wHV1ftS6bRYblBhIjjI8uT2IGk=
-<<<<<<< HEAD
-github.com/quic-go/quic-go v0.48.2 h1:wsKXZPeGWpMpCGSWqOcqpW2wZYic/8T3aqiOID0/KWE=
-github.com/quic-go/quic-go v0.48.2/go.mod h1:yBgs3rWBOADpga7F+jJsb6Ybg1LSYiQvwWlLX+/6HMs=
-github.com/quic-go/quic-go v0.49.0 h1:w5iJHXwHxs1QxyBv1EHKuC50GX5to8mJAxvtnttJp94=
-github.com/quic-go/quic-go v0.49.0/go.mod h1:s2wDnmCdooUQBmQfpUSTCYBl1/D4FcqbULMMkASvR6s=
-=======
 github.com/quic-go/quic-go v0.50.0 h1:3H/ld1pa3CYhkcc20TPIyG1bNsdhn9qZBGN3b9/UyUo=
 github.com/quic-go/quic-go v0.50.0/go.mod h1:Vim6OmUvlYdwBhXP9ZVrtGmCMWa3wEqhq3NgYrI8b4E=
 github.com/rs/cors v1.11.0 h1:0B9GE/r9Bc2UxRMMtymBkHTenPkHDv0CW4Y98GBY+po=
 github.com/rs/cors v1.11.0/go.mod h1:XyqrcTp5zjWr1wsJ8PIRZssZ8b/WMcMf71DJnit4EMU=
->>>>>>> 4c43430 (more work for DF world support)
 github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
 github.com/samber/lo v1.49.1 h1:4BIFyVfuQSEpluc7Fua+j1NolZHiEHEpaSEKdsH0tew=
 github.com/samber/lo v1.49.1/go.mod h1:dO6KHFzUKXgP8LDhU0oI8d2hekjXnGOu0DB8Jecxd6o=

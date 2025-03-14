@@ -53,6 +53,7 @@ func (ackC *ACKComponent) Add(ack player.Acknowledgment) {
 // Execute runs a list of acknowledgments with the given timestamp. It returns true if the ack ID
 // given is on the list.
 func (ackC *ACKComponent) Execute(ackID int64) bool {
+	ackC.mPlayer.Dbg.Notify(player.DebugModeACKs, true, "got raw ACK ID %d", ackID)
 	if !ackC.legacyMode {
 		ackID /= ACK_DIVIDER
 		if ackC.mPlayer.ClientDat.DeviceOS != protocol.DeviceOrbis {
@@ -71,6 +72,7 @@ func (ackC *ACKComponent) Execute(ackID int64) bool {
 
 	// If there is none found with the given ack ID.
 	if index == -1 {
+		ackC.mPlayer.Dbg.Notify(player.DebugModeACKs, true, "no ACK ID found for %d", ackID)
 		return false
 	}
 	//assert.IsTrue(index < len(ackC.pending) && index >= 0, "found index (%d) out of bounds of 0-%d", index, len(ackC.pending)-1)
@@ -90,6 +92,7 @@ func (ackC *ACKComponent) Execute(ackID int64) bool {
 	// didn't respond to a previous ACK, we don't expect them to send back the previous ones.
 	ackC.pending = ackC.pending[index+1:]
 	ackC.ticksSinceLastResponse = 0
+	ackC.mPlayer.Dbg.Notify(player.DebugModeACKs, true, "ACK ID %d executed", ackID)
 	return true
 }
 

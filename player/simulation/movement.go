@@ -294,6 +294,10 @@ func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder d
 func setPostCollisionMotion(movement player.MovementComponent, oldVel mgl32.Vec3, oldOnGround bool, blockUnder df_world.Block) {
 	if !oldOnGround && movement.YCollision() {
 		landOnBlock(movement, oldVel, blockUnder)
+	} else if movement.YCollision() {
+		newVel := movement.Vel()
+		newVel[1] = 0
+		movement.SetVel(newVel)
 	}
 
 	newVel := movement.Vel()

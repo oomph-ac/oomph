@@ -77,6 +77,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	data := input.TransactionData.(*protocol.UseItemOnEntityTransactionData)
 	e := c.mPlayer.EntityTracker().FindEntity(data.TargetEntityRuntimeID)
 	if e == nil {
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "entity %d not found", data.TargetEntityRuntimeID)
 		return
 	}
 	c.targetedEntity = e
@@ -107,12 +108,15 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 
 func (c *AuthoritativeCombatComponent) Calculate() bool {
 	// There is no attack input for this tick.
+	defer c.reset()
 	if !c.checkMisprediction && c.attackInput == nil {
 		return false
 	}
 
+	// Allow any hits if the player is in the correct gamemode.
 	if gamemode := c.mPlayer.GameMode; gamemode != packet.GameTypeSurvival && gamemode != packet.GameTypeAdventure {
-		return false
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "player is in gamemode %d, allowing hit", gamemode)
+		return true
 	}
 
 	t := time.Now()
@@ -131,7 +135,6 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	if c.checkMisprediction {
 		if c.mPlayer.LastEquipmentData == nil || !c.checkForMispredictedEntity() {
-			c.reset()
 			return false
 		}
 	}
@@ -221,8 +224,6 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	for _, hook := range c.hooks {
 		hook(c)
 	}
-	c.reset()
-
 	return true
 }
 

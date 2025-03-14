@@ -68,7 +68,7 @@ func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {
 	)
 
 	if !pl.IsVersion(minecraft.DefaultProtocol.ID()) {
-		latestPks := pl.Conn().Proto().ConvertFromLatest(*pk, pl.Conn())
+		latestPks := pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn())
 		if len(latestPks) == 0 {
 			return
 		}
@@ -86,8 +86,8 @@ func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {
 	}
 
 	if !latestVer && pkCtx.Modified() {
-		upgradedPks := pl.Conn().Proto().ConvertToLatest(*latestPk, pl.Conn())
-		*pk = upgradedPks[0]
+		downgradedPks := pl.Conn().Proto().ConvertFromLatest(*latestPk, pl.Conn())
+		*pk = downgradedPks[0]
 	}
 }
 

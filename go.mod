@@ -56,6 +56,6 @@ replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
 replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v0.0.35
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20250220151023-85476f959f18
+replace github.com/df-mc/dragonfly => ../dragonfly
 
 replace github.com/cooldogedev/spectrum => ../spectrum
