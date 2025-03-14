@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,10 +11,19 @@ import (
 )
 
 // ResourcePacks loads all resource packs in a path.
-func ResourcePacks(path string) []*resource.Pack {
+func ResourcePacks(path string, contentKeyFile string) ([]*resource.Pack, error) {
+	var contentKeys = make(map[string]string)
+	if dat, err := os.ReadFile(path + "/" + contentKeyFile); err != nil {
+		return nil, err
+	} else {
+		if err := json.Unmarshal(dat, &contentKeys); err != nil {
+			return nil, err
+		}
+	}
+
 	var packs []*resource.Pack
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+	if _, err := os.Stat(path); err == nil {
+		if err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -22,10 +33,19 @@ func ResourcePacks(path string) []*resource.Pack {
 				if err != nil {
 					return err
 				}
+
+				if key, ok := contentKeys[string(pack.UUID().String())]; ok {
+					fmt.Println("applied", key, "to", pack.Name())
+					pack = pack.WithContentKey(key)
+				}
 				packs = append(packs, pack)
 			}
 			return nil
-		})
+		}); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, err
 	}
-	return packs
+	return packs, nil
 }
