@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	"runtime/debug"
 
@@ -30,8 +29,8 @@ import (
 	v766 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v766"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -72,6 +71,11 @@ func main() {
 		panic(err)
 	}
 
+	packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
+	if err != nil {
+		panic(err)
+	}
+
 	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery(os.Args[2], ""), logger, opts, nil)
 	if err := proxy.Listen(minecraft.ListenConfig{
 		StatusProvider: statusProvider,
@@ -92,9 +96,8 @@ func main() {
 			v594.Protocol(),
 			v589.Protocol(),
 		},
-		PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
-			//fmt.Printf("pkID: %d, src: %s, dst: %s\n", header.PacketID, src.String(), dst.String())
-		},
+		ResourcePacks:        packs,
+		TexturePacksRequired: true,
 	}); err != nil {
 		panic(err)
 	}
