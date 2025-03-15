@@ -14,11 +14,11 @@ import (
 func ResourcePacks(path string, contentKeyFile string) ([]*resource.Pack, error) {
 	var contentKeys = make(map[string]string)
 	if dat, err := os.ReadFile(path + "/" + contentKeyFile); err != nil {
-		return nil, err
-	} else {
-		if err := json.Unmarshal(dat, &contentKeys); err != nil {
+		if !os.IsNotExist(err) {
 			return nil, err
 		}
+	} else if err := json.Unmarshal(dat, &contentKeys); err != nil {
+		return nil, err
 	}
 
 	var packs []*resource.Pack
