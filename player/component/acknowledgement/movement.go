@@ -27,6 +27,7 @@ func NewTeleportPlayerACK(p *player.Player, pos mgl32.Vec3, onGround, smoothed b
 
 func (ack *TeleportPlayer) Run() {
 	ack.mPlayer.Movement().Teleport(ack.pos, ack.onGround, ack.smoothed)
+	ack.mPlayer.Movement().RemovePendingTeleport()
 }
 
 // UpdateAbilities is an acknowledgment that is ran when the member player has it's abilities updated.

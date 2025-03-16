@@ -149,14 +149,15 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				p.combat.Attack(pk)
 				ctx.Cancel()
 				return
-			} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && tr.ActionType == protocol.UseItemActionClickAir && p.Movement().Gliding() {
+			} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
-
-				// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
-				// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
-				if _, isFireworks := p.inventory.Holding().Item().(item.Firework); isFireworks {
-					p.movement.SetGlideBoost(20)
-					p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
+				if tr.ActionType == protocol.UseItemActionClickAir && p.Movement().Gliding() {
+					// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
+					// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
+					if _, isFireworks := p.inventory.Holding().Item().(item.Firework); isFireworks {
+						p.movement.SetGlideBoost(20)
+						p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
+					}
 				}
 			} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))

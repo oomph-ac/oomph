@@ -84,6 +84,9 @@ type AuthoritativeMovementComponent struct {
 	knockback    mgl32.Vec3
 	ticksSinceKb uint64
 
+	pendingTeleportPos mgl32.Vec3
+	pendingTeleports   int
+
 	teleportPos             mgl32.Vec3
 	ticksSinceTeleport      uint64
 	teleportCompletionTicks uint64
@@ -379,6 +382,26 @@ func (mc *AuthoritativeMovementComponent) HasTeleport() bool {
 // TeleportSmoothed returns true if the movement component has a teleport that needs to be smoothed out.
 func (mc *AuthoritativeMovementComponent) TeleportSmoothed() bool {
 	return mc.teleportIsSmoothed
+}
+
+func (mc *AuthoritativeMovementComponent) SetPendingTeleportPos(pos mgl32.Vec3) {
+	mc.pendingTeleportPos = pos
+}
+
+func (mc *AuthoritativeMovementComponent) PendingTeleportPos() mgl32.Vec3 {
+	return mc.pendingTeleportPos
+}
+
+func (mc *AuthoritativeMovementComponent) AddPendingTeleport() {
+	mc.pendingTeleports++
+}
+
+func (mc *AuthoritativeMovementComponent) RemovePendingTeleport() {
+	mc.pendingTeleports--
+}
+
+func (mc *AuthoritativeMovementComponent) PendingTeleports() int {
+	return mc.pendingTeleports
 }
 
 // RemainingTeleportTicks returns the amount of ticks the teleport still needs to be completed.
@@ -738,11 +761,20 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.MoveActorAbsolute:
 		if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
+			mc.SetPendingTeleportPos(pk.Position)
+			mc.AddPendingTeleport()
 			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagOnGround), false))
 		}
 	case *packet.MovePlayer:
 		if pk.Mode != packet.MoveModeRotation {
-			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, pk.Position.Sub(playerHeightOffset), pk.OnGround, pk.Mode == packet.MoveModeNormal))
+			if pk.Mode == packet.MoveModeReset {
+				pk.Mode = packet.MoveModeTeleport
+			}
+
+			tpPos := pk.Position.Sub(playerHeightOffset)
+			mc.SetPendingTeleportPos(tpPos)
+			mc.AddPendingTeleport()
+			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, tpPos, pk.OnGround, pk.Mode == packet.MoveModeNormal))
 		}
 	case *packet.SetActorData:
 		/* if v, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {

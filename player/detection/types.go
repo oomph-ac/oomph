@@ -7,4 +7,5 @@ const (
 	TYPE_KILLAURA      = "Killaura"
 	TYPE_INV_MOVE      = "InvMove"
 	TYPE_SCAFFOLD      = "Scaffold"
+	TYPE_NUKER         = "Nuker"
 )
