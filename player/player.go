@@ -139,6 +139,8 @@ type Player struct {
 	// log is the logger of the player.
 	log *logrus.Logger
 
+	recoverFunc func(p *Player, err any)
+
 	pkCtx *context.HandlePacketContext
 
 	world.NopViewer
@@ -172,6 +174,10 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 	p.RegenerateWorld()
 	p.Dbg = NewDebugger(p)
 	return p
+}
+
+func (p *Player) SetRecoverFunc(f func(p *Player, err any)) {
+	p.recoverFunc = f
 }
 
 func (p *Player) WithPacketCtx(f func(*context.HandlePacketContext)) {
