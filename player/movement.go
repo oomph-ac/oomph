@@ -113,6 +113,16 @@ type MovementComponent interface {
 	HasTeleport() bool
 	// TeleportSmoothed returns true if the movement component has a teleport that needs to be smoothed out.
 	TeleportSmoothed() bool
+	// SetPendingTeleportPos
+	SetPendingTeleportPos(mgl32.Vec3)
+	// PendingTeleportPos
+	PendingTeleportPos() mgl32.Vec3
+	// AddPendingTeleport
+	AddPendingTeleport()
+	// RemovePendingTeleport
+	RemovePendingTeleport()
+	// PendingTeleports
+	PendingTeleports() int
 	// RemainingTeleportTicks returns the amount of ticks the teleport still needs to be completed.
 	RemainingTeleportTicks() int
 
@@ -291,8 +301,8 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	// To prevent the server never accepting our position (PMMP), we will always set our position to the final teleport position if a teleport is in progress.
 	// Otherwise, we will use the movement component's prediction.
 	var finalPos mgl32.Vec3
-	if p.Movement().HasTeleport() {
-		finalPos = p.Movement().TeleportPos()
+	if p.Movement().PendingTeleports() > 0 {
+		finalPos = p.Movement().PendingTeleportPos()
 	} else {
 		finalPos = p.Movement().Pos()
 	}
