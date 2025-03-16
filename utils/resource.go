@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +34,6 @@ func ResourcePacks(path string, contentKeyFile string) ([]*resource.Pack, error)
 				}
 
 				if key, ok := contentKeys[string(pack.UUID().String())]; ok {
-					fmt.Println("applied", key, "to", pack.Name())
 					pack = pack.WithContentKey(key)
 				}
 				packs = append(packs, pack)
