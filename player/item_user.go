@@ -16,7 +16,10 @@ func (p *Player) ReleaseItem() {}
 
 func (p *Player) UseItem() {}
 
-func (p *Player) HeldItems() (mainHand, offhand item.Stack) { return }
+func (p *Player) HeldItems() (mainHand, offhand item.Stack) {
+	mainHand = p.inventory.Holding()
+	return
+}
 
 // As we are not running a Dragonfly server, we don't need to implement entity handles.
 func (p *Player) H() *world.EntityHandle {

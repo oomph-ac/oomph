@@ -7,6 +7,7 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -44,20 +45,20 @@ func NewInventoryComponent(p *player.Player) *InventoryComponent {
 	}
 }
 
-func (c *InventoryComponent) Helmet() world.Item {
-	return c.pArmour.Slot(0).Item()
+func (c *InventoryComponent) Helmet() item.Stack {
+	return c.pArmour.Slot(0)
 }
 
-func (c *InventoryComponent) Chestplate() world.Item {
-	return c.pArmour.Slot(1).Item()
+func (c *InventoryComponent) Chestplate() item.Stack {
+	return c.pArmour.Slot(1)
 }
 
-func (c *InventoryComponent) Leggings() world.Item {
-	return c.pArmour.Slot(2).Item()
+func (c *InventoryComponent) Leggings() item.Stack {
+	return c.pArmour.Slot(2)
 }
 
-func (c *InventoryComponent) Boots() world.Item {
-	return c.pArmour.Slot(3).Item()
+func (c *InventoryComponent) Boots() item.Stack {
+	return c.pArmour.Slot(3)
 }
 
 func (c *InventoryComponent) WindowFromContainerID(id int32) (*player.Inventory, bool) {
@@ -119,7 +120,8 @@ func (c *InventoryComponent) HandleInventorySlot(pk *packet.InventorySlot) {
 	if pk.NewItem.Stack.NetworkID == 0 {
 		inv.SetSlot(int(pk.Slot), item.NewStack(&block.Air{}, 0))
 	} else if i, ok := world.ItemByRuntimeID(pk.NewItem.Stack.NetworkID, int16(pk.NewItem.Stack.MetadataValue)); ok {
-		inv.SetSlot(int(pk.Slot), item.NewStack(i, int(pk.NewItem.Stack.Count)))
+		iStack := item.NewStack(i, int(pk.NewItem.Stack.Count))
+		inv.SetSlot(int(pk.Slot), utils.ReadItem(pk.NewItem.Stack.NBTData, &iStack))
 	} else {
 		c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", pk.NewItem.Stack.NetworkID, pk.NewItem.Stack.MetadataValue)
 	}
@@ -136,7 +138,8 @@ func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent)
 		if itemInstance.Stack.NetworkID == 0 {
 			inv.SetSlot(index, item.NewStack(&block.Air{}, 0))
 		} else if i, found := world.ItemByRuntimeID(itemInstance.Stack.NetworkID, int16(itemInstance.Stack.MetadataValue)); found {
-			inv.SetSlot(index, item.NewStack(i, int(itemInstance.Stack.Count)))
+			iStack := item.NewStack(i, int(itemInstance.Stack.Count))
+			inv.SetSlot(index, utils.ReadItem(itemInstance.Stack.NBTData, &iStack))
 		} else {
 			c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", itemInstance.Stack.NetworkID, itemInstance.Stack.MetadataValue)
 		}

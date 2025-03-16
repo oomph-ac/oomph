@@ -72,7 +72,7 @@ func SimulatePlayerMovement(p *player.Player) {
 	}
 
 	if movement.Gliding() {
-		_, hasElytra := p.Inventory().Chestplate().(item.Elytra)
+		_, hasElytra := p.Inventory().Chestplate().Item().(item.Elytra)
 		if hasElytra && !movement.OnGround() {
 			movement.SetOnGround(false)
 			simulateGlide(p, movement)

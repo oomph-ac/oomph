@@ -83,6 +83,8 @@ type Player struct {
 	// make an attack packet when Oomph's full authoritative combat detects a misprediction.
 	LastEquipmentData *packet.MobEquipment
 
+	blockBreakProgress float32
+
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn       *minecraft.Conn
 	serverConn ServerConn

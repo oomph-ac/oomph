@@ -2,17 +2,16 @@ package player
 
 import (
 	"github.com/df-mc/dragonfly/server/item"
-	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // InventoryComponent is a component that handles actions related to the player's inventory.
 type InventoryComponent interface {
-	Helmet() world.Item
-	Chestplate() world.Item
-	Leggings() world.Item
-	Boots() world.Item
+	Helmet() item.Stack
+	Chestplate() item.Stack
+	Leggings() item.Stack
+	Boots() item.Stack
 
 	WindowFromContainerID(int32) (*Inventory, bool)
 	WindowFromWindowID(int32) (*Inventory, bool)

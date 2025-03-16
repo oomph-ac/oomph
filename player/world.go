@@ -1,8 +1,12 @@
 package player
 
 import (
+	"time"
+
+	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
@@ -127,7 +131,6 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 
 	replacingBlock := p.worldTx.Block(pos)
 	if _, isReplaceable := replacingBlock.(block.Replaceable); !isReplaceable {
-		p.Message("cannot place block at %v (not replaceable)", pos)
 		return
 	}
 
@@ -163,6 +166,21 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 	p.worldTx.SetBlock(pos, b, nil)
 }
 
+func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
+	for _, pos := range positions {
+		p.SendPacketToClient(&packet.UpdateBlock{
+			Position: pos,
+			NewBlockRuntimeID: world.BlockRuntimeID(p.worldTx.Block(df_cube.Pos{
+				int(pos.X()),
+				int(pos.Y()),
+				int(pos.Z()),
+			})),
+			Flags: packet.BlockUpdateNeighbours,
+			Layer: 0, // TODO: Implement and account for multi-layer blocks.
+		})
+	}
+}
+
 func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	/* chunkPos := protocol.ChunkPos{
 		int32(math32.Floor(p.movement.Pos().X())) >> 4,
@@ -170,51 +188,107 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	} */
 
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
+		var (
+			newActions    = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
+			hasCrackBreak bool
+		)
 		for _, action := range pk.BlockActions {
 			switch action.Action {
 			case protocol.PlayerActionPredictDestroyBlock:
-				if p.ServerConn() == nil {
+				if p.ServerConn() == nil || !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking || p.worldUpdater.BlockBreakPos() == nil {
 					continue
 				}
 
-				if !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
+				finalProgess := p.blockBreakProgress + (1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001))
+				if finalProgess < 1 {
+					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
+					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					continue
 				}
 
+				p.blockBreakProgress = 0.0
 				p.worldTx.SetBlock(df_cube.Pos{
 					int(action.BlockPos.X()),
 					int(action.BlockPos.Y()),
 					int(action.BlockPos.Z()),
 				}, block.Air{}, nil)
-			case protocol.PlayerActionStartBreak:
-				if p.worldUpdater.BlockBreakPos() != nil {
+			case protocol.PlayerActionStartBreak, protocol.PlayerActionCrackBreak:
+				if action.Action == protocol.PlayerActionStartBreak {
+					p.blockBreakProgress = 0.0
+				}
+
+				currentBlockBreakPos := p.worldUpdater.BlockBreakPos()
+				if action.Action == protocol.PlayerActionCrackBreak && currentBlockBreakPos != nil && *currentBlockBreakPos == action.BlockPos && hasCrackBreak {
+					// There should be no more than one crack break action unless the client is breaking another block.
 					continue
 				}
 
-				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
-			case protocol.PlayerActionCrackBreak:
-				if p.worldUpdater.BlockBreakPos() == nil {
-					continue
+				if currentBlockBreakPos == nil || *currentBlockBreakPos != action.BlockPos {
+					hasCrackBreak = false
+					p.blockBreakProgress = 0.0
+				} else {
+					hasCrackBreak = action.Action == protocol.PlayerActionCrackBreak
 				}
 
+				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
 			case protocol.PlayerActionAbortBreak:
+				p.blockBreakProgress = 0.0
 				p.worldUpdater.SetBlockBreakPos(nil)
 			case protocol.PlayerActionStopBreak:
 				if p.worldUpdater.BlockBreakPos() == nil {
 					continue
 				}
 
+				finalProgess := p.blockBreakProgress + (1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001))
+				if finalProgess < 1 {
+					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
+					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
+					continue
+				}
+
+				p.blockBreakProgress = 0.0
 				p.worldTx.SetBlock(df_cube.Pos{
 					int(p.worldUpdater.BlockBreakPos().X()),
 					int(p.worldUpdater.BlockBreakPos().Y()),
 					int(p.worldUpdater.BlockBreakPos().Z()),
 				}, block.Air{}, nil)
 			}
+			newActions = append(newActions, action)
 		}
+		pk.BlockActions = newActions
 	}
 
 	/* if p.Ready {
 		p.World().CleanChunks(p.worldUpdater.ChunkRadius(), chunkPos)
 	} */
+}
+
+func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
+	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
+		return 0
+	}
+
+	held, _ := p.HeldItems()
+	b := p.worldTx.Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
+	if _, isAir := b.(block.Air); isAir {
+		return math32.MaxFloat32
+	}
+
+	breakTime := block.BreakDuration(b, held)
+	/* if !p.movement.OnGround() {
+		breakTime *= 5
+	} */
+	for effectID, e := range p.effects.All() {
+		lvl := int(e.Amplifier)
+		switch effectID {
+		case packet.EffectHaste:
+			breakTime = time.Duration(float64(breakTime) * effect.Haste.Multiplier(lvl))
+		case packet.EffectMiningFatigue:
+			breakTime = time.Duration(float64(breakTime) * effect.MiningFatigue.Multiplier(lvl))
+		case packet.EffectConduitPower:
+			breakTime = time.Duration(float64(breakTime) * effect.ConduitPower.Multiplier(lvl))
+		}
+	}
+	return float32(breakTime.Milliseconds() / 50)
 }

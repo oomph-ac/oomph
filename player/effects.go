@@ -14,6 +14,8 @@ type EffectsComponent interface {
 	// Remove removes an effect from the effect component, removing the effect that matches with
 	// the passed effect ID.
 	Remove(effectID int32)
+	// All returns all effects that are currently active in the effect component.
+	All() map[int32]Effect
 	// Tick ticks all the effects, and removes those effects in which the duration has expired.
 	Tick()
 }
