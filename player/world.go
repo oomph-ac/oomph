@@ -156,7 +156,9 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 
 		// We sync the world in this instance to avoid any possibility of a long-persisting ghost block.
 		if cube.AnyIntersections(boxes, e.Box(rew.Position)) {
-			p.SyncWorld()
+			p.SendBlockUpdates([]protocol.BlockPos{
+				{int32(pos[0]), int32(pos[1]), int32(pos[2])},
+			})
 			return
 		}
 	}
