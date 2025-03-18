@@ -199,11 +199,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				inv.SetSlot(sourceSlot, sourceSlotItem.Grow(-droppedCount))
 			}
 
-			/* if !p.worldUpdater.ValidateInteraction(pk) {
-				p.SyncWorld()
-				return true
-			} */
-			if !p.worldUpdater.AttemptBlockPlacement(pk) {
+			if !p.worldUpdater.ValidateInteraction(pk) || !p.worldUpdater.AttemptBlockPlacement(pk) {
 				ctx.Cancel()
 			}
 		})

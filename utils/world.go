@@ -12,6 +12,7 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/world/blockmodel"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
 type BlockSearchResult struct {
@@ -146,6 +147,19 @@ func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
 		boxes[i] = game.DFBoxToCubeBox(bb)
 	}
 	return boxes
+}
+
+// GetBlocksInRadius returns a list of block positions within a radius of the given position.
+func GetBlocksInRadius(pos protocol.BlockPos, radius int32) []protocol.BlockPos {
+	blocks := []protocol.BlockPos{}
+	for x := -radius; x <= radius; x++ {
+		for y := -radius; y <= radius; y++ {
+			for z := -radius; z <= radius; z++ {
+				blocks = append(blocks, protocol.BlockPos{pos[0] + x, pos[1] + y, pos[2] + z})
+			}
+		}
+	}
+	return blocks
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
