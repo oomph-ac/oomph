@@ -6,7 +6,6 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
-	"github.com/df-mc/dragonfly/server/world"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
@@ -116,7 +115,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	case item.UsableOnBlock:
 		useCtx := item.UseContext{}
 		heldItem.UseOnBlock(dfReplacePos, df_cube.Face(dat.BlockFace), game.Vec32To64(dat.ClickedPosition), c.mPlayer.WorldTx(), c.mPlayer, &useCtx)
-	case world.Block:
+	case df_world.Block:
 		// If the block at the position is not replacable, we want to place the block on the side of the block.
 		if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(heldItem) {
 			replacePos = replacePos.Side(cube.Face(dat.BlockFace))
@@ -154,9 +153,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	if c.mPlayer.Conn().Proto().ID() >= player.GameVersion1_21_20 {
 		isInitalInput = dat.TriggerType == protocol.TriggerTypePlayerInput
 	} else {
-		isInitalInput = dat.ClickedPosition[0] > 1 || dat.ClickedPosition[1] > 1 || dat.ClickedPosition[2] > 1
+		isInitalInput = dat.ClickedPosition.LenSqr() > 0.0
 	}
-
 	if !isInitalInput {
 		return c.initalInteractionAccepted
 	}
@@ -185,11 +183,28 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 
 	// Check for all the blocks in between the interaction position and the player's eye position. If any blocks intersect
 	// with the line between the player's eye position and the interaction position, the interaction is cancelled.
+	var (
+		checkedPositions = make(map[df_cube.Pos]struct{})
+		iterCount        int
+	)
+
 	for intersectingBlockPos := range game.BlocksBetween(eyePos, interactPos) {
+		iterCount++
+		if iterCount > 49 {
+			c.mPlayer.Log().Debugf("too many iterations for interaction validation (eyePos=%v interactPos=%v uniqueBlocks=%d)", eyePos, interactPos, len(checkedPositions))
+			break
+		}
+
 		flooredPos := df_cube.Pos{int(intersectingBlockPos[0]), int(intersectingBlockPos[1]), int(intersectingBlockPos[2])}
 		if flooredPos == df_cube.Pos(blockPos) {
 			continue
 		}
+
+		// Make sure we don't iterate through the same block multiple times.
+		if _, ok := checkedPositions[flooredPos]; ok {
+			continue
+		}
+		checkedPositions[flooredPos] = struct{}{}
 
 		intersectingBlock := c.mPlayer.WorldTx().Block(flooredPos)
 		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.WorldTx())
