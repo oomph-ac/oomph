@@ -590,13 +590,14 @@ func attemptTeleport(movement player.MovementComponent, dbg *player.Debugger) bo
 		attemptJump(movement, dbg)
 		return true
 	}
-
 	// Calculate the smooth teleport's next position.
 	posDelta := movement.TeleportPos().Sub(movement.Pos())
 	if remaining := movement.RemainingTeleportTicks() + 1; remaining > 0 {
 		newPos := movement.Pos().Add(posDelta.Mul(1.0 / float32(remaining)))
 		movement.SetPos(newPos)
 		movement.SetVel(mgl32.Vec3{})
+		movement.SetJumpDelay(0)
+		return true
 	}
 	return false
 }

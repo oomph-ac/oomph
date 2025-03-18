@@ -4,6 +4,7 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -267,10 +268,12 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	p.ClientTick++
 
 	p.effects.Tick()
+
+	hasTeleport := p.movement.HasTeleport()
 	p.movement.Update(pk)
 
 	// If the client's prediction of movement deviates from the server, we send a correction so that the client can re-sync.
-	if !p.movement.Validate() {
+	if !p.movement.Validate() && p.movement.PendingTeleports() == 0 && !hasTeleport {
 		p.correctMovement()
 	} else if p.movement.Vel().Sub(p.movement.Client().Vel()).Len() < 1e-5 {
 		// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
@@ -315,8 +318,27 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 }
 
 func (p *Player) correctMovement() {
-	// Update the blocks in the world so the client can sync itself properly.
-	p.SyncWorld()
+	// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
+	// (the ones they are colliding with).
+	playerPos := p.movement.Pos()
+	p.SendBlockUpdates([]protocol.BlockPos{
+		{int32(playerPos[0]), int32(playerPos[1] - 1), int32(playerPos[2])},
+		{int32(playerPos[0]), int32(playerPos[1]), int32(playerPos[2])},
+		{int32(playerPos[0]), int32(playerPos[1] + 1), int32(playerPos[2])},
+		{int32(playerPos[0]) + 1, int32(playerPos[1] + 1), int32(playerPos[2])},
+		{int32(playerPos[0]) - 1, int32(playerPos[1] + 1), int32(playerPos[2])},
+		{int32(playerPos[0]), int32(playerPos[1] + 1), int32(playerPos[2] + 1)},
+		{int32(playerPos[0]), int32(playerPos[1] + 1), int32(playerPos[2] - 1)},
+		{int32(playerPos[0] + 1), int32(playerPos[1] + 1), int32(playerPos[2] + 1)},
+		{int32(playerPos[0] - 1), int32(playerPos[1] + 1), int32(playerPos[2] - 1)},
+		{int32(playerPos[0]), int32(playerPos[1] + 2), int32(playerPos[2])},
+		{int32(playerPos[0]) + 1, int32(playerPos[1] + 2), int32(playerPos[2])},
+		{int32(playerPos[0]) - 1, int32(playerPos[1] + 2), int32(playerPos[2])},
+		{int32(playerPos[0]), int32(playerPos[1] + 2), int32(playerPos[2] + 1)},
+		{int32(playerPos[0]), int32(playerPos[1] + 2), int32(playerPos[2] - 1)},
+		{int32(playerPos[0] + 1), int32(playerPos[1] + 2), int32(playerPos[2] + 1)},
+		{int32(playerPos[0] - 1), int32(playerPos[1] + 2), int32(playerPos[2] - 1)},
+	})
 
 	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.SimulationFrame)
 	if p.Dbg.Enabled(DebugModeMovementSim) {
