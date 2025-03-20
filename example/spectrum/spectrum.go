@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime/debug"
 
 	"github.com/cooldogedev/spectrum"
@@ -27,10 +28,12 @@ import (
 	v729 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v729"
 	v748 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v748"
 	v766 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v766"
+	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -102,6 +105,22 @@ func main() {
 		panic(err)
 	}
 
+	oconfig.Cfg = oconfig.DefaultConfig
+	//oconfig.Cfg.Movement.AcceptClientPosition = true
+	//oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.0625
+
+	go func() {
+		var interrupt = make(chan os.Signal, 1)
+		signal.Notify(interrupt, os.Interrupt)
+		<-interrupt
+
+		for _, s := range proxy.Registry().GetSessions() {
+			s.Server().WritePacket(&packet.Disconnect{})
+			s.Disconnect("shutdown")
+		}
+		os.Exit(0)
+	}()
+
 	for {
 		initalSession, err := proxy.Accept()
 		if err != nil {
@@ -120,7 +139,6 @@ func main() {
 			playerLog.SetLevel(logrus.DebugLevel)
 
 			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
-			proc.Player().Movement().SetValidationThreshold(0.3)
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
