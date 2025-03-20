@@ -441,7 +441,7 @@ func tryCollisions(movement player.MovementComponent, tx *df_world.Tx, dbg *play
 
 	// Unlike Java, bedrock seems to have a strange condition for the client to be considered on the ground. This is probably useful
 	// in cases where the client is teleporting, and the velocity (0) would still be equal to the previous velocity.
-	movement.SetOnGround((yCollision && currVel.Y() < 0) || (movement.OnGround() && !yCollision && currVel.Y() == 0.0))
+	movement.SetOnGround((yCollision && currVel.Y() < 0) || (movement.OnGround() && !yCollision && math32.Abs(currVel.Y()) <= 1e-5))
 	movement.SetVel(collisionVel)
 
 	dbg.Notify(player.DebugModeMovementSim, true, "finalVel=%v finalPos=%v", collisionVel, movement.Pos())
@@ -561,7 +561,7 @@ func attemptJump(movement player.MovementComponent, dbg *player.Debugger) bool {
 	// FIXME: The client seems to sometimes prevent it's own jump from happening - it is unclear how it is determined, however.
 	// This is a temporary hack to get around this issue for now.
 	clientJump := movement.Client().Pos().Y() - movement.Client().LastPos().Y()
-	if clientJump == 0.0 && !movement.HasKnockback() && !movement.HasTeleport() {
+	if math32.Abs(clientJump) <= 1e-4 && !movement.HasKnockback() && !movement.HasTeleport() {
 		movement.SetJumpHeight(0.0)
 	}
 
@@ -596,9 +596,9 @@ func attemptTeleport(movement player.MovementComponent, dbg *player.Debugger) bo
 	if remaining := movement.RemainingTeleportTicks() + 1; remaining > 0 {
 		newPos := movement.Pos().Add(posDelta.Mul(1.0 / float32(remaining)))
 		movement.SetPos(newPos)
-		movement.SetVel(mgl32.Vec3{})
+		//movement.SetVel(mgl32.Vec3{})
 		movement.SetJumpDelay(0)
-		return true
+		return remaining > 1
 	}
 	return false
 }

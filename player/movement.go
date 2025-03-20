@@ -1,7 +1,6 @@
 package player
 
 import (
-	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oconfig"
@@ -268,49 +267,40 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	p.SimulationFrame = pk.Tick
 	p.ClientTick++
 
-	p.effects.Tick()
-
 	hasTeleport := p.movement.HasTeleport()
+	hasKnockback := p.movement.HasKnockback()
+
+	p.effects.Tick()
 	p.movement.Update(pk)
 
 	// If the client's prediction of movement deviates from the server, we send a correction so that the client can re-sync.
 	posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
 	velDiff := p.movement.Vel().Sub(p.movement.Client().Vel())
 
-	if posDiff.Len() > oconfig.Movement().CorrectionThreshold &&
-		p.movement.PendingTeleports() == 0 && !hasTeleport {
+	needsCorrection := posDiff.Len() > oconfig.Movement().CorrectionThreshold
+	if needsCorrection && p.movement.PendingTeleports() == 0 && !hasTeleport &&
+		!pk.InputData.Load(packet.InputFlagJumpPressedRaw) && !hasKnockback {
 		p.movement.Sync()
-	} else if p.movement.PendingCorrections() == 0 {
+	} else if !needsCorrection && p.movement.PendingCorrections() == 0 {
 		inCooldown := p.movement.InCorrectionCooldown()
 		p.movement.SetCorrectionCooldown(false)
 
 		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
 		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.worldTx)) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.worldTx)) > 0
 		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
-			newPos := p.movement.Pos()
-			if math32.Abs(posDiff[0]) <= oconfig.Movement().PositionAcceptanceThreshold {
-				newPos[0] = p.movement.Client().Pos()[0]
+			if posDiff.Len() < oconfig.Movement().PositionAcceptanceThreshold {
+				p.movement.SetPos(p.movement.Client().Pos().Add(mgl32.Vec3{0, 1e-4}))
 			}
-			if math32.Abs(posDiff[2]) <= oconfig.Movement().PositionAcceptanceThreshold {
-				newPos[2] = p.movement.Client().Pos()[2]
+			if velDiff.Len() < oconfig.Movement().VelocityAcceptanceThreshold {
+				p.movement.SetVel(p.movement.Client().Vel())
+				velDiff = mgl32.Vec3{}
 			}
-			p.movement.SetPos(newPos)
 
-			newVel := p.movement.Vel()
-			if math32.Abs(velDiff[0]) <= oconfig.Movement().VelocityAcceptanceThreshold {
-				newVel[0] = p.movement.Client().Vel()[0]
-			}
-			if math32.Abs(velDiff[2]) <= oconfig.Movement().VelocityAcceptanceThreshold {
-				newVel[2] = p.movement.Client().Vel()[2]
-			}
-			p.movement.SetVel(newVel)
-
+			// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
+			// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
+			// the client and server position is desynced consistently without going above the correction threshold.
 			if velDiff.Len() < 1e-5 && oconfig.Movement().PersuasionThreshold > 0 {
-				// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
-				// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
-				// the client and server position is desynced consistently without going above the correction threshold.
 				threshold := oconfig.Movement().PersuasionThreshold
-
 				if !p.movement.XCollision() {
 					posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
 				}
