@@ -109,14 +109,13 @@ type AuthoritativeMovementComponent struct {
 	gliding         bool
 	glideBoostTicks int64
 
-	canSimulate            bool
 	flying, trustFlyStatus bool
 
 	allowedInputs int64
 	hasFirstInput bool
 
-	validationThreshold    float32
-	maxAcceptanceThreshold float32
+	pendingCorrections   int
+	inCorrectionCooldown bool
 }
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
@@ -124,10 +123,6 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		mPlayer:              p,
 		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
-		canSimulate:          true,
-
-		maxAcceptanceThreshold: 0.002,
-		validationThreshold:    0.3,
 	}
 }
 
@@ -438,6 +433,24 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 	).GrowVec3(mgl32.Vec3{-0.001, 0, -0.001})
 }
 
+// ClientBoundingBox returns the bounding box of the movement component translated to the client's position.
+func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox {
+	width := mc.size[0] / 2
+	var yOffset float32
+	if mc.mPlayer.VersionInRange(-1, player.GameVersion1_20_60) {
+		yOffset = mc.slideOffset.Y()
+	}
+
+	return cube.Box(
+		mc.nonAuthoritative.pos[0]-width,
+		mc.nonAuthoritative.pos[1]+yOffset,
+		mc.nonAuthoritative.pos[2]-width,
+		mc.nonAuthoritative.pos[0]+width,
+		mc.nonAuthoritative.pos[1]+mc.size[1]+yOffset,
+		mc.nonAuthoritative.pos[2]+width,
+	).GrowVec3(mgl32.Vec3{-0.001, 0, -0.001})
+}
+
 // Gravity returns the gravity of the movement component.
 func (mc *AuthoritativeMovementComponent) Gravity() float32 {
 	return mc.gravity
@@ -573,16 +586,6 @@ func (mc *AuthoritativeMovementComponent) GlideBoost() int64 {
 // SetGlideBoost sets the amount of ticks the movement component should apply a gliding boost for.
 func (mc *AuthoritativeMovementComponent) SetGlideBoost(boostTicks int64) {
 	mc.glideBoostTicks = boostTicks
-}
-
-// CanSimulate returns true if the movement component can be simulated by the server for the current frame.
-func (mc *AuthoritativeMovementComponent) CanSimulate() bool {
-	return mc.canSimulate
-}
-
-// SetCanSimulate sets wether or not the movement component can be simulated by the server for the current frame.
-func (mc *AuthoritativeMovementComponent) SetCanSimulate(canSim bool) {
-	mc.canSimulate = canSim
 }
 
 // Flying returns true if the movement component is flying.
@@ -796,52 +799,9 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 	}
 }
 
-// SetAcceptanceThreshold sets the amount of blocks the server's position can adjust itself to the client's position
-// every simulation if both the client and server velocities are roughly the same.
-func (mc *AuthoritativeMovementComponent) SetAcceptanceThreshold(threshold float32) {
-	mc.maxAcceptanceThreshold = threshold
-}
-
-// AcceptanceThreshold returns the amount of blocks the server's position can adjust itself to the client's position
-// every simulation if both the client and server velocities are roughly the same.
-func (mc *AuthoritativeMovementComponent) AcceptanceThreshold() float32 {
-	return mc.maxAcceptanceThreshold
-}
-
-// SetValidationThreshold sets the amount of blocks the client's position can deviate from the simulated one before a correction is required.
-func (mc *AuthoritativeMovementComponent) SetValidationThreshold(threshold float32) {
-	mc.validationThreshold = threshold
-}
-
-// ValidationThreshold returnsr the amount of blocks the client's position can deviate from the simmulated one before a correction is required.
-func (mc *AuthoritativeMovementComponent) ValidationThreshold() float32 {
-	return mc.validationThreshold
-}
-
 // Simulate does any simulations needed by the movement component.
 func (mc *AuthoritativeMovementComponent) Simulate() {
-	if !mc.canSimulate {
-		mc.pos = mc.nonAuthoritative.pos
-		mc.lastPos = mc.nonAuthoritative.lastPos
-		mc.vel = mc.nonAuthoritative.vel
-		mc.lastVel = mc.nonAuthoritative.lastVel
-		mc.mov = mc.nonAuthoritative.mov
-		mc.lastMov = mc.nonAuthoritative.lastMov
-
-		mc.canSimulate = true
-		return
-	}
-
 	simulation.SimulatePlayerMovement(mc.mPlayer)
-}
-
-// Validate is a function that returns true if this movement component has a position within the given threshold of the other movement component.
-func (mc *AuthoritativeMovementComponent) Validate() bool {
-	if !mc.canSimulate {
-		return true
-	}
-
-	return mc.nonAuthoritative.pos.Sub(mc.pos).Len() <= mc.validationThreshold
 }
 
 // Reset is a function that resets the current movement of the movement component to the client's non-authoritative movement.
@@ -852,4 +812,52 @@ func (mc *AuthoritativeMovementComponent) Reset() {
 	mc.vel = mc.nonAuthoritative.vel
 	mc.lastMov = mc.nonAuthoritative.lastMov
 	mc.mov = mc.nonAuthoritative.mov
+}
+
+// PendingCorrections returns the number of pending corrections the movement component has.
+func (mc *AuthoritativeMovementComponent) PendingCorrections() int {
+	return mc.pendingCorrections
+}
+
+// AddPendingCorrection increments the number of pending corrections the movement component has.
+func (mc *AuthoritativeMovementComponent) AddPendingCorrection() {
+	mc.pendingCorrections++
+}
+
+// RemovePendingCorrection decrements the number of pending corrections the movement component has.
+func (mc *AuthoritativeMovementComponent) RemovePendingCorrection() {
+	mc.pendingCorrections--
+}
+
+// InCorrectionCooldown returns true if the movement component is in a correction cooldown.
+func (mc *AuthoritativeMovementComponent) InCorrectionCooldown() bool {
+	return mc.inCorrectionCooldown
+}
+
+// SetCorrectionCooldown sets wether or not the movement component is in a correction cooldown.
+func (mc *AuthoritativeMovementComponent) SetCorrectionCooldown(cooldown bool) {
+	mc.inCorrectionCooldown = cooldown
+}
+
+func (mc *AuthoritativeMovementComponent) Sync() {
+	// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
+	// (the ones they are colliding with).
+	mc.mPlayer.SyncWorld()
+
+	mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "correcting movement for simulation frame %d", mc.mPlayer.SimulationFrame)
+	if mc.mPlayer.Dbg.Enabled(player.DebugModeMovementSim) {
+		mc.mPlayer.Message("correcting movement for simulation frame %d", mc.mPlayer.SimulationFrame)
+	}
+
+	mc.AddPendingCorrection()
+	mc.SetCorrectionCooldown(true)
+	mc.mPlayer.ACKs().Add(acknowledgement.NewMovementCorrectionACK(mc.mPlayer))
+
+	mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
+		PredictionType: packet.PredictionTypePlayer,
+		Position:       mc.Pos().Add(mgl32.Vec3{0, 1.621}),
+		Delta:          mc.Vel(),
+		OnGround:       mc.OnGround(),
+		Tick:           mc.mPlayer.SimulationFrame,
+	})
 }

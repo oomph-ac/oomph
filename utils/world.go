@@ -164,8 +164,7 @@ func GetBlocksInRadius(pos protocol.BlockPos, radius int32) []protocol.BlockPos 
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
 func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src *world.Tx) []BlockSearchResult {
-	grown := aabb.Grow(0.5)
-	min, max := grown.Min(), grown.Max()
+	min, max := aabb.Min(), aabb.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 	blocks := make([]BlockSearchResult, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))

@@ -53,7 +53,7 @@ func NewProcessor(
 
 func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameData) {
 	gd.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-	gd.PlayerMovementSettings.RewindHistorySize = 40
+	gd.PlayerMovementSettings.RewindHistorySize = 100
 }
 
 func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {

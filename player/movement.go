@@ -1,10 +1,12 @@
 package player
 
 import (
+	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -135,6 +137,9 @@ type MovementComponent interface {
 	// BoundingBox returns the bounding box of the movement component translated to
 	// it's current position.
 	BoundingBox() cube.BBox
+	// ClientBoundingBox returns the bounding box of the movement component translated to
+	// the client's current position.
+	ClientBoundingBox() cube.BBox
 
 	// Gravity returns the gravity of the movement component.
 	Gravity() float32
@@ -202,11 +207,6 @@ type MovementComponent interface {
 	// SetGlideBoost sets the amount of ticks the movement component should apply a gliding boost for.
 	SetGlideBoost(boostTicks int64)
 
-	// CanSimulate returns true if the movement component can be simulated by the server for the current frame.
-	CanSimulate() bool
-	// SetCanSimulate sets wether or not the movement component can be simulated by the server for the current frame.
-	SetCanSimulate(simulate bool)
-
 	// Flying returns true if the movement component is currently flying.
 	Flying() bool
 	// SetFlying sets wether or not the movement component is flying.
@@ -221,21 +221,22 @@ type MovementComponent interface {
 	// ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
 	ServerUpdate(pk packet.Packet)
 
-	// SetAcceptanceThreshold sets the amount of blocks the server's position can adjust itself to the client's position
-	// every simulation if both the client and server velocities are roughly the same.
-	SetAcceptanceThreshold(threshold float32)
-	// AcceptanceThreshold returns the amount of blocks the server's position can adjust itself to the client's position
-	// every simulation if both the client and server velocities are roughly the same.
-	AcceptanceThreshold() float32
-
-	// SetValidationThreshold sets the amount of blocks the client's position can deviate from the simulated one before a correction is required.
-	SetValidationThreshold(threshold float32)
-	// ValidationThreshold returnsr the amount of blocks the client's position can deviate from the simmulated one before a correction is required.
-	ValidationThreshold() float32
-	// Validate is a function that returns true if this movement component has a position within the given threshold of the non authoritative movement.
-	Validate() bool
 	// Reset is a function that resets the current movement of the movement component to the client's non-authoritative movement.
 	Reset()
+
+	// PendingCorrections is the amount of corrections sent to the client that is still pending from the server.
+	PendingCorrections() int
+	// AddPendingCorrection adds a pending correction to the movement component.
+	AddPendingCorrection()
+	// RemovePendingCorrection removes a pending correction from the movement component.
+	RemovePendingCorrection()
+	// InCorrectionCooldown returns true if the client has synced back with the server for at least one tick after a correction.
+	InCorrectionCooldown() bool
+	// SetCorrectionCooldown sets wether or not the client has synced back with the server for at least one tick after a correction.
+	SetCorrectionCooldown(bool)
+
+	// Sync sends a correction to the client to re-sync the client's movement with the server's.
+	Sync()
 }
 
 // NonAuthoritativeMovementInfo represents movement information that the player has sent to the server but has not validated/verified.
@@ -273,32 +274,62 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	p.movement.Update(pk)
 
 	// If the client's prediction of movement deviates from the server, we send a correction so that the client can re-sync.
-	if !p.movement.Validate() && p.movement.PendingTeleports() == 0 && !hasTeleport {
-		p.correctMovement()
-	} else if p.movement.Vel().Sub(p.movement.Client().Vel()).Len() < 1e-5 {
-		// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
-		// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
-		// the client and server position is desynced consistently without going above the correction threshold.
-		posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
-		threshold := p.movement.AcceptanceThreshold()
+	posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
+	velDiff := p.movement.Vel().Sub(p.movement.Client().Vel())
 
-		if !p.movement.XCollision() {
-			posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
-		}
-		posDiff[1] = 0
-		if !p.movement.ZCollision() {
-			posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
-		}
+	if posDiff.Len() > oconfig.Movement().CorrectionThreshold &&
+		p.movement.PendingTeleports() == 0 && !hasTeleport {
+		p.movement.Sync()
+	} else if p.movement.PendingCorrections() == 0 {
+		inCooldown := p.movement.InCorrectionCooldown()
+		p.movement.SetCorrectionCooldown(false)
 
-		p.movement.SetPos(p.movement.Pos().Sub(posDiff))
-		p.Dbg.Notify(
-			DebugModeMovementSim,
-			posDiff.Len() >= 5e-4,
-			"shifted server position by %v (newPos=%v diff=%v)",
-			posDiff,
-			p.movement.Pos(),
-			p.movement.Pos().Sub(p.movement.Client().Pos()),
-		)
+		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
+		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.worldTx)) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.worldTx)) > 0
+		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
+			newPos := p.movement.Pos()
+			if math32.Abs(posDiff[0]) <= oconfig.Movement().PositionAcceptanceThreshold {
+				newPos[0] = p.movement.Client().Pos()[0]
+			}
+			if math32.Abs(posDiff[2]) <= oconfig.Movement().PositionAcceptanceThreshold {
+				newPos[2] = p.movement.Client().Pos()[2]
+			}
+			p.movement.SetPos(newPos)
+
+			newVel := p.movement.Vel()
+			if math32.Abs(velDiff[0]) <= oconfig.Movement().VelocityAcceptanceThreshold {
+				newVel[0] = p.movement.Client().Vel()[0]
+			}
+			if math32.Abs(velDiff[2]) <= oconfig.Movement().VelocityAcceptanceThreshold {
+				newVel[2] = p.movement.Client().Vel()[2]
+			}
+			p.movement.SetVel(newVel)
+
+			if velDiff.Len() < 1e-5 && oconfig.Movement().PersuasionThreshold > 0 {
+				// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
+				// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
+				// the client and server position is desynced consistently without going above the correction threshold.
+				threshold := oconfig.Movement().PersuasionThreshold
+
+				if !p.movement.XCollision() {
+					posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
+				}
+				posDiff[1] = 0
+				if !p.movement.ZCollision() {
+					posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
+				}
+
+				p.movement.SetPos(p.movement.Pos().Sub(posDiff))
+				p.Dbg.Notify(
+					DebugModeMovementSim,
+					posDiff.Len() >= 5e-4,
+					"shifted server position by %v (newPos=%v diff=%v)",
+					posDiff,
+					p.movement.Pos(),
+					p.movement.Pos().Sub(p.movement.Client().Pos()),
+				)
+			}
+		}
 	}
 
 	// To prevent the server never accepting our position (PMMP), we will always set our position to the final teleport position if a teleport is in progress.
@@ -315,41 +346,4 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	// other players will be unable to see if another client is using a cheat to modify their movement (e.g - fly). Of course, that is
 	// granted that the movement scenario is supported by Oomph.
 	pk.Position = finalPos.Add(mgl32.Vec3{0, 1.621})
-}
-
-func (p *Player) correctMovement() {
-	// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
-	// (the ones they are colliding with).
-	playerPos := p.movement.Pos()
-	p.SendBlockUpdates([]protocol.BlockPos{
-		{int32(playerPos[0]), int32(playerPos[1] - 1), int32(playerPos[2])},
-		{int32(playerPos[0]), int32(playerPos[1]), int32(playerPos[2])},
-		{int32(playerPos[0]), int32(playerPos[1] + 1), int32(playerPos[2])},
-		{int32(playerPos[0]) + 1, int32(playerPos[1] + 1), int32(playerPos[2])},
-		{int32(playerPos[0]) - 1, int32(playerPos[1] + 1), int32(playerPos[2])},
-		{int32(playerPos[0]), int32(playerPos[1] + 1), int32(playerPos[2] + 1)},
-		{int32(playerPos[0]), int32(playerPos[1] + 1), int32(playerPos[2] - 1)},
-		{int32(playerPos[0] + 1), int32(playerPos[1] + 1), int32(playerPos[2] + 1)},
-		{int32(playerPos[0] - 1), int32(playerPos[1] + 1), int32(playerPos[2] - 1)},
-		{int32(playerPos[0]), int32(playerPos[1] + 2), int32(playerPos[2])},
-		{int32(playerPos[0]) + 1, int32(playerPos[1] + 2), int32(playerPos[2])},
-		{int32(playerPos[0]) - 1, int32(playerPos[1] + 2), int32(playerPos[2])},
-		{int32(playerPos[0]), int32(playerPos[1] + 2), int32(playerPos[2] + 1)},
-		{int32(playerPos[0]), int32(playerPos[1] + 2), int32(playerPos[2] - 1)},
-		{int32(playerPos[0] + 1), int32(playerPos[1] + 2), int32(playerPos[2] + 1)},
-		{int32(playerPos[0] - 1), int32(playerPos[1] + 2), int32(playerPos[2] - 1)},
-	})
-
-	p.Dbg.Notify(DebugModeMovementSim, true, "correcting movement for simulation frame %d", p.SimulationFrame)
-	if p.Dbg.Enabled(DebugModeMovementSim) {
-		p.Message("correcting movement for simulation frame %d", p.SimulationFrame)
-	}
-
-	p.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
-		PredictionType: packet.PredictionTypePlayer,
-		Position:       p.movement.Pos().Add(mgl32.Vec3{0, 1.621}),
-		Delta:          p.movement.Vel(),
-		OnGround:       p.movement.OnGround(),
-		Tick:           p.SimulationFrame,
-	})
 }

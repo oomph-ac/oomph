@@ -27,14 +27,16 @@ type InventoryComponent interface {
 }
 
 type Inventory struct {
-	items []item.Stack
-	size  uint32
+	items        []item.Stack
+	unknownItems map[int]struct{}
+	size         uint32
 }
 
 func NewInventory(size uint32) *Inventory {
 	return &Inventory{
-		items: make([]item.Stack, size),
-		size:  size,
+		items:        make([]item.Stack, size),
+		unknownItems: make(map[int]struct{}),
+		size:         size,
 	}
 }
 

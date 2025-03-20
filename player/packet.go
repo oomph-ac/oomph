@@ -5,6 +5,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player/context"
@@ -86,6 +87,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				mode = DebugModeAimA
 			case "timer-a":
 				mode = DebugModeTimerA
+			case "block_placement":
+				mode = DebugModeBlockPlacement
 			default:
 				p.Message("Unknown debug mode: %s", args[1])
 				return
@@ -237,7 +240,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			p.entTracker.MaxRewind(),
+			oconfig.Combat().MaxRewind,
 			false,
 			width,
 			height,
@@ -250,7 +253,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			p.entTracker.MaxRewind(),
+			oconfig.Combat().MaxRewind,
 			true,
 			width,
 			height,

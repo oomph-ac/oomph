@@ -25,13 +25,6 @@ type EntityTrackerComponent interface {
 	// HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 	HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute)
 
-	// SetMaxRewind sets the maximum amount of ticks that entities are allowed to be
-	// rewinded by.
-	SetMaxRewind(rTicks int)
-	// MaxRewind returns the maximum amount of ticks that entities are allowed to be
-	// rewound by.
-	MaxRewind() int
-
 	// Tick makes the entity tracker component tick all of the entities. If the player has
 	// full authoritative combat enabled, this is called on the "server" goroutine. On all other
 	// modes it is called when PlayerAuthInput is recieved.

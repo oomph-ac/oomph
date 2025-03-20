@@ -31,9 +31,11 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/pprof v0.0.0-20250302191652-9094ed2288e7 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/hjson/hjson-go/v4 v4.4.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
+	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5 // indirect
 	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
 	github.com/quic-go/quic-go v0.50.0 // indirect
 	github.com/rs/cors v1.11.0 // indirect
@@ -59,3 +61,5 @@ replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunne
 replace github.com/df-mc/dragonfly => ../dragonfly
 
 replace github.com/cooldogedev/spectrum => ../spectrum
+
+replace github.com/oomph-ac/oconfig => ../oconfig

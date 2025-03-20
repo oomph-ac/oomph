@@ -258,11 +258,13 @@ func simulationIsReliable(p *player.Player) bool {
 		return true
 	}
 
-	for _, b := range utils.GetNearbyBlocks(movement.BoundingBox(), false, true, p.WorldTx()) {
+	for _, b := range utils.GetNearbyBlocks(movement.BoundingBox().Grow(1), false, true, p.WorldTx()) {
 		if _, isLiquid := b.Block.(df_world.Liquid); isLiquid {
-			return false
+			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(b.Position.Vec3())
+			if movement.BoundingBox().IntersectsWith(blockBB) {
+				return false
+			}
 		}
-
 		if utils.BlockName(b.Block) == "minecraft:bamboo" {
 			return false
 		}
@@ -510,7 +512,7 @@ func blocksInside(movement player.MovementComponent, tx *world.Tx) ([]df_world.B
 	bb := movement.BoundingBox()
 	blocks := []df_world.Block{}
 
-	for _, result := range utils.GetNearbyBlocks(bb, false, true, tx) {
+	for _, result := range utils.GetNearbyBlocks(bb.Grow(1), false, true, tx) {
 		pos := result.Position
 		block := result.Block
 		boxes := utils.BlockBoxes(block, pos, tx)
@@ -521,7 +523,6 @@ func blocksInside(movement player.MovementComponent, tx *world.Tx) ([]df_world.B
 			}
 		}
 	}
-
 	return blocks, len(blocks) > 0
 }
 

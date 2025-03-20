@@ -131,6 +131,7 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 
 	replacingBlock := p.worldTx.Block(pos)
 	if _, isReplaceable := replacingBlock.(block.Replaceable); !isReplaceable {
+		p.Dbg.Notify(DebugModeBlockPlacement, true, "block at %v is not replaceable", pos)
 		return
 	}
 
@@ -142,13 +143,14 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) {
+	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
 		//p.SyncWorld()
+		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", pos)
 		return
 	}
 
 	// Check if any entity is in the way of the block being placed.
-	for _, e := range p.EntityTracker().All() {
+	for eid, e := range p.EntityTracker().All() {
 		rew, ok := e.Rewind(p.ClientTick)
 		if !ok {
 			continue
@@ -159,13 +161,15 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 			p.SendBlockUpdates([]protocol.BlockPos{
 				{int32(pos[0]), int32(pos[1]), int32(pos[2])},
 			})
+			p.Dbg.Notify(DebugModeBlockPlacement, true, "entity %d intersects with block at %v", eid, pos)
 			return
 		}
 	}
 
-	inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
-	inv.SetSlot(int(p.inventory.HeldSlot()), p.inventory.Holding().Grow(-1))
+	/* inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
+	inv.SetSlot(int(p.inventory.HeldSlot()), p.inventory.Holding().Grow(-1)) */
 	p.worldTx.SetBlock(pos, b, nil)
+	p.Dbg.Notify(DebugModeBlockPlacement, true, "placed block at %v", pos)
 }
 
 func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
@@ -242,8 +246,8 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				finalProgess := p.blockBreakProgress + (1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001))
-				if finalProgess < 1 {
+				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001)
+				if p.blockBreakProgress < 1 {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					continue
@@ -275,6 +279,10 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	b := p.worldTx.Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
 	if _, isAir := b.(block.Air); isAir {
 		return math32.MaxFloat32
+	} else if utils.BlockName(b) == "minecraft:web" {
+		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
+		// Just return 1 and accept when the client does break the cobweb.
+		return 1
 	}
 
 	breakTime := block.BreakDuration(b, held)
