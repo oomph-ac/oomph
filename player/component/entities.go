@@ -8,25 +8,17 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-const (
-	DEFAULT_MAX_REWIND_TICKS int = 6
-)
-
 // EntityTrackerComponent is a component that handles entities that the member player is
 // viewing on their screen.
 type EntityTrackerComponent struct {
-	mPlayer *player.Player
-
-	entities       map[uint64]*entity.Entity
-	maxRewindTicks int
+	mPlayer  *player.Player
+	entities map[uint64]*entity.Entity
 }
 
 func NewEntityTrackerComponent(p *player.Player) *EntityTrackerComponent {
 	return &EntityTrackerComponent{
-		mPlayer: p,
-
-		entities:       make(map[uint64]*entity.Entity),
-		maxRewindTicks: DEFAULT_MAX_REWIND_TICKS,
+		mPlayer:  p,
+		entities: make(map[uint64]*entity.Entity),
 	}
 }
 
@@ -73,18 +65,6 @@ func (c *EntityTrackerComponent) HandleMovePlayer(pk *packet.MovePlayer) {
 // HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute) {
 	c.MoveEntity(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
-}
-
-// SetMaxRewind sets the maximum amount of ticks that entities are allowed to be
-// rewinded by.
-func (c *EntityTrackerComponent) SetMaxRewind(rTicks int) {
-	c.maxRewindTicks = rTicks
-}
-
-// MaxRewind returns the maximum amount of ticks that entities are allowed to be
-// rewound by.
-func (c *EntityTrackerComponent) MaxRewind() int {
-	return c.maxRewindTicks
 }
 
 // Tick makes the entity tracker component tick all of the entities. If the player has

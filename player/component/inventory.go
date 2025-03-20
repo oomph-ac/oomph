@@ -5,7 +5,6 @@ import (
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -123,6 +122,7 @@ func (c *InventoryComponent) HandleInventorySlot(pk *packet.InventorySlot) {
 		iStack := item.NewStack(i, int(pk.NewItem.Stack.Count))
 		inv.SetSlot(int(pk.Slot), utils.ReadItem(pk.NewItem.Stack.NBTData, &iStack))
 	} else {
+		inv.SetSlot(int(pk.Slot), item.NewStack(&block.Air{}, 1))
 		c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", pk.NewItem.Stack.NetworkID, pk.NewItem.Stack.MetadataValue)
 	}
 }
@@ -141,6 +141,7 @@ func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent)
 			iStack := item.NewStack(i, int(itemInstance.Stack.Count))
 			inv.SetSlot(index, utils.ReadItem(itemInstance.Stack.NBTData, &iStack))
 		} else {
+			inv.SetSlot(index, item.NewStack(&block.Air{}, 1))
 			c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", itemInstance.Stack.NetworkID, itemInstance.Stack.MetadataValue)
 		}
 	}
@@ -267,10 +268,4 @@ func (c *InventoryComponent) handleDestroyRequest(tx *invReq, src protocol.Stack
 		isDrop,
 		c.mPlayer,
 	))
-}
-
-func validatePlayerInventorySlot(slot int) {
-	if slot < 0 || slot >= int(inventorySizePlayer) {
-		panic(oerror.New("slot %d is invalid for player inventory (expecting 0-35)", slot))
-	}
 }

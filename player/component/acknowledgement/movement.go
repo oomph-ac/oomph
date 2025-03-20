@@ -128,3 +128,16 @@ func NewKnockbackACK(p *player.Player, knockback mgl32.Vec3) *Knockback {
 func (ack *Knockback) Run() {
 	ack.mPlayer.Movement().SetKnockback(ack.knockback)
 }
+
+// MovementCorrection is an acknowledgment that is ran whenever the player recieves a movement correction from the server.
+type MovementCorrection struct {
+	mPlayer *player.Player
+}
+
+func NewMovementCorrectionACK(p *player.Player) *MovementCorrection {
+	return &MovementCorrection{mPlayer: p}
+}
+
+func (ack *MovementCorrection) Run() {
+	ack.mPlayer.Movement().RemovePendingCorrection()
+}

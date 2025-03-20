@@ -105,17 +105,34 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	}
 
 	heldItem := c.mPlayer.Inventory().Holding().Item()
+	c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "item in hand: %T", heldItem)
+
 	switch heldItem := heldItem.(type) {
+	case *block.Air:
+		// This only happens when Dragonfly is unsure of what the item is (unregistered), so we use the client-authoritative block in hand.
+		if b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID)); ok {
+			// If the block at the position is not replacable, we want to place the block on the side of the block.
+			if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
+				replacePos = replacePos.Side(cube.Face(dat.BlockFace))
+			}
+
+			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "using client-authoritative block in hand: %T", b)
+			c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), b, nil)
+		}
 	case nil:
 		// The player has nothing in this slot, ignore the block placement.
 		// FIXME: It seems some blocks aren't implemented by Dragonfly and will therefore seem to be air when
 		// it is actually a valid block.
 		//c.mPlayer.NMessage("<red>Block placement denied: no item in hand.</red>")
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Block placement denied: no item in hand.")
 		return true
 	case item.UsableOnBlock:
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "item.UsableOnBlock")
 		useCtx := item.UseContext{}
 		heldItem.UseOnBlock(dfReplacePos, df_cube.Face(dat.BlockFace), game.Vec32To64(dat.ClickedPosition), c.mPlayer.WorldTx(), c.mPlayer, &useCtx)
 	case df_world.Block:
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "world.Block")
+
 		// If the block at the position is not replacable, we want to place the block on the side of the block.
 		if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(heldItem) {
 			replacePos = replacePos.Side(cube.Face(dat.BlockFace))

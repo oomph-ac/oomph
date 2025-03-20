@@ -12,6 +12,7 @@ const (
 	DebugModeChunks
 	DebugModeAimA
 	DebugModeTimerA
+	DebugModeBlockPlacement
 
 	debugModeCount
 )
@@ -31,6 +32,7 @@ var DebugModeList = []string{
 	"chunks",
 	"aim-a",
 	"timer-a",
+	"block_placement",
 }
 
 type Debugger struct {
