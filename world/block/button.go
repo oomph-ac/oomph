@@ -18,7 +18,7 @@ func init() {
 type Button struct {
 	Block world.Block
 
-	Direction cube.Direction
+	Direction cube.Face
 	Pressed   bool
 }
 
@@ -35,7 +35,7 @@ func (b Button) Model() world.BlockModel {
 }
 
 func allButtonBlocks() (blocks []world.Block) {
-	for _, dir := range cube.Directions() {
+	for _, dir := range cube.Faces() {
 		for _, woodType := range block.WoodTypes() {
 			blocks = append(blocks, Button{Block: block.Planks{Wood: woodType}, Direction: dir, Pressed: false})
 			blocks = append(blocks, Button{Block: block.Planks{Wood: woodType}, Direction: dir, Pressed: true})
