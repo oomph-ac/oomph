@@ -170,7 +170,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	if c.mPlayer.Conn().Proto().ID() >= player.GameVersion1_21_20 {
 		isInitalInput = dat.TriggerType == protocol.TriggerTypePlayerInput
 	} else {
-		isInitalInput = dat.ClickedPosition.LenSqr() > 0.0
+		isInitalInput = dat.ClickedPosition.LenSqr() > 0.0 && dat.ClickedPosition.LenSqr() <= 1.0
 	}
 	if !isInitalInput {
 		return c.initalInteractionAccepted
