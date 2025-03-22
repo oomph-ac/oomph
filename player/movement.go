@@ -288,26 +288,33 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
 		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.worldTx)) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.worldTx)) > 0
 		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
-			if posDiff.Len() < oconfig.Movement().PositionAcceptanceThreshold {
+			if oconfig.Movement().AcceptClientPosition && posDiff.Len() < oconfig.Movement().PositionAcceptanceThreshold {
 				p.movement.SetPos(p.movement.Client().Pos().Add(mgl32.Vec3{0, 1e-4}))
+				p.Dbg.Notify(
+					DebugModeMovementSim,
+					true,
+					"accepted client position (newPos=%v)",
+					p.movement.Pos(),
+				)
 			}
-			if velDiff.Len() < oconfig.Movement().VelocityAcceptanceThreshold {
+			if oconfig.Movement().AcceptClientVelocity && velDiff.Len() < oconfig.Movement().VelocityAcceptanceThreshold {
 				p.movement.SetVel(p.movement.Client().Vel())
-				velDiff = mgl32.Vec3{}
+				p.Dbg.Notify(
+					DebugModeMovementSim,
+					true,
+					"accepted client velocity (newVel=%v)",
+					p.movement.Vel(),
+				)
 			}
 
 			// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
 			// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
 			// the client and server position is desynced consistently without going above the correction threshold.
-			if velDiff.Len() < 1e-5 && oconfig.Movement().PersuasionThreshold > 0 {
+			if oconfig.Movement().PersuasionThreshold > 0 {
 				threshold := oconfig.Movement().PersuasionThreshold
-				if !p.movement.XCollision() {
-					posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
-				}
+				posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
 				posDiff[1] = 0
-				if !p.movement.ZCollision() {
-					posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
-				}
+				posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
 
 				p.movement.SetPos(p.movement.Pos().Sub(posDiff))
 				p.Dbg.Notify(

@@ -161,6 +161,9 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 						p.movement.SetGlideBoost(20)
 						p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
 					}
+				} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
+					ctx.Cancel()
+					return
 				}
 			} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
