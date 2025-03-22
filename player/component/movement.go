@@ -853,11 +853,14 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 	mc.SetCorrectionCooldown(true)
 	mc.mPlayer.ACKs().Add(acknowledgement.NewMovementCorrectionACK(mc.mPlayer))
 
-	mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
-		PredictionType: packet.PredictionTypePlayer,
-		Position:       mc.Pos().Add(mgl32.Vec3{0, 1.621}),
-		Delta:          mc.Vel(),
-		OnGround:       mc.OnGround(),
-		Tick:           mc.mPlayer.SimulationFrame,
-	})
+	if !mc.mPlayer.PendingCorrectionACK {
+		mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
+			PredictionType: packet.PredictionTypePlayer,
+			Position:       mc.Pos().Add(mgl32.Vec3{0, 1.621}),
+			Delta:          mc.Vel(),
+			OnGround:       mc.OnGround(),
+			Tick:           mc.mPlayer.SimulationFrame,
+		})
+		mc.mPlayer.PendingCorrectionACK = true
+	}
 }

@@ -73,6 +73,11 @@ type Player struct {
 	StackLatency    time.Duration
 	LastServerTick  time.Time
 
+	// PendingCorrectionACK is a boolean indicating wether the client has recieved a correction
+	// Oomph has sent to it. This is used to not spam the client with mutliple corrections which may
+	// cause desync due to the client's own interpolation.
+	PendingCorrectionACK bool
+
 	// GameMode is the gamemode of the player. The player is exempt from movement predictions
 	// if they are not in survival or adventure mode.
 	GameMode int32
@@ -83,6 +88,7 @@ type Player struct {
 	// make an attack packet when Oomph's full authoritative combat detects a misprediction.
 	LastEquipmentData *packet.MobEquipment
 
+	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
 	blockBreakProgress float32
 
 	// conn is the connection to the client, and serverConn is the connection to the server.

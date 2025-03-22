@@ -62,32 +62,12 @@ func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {
 		return
 	}
 
-	var (
-		latestPk  *packet.Packet
-		latestVer bool
-	)
-
-	if !pl.IsVersion(minecraft.DefaultProtocol.ID()) {
-		latestPks := pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn())
-		if len(latestPks) == 0 {
-			return
-		}
-		latestPk = &latestPks[0]
-	} else {
-		latestPk = pk
-		latestVer = true
-	}
-
-	pkCtx := context.NewHandlePacketContext(latestPk)
+	pkCtx := context.NewHandlePacketContext(pk)
 	pl.HandleServerPacket(pkCtx)
+
 	if pkCtx.Cancelled() {
 		ctx.Cancel()
 		return
-	}
-
-	if !latestVer && pkCtx.Modified() {
-		downgradedPks := pl.Conn().Proto().ConvertFromLatest(*latestPk, pl.Conn())
-		*pk = downgradedPks[0]
 	}
 }
 
@@ -109,35 +89,12 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 		return
 	}
 
-	// As far as we know at the moment, none of the packets require multiple conversions.
-	var (
-		upgradedPk *packet.Packet
-		latestVer  bool
-	)
-	if !pl.IsVersion(minecraft.DefaultProtocol.ID()) {
-		upgradedPks := pl.Conn().Proto().ConvertToLatest(*pk, pl.Conn())
-		if len(upgradedPks) == 0 {
-			return
-		}
-		upgradedPk = &upgradedPks[0]
-	} else {
-		upgradedPk = pk
-		latestVer = true
-	}
-
-	pkCtx := context.NewHandlePacketContext(upgradedPk)
+	pkCtx := context.NewHandlePacketContext(pk)
 	pl.HandleClientPacket(pkCtx)
 
 	if pkCtx.Cancelled() {
 		ctx.Cancel()
 		return
-	}
-
-	// If the packet was modified, and the player is not on the latest version, we need to convert it back and then
-	// modify the value of the pointer to the original packet.
-	if !latestVer && pkCtx.Modified() {
-		downgradedPks := pl.Conn().Proto().ConvertFromLatest(*upgradedPk, pl.Conn())
-		*pk = downgradedPks[0] // We know for a fact here that the packet can be downgraded because it was able to be upgraded.
 	}
 }
 

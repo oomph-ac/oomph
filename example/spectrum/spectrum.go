@@ -65,7 +65,7 @@ func main() {
 	opts.ClientDecode = player.DecodeClientPackets
 	opts.AutoLogin = false
 	opts.Addr = ":" + os.Args[1]
-	opts.SyncProtocol = true
+	opts.SyncProtocol = false
 	if len(os.Args) >= 4 {
 		opts.Token = os.Args[3]
 	}
@@ -79,7 +79,7 @@ func main() {
 		panic(err)
 	}
 
-	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery(os.Args[2], ""), logger, opts, nil)
+	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery(os.Args[2], os.Args[2]), logger, opts, nil)
 	if err := proxy.Listen(minecraft.ListenConfig{
 		StatusProvider: statusProvider,
 		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
@@ -100,7 +100,11 @@ func main() {
 			v589.Protocol(),
 		},
 		ResourcePacks:        packs,
-		TexturePacksRequired: true,
+		TexturePacksRequired: false,
+
+		/* PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
+			fmt.Printf("%s -> %s: %d\n", src, dst, header.PacketID)
+		}, */
 	}); err != nil {
 		panic(err)
 	}
