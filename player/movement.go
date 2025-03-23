@@ -266,6 +266,7 @@ func (p *Player) Movement() MovementComponent {
 func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	p.SimulationFrame = pk.Tick
 	p.ClientTick++
+	p.InputCount++
 
 	hasTeleport := p.movement.HasTeleport()
 	hasKnockback := p.movement.HasKnockback()

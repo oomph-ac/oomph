@@ -9,6 +9,7 @@ import (
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player/context"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -154,12 +155,24 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				return
 			} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
-				if tr.ActionType == protocol.UseItemActionClickAir && p.Movement().Gliding() {
+				if tr.ActionType == protocol.UseItemActionClickAir {
 					// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
 					// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
-					if _, isFireworks := p.inventory.Holding().Item().(item.Firework); isFireworks {
+					held := p.inventory.Holding()
+					if _, isFireworks := held.Item().(item.Firework); isFireworks && p.Movement().Gliding() {
 						p.movement.SetGlideBoost(20)
 						p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
+					} else if utils.IsItemProjectile(held.Item()) {
+						delta := p.InputCount - p.lastUseProjectileTick
+						if delta < 4 {
+							ctx.Cancel()
+							_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
+							p.Popup("<red>Item cooldown</red>")
+							return
+						}
+						p.lastUseProjectileTick = p.InputCount
+						inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
+						inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
 					}
 				} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
 					ctx.Cancel()

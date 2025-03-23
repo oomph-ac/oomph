@@ -93,6 +93,38 @@ func (c *InventoryComponent) WindowFromWindowID(id int32) (*player.Inventory, bo
 	}
 }
 
+func (c *InventoryComponent) Sync(windowID int32) bool {
+	inv, found := c.WindowFromWindowID(windowID)
+	if !found {
+		return false
+	}
+
+	contents := make([]protocol.ItemInstance, inv.Size())
+	for i := range contents {
+		contents[i] = utils.InstanceFromItem(inv.Slot(i))
+	}
+	_ = c.mPlayer.WritePacket(&packet.InventoryContent{
+		WindowID: uint32(windowID),
+		Content:  contents,
+	})
+
+	return true
+}
+
+func (c *InventoryComponent) SyncSlot(windowID int32, slot int) bool {
+	inv, found := c.WindowFromWindowID(windowID)
+	if !found {
+		return false
+	}
+
+	_ = c.mPlayer.WritePacket(&packet.InventorySlot{
+		WindowID: uint32(windowID),
+		Slot:     uint32(slot),
+		NewItem:  utils.InstanceFromItem(inv.Slot(slot)),
+	})
+	return true
+}
+
 func (c *InventoryComponent) HeldSlot() int32 {
 	return c.heldSlot
 }

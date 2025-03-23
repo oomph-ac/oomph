@@ -24,6 +24,9 @@ type InventoryComponent interface {
 	HandleInventoryContent(pk *packet.InventoryContent)
 	HandleItemStackRequest(pk *packet.ItemStackRequest)
 	HandleItemStackResponse(pk *packet.ItemStackResponse)
+
+	Sync(windowID int32) bool
+	SyncSlot(windowID int32, slot int) bool
 }
 
 type Inventory struct {
@@ -52,6 +55,10 @@ func (i *Inventory) SetSlot(slot int, it item.Stack) {
 		panic(oerror.New("slot %d is invalid for inventory (expecting 0-%d)", slot, i.size-1))
 	}
 	i.items[slot] = it
+}
+
+func (i *Inventory) Size() uint32 {
+	return i.size
 }
 
 func (p *Player) SetInventory(invComponent InventoryComponent) {
