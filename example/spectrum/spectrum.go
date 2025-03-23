@@ -51,7 +51,7 @@ func main() {
 
 	if os.Getenv("PPROF_ENABLED") != "" {
 		// set configurations before calling `statsview.New()` method
-		viewer.SetConfiguration(viewer.WithTheme(viewer.ThemeWesteros), viewer.WithAddr("localhost:8080"))
+		viewer.SetConfiguration(viewer.WithTheme(viewer.ThemeWesteros), viewer.WithAddr("192.168.1.172:8080"))
 
 		mgr := statsview.New()
 		go mgr.Start()
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	debug.SetGCPercent(-1)
-	debug.SetMemoryLimit(1024 * 1024 * 1024) // 1GB
+	debug.SetMemoryLimit(4 * 1024 * 1024 * 1024) // 4GB
 
 	opts := util.DefaultOpts()
 	opts.ClientDecode = player.DecodeClientPackets

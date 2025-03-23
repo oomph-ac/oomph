@@ -13,6 +13,7 @@ const (
 	DebugModeAimA
 	DebugModeTimerA
 	DebugModeBlockPlacement
+	DebugModeInteraction
 
 	debugModeCount
 )
@@ -33,6 +34,7 @@ var DebugModeList = []string{
 	"aim-a",
 	"timer-a",
 	"block_placement",
+	"interaction",
 }
 
 type Debugger struct {
