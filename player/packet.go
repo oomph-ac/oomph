@@ -173,6 +173,21 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 						p.lastUseProjectileTick = p.InputCount
 						inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 						inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
+					} else if c, ok := held.Item().(item.Consumable); ok {
+						if p.startUseConsumableTick == 0 {
+							p.startUseConsumableTick = p.InputCount
+							p.consumedSlot = int(tr.HotBarSlot)
+						} else {
+							duration := p.InputCount - p.startUseConsumableTick
+							if duration < (c.ConsumeDuration().Milliseconds() / 50) {
+								ctx.Cancel()
+								_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
+								p.Popup("<red>Item consumption cooldown</red>")
+								return
+							}
+							p.startUseConsumableTick = 0
+							p.consumedSlot = 0
+						}
 					}
 				} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
 					ctx.Cancel()
@@ -225,6 +240,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
 		p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
+		if p.startUseConsumableTick != 0 && p.consumedSlot != int(pk.HotBarSlot) {
+			p.startUseConsumableTick = 0
+			p.consumedSlot = 0
+		}
 	case *packet.Animate:
 		if pk.ActionType == packet.AnimateActionSwingArm {
 			p.Combat().Swing()
