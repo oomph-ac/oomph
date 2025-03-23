@@ -65,13 +65,14 @@ type Player struct {
 	UniqueId  int64
 
 	// ClientTick is the tick of the client, synchronized with the server's on an interval.
+	// InputCount is the amount of PlayerAuthInput packets the client has sent.
 	// SimulationFrame is the simulation frame of the client, sent in PlayerAuthInput.
-	SimulationFrame uint64
-	ClientTick      int64
-	ServerTick      int64
-	Tps             float32
-	StackLatency    time.Duration
-	LastServerTick  time.Time
+	SimulationFrame        uint64
+	ClientTick, InputCount int64
+	ServerTick             int64
+	Tps                    float32
+	StackLatency           time.Duration
+	LastServerTick         time.Time
 
 	// PendingCorrectionACK is a boolean indicating wether the client has recieved a correction
 	// Oomph has sent to it. This is used to not spam the client with mutliple corrections which may
@@ -90,6 +91,9 @@ type Player struct {
 
 	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
 	blockBreakProgress float32
+
+	// lastUseProjectileTick is the last tick the player used a projectile item.
+	lastUseProjectileTick int64
 
 	// conn is the connection to the client, and serverConn is the connection to the server.
 	conn       *minecraft.Conn
