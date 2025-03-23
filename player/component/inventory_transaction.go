@@ -71,11 +71,12 @@ type transferAction struct {
 
 	srcInv  int32
 	srcSlot int
-	srcItem item.Stack
 
 	dstInv  int32
 	dstSlot int
-	dstItem item.Stack
+
+	oldSrcItem item.Stack
+	oldDstItem item.Stack
 
 	mPlayer atomic.Pointer[player.Player]
 }
@@ -91,13 +92,13 @@ func newInvTransferAction(
 	mPlayer *player.Player,
 ) *transferAction {
 	a := &transferAction{
-		count:   count,
-		srcInv:  srcInv,
-		srcSlot: srcSlot,
-		srcItem: srcItem,
-		dstInv:  dstInv,
-		dstSlot: dstSlot,
-		dstItem: dstItem,
+		count:      count,
+		srcInv:     srcInv,
+		srcSlot:    srcSlot,
+		oldSrcItem: srcItem,
+		dstInv:     dstInv,
+		dstSlot:    dstSlot,
+		oldDstItem: dstItem,
 	}
 	a.mPlayer.Store(mPlayer)
 	return a
@@ -125,16 +126,19 @@ func (a *transferAction) execute() {
 		return
 	}
 
-	if a.srcItem.Empty() {
+	srcItem, dstItem := srcInv.Slot(a.srcSlot), dstInv.Slot(a.dstSlot)
+	// Save old items here in case they get modified by a previous transaction being reverted.
+	a.oldSrcItem, a.oldDstItem = srcItem, dstItem
+
+	if srcItem.Empty() {
 		mPlayer.Log().Debugf("unexpected empty source item")
 		return
 	}
-	dstItem := a.dstItem
 	if dstItem.Empty() {
-		dstItem = a.srcItem.Grow(-math32.MaxInt32)
+		dstItem = srcItem.Grow(-math32.MaxInt32)
 	}
 
-	srcInv.SetSlot(a.srcSlot, a.srcItem.Grow(-a.count))
+	srcInv.SetSlot(a.srcSlot, srcItem.Grow(-a.count))
 	dstInv.SetSlot(a.dstSlot, dstItem.Grow(a.count))
 }
 
@@ -156,18 +160,19 @@ func (a *transferAction) revert() {
 		return
 	}
 
-	srcInv.SetSlot(a.srcSlot, a.srcItem)
-	dstInv.SetSlot(a.dstSlot, a.dstItem)
+	srcInv.SetSlot(a.srcSlot, a.oldSrcItem)
+	dstInv.SetSlot(a.dstSlot, a.oldDstItem)
 }
 
 type swapAction struct {
 	srcInv  int32
-	srcItem item.Stack
 	srcSlot int
 
 	dstInv  int32
-	dstItem item.Stack
 	dstSlot int
+
+	oldSrcItem item.Stack
+	oldDstItem item.Stack
 
 	mPlayer atomic.Pointer[player.Player]
 }
@@ -182,12 +187,12 @@ func newInvSwapAction(
 	mPlayer *player.Player,
 ) *swapAction {
 	a := &swapAction{
-		srcInv:  srcInv,
-		srcItem: srcItem,
-		srcSlot: srcSlot,
-		dstInv:  dstInv,
-		dstItem: dstItem,
-		dstSlot: dstSlot,
+		srcInv:     srcInv,
+		oldSrcItem: srcItem,
+		srcSlot:    srcSlot,
+		dstInv:     dstInv,
+		oldDstItem: dstItem,
+		dstSlot:    dstSlot,
 	}
 	a.mPlayer.Store(mPlayer)
 	return a
@@ -215,8 +220,12 @@ func (a *swapAction) execute() {
 		return
 	}
 
-	srcInv.SetSlot(a.srcSlot, a.dstItem)
-	dstInv.SetSlot(a.dstSlot, a.srcItem)
+	// Save old items here in case they get modified by a previous transaction being reverted.
+	srcItem, dstItem := srcInv.Slot(a.srcSlot), dstInv.Slot(a.dstSlot)
+	a.oldSrcItem, a.oldDstItem = srcItem, dstItem
+
+	srcInv.SetSlot(a.srcSlot, dstItem)
+	dstInv.SetSlot(a.dstSlot, srcItem)
 }
 
 func (a *swapAction) revert() {
@@ -237,14 +246,15 @@ func (a *swapAction) revert() {
 		return
 	}
 
-	srcInv.SetSlot(a.srcSlot, a.srcItem)
-	dstInv.SetSlot(a.dstSlot, a.dstItem)
+	srcInv.SetSlot(a.srcSlot, a.oldSrcItem)
+	dstInv.SetSlot(a.dstSlot, a.oldDstItem)
 }
 
 type destroyAction struct {
 	mPlayer atomic.Pointer[player.Player]
 
-	srcItem item.Stack
+	oldSrcItem item.Stack
+
 	count   int
 	srcSlot int
 	srcInv  int32
@@ -260,11 +270,11 @@ func newDestroyAction(
 	mPlayer *player.Player,
 ) *destroyAction {
 	a := &destroyAction{
-		srcItem: srcItem,
-		count:   count,
-		srcSlot: srcSlot,
-		srcInv:  srcInv,
-		isDrop:  isDrop,
+		oldSrcItem: srcItem,
+		count:      count,
+		srcSlot:    srcSlot,
+		srcInv:     srcInv,
+		isDrop:     isDrop,
 	}
 	a.mPlayer.Store(mPlayer)
 	return a
@@ -286,15 +296,19 @@ func (a *destroyAction) execute() {
 		return
 	}
 
-	if a.count > a.srcItem.Count() {
+	srcItem := inv.Slot(a.srcSlot)
+	// Save old items here in case they get modified by a previous transaction being reverted.
+	a.oldSrcItem = srcItem
+
+	if a.count > srcItem.Count() {
 		if a.isDrop {
-			mPlayer.Log().Debugf("attempted to drop %d items, but only %d are available", a.count, a.srcItem.Count())
+			mPlayer.Log().Debugf("attempted to drop %d items, but only %d are available", a.count, srcItem.Count())
 		} else {
-			mPlayer.Log().Debugf("attempted to destroy %d items, but only %d are available", a.count, a.srcItem.Count())
+			mPlayer.Log().Debugf("attempted to destroy %d items, but only %d are available", a.count, srcItem.Count())
 		}
 		return
 	}
-	inv.SetSlot(a.srcSlot, a.srcItem.Grow(-a.count))
+	inv.SetSlot(a.srcSlot, srcItem.Grow(-a.count))
 }
 
 func (a *destroyAction) revert() {
@@ -308,5 +322,5 @@ func (a *destroyAction) revert() {
 		mPlayer.Log().Debugf("no inventory with container id %d found", a.srcInv)
 		return
 	}
-	inv.SetSlot(a.srcSlot, a.srcItem)
+	inv.SetSlot(a.srcSlot, a.oldSrcItem)
 }
