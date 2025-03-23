@@ -86,10 +86,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	}
 
 	c.prevPlaceRequest = dat
-	if dat.ActionType != protocol.UseItemActionClickBlock || dat.HeldItem.Stack.NetworkID == 0 ||
-		dat.HeldItem.Stack.BlockRuntimeID == 0 || c.mPlayer.GameMode == packet.GameTypeCreative ||
-		c.mPlayer.GameMode == packet.GameTypeCreativeSpectator {
-		// Allow any block placements for creative mode players.
+	if dat.ActionType != protocol.UseItemActionClickBlock {
 		return true
 	}
 
@@ -143,7 +140,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 }
 
 func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransaction) bool {
-	if gamemode := c.mPlayer.GameMode; gamemode != packet.GameTypeSurvival && gamemode != packet.GameTypeAdventure {
+	if gm := c.mPlayer.GameMode; gm != packet.GameTypeSurvival && gm != packet.GameTypeAdventure {
 		return true
 	}
 
@@ -151,7 +148,6 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	if !ok {
 		return true
 	}
-
 	if dat.ActionType != protocol.UseItemActionClickBlock {
 		c.initalInteractionAccepted = true
 		return true
@@ -192,9 +188,10 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		eyePos[1] += 1.62
 	}
 
-	if eyePos.Sub(interactPos).Len() >= 7.0 {
+	if dist := eyePos.Sub(interactPos).Len(); dist >= 7.0 {
 		c.initalInteractionAccepted = false
-		c.mPlayer.NMessage("<red>Interaction denied: too far away.</red>")
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Interaction denied: too far away (%.4f blocks).", dist)
+		//c.mPlayer.NMessage("<red>Interaction denied: too far away.</red>")
 		return false
 	}
 
@@ -235,7 +232,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 
 			// If there is an intersection, the interaction is invalid.
 			if _, ok := trace.BBoxIntercept(iBB, eyePos, interactPos); ok {
-				c.mPlayer.NMessage("<red>Interaction denied: block obstructs path.</red>")
+				//c.mPlayer.NMessage("<red>Interaction denied: block obstructs path.</red>")
+				c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Interaction denied: block obstructs path.")
 				c.initalInteractionAccepted = false
 				return false
 			}
