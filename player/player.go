@@ -158,6 +158,9 @@ type Player struct {
 
 	pkCtx *context.HandlePacketContext
 
+	// remoteEventFunc is the function for sending remote events to the server
+	remoteEventFunc func(e RemoteEvent, p *Player)
+
 	world.NopViewer
 }
 
@@ -184,6 +187,14 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 		log: log,
 
 		listener: listener,
+
+		remoteEventFunc: func(e RemoteEvent, p *Player) {
+			enc, _ := json.Marshal(e)
+			p.SendPacketToServer(&packet.ScriptMessage{
+				Identifier: e.ID(),
+				Data:       enc,
+			})
+		},
 	}
 
 	p.RegenerateWorld()
@@ -193,6 +204,10 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 func (p *Player) SetRecoverFunc(f func(p *Player, err any)) {
 	p.recoverFunc = f
+}
+
+func (p *Player) SetRemoteEventFunc(f func(e RemoteEvent, p *Player)) {
+	p.remoteEventFunc = f
 }
 
 func (p *Player) WithPacketCtx(f func(*context.HandlePacketContext)) {
@@ -280,17 +295,12 @@ func (p *Player) EventHandler() EventHandler {
 }
 
 // SendRemoteEvent sends an Oomph event to the remote server.
-// TODO: Better way to do this. Please.
 func (p *Player) SendRemoteEvent(e RemoteEvent) {
 	if p.serverConn == nil {
 		return
 	}
 
-	enc, _ := json.Marshal(e)
-	p.SendPacketToServer(&packet.ScriptMessage{
-		Identifier: e.ID(),
-		Data:       enc,
-	})
+	p.remoteEventFunc(e, p)
 }
 
 // RegisterDetection registers a detection to the player.
