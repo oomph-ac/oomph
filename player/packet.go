@@ -132,6 +132,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			p.handleBlockActions(pk)
 			p.handleMovement(pk)
 
+			if !oconfig.Combat().FullAuthoritative {
+				p.entTracker.Tick(p.ClientTick)
+			}
+
 			serverVerifiedHit := p.combat.Calculate()
 			if serverVerifiedHit && missedSwing {
 				pk.InputData.Unset(packet.InputFlagMissedSwing)
