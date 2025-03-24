@@ -47,3 +47,14 @@ func GetRotationToPoint(origin, target mgl32.Vec3) mgl32.Vec2 {
 
 	return mgl32.Vec2{yaw, pitch}
 }
+
+func AngleToPoint(
+	origin,
+	target,
+	rotation mgl32.Vec3,
+) mgl32.Vec2 {
+	diff := target.Sub(origin)
+	yaw := math32.Atan2(diff[2], diff[0]) * 180 / math32.Pi
+	pitch := math32.Atan2(diff[1], math32.Sqrt(diff[0]*diff[0]+diff[2]*diff[2])) * 180 / math32.Pi
+	return mgl32.Vec2{yaw - rotation[0], pitch - rotation[1]}
+}

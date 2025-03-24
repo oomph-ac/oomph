@@ -66,6 +66,7 @@ func main() {
 	opts.AutoLogin = false
 	opts.Addr = ":" + os.Args[1]
 	opts.SyncProtocol = false
+
 	if len(os.Args) >= 4 {
 		opts.Token = os.Args[3]
 	}
@@ -115,6 +116,7 @@ func main() {
 	oconfig.Cfg.Movement.AcceptClientVelocity = true
 	oconfig.Cfg.Movement.VelocityAcceptanceThreshold = 0.05
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.005
+	oconfig.Cfg.Combat.FullAuthoritative = true
 
 	//oconfig.Cfg.Movement.AcceptClientPosition = true
 	//oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.0625
