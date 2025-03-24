@@ -247,6 +247,10 @@ func (p *Player) SendPacketToClient(pk packet.Packet) error {
 
 // SendPacketToServer sends a packet to the server.
 func (p *Player) SendPacketToServer(pk packet.Packet) error {
+	if pk == nil {
+		return nil
+	}
+
 	if p.MState.IsReplay {
 		return nil
 	} else if p.serverConn == nil {
