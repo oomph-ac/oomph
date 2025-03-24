@@ -24,6 +24,11 @@ func (p *Player) ServerConn() ServerConn {
 
 // SetConn sets the connection to the client.
 func (p *Player) SetConn(conn *minecraft.Conn) {
+	conn.WritePacket(&packet.ScriptMessage{
+		Identifier: "oomph_is_here_proceed_with_caution",
+		Data:       []byte("Smile! You're on camera."),
+	})
+
 	p.conn = conn
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID
