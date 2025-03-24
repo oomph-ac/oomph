@@ -3,10 +3,12 @@ package component
 import (
 	"time"
 
+	"github.com/chewxy/math32"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
@@ -70,7 +72,9 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	}
 
 	if input == nil {
-		c.checkMisprediction = true
+		if oconfig.Combat().FullAuthoritative {
+			c.checkMisprediction = true
+		}
 		return
 	}
 
@@ -82,17 +86,21 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	}
 	c.targetedEntity = e
 
-	rewindPos, ok := e.Rewind(c.mPlayer.ClientTick)
-	if !ok {
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no rewind positions available for entity %d", data.TargetEntityRuntimeID)
-		return
+	if oconfig.Combat().FullAuthoritative {
+		rewindPos, ok := e.Rewind(c.mPlayer.ClientTick)
+		if !ok {
+			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no rewind positions available for entity %d", data.TargetEntityRuntimeID)
+			return
+		}
+		c.startEntityPos = rewindPos.PrevPosition
+		c.endEntityPos = rewindPos.Position
+	} else {
+		c.startEntityPos = e.PrevPosition
+		c.endEntityPos = e.Position
 	}
 
 	c.startAttackPos = c.mPlayer.Movement().LastPos()
 	c.endAttackPos = c.mPlayer.Movement().Pos()
-
-	c.startEntityPos = rewindPos.PrevPosition
-	c.endEntityPos = rewindPos.Position
 	c.entityBB = e.Box(mgl32.Vec3{})
 
 	if c.mPlayer.Movement().Sneaking() {
@@ -134,6 +142,9 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 		closestRaycastDist float32 = 1_000_000
 		closestRawDist     float32 = 1_000_000
+		closestAngle       float32 = 1_000_000
+
+		raycastHit bool
 	)
 
 	if c.checkMisprediction {
@@ -143,6 +154,10 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	movement := c.mPlayer.Movement()
+	if movement.PendingCorrections() > 0 && !oconfig.Combat().FullAuthoritative {
+		return false
+	}
+
 	hasNonSmoothTeleport := movement.HasTeleport() && !movement.TeleportSmoothed()
 	if hasNonSmoothTeleport {
 		c.startAttackPos = movement.TeleportPos()
@@ -152,6 +167,17 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	c.startRotation = c.mPlayer.Movement().LastRotation()
 	c.endRotation = c.mPlayer.Movement().Rotation()
 
+	var (
+		altEntityStartPos mgl32.Vec3
+		altEntityEndPos   mgl32.Vec3
+		altEntityPosDelta mgl32.Vec3
+	)
+	if !oconfig.Combat().FullAuthoritative {
+		altEntityStartPos = c.targetedEntity.PrevPosition
+		altEntityEndPos = c.targetedEntity.Position
+		altEntityPosDelta = altEntityEndPos.Sub(altEntityStartPos)
+	}
+
 	hitValid := false
 	stepAmt := 1.0 / float32(COMBAT_LERP_POSITION_STEPS)
 	for partialTicks := float32(0.0); partialTicks <= 1; partialTicks += stepAmt {
@@ -159,24 +185,50 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		entityBB := c.entityBB.Translate(lerpedResult.entityPos).Grow(0.1)
 		dV := game.DirectionVector(lerpedResult.rotation.Z(), lerpedResult.rotation.X())
 
-		if c.mPlayer.InputMode != packet.InputModeTouch {
-			if entityBB.Vec3Within(lerpedResult.attackPos) {
-				closestRaycastDist = 0
-				hitValid = true
-				c.raycastResults = append(c.raycastResults, 0.0)
-				continue
+		// If the attack position is within the entity's bounding box, the hit is valid and we don't have to do any further checks.
+		if entityBB.Vec3Within(lerpedResult.attackPos) {
+			closestRaycastDist = 0
+			closestRawDist = 0
+			closestAngle = 0
+			hitValid = true
+			c.raycastResults = append(c.raycastResults, 0.0)
+			c.rawResults = append(c.rawResults, 0.0)
+			break
+		}
+
+		if angle := math32.Abs(game.AngleToPoint(lerpedResult.attackPos, lerpedResult.entityPos, lerpedResult.rotation)[0]); angle < closestAngle {
+			closestAngle = angle
+		}
+
+		if hitResult, ok := trace.BBoxIntercept(entityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
+			raycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
+			hitValid = hitValid || raycastDist <= COMBAT_SURVIVAL_REACH
+			c.raycastResults = append(c.raycastResults, raycastDist)
+
+			if raycastDist < closestRaycastDist {
+				closestRaycastDist = raycastDist
+				closestHitResult = hitResult
+				lerpedAtClosest = lerpedResult
 			}
+			raycastHit = true
+		}
 
-			if hitResult, ok := trace.BBoxIntercept(entityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
-				raycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
-				hitValid = hitValid || raycastDist <= COMBAT_SURVIVAL_REACH
-				c.raycastResults = append(c.raycastResults, raycastDist)
-
-				if raycastDist < closestRaycastDist {
-					closestRaycastDist = raycastDist
+		// An extra raycast is ran here with the current entity position, as the client may have ticked
+		// the entity to a new position while the frame logic was running (where attacks are done). This is only
+		// required if FullAuthoritative is *disabled*, as we want to match the client's own logic as closely as possible.
+		if !oconfig.Combat().FullAuthoritative {
+			altEntPos := altEntityStartPos.Add(altEntityPosDelta.Mul(partialTicks))
+			altEntityBB := c.entityBB.Translate(altEntPos).Grow(0.1)
+			if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
+				altRaycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
+				hitValid = hitValid || altRaycastDist <= COMBAT_SURVIVAL_REACH
+				c.raycastResults = append(c.raycastResults, altRaycastDist)
+				if altRaycastDist < closestRaycastDist {
+					closestRaycastDist = altRaycastDist
 					closestHitResult = hitResult
 					lerpedAtClosest = lerpedResult
 				}
+				raycastHit = true
 			}
 		}
 
@@ -186,14 +238,21 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			closestRawDist = rawDist
 		}
 
-		if c.mPlayer.InputMode == packet.InputModeTouch {
+		/* if c.mPlayer.InputMode == packet.InputModeTouch {
 			hitValid = hitValid || rawDist <= COMBAT_SURVIVAL_REACH
-		}
+		} */
+	}
+
+	// Only allow the raw distance check to be use for touch players if a raycast is unable to land on the entity. This prevents clients
+	// abusing spoofing their input to gain a slight reach advantage. We also want to make sure we're not allowing the player to hit entities
+	// that are behind them. 110 degrees is MC:BE's maximum camera FOV.
+	if !hitValid && c.mPlayer.InputMode == packet.InputModeTouch {
+		hitValid = closestRawDist <= COMBAT_SURVIVAL_REACH && closestAngle <= 110.0
 	}
 
 	// If the hit is valid and the player is not on touch mode, check if the closest calculated ray from the player's eye position to the bounding box
 	// of the entity, has any intersecting blocks. If there are blocks that are in the way of the ray then the hit is invalid.
-	if hitValid && c.mPlayer.InputMode != packet.InputModeTouch && closestRaycastDist > 0 {
+	if hitValid && raycastHit && closestRaycastDist > 0 {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 
 	check_blocks_between_ray:
@@ -215,7 +274,14 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			}
 		}
 	}
-	c.mPlayer.Dbg.Notify(player.DebugModeCombat, !hitValid && !c.checkMisprediction, "<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f)", closestRaycastDist, closestRawDist)
+
+	c.mPlayer.Dbg.Notify(
+		player.DebugModeCombat,
+		!hitValid && !c.checkMisprediction,
+		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f)",
+		closestRaycastDist,
+		closestRawDist,
+	)
 
 	// If this is the full-authoritative combat component, and the hit is valid, send the attack packet to the server.
 	if hitValid {

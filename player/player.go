@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
@@ -442,7 +443,10 @@ func (p *Player) tick() bool {
 	}
 
 	p.Movement().Tick(p.ServerTick - prevTick)
-	p.EntityTracker().Tick(p.ServerTick)
+	if oconfig.Combat().FullAuthoritative {
+		p.EntityTracker().Tick(p.ServerTick)
+	}
+
 	p.ACKs().Tick(false)
 	if !p.ACKs().Responsive() {
 		p.Disconnect(game.ErrorNetworkTimeout)
