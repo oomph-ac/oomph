@@ -31,7 +31,7 @@ func (b Button) Hash() (uint64, uint64) {
 }
 
 func (b Button) Model() world.BlockModel {
-	return blockmodel.NoCollisionSolid{}
+	return blockmodel.NoCollisionNotSolid{}
 }
 
 func allButtonBlocks() (blocks []world.Block) {
