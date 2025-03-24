@@ -116,7 +116,9 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	// Allow any hits if the player is in the correct gamemode.
 	if gamemode := c.mPlayer.GameMode; gamemode != packet.GameTypeSurvival && gamemode != packet.GameTypeAdventure {
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "player is in gamemode %d, allowing hit", gamemode)
-		c.mPlayer.SendPacketToServer(c.attackInput)
+		if c.attackInput != nil {
+			c.mPlayer.SendPacketToServer(c.attackInput)
+		}
 		return true
 	}
 
