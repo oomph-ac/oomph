@@ -689,6 +689,8 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.sneaking = true
 	} else if pk.InputData.Load(packet.InputFlagStopSneaking) {
 		mc.sneaking = false
+	} else {
+		mc.sneaking = pk.InputData.Load(packet.InputFlagSneakDown)
 	}
 
 	mc.jumping = pk.InputData.Load(packet.InputFlagStartJumping)

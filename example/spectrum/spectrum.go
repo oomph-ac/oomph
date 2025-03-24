@@ -112,9 +112,9 @@ func main() {
 
 	oconfig.Cfg = oconfig.DefaultConfig
 	oconfig.Cfg.Movement.AcceptClientPosition = true
-	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.03125
+	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.125
 	oconfig.Cfg.Movement.AcceptClientVelocity = true
-	oconfig.Cfg.Movement.VelocityAcceptanceThreshold = 0.05
+	oconfig.Cfg.Movement.VelocityAcceptanceThreshold = 0.07
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.005
 	oconfig.Cfg.Combat.FullAuthoritative = true
 
