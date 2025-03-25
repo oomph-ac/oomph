@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -29,6 +30,7 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 		Data:       []byte("Smile! You're on camera."),
 	})
 
+	p.shieldID = utils.ConnShieldID(conn)
 	p.conn = conn
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID

@@ -10,6 +10,8 @@ type EventHandler interface {
 	HandlePunishment(ctx *event.Context[*Player], detection Detection, message *string)
 	// HandleFlag is called when a detection flags a player.
 	HandleFlag(ctx *event.Context[*Player], detection Detection, data *orderedmap.OrderedMap[string, any])
+	// HandlePlayerTick is called when the player's "server" goroutine is ticked.
+	HandlePlayerTick(ctx *event.Context[*Player])
 	// HandleQuit is called when a player is closed.
 	HandleQuit()
 }
@@ -21,5 +23,7 @@ func (NopEventHandler) HandlePunishment(*event.Context[*Player], Detection, *str
 
 func (NopEventHandler) HandleFlag(*event.Context[*Player], Detection, *orderedmap.OrderedMap[string, any]) {
 }
+
+func (NopEventHandler) HandlePlayerTick(*event.Context[*Player]) {}
 
 func (NopEventHandler) HandleQuit() {}

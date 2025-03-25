@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
@@ -161,6 +162,8 @@ type Player struct {
 	// remoteEventFunc is the function for sending remote events to the server
 	remoteEventFunc func(e RemoteEvent, p *Player)
 
+	shieldID int32
+
 	world.NopViewer
 }
 
@@ -199,6 +202,7 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 
 	p.RegenerateWorld()
 	p.Dbg = NewDebugger(p)
+
 	return p
 }
 
@@ -355,13 +359,13 @@ func (p *Player) SetLog(log *logrus.Logger) {
 }
 
 // Disconnect disconnects the player with the given reason.
-func (p *Player) Disconnect(reason string) {
+func (p *Player) Disconnect(reason string, args ...interface{}) {
 	if p.MState.IsReplay {
 		return
 	}
 
 	p.SendPacketToClient(&packet.Disconnect{
-		Message: text.Colourf(reason),
+		Message: text.Colourf(reason, args...),
 	})
 	p.conn.Close()
 
@@ -463,6 +467,9 @@ func (p *Player) tick() bool {
 		return false
 	}
 	p.ACKs().Flush()
+
+	// Notify the event handler of the player tick.
+	p.EventHandler().HandlePlayerTick(event.C(p))
 
 	if err := p.conn.Flush(); err != nil {
 		return false
