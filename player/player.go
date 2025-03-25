@@ -359,13 +359,13 @@ func (p *Player) SetLog(log *logrus.Logger) {
 }
 
 // Disconnect disconnects the player with the given reason.
-func (p *Player) Disconnect(reason string, args ...interface{}) {
+func (p *Player) Disconnect(reason string) {
 	if p.MState.IsReplay {
 		return
 	}
 
 	p.SendPacketToClient(&packet.Disconnect{
-		Message: text.Colourf(reason, args...),
+		Message: reason,
 	})
 	p.conn.Close()
 
