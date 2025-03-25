@@ -15,6 +15,10 @@ type AckRefreshEvent struct {
 	Timestamp int64
 }
 
+func NewAckRefreshEvent(timestamp int64) *AckRefreshEvent {
+	return &AckRefreshEvent{Timestamp: timestamp}
+}
+
 func (ev *AckRefreshEvent) ID() uint16 {
 	return IDAckRefreshEvent
 }

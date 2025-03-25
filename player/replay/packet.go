@@ -17,6 +17,16 @@ type PacketEvent struct {
 	Packet     packet.Packet
 }
 
+func NewPacketEvent(
+	fromServer bool,
+	pk packet.Packet,
+) *PacketEvent {
+	return &PacketEvent{
+		FromServer: fromServer,
+		Packet:     pk,
+	}
+}
+
 func (ev *PacketEvent) ID() uint16 {
 	return IDPacketEvent
 }

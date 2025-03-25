@@ -17,6 +17,23 @@ type Event interface {
 	Marshal(io protocol.IO)
 }
 
+func EncodeEvent(e Event, w *protocol.Writer) {
+	eventId := e.ID()
+	w.Uint16(&eventId)
+	e.Marshal(w)
+}
+
+func DecodeEvent(r *protocol.Reader) Event {
+	var eventId uint16
+	r.Uint16(&eventId)
+	if f, ok := eventPool[eventId]; ok {
+		e := f()
+		e.Marshal(r)
+		return e
+	}
+	return nil
+}
+
 func EventFromID(id uint16) Event {
 	if f, ok := eventPool[id]; ok {
 		return f()

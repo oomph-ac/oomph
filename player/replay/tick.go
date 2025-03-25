@@ -10,6 +10,10 @@ func init() {
 // information needed to be encoded for this event.
 type TickEvent struct{}
 
+func NewTickEvent() *TickEvent {
+	return &TickEvent{}
+}
+
 func (ev *TickEvent) ID() uint16 {
 	return IDTickEvent
 }
