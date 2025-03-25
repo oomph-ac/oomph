@@ -8,6 +8,7 @@ require (
 	github.com/df-mc/dragonfly v0.10.1
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
+	github.com/gameparrot/gtipc v0.1.0
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-echarts/statsview v0.4.2
 	github.com/go-gl/mathgl v1.2.0
@@ -15,7 +16,7 @@ require (
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
 	github.com/sandertv/gophertunnel v1.44.1-0.20250306105157-a61732e9cb7b
-	github.com/sasha-s/go-deadlock v0.3.1
+	github.com/sasha-s/go-deadlock v0.3.5
 	github.com/sirupsen/logrus v1.9.3
 )
 
@@ -23,10 +24,10 @@ require (
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cooldogedev/spectral v0.0.5 // indirect
-	github.com/df-mc/atomic v1.10.0 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.19 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
+	github.com/gameparrot/goquery v0.2.0 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.5.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
@@ -37,7 +38,7 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.23.0 // indirect
-	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
+	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
 	github.com/quic-go/quic-go v0.50.0 // indirect
 	github.com/rs/cors v1.11.0 // indirect
 	github.com/samber/lo v1.49.1 // indirect
@@ -55,7 +56,7 @@ require (
 	golang.org/x/tools v0.31.0 // indirect
 )
 
-replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
+replace github.com/sandertv/go-raknet => ../go-raknet
 
 replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v1.24.12-0.20250314120232-7eb6691ba0c3
 
@@ -66,3 +67,5 @@ replace github.com/cooldogedev/spectrum => ../spectrum
 replace github.com/oomph-ac/oconfig => ../oconfig
 
 replace github.com/oomph-ac/multiversion => ../multiversion
+
+replace github.com/gameparrot/gtipc => ../gtipc
