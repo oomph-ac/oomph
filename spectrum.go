@@ -98,6 +98,15 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 	}
 }
 
+func (p *Processor) ProcessEndOfBatch() {
+	if pl := p.pl.Load(); pl != nil {
+		pl.ACKs().Flush()
+		if err := pl.Conn().Flush(); err != nil {
+			pl.Log().Errorf("error flushing client connection: %v", err)
+		}
+	}
+}
+
 func (p *Processor) ProcessPreTransfer(*session.Context, *string, *string) {
 	if pl := p.pl.Load(); pl != nil {
 		pl.PauseProcessing()
