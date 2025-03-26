@@ -351,7 +351,7 @@ func (p *Player) Disconnect(reason string) {
 	}
 
 	p.SendPacketToClient(&packet.Disconnect{
-		Message: text.Colourf(reason),
+		Message: reason,
 	})
 	p.conn.Close()
 
@@ -452,11 +452,10 @@ func (p *Player) tick() bool {
 		p.Disconnect(game.ErrorNetworkTimeout)
 		return false
 	}
-	p.ACKs().Flush()
-
+	/* p.ACKs().Flush()
 	if err := p.conn.Flush(); err != nil {
 		return false
-	}
+	} */
 	if srvConn, ok := p.serverConn.(*minecraft.Conn); ok {
 		if err := srvConn.Flush(); err != nil {
 			return false
