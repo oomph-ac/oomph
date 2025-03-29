@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 )
 
@@ -40,8 +39,12 @@ func NewLatencyACK(p *player.Player, timeOf time.Time, tickOf int64) *Latency {
 
 func (ack *Latency) Run() {
 	ack.mPlayer.StackLatency = time.Since(ack.timeOf)
-	ack.mPlayer.ClientTick = ack.tickOf
-	ack.mPlayer.Dbg.Notify(player.DebugModeLatency, true, "latency=%fms", game.Round64(float64(ack.mPlayer.StackLatency.Microseconds())/1000.0, 2))
+	// Using this little trick screws over players attempting to use backtrack. GG.
+	if !ack.mPlayer.Ready || ack.mPlayer.ClientTick < ack.tickOf || ack.mPlayer.ClientTick >= ack.mPlayer.ServerTick {
+		// ack.mPlayer.Message("set tick from %d -> %d", ack.mPlayer.ClientTick, ack.tickOf)
+		ack.mPlayer.ClientTick = ack.tickOf
+	}
+	ack.mPlayer.Dbg.Notify(player.DebugModeLatency, true, "latency=%.2fms (tickLatency=%d)", float64(ack.mPlayer.StackLatency.Microseconds())/1000.0, ack.mPlayer.ServerTick-ack.mPlayer.ClientTick)
 }
 
 // UpdateSimRate is an acknowledgment that is ran to update the player's simulation rate.
