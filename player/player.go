@@ -462,6 +462,7 @@ func (p *Player) tick() bool {
 		p.Disconnect(game.ErrorNetworkTimeout)
 		return false
 	}
+	// TODO: impl this for non-spectrum users.
 	/* p.ACKs().Flush()
 	if err := p.conn.Flush(); err != nil {
 		return false
