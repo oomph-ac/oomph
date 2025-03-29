@@ -13,7 +13,7 @@ import (
 
 const (
 	ACK_DIVIDER              = 1_000
-	MAX_ALLOWED_PENDING_ACKS = 600 // ~ 30 seconds worth of pending ACKs
+	MAX_ALLOWED_PENDING_ACKS = 1200 // ~ 60 seconds worth of pending ACKs
 )
 
 // ACKComponent is the component of the player that is responsible for sending and handling

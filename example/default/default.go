@@ -20,6 +20,7 @@ import (
 	v729 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v729"
 	v748 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v748"
 	v766 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v766"
+	v776 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v776"
 	_ "github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
@@ -57,6 +58,7 @@ func main() {
 		AllowInvalidPackets: true,
 
 		AcceptedProtocols: []minecraft.Protocol{
+			v776.Protocol(),
 			v766.Protocol(),
 			v748.Protocol(),
 			v729.Protocol(),
