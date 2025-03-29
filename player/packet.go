@@ -15,7 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var DecodeClientPackets = []uint32{
+var ClientDecode = []uint32{
 	packet.IDScriptMessage,
 	packet.IDText,
 	packet.IDPlayerAuthInput,
@@ -26,6 +26,8 @@ var DecodeClientPackets = []uint32{
 	packet.IDAnimate,
 	packet.IDMovePlayer,
 	packet.IDItemStackRequest,
+	packet.IDLevelSoundEvent,
+	packet.IDClientMovementPredictionSync,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {

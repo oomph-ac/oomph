@@ -14,7 +14,7 @@ require (
 	github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
-	github.com/sandertv/gophertunnel v1.44.1-0.20250306105157-a61732e9cb7b
+	github.com/sandertv/gophertunnel v1.45.1
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
 )
@@ -47,7 +47,7 @@ require (
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/mod v0.24.0 // indirect
-	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
@@ -57,7 +57,7 @@ require (
 
 replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v1.24.12-0.20250314120232-7eb6691ba0c3
+replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v1.24.12-0.20250325214352-3d2f220fd9a0
 
 replace github.com/df-mc/dragonfly => ../dragonfly
 
