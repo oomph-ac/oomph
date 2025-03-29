@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -36,7 +34,6 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
 
@@ -109,8 +106,9 @@ func main() {
 		TexturePacksRequired: true,
 
 		AllowInvalidPackets: true,
+		AllowUnknownPackets: true,
 
-		PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
+		/* PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
 			var pk packet.Packet
 			if f, ok := minecraft.DefaultProtocol.Packets(false)[header.PacketID]; ok {
 				pk = f()
@@ -118,16 +116,8 @@ func main() {
 				pk = f()
 			}
 
-			if req, ok := pk.(*packet.ItemStackRequest); ok {
-				req.Marshal(protocol.NewReader(bytes.NewBuffer(payload), 0, false))
-				fmt.Println(req.Requests, "ItemStackRequest")
-			} else if res, ok := pk.(*packet.ItemStackResponse); ok {
-				res.Marshal(protocol.NewReader(bytes.NewBuffer(payload), 0, false))
-				fmt.Println(res.Responses, "ItemStackResponse")
-			}
-
-			//fmt.Printf("%s -> %s: %T\n", src, dst, pk)
-		},
+			fmt.Printf("%s -> %s: %T\n", src, dst, pk)
+		}, */
 	}); err != nil {
 		panic(err)
 	}
