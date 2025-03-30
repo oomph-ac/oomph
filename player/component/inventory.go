@@ -3,7 +3,6 @@ package component
 import (
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/item"
-	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -149,13 +148,10 @@ func (c *InventoryComponent) HandleInventorySlot(pk *packet.InventorySlot) {
 	}
 
 	if pk.NewItem.Stack.NetworkID == 0 {
-		inv.SetSlot(int(pk.Slot), item.NewStack(&block.Air{}, 0))
-	} else if i, ok := world.ItemByRuntimeID(pk.NewItem.Stack.NetworkID, int16(pk.NewItem.Stack.MetadataValue)); ok {
-		iStack := item.NewStack(i, int(pk.NewItem.Stack.Count))
-		inv.SetSlot(int(pk.Slot), utils.ReadItem(pk.NewItem.Stack.NBTData, &iStack))
+		inv.SetSlot(int(pk.Slot), item.NewStack(block.Air{}, 0))
 	} else {
-		inv.SetSlot(int(pk.Slot), item.NewStack(&block.Air{}, 1))
-		c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", pk.NewItem.Stack.NetworkID, pk.NewItem.Stack.MetadataValue)
+		iStack := utils.StackToItem(pk.NewItem.Stack)
+		inv.SetSlot(int(pk.Slot), utils.ReadItem(pk.NewItem.Stack.NBTData, &iStack))
 	}
 }
 
@@ -169,12 +165,9 @@ func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent)
 	for index, itemInstance := range pk.Content {
 		if itemInstance.Stack.NetworkID == 0 {
 			inv.SetSlot(index, item.NewStack(&block.Air{}, 0))
-		} else if i, found := world.ItemByRuntimeID(itemInstance.Stack.NetworkID, int16(itemInstance.Stack.MetadataValue)); found {
-			iStack := item.NewStack(i, int(itemInstance.Stack.Count))
-			inv.SetSlot(index, utils.ReadItem(itemInstance.Stack.NBTData, &iStack))
 		} else {
-			inv.SetSlot(index, item.NewStack(&block.Air{}, 1))
-			c.mPlayer.Log().Debugf("could not find item with runtime id %d w/ meta %d", itemInstance.Stack.NetworkID, itemInstance.Stack.MetadataValue)
+			iStack := utils.StackToItem(itemInstance.Stack)
+			inv.SetSlot(index, utils.ReadItem(itemInstance.Stack.NBTData, &iStack))
 		}
 	}
 }
