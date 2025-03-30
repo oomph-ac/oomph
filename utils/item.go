@@ -18,6 +18,14 @@ func IsItemProjectile(i world.Item) bool {
 	return false
 }
 
+func ItemName(i world.Item) string {
+	if i == nil {
+		return ""
+	}
+	n, _ := i.EncodeItem()
+	return n
+}
+
 // noinspection ALL
 //
 //go:linkname ReadItem github.com/df-mc/dragonfly/server/internal/nbtconv.Item
@@ -27,3 +35,8 @@ func ReadItem(data map[string]any, s *item.Stack) item.Stack
 //
 //go:linkname InstanceFromItem github.com/df-mc/dragonfly/server/session.instanceFromItem
 func InstanceFromItem(it item.Stack) protocol.ItemInstance
+
+// noinspection ALL
+//
+//go:linkname StackToItem github.com/df-mc/dragonfly/server/session.stackToItem
+func StackToItem(it protocol.ItemStack) item.Stack
