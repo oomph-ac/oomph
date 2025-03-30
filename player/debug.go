@@ -33,7 +33,7 @@ var DebugModeList = []string{
 	"chunks",
 	"aim-a",
 	"timer-a",
-	"block_placement",
+	"block_placements",
 	"interaction",
 }
 

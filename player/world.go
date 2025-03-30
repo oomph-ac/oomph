@@ -1,6 +1,8 @@
 package player
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/chewxy/math32"
@@ -250,6 +252,8 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				if p.blockBreakProgress < 1 {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
+					p.Popup("<red>Broke block too early!</red>")
+					fmt.Println(p.inventory.Holding().Item())
 					continue
 				}
 
@@ -276,6 +280,14 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	held, _ := p.HeldItems()
+
+	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
+	// hack to allow netherite tools to work. However, it introduces a bypass where any nethite tool will be able to break
+	// blocks instantly.
+	if strings.Contains(utils.ItemName(held.Item()), "netherite") {
+		return 0
+	}
+
 	b := p.worldTx.Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
 	if _, isAir := b.(block.Air); isAir {
 		return math32.MaxFloat32

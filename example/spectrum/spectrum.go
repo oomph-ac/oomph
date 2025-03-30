@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"time"
 
 	"github.com/cooldogedev/spectrum"
 	"github.com/cooldogedev/spectrum/server"
@@ -67,6 +68,7 @@ func main() {
 	opts.AutoLogin = false
 	opts.Addr = ":" + os.Args[1]
 	opts.SyncProtocol = false
+	opts.LatencyInterval = int64(time.Second)
 
 	if len(os.Args) >= 4 {
 		opts.Token = os.Args[3]
