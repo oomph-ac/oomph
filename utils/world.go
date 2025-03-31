@@ -110,8 +110,11 @@ func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
 		return []cube.BBox{}
 	case "minecraft:flower_pot":
 		return []cube.BBox{cube.Box(5/16.0, 0, 5/16.0, 11/16.0, 3/8.0, 11/16.0)}
-	case "minecraft:black_candle":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
+	case "minecraft:black_candle", "minecraft:blue_candle", "minecraft:brown_candle", "minecraft:cyan_candle",
+		"minecraft:gray_candle", "minecraft:green_candle", "minecraft:light_blue_candle", "minecraft:light_gray_candle",
+		"minecraft:lime_candle", "minecraft:magenta_candle", "minecraft:orange_candle", "minecraft:pink_candle", "minecraft:purple_candle",
+		"minecraft:red_candle", "minecraft:white_candle", "minecraft:yellow_candle":
+		return []cube.BBox{cube.Box(0.28125, 0, 0.28125, 0.71875, 0.375, 0.71875)}
 	case "minecraft:tallgrass", "minecraft:fern", "minecraft:large_fern", "minecraft:rose_bush", "minecraft:peony", "minecraft:paeonia":
 		return []cube.BBox{}
 	case "minecraft:end_portal_frame":

@@ -125,10 +125,11 @@ func main() {
 	}
 
 	oconfig.Cfg = oconfig.DefaultConfig
-	oconfig.Cfg.Movement.AcceptClientPosition = true
-	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.125
+	oconfig.Cfg.Movement.AcceptClientPosition = false
+	oconfig.Cfg.Movement.AcceptClientVelocity = false
+	/* oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.125
 	oconfig.Cfg.Movement.AcceptClientVelocity = true
-	oconfig.Cfg.Movement.VelocityAcceptanceThreshold = 0.07
+	oconfig.Cfg.Movement.VelocityAcceptanceThreshold = 0.07 */
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.005
 	oconfig.Cfg.Combat.FullAuthoritative = true
 
@@ -142,7 +143,7 @@ func main() {
 
 		for _, s := range proxy.Registry().GetSessions() {
 			s.Server().WritePacket(&packet.Disconnect{})
-			s.Disconnect("shutdown")
+			s.Disconnect("Proxy restarting...")
 		}
 		os.Exit(0)
 	}()
