@@ -221,6 +221,10 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				}, block.Air{}, nil)
 			case protocol.PlayerActionStartBreak, protocol.PlayerActionCrackBreak:
 				if action.Action == protocol.PlayerActionStartBreak {
+					// We assume a potential mispredction here because the client while clicking, think it may need to break
+					// a block, but the server may instead think an entity is in the way of that block, constituting
+					// a misprediction.
+					p.combat.Attack(nil)
 					p.blockBreakProgress = 0.0
 				}
 
