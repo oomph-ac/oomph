@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -253,7 +252,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					p.Popup("<red>Broke block too early!</red>")
-					fmt.Println(p.inventory.Holding().Item())
+					p.Log().Debugf("broke block too early (progress=%.4f item=%v)", p.blockBreakProgress, p.Inventory().Holding())
 					continue
 				}
 
@@ -280,6 +279,10 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	held, _ := p.HeldItems()
+	if _, isShear := held.Item().(item.Shears); isShear {
+		// FFS???
+		return 1
+	}
 
 	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
 	// hack to allow netherite tools to work. However, it introduces a bypass where any nethite tool will be able to break
@@ -294,6 +297,8 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	} else if utils.BlockName(b) == "minecraft:web" {
 		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
 		// Just return 1 and accept when the client does break the cobweb.
+		return 1
+	} else if utils.BlockName(b) == "minecraft:bed" {
 		return 1
 	}
 
