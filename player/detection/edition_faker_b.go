@@ -34,6 +34,8 @@ func New_EditionFakerB(p *player.Player) *EditionFakerB {
 
 			MaxViolations: 1,
 		},
+
+		run: true,
 	}
 }
 
