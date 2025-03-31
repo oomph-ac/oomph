@@ -46,11 +46,10 @@ func SimulatePlayerMovement(p *player.Player) {
 	// If a teleport was able to be handled, do not continue with the simulation.
 	if attemptTeleport(movement, p.Dbg) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
-		if attemptKnockback(movement) {
+		/* if attemptKnockback(movement) {
 			p.Dbg.Notify(player.DebugModeMovementSim, true, "knockback applied: %v", movement.Vel())
 			movement.SetPos(movement.Pos().Add(movement.Vel()))
-		}
-
+		} */
 		return
 	}
 
