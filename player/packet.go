@@ -117,6 +117,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		ctx.SetModified()
 
 		<-p.world.Exec(func(tx *df_world.Tx) {
+			defer p.recoverError()
+
 			p.worldTx = tx
 			p.InputMode = pk.InputMode
 
@@ -152,6 +154,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
 		<-p.world.Exec(func(tx *df_world.Tx) {
+			defer p.recoverError()
+
 			p.worldTx = tx
 			if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 				// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
