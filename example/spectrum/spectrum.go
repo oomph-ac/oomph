@@ -133,6 +133,8 @@ func main() {
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.005
 	oconfig.Cfg.Combat.FullAuthoritative = true
 
+	oconfig.Cfg.Combat.MaxRewind = 4
+
 	//oconfig.Cfg.Movement.AcceptClientPosition = true
 	//oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.0625
 
