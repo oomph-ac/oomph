@@ -96,6 +96,7 @@ func (p *Player) RegenerateWorld() {
 			panic(oerror.New("world loader should not be null when world is not null"))
 		}
 		<-w.Exec(func(tx *world.Tx) {
+			defer p.recoverError()
 			p.worldLoader.ChangeWorld(tx, newWorld)
 		})
 		w.Close()
