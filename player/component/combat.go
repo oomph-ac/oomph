@@ -24,6 +24,10 @@ const (
 	COMBAT_SURVIVAL_REACH                float32 = 2.9
 )
 
+func init() {
+	// There is nothing to say.
+}
+
 // AuthoritativeCombatComponent is responsible for managing and simulating combat mechanics for players on the server.
 // It ensures that all players operate under the same rules and conditions during combat, and determines wether or not an attack can be sent to the server.
 type AuthoritativeCombatComponent struct {
