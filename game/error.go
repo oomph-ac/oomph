@@ -1,7 +1,7 @@
 package game
 
 const (
-	ErrorNotReady              = "Error: Client did not initalize correctly."
+	ErrorNotReady              = "Error: Client did not initialize correctly."
 	ErrorNetworkTimeout        = "Error: Network timed out."
 	ErrorChunkCacheUnsupported = "Error: Chunk cache is not supported."
 	ErrorInvalidInventorySlot  = "Error: Invalid inventory slot selected."

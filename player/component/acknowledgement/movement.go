@@ -8,7 +8,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
-// TeleportPlayer is an acknowledgment that is ran when the player recieves a teleport from the server.
+// TeleportPlayer is an acknowledgment that is ran when the player receives a teleport from the server.
 type TeleportPlayer struct {
 	mPlayer *player.Player
 
@@ -80,7 +80,7 @@ func (ack *UpdateAttributes) Run() {
 	}
 }
 
-// PlayerUpdateActorData is an acknowledgment that is ran when the member player recieves an update for it's actor data
+// PlayerUpdateActorData is an acknowledgment that is ran when the member player receives an update for it's actor data
 type PlayerUpdateActorData struct {
 	mPlayer  *player.Player
 	metadata map[uint32]interface{}
@@ -115,7 +115,7 @@ func (ack *PlayerUpdateActorData) Run() {
 	}
 }
 
-// Knockback is an acknowledgment that is ran whenever the player recieves a knockback update from the server.
+// Knockback is an acknowledgment that is ran whenever the player receives a knockback update from the server.
 type Knockback struct {
 	mPlayer   *player.Player
 	knockback mgl32.Vec3
@@ -129,7 +129,7 @@ func (ack *Knockback) Run() {
 	ack.mPlayer.Movement().SetKnockback(ack.knockback)
 }
 
-// MovementCorrection is an acknowledgment that is ran whenever the player recieves a movement correction from the server.
+// MovementCorrection is an acknowledgment that is ran whenever the player receives a movement correction from the server.
 type MovementCorrection struct {
 	mPlayer  *player.Player
 	setField bool

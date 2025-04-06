@@ -72,7 +72,7 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 		b = block.Air{}
 	}
 
-	// TODO: Add a block policy to allow servers to determine wether block updates should be lag-compensated or if movement should
+	// TODO: Add a block policy to allow servers to determine whether block updates should be lag-compensated or if movement should
 	// use the latest world state instantly.
 	c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
 }
@@ -159,7 +159,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return false
 	}
 
-	// On newer versions of the game (1.21.20+), we are able to determine wether the input was from a
+	// On newer versions of the game (1.21.20+), we are able to determine whether the input was from a
 	// simulation frame, or from the player itself. However, on older versions there's no other way to
 	// distinguish this besides a zero-vector click position that is usually from jump-bridging.
 	var isInitalInput bool

@@ -66,9 +66,9 @@ type MovementComponent interface {
 
 	// Sprinting returns true if the movement component is sprinting.
 	Sprinting() bool
-	// SetSprinting sets wether or not the movement component is sprinting.
+	// SetSprinting sets whether the movement component is sprinting.
 	SetSprinting(sprint bool)
-	// PressingSprint returns wether or not the movement component is holding down the key bound to the sprint action.
+	// PressingSprint returns whether the movement component is holding down the key bound to the sprint action.
 	PressingSprint() bool
 
 	// Jumping returns true if the movement component is expecting a jump in the current frame.
@@ -90,13 +90,13 @@ type MovementComponent interface {
 	// PenetratedLastFrame returns true if the movement component had penetrated through a block in
 	// the previous simulation frame.
 	PenetratedLastFrame() bool
-	// SetPenetratedLastFrame sets wether or not the movement component had penetrated through a block
+	// SetPenetratedLastFrame sets whether the movement component had penetrated through a block
 	// in the previous simulation frame.
 	SetPenetratedLastFrame(penetrated bool)
 	// StuckInCollider returns true if the movement component is stuck in a block that does
 	// not support one-way collisions.
 	StuckInCollider() bool
-	// SetStuckInCollider sets wether or not the movement component is stuck in a block that does
+	// SetStuckInCollider sets whether the movement component is stuck in a block that does
 	// not support one-way collisions.
 	SetStuckInCollider(stuck bool)
 
@@ -178,28 +178,28 @@ type MovementComponent interface {
 	// ZCollision returns true if the movement component is collided with a block
 	// on the z-axis.
 	ZCollision() bool
-	// SetCollisions sets wether or not the movement component is colliding with a block
+	// SetCollisions sets whether the movement component is colliding with a block
 	// on the x, y, or z axies.
 	SetCollisions(x, y, z bool)
 
 	// OnGround returns true if the movement component is on the ground.
 	OnGround() bool
-	// SetOnGround sets wether or not the movement component is on the ground.
+	// SetOnGround sets whether the movement component is on the ground.
 	SetOnGround(onGround bool)
 
 	// Immobile returns true if the movement component is immobile.
 	Immobile() bool
-	// SetImmobile sets wether or not the movement component is immobile.
+	// SetImmobile sets whether the movement component is immobile.
 	SetImmobile(immobile bool)
 
 	// NoClip returns true if the movement component has no collisions.
 	NoClip() bool
-	// SetNoClip sets wether or not the movement component has no collisions.
+	// SetNoClip sets whether the movement component has no collisions.
 	SetNoClip(noClip bool)
 
 	// Gliding returns true if the movement component is gliding.
 	Gliding() bool
-	// SetGliding sets wether or not movement component has no collisions.
+	// SetGliding sets whether movement component has no collisions.
 	SetGliding(gliding bool)
 	// GlideBoost returns the amount of ticks the movement component has a gliding boost for.
 	GlideBoost() (boostTicks int64)
@@ -208,11 +208,11 @@ type MovementComponent interface {
 
 	// Flying returns true if the movement component is currently flying.
 	Flying() bool
-	// SetFlying sets wether or not the movement component is flying.
+	// SetFlying sets whether the movement component is flying.
 	SetFlying(fly bool)
-	// TrustFlyStatus returns wether or not the movement component can trust the fly status sent by the client.
+	// TrustFlyStatus returns whether the movement component can trust the fly status sent by the client.
 	TrustFlyStatus() bool
-	// SetTrustFlyStatus sets wether or not the movement component can trust the fly status sent by the client.
+	// SetTrustFlyStatus sets whether the movement component can trust the fly status sent by the client.
 	SetTrustFlyStatus(bool)
 
 	// Update updates the states of the movement component from the given input.
@@ -231,7 +231,7 @@ type MovementComponent interface {
 	RemovePendingCorrection()
 	// InCorrectionCooldown returns true if the client has synced back with the server for at least one tick after a correction.
 	InCorrectionCooldown() bool
-	// SetCorrectionCooldown sets wether or not the client has synced back with the server for at least one tick after a correction.
+	// SetCorrectionCooldown sets whether the client has synced back with the server for at least one tick after a correction.
 	SetCorrectionCooldown(bool)
 
 	// Sync sends a correction to the client to re-sync the client's movement with the server's.
@@ -249,9 +249,9 @@ type NonAuthoritativeMovementInfo interface {
 	Mov() mgl32.Vec3
 	LastMov() mgl32.Vec3
 
-	// ToggledFly returns wether or not the client has attempted to trigger a fly action.
+	// ToggledFly returns whether the client has attempted to trigger a fly action.
 	ToggledFly() bool
-	// SetToggledFly sets wether or not the client has attempted to trigger a fly action.
+	// SetToggledFly sets whether the client has attempted to trigger a fly action.
 	SetToggledFly(bool)
 }
 

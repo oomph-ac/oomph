@@ -93,8 +93,8 @@ func SimulatePlayerMovement(p *player.Player) {
 		moveRelative(movement, moveRelativeSpeed)
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "moveRelative force applied (vel=%v)", movement.Vel())
 
-		nearClimable := utils.BlockClimbable(p.WorldTx().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()))))
-		if nearClimable {
+		nearClimbable := utils.BlockClimbable(p.WorldTx().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()))))
+		if nearClimbable {
 			newVel := movement.Vel()
 			//newVel[0] = game.ClampFloat(newVel[0], -0.3, 0.3)
 			//newVel[2] = game.ClampFloat(newVel[2], -0.3, 0.3)
