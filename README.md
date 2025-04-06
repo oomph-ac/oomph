@@ -31,7 +31,7 @@ Oomph utilizes a server authoritative combat system to prevent any type of hitbo
 
 Oomph has a "server" tick and a client tick, and utilizes a position buffer to get an entity's position nearest to that tick. The amount of positions buffered is configurable via. `oconfig`. Whenever the client gives an indication of an attack or missed swing, Oomph will rewind the entity to the exact client tick (or closest, if the tick is not found in the position buffer). 
 
-There are three possible scenarios where Oomph decides to calculate combat on the next PlayerAuthInput packket:
+There are three possible scenarios where Oomph decides to calculate combat on the next PlayerAuthInput packet:
 * If the client sends an InventoryTransaction packet, the first one sent will be used to calculate the end result.
 * If the client has sent a missed swing flag in the next PlayerAuthInput.
 * If the client has sent a start block break action in the next PlayerAuthInput.
