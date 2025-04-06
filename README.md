@@ -6,6 +6,13 @@ Oomph acts as an intermediary between your server and Minecraft clients, process
 
 Oomph implements a server authoritative system for movement and combat, allowing the proxy to mitigate a large variety of common cheats.
 
+## Dependencies
+- [Dragonfly](https://github.com/oomph-ac/dragonfly)
+- [Spectrum](https://github.com/oomph-ac/spectrum)
+- (For your PM server) [Spectrum-PM](https://github.com/oomph-ac/spectrum-pm)
+- [OConfig](https://github.com/oomph-ac/oconfig)
+The multi-version will not be going public at the moment, you may remove the dependency from `go.mod`.
+
 ## Server Authoritative Movement
 Similar to what is implemented in BDS, Oomph attempts to replicate the movement of players and send any corrections if deemed neccessary. Unlike BDS, Oomph accounts for latency, making it much smoother than the current vanilla system. As of now, Oomph has known issues with the following:
 * Liquids, the client is fully exempted in this scenario.
