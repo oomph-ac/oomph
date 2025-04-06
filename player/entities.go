@@ -27,7 +27,7 @@ type EntityTrackerComponent interface {
 
 	// Tick makes the entity tracker component tick all of the entities. If the player has
 	// full authoritative combat enabled, this is called on the "server" goroutine. On all other
-	// modes it is called when PlayerAuthInput is recieved.
+	// modes it is called when PlayerAuthInput is received.
 	Tick(tick int64)
 }
 
