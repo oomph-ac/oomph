@@ -16,7 +16,7 @@ type Entity struct {
 
 	// Position is the current position of the entity, after interpolation.
 	Position, PrevPosition mgl32.Vec3
-	// RecvPosition is the position of the entity recieved by the client. It
+	// RecvPosition is the position of the entity received by the client. It
 	// is used as the end point for interpolation.
 	RecvPosition, PrevRecvPosition mgl32.Vec3
 
@@ -64,8 +64,8 @@ func New(entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySi
 	return e
 }
 
-// RecievePosition updates the position of the entity, and adds the previous position to its position history.
-func (e *Entity) RecievePosition(hp HistoricalPosition) {
+// ReceivePosition updates the position of the entity, and adds the previous position to its position history.
+func (e *Entity) ReceivePosition(hp HistoricalPosition) {
 	e.PrevRecvPosition = e.RecvPosition
 	e.RecvPosition = hp.Position
 

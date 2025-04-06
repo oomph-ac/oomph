@@ -75,7 +75,7 @@ type Player struct {
 	StackLatency           time.Duration
 	LastServerTick         time.Time
 
-	// PendingCorrectionACK is a boolean indicating wether the client has recieved a correction
+	// PendingCorrectionACK is a boolean indicating whether the client has received a correction
 	// Oomph has sent to it. This is used to not spam the client with mutliple corrections which may
 	// cause desync due to the client's own interpolation.
 	PendingCorrectionACK bool
@@ -142,7 +142,7 @@ type Player struct {
 	entTracker EntityTrackerComponent
 
 	// combat is the component that handles validating combat. This combat component does not rely on client ACKs to determine the position
-	// and state of the entity. This component determines wether or not an attack should be sent to the server.
+	// and state of the entity. This component determines whether an attack should be sent to the server.
 	combat CombatComponent
 
 	// eventHandler is a handler that handles events such as punishments and flags from detections.

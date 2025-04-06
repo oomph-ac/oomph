@@ -121,7 +121,7 @@ func (ackC *ACKComponent) Legacy() bool {
 	return ackC.legacyMode
 }
 
-// SetLegacy sets wether or not the acknowledgment component should use legacy mode.
+// SetLegacy sets whether the acknowledgment component should use legacy mode.
 func (ackC *ACKComponent) SetLegacy(legacy bool) {
 	ackC.legacyMode = legacy
 }

@@ -50,7 +50,7 @@ func (c *EntityTrackerComponent) MoveEntity(rid uint64, tick int64, pos mgl32.Ve
 		if e.IsPlayer {
 			pos[1] -= 1.62
 		}
-		e.RecievePosition(entity.HistoricalPosition{
+		e.ReceivePosition(entity.HistoricalPosition{
 			Position:     pos,
 			PrevPosition: e.RecvPosition,
 			Teleport:     teleport,
@@ -89,7 +89,7 @@ func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbs
 
 // Tick makes the entity tracker component tick all of the entities. If the player has
 // full authoritative combat enabled, this is called on the "server" goroutine. On all other
-// modes it is called when PlayerAuthInput is recieved.
+// modes it is called when PlayerAuthInput is received.
 func (c *EntityTrackerComponent) Tick(tick int64) {
 	for _, e := range c.entities {
 		e.Tick(tick)

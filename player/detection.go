@@ -31,7 +31,7 @@ type Detection interface {
 	Description() string
 	// Punishable returns true if the detection should trigger a punishment.
 	Punishable() bool
-	// Metadata returns the inital metadata that should be registered for a detection.
+	// Metadata returns the initial metadata that should be registered for a detection.
 	Metadata() *DetectionMetadata
 
 	// Detect lets the detection handle a packet for any suspicious behavior that might flag it.

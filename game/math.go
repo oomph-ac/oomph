@@ -40,7 +40,7 @@ func Round64(val float64, precision int) float64 {
 	return math.Round(val*pwr) / pwr
 }
 
-// Float32ApproxEq determines wether two floating point numbers are close enough to each other
+// Float32ApproxEq determines whether two floating point numbers are close enough to each other
 // by a threshold of 1e-5.
 func Float32ApproxEq(a, b float32) bool {
 	return math32.Abs(a-b) <= 1e-5

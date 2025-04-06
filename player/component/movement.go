@@ -48,12 +48,12 @@ func (m *NonAuthoritativeMovement) LastMov() mgl32.Vec3 {
 	return m.lastMov
 }
 
-// ToggledFly returns wether or not the movement component has attempted to trigger a fly action.
+// ToggledFly returns whether the movement component has attempted to trigger a fly action.
 func (m *NonAuthoritativeMovement) ToggledFly() bool {
 	return m.toggledFly
 }
 
-// SetToggledFly sets wether or not the movement component has attempted to trigger a fly action.
+// SetToggledFly sets whether the movement component has attempted to trigger a fly action.
 func (m *NonAuthoritativeMovement) SetToggledFly(toggled bool) {
 	m.toggledFly = toggled
 }
@@ -265,12 +265,12 @@ func (mc *AuthoritativeMovementComponent) Sprinting() bool {
 	return mc.sprinting
 }
 
-// SetSprinting sets wether or not the movement component is sprinting.
+// SetSprinting sets whether the movement component is sprinting.
 func (mc *AuthoritativeMovementComponent) SetSprinting(sprinting bool) {
 	mc.sprinting = sprinting
 }
 
-// PressingSprint returns wether or not the movement component is holding down the key bound to the sprint action.
+// PressingSprint returns whether the movement component is holding down the key bound to the sprint action.
 func (mc *AuthoritativeMovementComponent) PressingSprint() bool {
 	return mc.pressingSprint
 }
@@ -316,7 +316,7 @@ func (mc *AuthoritativeMovementComponent) PenetratedLastFrame() bool {
 	return mc.penetratedLastFrame
 }
 
-// SetPenetratedLastFrame sets wether or not the movement component had penetrated through a block
+// SetPenetratedLastFrame sets whether the movement component had penetrated through a block
 // in the previous simulation frame.
 func (mc *AuthoritativeMovementComponent) SetPenetratedLastFrame(penetrated bool) {
 	mc.penetratedLastFrame = penetrated
@@ -328,7 +328,7 @@ func (mc *AuthoritativeMovementComponent) StuckInCollider() bool {
 	return mc.stuckInCollider
 }
 
-// SetStuckInCollider sets wether or not the movement component is stuck in a block that does
+// SetStuckInCollider sets whether the movement component is stuck in a block that does
 // not support one-way collisions.
 func (mc *AuthoritativeMovementComponent) SetStuckInCollider(stuck bool) {
 	mc.stuckInCollider = stuck
@@ -530,8 +530,8 @@ func (mc *AuthoritativeMovementComponent) ZCollision() bool {
 	return mc.collideZ
 }
 
-// SetCollisions sets wether or not the movement component is colliding with a block
-// on the x, y, or z axies.
+// SetCollisions sets whether the movement component is colliding with a block
+// on the x, y, or z axes.
 func (mc *AuthoritativeMovementComponent) SetCollisions(xCollision, yCollision, zCollision bool) {
 	mc.collideX = xCollision
 	mc.collideY = yCollision
@@ -543,7 +543,7 @@ func (mc *AuthoritativeMovementComponent) OnGround() bool {
 	return mc.onGround
 }
 
-// SetOnGround sets wether or not the movement component is on the ground.
+// SetOnGround sets whether the movement component is on the ground.
 func (mc *AuthoritativeMovementComponent) SetOnGround(onGround bool) {
 	mc.onGround = onGround
 }
@@ -553,7 +553,7 @@ func (mc *AuthoritativeMovementComponent) Immobile() bool {
 	return mc.immobile
 }
 
-// SetImmobile sets wether or not the movement component is immobile.
+// SetImmobile sets whether the movement component is immobile.
 func (mc *AuthoritativeMovementComponent) SetImmobile(immobile bool) {
 	mc.immobile = immobile
 }
@@ -563,7 +563,7 @@ func (mc *AuthoritativeMovementComponent) NoClip() bool {
 	return mc.noClip
 }
 
-// SetNoClip sets wether or not the movement component has collisions.
+// SetNoClip sets whether the movement component has collisions.
 func (mc *AuthoritativeMovementComponent) SetNoClip(noClip bool) {
 	mc.noClip = noClip
 }
@@ -573,7 +573,7 @@ func (mc *AuthoritativeMovementComponent) Gliding() bool {
 	return mc.gliding
 }
 
-// SetGliding sets wether or not the movement component is gliding.
+// SetGliding sets whether the movement component is gliding.
 func (mc *AuthoritativeMovementComponent) SetGliding(gliding bool) {
 	mc.gliding = gliding
 }
@@ -598,12 +598,12 @@ func (mc *AuthoritativeMovementComponent) SetFlying(fly bool) {
 	mc.flying = fly
 }
 
-// TrustFlyStatus returns wether or not the movement component can trust the fly status sent by the client.
+// TrustFlyStatus returns whether the movement component can trust the fly status sent by the client.
 func (mc *AuthoritativeMovementComponent) TrustFlyStatus() bool {
 	return mc.trustFlyStatus
 }
 
-// SetTrustFlyStatus sets wether or not the movement component can trust the fly status sent by the client.
+// SetTrustFlyStatus sets whether the movement component can trust the fly status sent by the client.
 func (mc *AuthoritativeMovementComponent) SetTrustFlyStatus(trust bool) {
 	mc.trustFlyStatus = trust
 }
@@ -836,7 +836,7 @@ func (mc *AuthoritativeMovementComponent) InCorrectionCooldown() bool {
 	return mc.inCorrectionCooldown
 }
 
-// SetCorrectionCooldown sets wether or not the movement component is in a correction cooldown.
+// SetCorrectionCooldown sets whether the movement component is in a correction cooldown.
 func (mc *AuthoritativeMovementComponent) SetCorrectionCooldown(cooldown bool) {
 	mc.inCorrectionCooldown = cooldown
 }

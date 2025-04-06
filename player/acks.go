@@ -11,14 +11,14 @@ type AcknowledgmentComponent interface {
 	// Timestamp returns the current timestamp of the acknowledgment component to be sent later to the member player.
 	Timestamp() int64
 	// SetTimestamp manually sets the timestamp of the acknowledgment component to be sent later to the member
-	// player. This is likely to be used in Oomph recodings/replays.
+	// player. This is likely to be used in Oomph recordings/replays.
 	SetTimestamp(timestamp int64)
 	// Responsive returns true if the member player is responding to acknowledgments.
 	Responsive() bool
 
 	// Legacy returns true if the acknowledgment component is using legacy mode.
 	Legacy() bool
-	// SetLegacy sets wether or not the acknowledgment component should use legacy mode.
+	// SetLegacy sets whether the acknowledgment component should use legacy mode.
 	SetLegacy(legacy bool)
 
 	// Tick ticks the acknowledgment component. The client parameter is true if the tick is triggered

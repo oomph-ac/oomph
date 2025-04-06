@@ -15,7 +15,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// ChunkUpdate is an acknowledgment that runs when a player recieves a LevelChunk packet from the server.
+// ChunkUpdate is an acknowledgment that runs when a player receives a LevelChunk packet from the server.
 type ChunkUpdate struct {
 	mPlayer *player.Player
 	pk      *packet.LevelChunk
@@ -40,7 +40,7 @@ func (ack *ChunkUpdate) Run() {
 	ack.mPlayer.WorldUpdater().DeferChunk(protocol.ChunkPos{ack.pk.Position[0], ack.pk.Position[1]}, c)
 }
 
-// SubChunkUpdate is an acknowledgment that runs when a player recievs a SubChunk packet.
+// SubChunkUpdate is an acknowledgment that runs when a player receives a SubChunk packet.
 type SubChunkUpdate struct {
 	mPlayer *player.Player
 	pk      *packet.SubChunk

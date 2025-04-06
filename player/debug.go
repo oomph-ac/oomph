@@ -67,7 +67,7 @@ func (d *Debugger) Toggle(mode int) {
 	d.Modes[mode] = !d.Modes[mode]
 }
 
-// Enabled returns wether the debug mode is enabled or not.
+// Enabled returns whether the debug mode is enabled or not.
 func (d *Debugger) Enabled(mode int) bool {
 	if mode >= debugModeCount || mode < 0 {
 		return false

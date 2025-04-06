@@ -35,7 +35,7 @@ type WorldUpdaterComponent interface {
 
 	// SetChunkRadius sets the chunk radius of the world updater component.
 	SetChunkRadius(radius int32)
-	// ChunkRadius returns the chunk radius of the world udpater component.
+	// ChunkRadius returns the chunk radius of the world updater component.
 	ChunkRadius() int32
 
 	// DeferChunk defers a chunk that isn't in range of the WorldLoader.
