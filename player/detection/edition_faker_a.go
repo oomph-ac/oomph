@@ -86,7 +86,7 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 	deviceOS := d.mPlayer.ClientDat.DeviceOS
 	titleID := d.mPlayer.IdentityDat.TitleID
 
-	// Check if there's a titleID we know that is invalid/incompatiable with Minecraft: Bedrock Edition.
+	// Check if there's a titleID we know that is invalid/incompatible with Minecraft: Bedrock Edition.
 	if clientType, ok := invalidTitleIDs[titleID]; ok {
 		data := orderedmap.NewOrderedMap[string, any]()
 		data.Set("titleID", titleID)

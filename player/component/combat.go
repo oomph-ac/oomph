@@ -29,7 +29,7 @@ func init() {
 }
 
 // AuthoritativeCombatComponent is responsible for managing and simulating combat mechanics for players on the server.
-// It ensures that all players operate under the same rules and conditions during combat, and determines wether or not an attack can be sent to the server.
+// It ensures that all players operate under the same rules and conditions during combat, and determines whether an attack can be sent to the server.
 type AuthoritativeCombatComponent struct {
 	mPlayer *player.Player
 

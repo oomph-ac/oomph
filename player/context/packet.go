@@ -9,7 +9,7 @@ type HandlePacketContext struct {
 	// modified is a boolean indicating whether Oomph has modified the packet. If it has, we have to re-encode
 	// the packet with the modified data.
 	modified bool
-	// cancel is a boolean indicating wether the packet should be sent to the client/server.
+	// cancel is a boolean indicating whether the packet should be sent to the client/server.
 	cancel bool
 }
 

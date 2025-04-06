@@ -31,7 +31,7 @@ func (*ScaffoldA) SubType() string {
 }
 
 func (*ScaffoldA) Description() string {
-	return "Checks if the click vector is zero during an inital right click input."
+	return "Checks if the click vector is zero during an initial right click input."
 }
 
 func (*ScaffoldA) Punishable() bool {
