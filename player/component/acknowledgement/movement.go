@@ -1,12 +1,48 @@
 package acknowledgement
 
 import (
+	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+// PlayerEffects is an acknowledgment that is ran when the player receives an effects update from the server.
+type PlayerEffects struct {
+	mPlayer    *player.Player
+	effectType int32
+	amplifier  int32
+	duration   int32
+	operation  byte
+}
+
+func NewPlayerEffectsACK(p *player.Player, effectType, amplifier, duration int32, operation byte) *PlayerEffects {
+	return &PlayerEffects{
+		mPlayer:    p,
+		effectType: effectType,
+		amplifier:  amplifier,
+		duration:   duration,
+		operation:  operation,
+	}
+}
+
+func (ack *PlayerEffects) Run() {
+	if ack.operation == packet.MobEffectAdd || ack.operation == packet.MobEffectModify {
+		t, ok := effect.ByID(int(ack.effectType))
+		if !ok {
+			return
+		}
+
+		if _, ok := t.(effect.LastingType); ok {
+			ack.mPlayer.Effects().Add(ack.effectType, player.NewEffect(ack.amplifier+1, ack.duration))
+		}
+	} else {
+		ack.mPlayer.Effects().Remove(ack.effectType)
+	}
+}
 
 // TeleportPlayer is an acknowledgment that is ran when the player receives a teleport from the server.
 type TeleportPlayer struct {
