@@ -57,7 +57,7 @@ require (
 
 replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
 
-replace github.com/sandertv/gophertunnel => github.com/tedacmc/tedac-gophertunnel v1.24.12-0.20250325214352-3d2f220fd9a0
+replace github.com/sandertv/gophertunnel => ../tedac-gophertunnel
 
 replace github.com/df-mc/dragonfly => ../dragonfly
 

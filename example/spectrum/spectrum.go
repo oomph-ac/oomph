@@ -83,7 +83,12 @@ func main() {
 		panic(err)
 	}
 
-	proxy := spectrum.NewSpectrum(server.NewStaticDiscovery(os.Args[2], os.Args[2]), logger, opts, nil)
+	proxy := spectrum.NewSpectrum(
+		server.NewStaticDiscovery(os.Args[2], os.Args[2]),
+		logger,
+		opts,
+		nil,
+	)
 	if err := proxy.Listen(minecraft.ListenConfig{
 		StatusProvider: statusProvider,
 		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
@@ -127,12 +132,8 @@ func main() {
 	oconfig.Cfg = oconfig.DefaultConfig
 	oconfig.Cfg.Movement.AcceptClientPosition = false
 	oconfig.Cfg.Movement.AcceptClientVelocity = false
-	/* oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.125
-	oconfig.Cfg.Movement.AcceptClientVelocity = true
-	oconfig.Cfg.Movement.VelocityAcceptanceThreshold = 0.07 */
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.005
 	oconfig.Cfg.Combat.FullAuthoritative = true
-
 	oconfig.Cfg.Combat.MaxRewind = 4
 
 	//oconfig.Cfg.Movement.AcceptClientPosition = true
