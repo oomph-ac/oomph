@@ -764,6 +764,16 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 // ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
 func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 	switch pk := pk.(type) {
+	case *packet.MobEffect:
+		if pk.EntityRuntimeID == mc.mPlayer.RuntimeId {
+			mc.mPlayer.ACKs().Add(acknowledgement.NewPlayerEffectsACK(
+				mc.mPlayer,
+				pk.EffectType,
+				pk.Amplifier,
+				pk.Duration,
+				pk.Operation,
+			))
+		}
 	case *packet.MoveActorAbsolute:
 		if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
 			mc.SetPendingTeleportPos(pk.Position)

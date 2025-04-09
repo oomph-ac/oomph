@@ -2,12 +2,10 @@ package player
 
 import (
 	"strings"
-	"time"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
@@ -207,10 +205,12 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				finalProgess := p.blockBreakProgress + (1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001))
-				if finalProgess < 1 {
+				finalProgress := p.blockBreakProgress + (1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001))
+				if finalProgress <= 0.999 {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
+					p.Popup("<red>Broke block too early!</red>")
+					p.Log().Debugf("broke block too early (progress=%.4f item=%v)", p.blockBreakProgress, p.Inventory().Holding())
 					continue
 				}
 
@@ -253,7 +253,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				}
 
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001)
-				if p.blockBreakProgress < 1 {
+				if p.blockBreakProgress <= 0.999 {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					p.Popup("<red>Broke block too early!</red>")
@@ -307,20 +307,17 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		return 1
 	}
 
-	breakTime := block.BreakDuration(b, held)
+	breakTime := float32(block.BreakDuration(b, held).Milliseconds())
 	/* if !p.movement.OnGround() {
 		breakTime *= 5
 	} */
 	for effectID, e := range p.effects.All() {
-		lvl := int(e.Amplifier)
 		switch effectID {
 		case packet.EffectHaste:
-			breakTime = time.Duration(float64(breakTime) * effect.Haste.Multiplier(lvl))
+			breakTime *= float32(1 - (0.2 * float64(e.Amplifier)))
 		case packet.EffectMiningFatigue:
-			breakTime = time.Duration(float64(breakTime) * effect.MiningFatigue.Multiplier(lvl))
-		case packet.EffectConduitPower:
-			breakTime = time.Duration(float64(breakTime) * effect.ConduitPower.Multiplier(lvl))
+			breakTime *= float32(1 + (0.3 * float64(e.Amplifier)))
 		}
 	}
-	return float32(breakTime.Milliseconds() / 50)
+	return float32(breakTime / 50)
 }
