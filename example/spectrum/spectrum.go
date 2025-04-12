@@ -33,6 +33,7 @@ import (
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/transport"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -87,7 +88,7 @@ func main() {
 		server.NewStaticDiscovery(os.Args[2], os.Args[2]),
 		logger,
 		opts,
-		nil,
+		transport.NewTCP(),
 	)
 	if err := proxy.Listen(minecraft.ListenConfig{
 		StatusProvider: statusProvider,
