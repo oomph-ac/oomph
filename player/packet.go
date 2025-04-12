@@ -39,6 +39,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	p.pkCtx = ctx
 	defer func() {
 		p.pkCtx = nil
+		p.worldTx = nil
 	}()
 
 	pk := *(ctx.Packet())
@@ -277,6 +278,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	p.pkCtx = ctx
 	defer func() {
 		p.pkCtx = nil
+		p.worldTx = nil
 	}()
 
 	pk := *(ctx.Packet())
