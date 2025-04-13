@@ -1,6 +1,7 @@
 package player
 
 import (
+	"math"
 	"strings"
 
 	"github.com/chewxy/math32"
@@ -297,6 +298,13 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	b := p.worldTx.Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
+	if blockHash, _ := b.Hash(); blockHash == math.MaxUint64 {
+		// If the block hash is MaxUint64, then the block is unknown to dragonfly. In the future,
+		// we should implement more blocks to avoid this condition allowing clients to break those
+		// blocks at any interval they please.
+		return 0
+	}
+
 	if _, isAir := b.(block.Air); isAir {
 		return math32.MaxFloat32
 	} else if utils.BlockName(b) == "minecraft:web" {
