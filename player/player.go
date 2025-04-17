@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
@@ -463,6 +464,11 @@ func (p *Player) tick() bool {
 		return false
 	}
 	p.ACKs().Flush()
+
+	if h := p.eventHandler; h != nil {
+		h.HandleTick(event.C(p))
+	}
+
 	if err := p.conn.Flush(); err != nil {
 		return false
 	}
