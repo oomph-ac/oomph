@@ -469,12 +469,14 @@ func (p *Player) Tick() bool {
 		h.HandleTick(event.C(p))
 	}
 
-	if err := p.conn.Flush(); err != nil {
-		return false
-	}
-	if srvConn, ok := p.serverConn.(*minecraft.Conn); ok {
-		if err := srvConn.Flush(); err != nil {
+	if !p.MState.IsReplay {
+		if err := p.conn.Flush(); err != nil {
 			return false
+		}
+		if srvConn, ok := p.serverConn.(*minecraft.Conn); ok {
+			if err := srvConn.Flush(); err != nil {
+				return false
+			}
 		}
 	}
 	return true
