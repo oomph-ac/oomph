@@ -425,7 +425,7 @@ func (p *Player) StartTicking() {
 	for {
 		select {
 		case <-t.C:
-			if !p.tick() {
+			if !p.Tick() {
 				return
 			}
 		case <-p.CloseChan:
@@ -434,8 +434,8 @@ func (p *Player) StartTicking() {
 	}
 }
 
-// tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
-func (p *Player) tick() bool {
+// Tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
+func (p *Player) Tick() bool {
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
