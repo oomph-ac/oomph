@@ -2,7 +2,6 @@ package component
 
 import (
 	"math/rand/v2"
-	"time"
 
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
@@ -135,7 +134,7 @@ func (ackC *ACKComponent) Tick(client bool) {
 
 	// Update the latency every half-second.
 	if ackC.mPlayer.ServerTick%10 == 0 {
-		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, time.Now(), ackC.mPlayer.ServerTick))
+		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, ackC.mPlayer.Time(), ackC.mPlayer.ServerTick))
 	}
 
 	// Validate that there are no duplicate timestamps.
