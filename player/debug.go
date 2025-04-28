@@ -6,14 +6,13 @@ const (
 	DebugModeACKs = iota
 	DebugModeRotations
 	DebugModeCombat
-	DebugModeClicks
 	DebugModeMovementSim
 	DebugModeLatency
 	DebugModeChunks
 	DebugModeAimA
-	DebugModeTimerA
+	DebugModeTimer
 	DebugModeBlockPlacement
-	DebugModeInteraction
+	DebugModeUnhandledPackets
 
 	debugModeCount
 )
@@ -27,14 +26,13 @@ var DebugModeList = []string{
 	"acks",
 	"rotations",
 	"combat",
-	"clicks",
 	"movement_sim",
 	"latency",
 	"chunks",
 	"aim-a",
 	"timer-a",
 	"block_placements",
-	"interaction",
+	"unhandled_packets",
 }
 
 type Debugger struct {

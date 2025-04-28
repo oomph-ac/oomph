@@ -2,6 +2,7 @@ package player
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"runtime"
@@ -197,6 +198,9 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 			})
 		},
 	}
+	if mState.IsReplay {
+		p.LastServerTick = mState.CurrentTime
+	}
 
 	p.RegenerateWorld()
 	p.Dbg = NewDebugger(p)
@@ -358,7 +362,7 @@ func (p *Player) SetLog(log *logrus.Logger) {
 // Disconnect disconnects the player with the given reason.
 func (p *Player) Disconnect(reason string) {
 	if p.MState.IsReplay {
-		return
+		panic(fmt.Errorf("disconnect: %v", reason))
 	}
 
 	p.SendPacketToClient(&packet.Disconnect{
@@ -443,7 +447,7 @@ func (p *Player) Tick() bool {
 		return false
 	}
 
-	delta := time.Since(p.LastServerTick).Milliseconds()
+	delta := p.Time().Sub(p.LastServerTick).Milliseconds()
 	p.LastServerTick = p.Time()
 
 	prevTick := p.ServerTick
@@ -463,7 +467,11 @@ func (p *Player) Tick() bool {
 		p.Disconnect(game.ErrorNetworkTimeout)
 		return false
 	}
-	p.ACKs().Flush()
+	// If the player state is from a replay, we should only flush the acknowledgment component when
+	// requested by the program handling the replay.
+	if !p.MState.IsReplay {
+		p.ACKs().Flush()
+	}
 
 	if h := p.eventHandler; h != nil {
 		h.HandleTick(event.C(p))
