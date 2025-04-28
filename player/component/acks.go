@@ -1,6 +1,7 @@
 package component
 
 import (
+	"fmt"
 	"math/rand/v2"
 
 	"github.com/oomph-ac/oomph/game"
@@ -134,7 +135,11 @@ func (ackC *ACKComponent) Tick(client bool) {
 
 	// Update the latency every half-second.
 	if ackC.mPlayer.ServerTick%10 == 0 {
-		ackC.Add(acknowledgement.NewLatencyACK(ackC.mPlayer, ackC.mPlayer.Time(), ackC.mPlayer.ServerTick))
+		ackC.Add(acknowledgement.NewLatencyACK(
+			ackC.mPlayer,
+			ackC.mPlayer.Time(),
+			ackC.mPlayer.ServerTick,
+		))
 	}
 
 	// Validate that there are no duplicate timestamps.
@@ -143,6 +148,9 @@ func (ackC *ACKComponent) Tick(client bool) {
 		_, exists := knownTimestamps[batch.timestamp]
 		knownTimestamps[batch.timestamp] = struct{}{}
 		if exists {
+			for _, batches := range ackC.pending {
+				fmt.Println(batches.timestamp, len(batches.acks))
+			}
 			ackC.mPlayer.Disconnect(game.ErrorInternalDuplicateACK)
 			break
 		}

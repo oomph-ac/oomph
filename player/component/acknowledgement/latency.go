@@ -38,7 +38,7 @@ func NewLatencyACK(p *player.Player, timeOf time.Time, tickOf int64) *Latency {
 }
 
 func (ack *Latency) Run() {
-	ack.mPlayer.StackLatency = time.Since(ack.timeOf)
+	ack.mPlayer.StackLatency = ack.mPlayer.Time().Sub(ack.timeOf)
 	// Using this little trick screws over players attempting to use backtrack. GG.
 	if !ack.mPlayer.Ready || ack.mPlayer.ClientTick < ack.tickOf || ack.mPlayer.ClientTick >= ack.mPlayer.ServerTick {
 		// ack.mPlayer.Message("set tick from %d -> %d", ack.mPlayer.ClientTick, ack.tickOf)

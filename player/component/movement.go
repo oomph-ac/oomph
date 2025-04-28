@@ -133,8 +133,10 @@ func (mc *AuthoritativeMovementComponent) InputAcceptable() bool {
 	}
 
 	if mc.allowedInputs <= 0 {
+		mc.mPlayer.Dbg.Notify(player.DebugModeTimer, true, "no allowed inputs remaining (cT=%d sT=%d)", mc.mPlayer.SimulationFrame, mc.mPlayer.ServerTick)
 		return false
 	}
+	mc.mPlayer.Dbg.Notify(player.DebugModeTimer, true, "allowed inputs remaining: %d (cT=%d sT=%d)", mc.allowedInputs, mc.mPlayer.SimulationFrame, mc.mPlayer.ServerTick)
 	mc.allowedInputs--
 	return true
 }
