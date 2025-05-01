@@ -451,8 +451,8 @@ func (p *Player) Tick() bool {
 	p.LastServerTick = p.Time()
 
 	prevTick := p.ServerTick
-	if delta >= 100 {
-		p.ServerTick += (delta / 50) - 1
+	if delta > 50 {
+		p.ServerTick += (delta / 50) + 1
 	} else {
 		p.ServerTick++
 	}
