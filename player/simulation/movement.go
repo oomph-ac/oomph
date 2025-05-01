@@ -285,7 +285,7 @@ func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder d
 	case "minecraft:slime":
 		newVel[1] = game.SlimeBounceMultiplier * old.Y()
 	case "minecraft:bed":
-		newVel[1] = math32.Max(1.0, game.BedBounceMultiplier*old.Y())
+		newVel[1] = math32.Min(1.0, game.BedBounceMultiplier*old.Y())
 	default:
 		newVel[1] = 0
 	}
