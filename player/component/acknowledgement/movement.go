@@ -147,7 +147,7 @@ func (ack *PlayerUpdateActorData) Run() {
 	if f, ok := ack.metadata[entity.DataKeyFlags]; ok {
 		flags := f.(int64)
 		ack.mPlayer.Movement().SetImmobile(utils.HasDataFlag(entity.DataFlagImmobile, flags))
-		ack.mPlayer.Movement().SetSprinting(utils.HasDataFlag(entity.DataFlagSprinting, flags))
+		ack.mPlayer.Movement().SetServerSprint(utils.HasDataFlag(entity.DataFlagSprinting, flags))
 	}
 }
 
