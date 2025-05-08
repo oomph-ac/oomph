@@ -68,6 +68,10 @@ type MovementComponent interface {
 	Sprinting() bool
 	// SetSprinting sets whether the movement component is sprinting.
 	SetSprinting(sprint bool)
+	// ServerSprint returns true if the movement component is sprinting according to the server.
+	ServerSprint() bool
+	// SetServerSprint sets whether the movement component is sprinting according to the server.
+	SetServerSprint(sprint bool)
 	// PressingSprint returns whether the movement component is holding down the key bound to the sprint action.
 	PressingSprint() bool
 
@@ -253,6 +257,9 @@ type NonAuthoritativeMovementInfo interface {
 	ToggledFly() bool
 	// SetToggledFly sets whether the client has attempted to trigger a fly action.
 	SetToggledFly(bool)
+
+	HorizontalCollision() bool
+	VerticalCollision() bool
 }
 
 func (p *Player) SetMovement(c MovementComponent) {
@@ -290,7 +297,8 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.worldTx)) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.worldTx)) > 0
 		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
 			if oconfig.Movement().AcceptClientPosition && posDiff.Len() < oconfig.Movement().PositionAcceptanceThreshold {
-				p.movement.SetPos(p.movement.Client().Pos().Add(mgl32.Vec3{0, 1e-4}))
+				posDiff = mgl32.Vec3{}
+				p.movement.SetPos(p.movement.Client().Pos())
 				p.Dbg.Notify(
 					DebugModeMovementSim,
 					true,
