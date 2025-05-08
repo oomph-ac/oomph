@@ -22,6 +22,9 @@ type NonAuthoritativeMovement struct {
 	mov, lastMov mgl32.Vec3
 
 	toggledFly bool
+
+	horizontalCollision bool
+	verticalCollision   bool
 }
 
 func (m *NonAuthoritativeMovement) Pos() mgl32.Vec3 {
@@ -58,9 +61,16 @@ func (m *NonAuthoritativeMovement) SetToggledFly(toggled bool) {
 	m.toggledFly = toggled
 }
 
-type AuthoritativeMovementComponent struct {
-	mPlayer *player.Player
+func (m *NonAuthoritativeMovement) HorizontalCollision() bool {
+	return m.horizontalCollision
+}
 
+func (m *NonAuthoritativeMovement) VerticalCollision() bool {
+	return m.verticalCollision
+}
+
+type AuthoritativeMovementComponent struct {
+	mPlayer          *player.Player
 	nonAuthoritative *NonAuthoritativeMovement
 
 	pos, lastPos           mgl32.Vec3
@@ -92,8 +102,10 @@ type AuthoritativeMovementComponent struct {
 	teleportCompletionTicks uint64
 	teleportIsSmoothed      bool
 
-	sprinting, pressingSprint bool
-	sneaking, pressingSneak   bool
+	sprinting, pressingSprint         bool
+	serverSprint, serverSprintApplied bool
+
+	sneaking, pressingSneak bool
 
 	jumping, pressingJump bool
 	jumpDelay             uint64
@@ -272,6 +284,17 @@ func (mc *AuthoritativeMovementComponent) SetSprinting(sprinting bool) {
 	mc.sprinting = sprinting
 }
 
+// ServerSprint returns whether the movement component is sprinting according to the server.
+func (mc *AuthoritativeMovementComponent) ServerSprint() bool {
+	return mc.serverSprint
+}
+
+// SetServerSprint sets whether the movement component is sprinting according to the server.
+func (mc *AuthoritativeMovementComponent) SetServerSprint(sprinting bool) {
+	mc.serverSprintApplied = false
+	mc.serverSprint = sprinting
+}
+
 // PressingSprint returns whether the movement component is holding down the key bound to the sprint action.
 func (mc *AuthoritativeMovementComponent) PressingSprint() bool {
 	return mc.pressingSprint
@@ -432,7 +455,7 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 		mc.pos[0]+width,
 		mc.pos[1]+mc.size[1]+yOffset,
 		mc.pos[2]+width,
-	).GrowVec3(mgl32.Vec3{-0.001, 0, -0.001})
+	).GrowVec3(mgl32.Vec3{-1e-4, 0, -1e-4})
 }
 
 // ClientBoundingBox returns the bounding box of the movement component translated to the client's position.
@@ -616,6 +639,9 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	//assert.IsTrue(pk != nil, "given player input is nil")
 	//assert.IsTrue(mc.nonAuthoritative != nil, "non-authoritative data is null")
 
+	mc.nonAuthoritative.horizontalCollision = pk.InputData.Load(packet.InputFlagHorizontalCollision)
+	mc.nonAuthoritative.verticalCollision = pk.InputData.Load(packet.InputFlagVerticalCollision)
+
 	mc.nonAuthoritative.lastPos = mc.nonAuthoritative.pos
 	mc.nonAuthoritative.pos = pk.Position.Sub(playerHeightOffset)
 	mc.nonAuthoritative.lastVel = mc.nonAuthoritative.vel
@@ -677,6 +703,14 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		needsSpeedAdjusted = isNewVersionPlayer && !mc.serverUpdatedSpeed
 		mc.airSpeed = 0.02
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+	} else if clientSprintFlag := pk.InputData.Load(packet.InputFlagSprinting); !stopFlag && !startFlag && !mc.serverSprintApplied && mc.sprinting != mc.serverSprint && clientSprintFlag == mc.serverSprint {
+		mc.sprinting = mc.serverSprint
+		mc.serverSprintApplied = true
+		mc.airSpeed = 0.02
+		if mc.sprinting {
+			mc.airSpeed = 0.026
+		}
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "(noFlag) air speed adjusted to %f", mc.airSpeed)
 	}
 
 	if needsSpeedAdjusted {
@@ -717,22 +751,20 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.gliding = true
 	}
 
-	// Run the movement simulation after the states of the movement component have been updated.
-	mc.Simulate()
-
+	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
-	if !isNewVersionPlayer {
+	if isNewVersionPlayer {
 		needsSpeedAdjusted = false
 		if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
-			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.21.80- has start/stop sprint race condition")
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.20.80- has start/stop sprint race condition")
 			mc.sprinting = false
 			needsSpeedAdjusted = true
 		} else if startFlag /*&& !mc.sprinting && hasForwardKeyPressed*/ {
-			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.21.80- starts sprint")
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.20.80- starts sprint")
 			mc.sprinting = true
 			needsSpeedAdjusted = true
 		} else if stopFlag /*&& mc.sprinting && !hasForwardKeyPressed*/ {
-			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.21.80- stops sprint")
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.20.80- stops sprint")
 			mc.sprinting = false
 			needsSpeedAdjusted = !mc.serverUpdatedSpeed
 		}
@@ -761,6 +793,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	if mc.jumpDelay > 0 {
 		mc.jumpDelay--
 	}
+
 }
 
 // ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
@@ -811,11 +844,6 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 		mc.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalInvalidPacketForMovementComponent, pk))
 		//panic(oerror.New("movement component cannot handle %T", pk))
 	}
-}
-
-// Simulate does any simulations needed by the movement component.
-func (mc *AuthoritativeMovementComponent) Simulate() {
-	simulation.SimulatePlayerMovement(mc.mPlayer)
 }
 
 // Reset is a function that resets the current movement of the movement component to the client's non-authoritative movement.
