@@ -7,11 +7,9 @@ import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/df-mc/dragonfly/server/block/model"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/world/blockmodel"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
@@ -68,7 +66,6 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
 func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
-	var blockModel world.BlockModel
 	switch BlockName(b) {
 	case "minecraft:portal", "minecraft:end_portal":
 		return []cube.BBox{}
@@ -123,28 +120,10 @@ func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
 		return []cube.BBox{}
 	case "minecraft:glow_lichen", "minecraft:pink_petals":
 		return []cube.BBox{}
-	default:
-		switch oldModel := b.Model().(type) {
-		case model.Wall:
-			blockModel = blockmodel.Wall{
-				NorthConnection: oldModel.NorthConnection,
-				EastConnection:  oldModel.EastConnection,
-				SouthConnection: oldModel.SouthConnection,
-				WestConnection:  oldModel.WestConnection,
-				Post:            oldModel.Post,
-			}
-		default:
-			switch b.(type) {
-			case block.IronBars:
-				blockModel = blockmodel.IronBars{}
-			default:
-				blockModel = oldModel
-			}
-		}
 	}
 
 	var boxes []cube.BBox
-	dfBoxes := blockModel.BBox(df_cube.Pos(pos), tx)
+	dfBoxes := b.Model().BBox(df_cube.Pos(pos), tx)
 	boxes = make([]cube.BBox, len(dfBoxes))
 	for i, bb := range dfBoxes {
 		boxes[i] = game.DFBoxToCubeBox(bb)
