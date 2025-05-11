@@ -7,7 +7,7 @@ require (
 	github.com/cooldogedev/spectrum v0.0.37-0.20250302204654-28111dbf25f0
 	github.com/df-mc/dragonfly v0.10.1
 	github.com/elliotchance/orderedmap/v2 v2.2.0
-	github.com/ethaniccc/float32-cube v0.0.0-20230113135104-a65c4cb545c8
+	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-echarts/statsview v0.4.2
 	github.com/go-gl/mathgl v1.2.0
