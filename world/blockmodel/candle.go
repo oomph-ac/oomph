@@ -7,41 +7,63 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 )
 
+var (
+	oneBB = cube.Box(
+		7.0/16.0,
+		0.0,
+		7.0/16.0,
+		9.0/16.0,
+		6.0/16.0,
+		9.0/16.0,
+	)
+	twoBB = cube.Box(
+		0.3125,
+		0.0,
+		0.4375,
+		0.6875,
+		6.0/16.0,
+		0.625,
+	)
+	threeBB = cube.Box(
+		0.3125,
+		0.0,
+		0.375,
+		0.625,
+		6.0/16.0,
+		0.6875,
+	)
+	fourBB = cube.Box(
+		0.3125,
+		0.0,
+		0.3125,
+		0.6875,
+		6.0/16.0,
+		0.625,
+	)
+)
+
 type Candle struct {
 	Count int32
 	Lit   bool
 }
 
 func (c Candle) BBox(pos cube.Pos, s world.BlockSource) []cube.BBox {
-	const inset1 = 7.0 / 16.0
-	const inset2 = 6.0 / 16.0
-	const inset3 = 5.0 / 16.0
-	const downardInset = 10.0 / 16.0
-
-	bb := cube.Box(0, 0, 0, 1, 1, 1)
+	var bb cube.BBox
 	switch c.Count {
 	case 1:
-		bb = bb.Stretch(cube.X, -inset1).
-			Stretch(cube.Z, -inset1)
+		bb = oneBB
 	case 2:
-		bb = bb.Stretch(cube.X, -inset3).
-			ExtendTowards(cube.FaceUp, -inset1).
-			ExtendTowards(cube.FaceDown, -inset2)
+		bb = twoBB
 	case 3:
-		bb = bb.ExtendTowards(cube.FaceWest, -inset3).
-			ExtendTowards(cube.FaceEast, -inset2).
-			ExtendTowards(cube.FaceNorth, -inset2).
-			ExtendTowards(cube.FaceSouth, -inset3)
+		bb = threeBB
 	case 4:
-		bb = bb.Stretch(cube.X, -inset3).
-			ExtendTowards(cube.FaceNorth, -inset3).
-			ExtendTowards(cube.FaceSouth, -inset2)
+		bb = fourBB
 	default:
 		panic(fmt.Errorf("invalid count for candles (%d)", c.Count))
 	}
-	return []cube.BBox{bb.ExtendTowards(cube.FaceUp, -downardInset)}
+	return []cube.BBox{bb}
 }
 
 func (c Candle) FaceSolid(pos cube.Pos, face cube.Face, s world.BlockSource) bool {
-	return true
+	return false
 }

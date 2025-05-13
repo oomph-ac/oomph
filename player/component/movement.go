@@ -753,7 +753,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 
 	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
-	if isNewVersionPlayer {
+	if !isNewVersionPlayer {
 		needsSpeedAdjusted = false
 		if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
 			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "1.20.80- has start/stop sprint race condition")
