@@ -45,7 +45,7 @@ func BlockFriction(b world.Block) float32 {
 // CanPassBlock returns true if an entity can pass through the given block.
 func CanPassBlock(b world.Block) bool {
 	switch BlockName(b) {
-	case "minecraft:web":
+	case "minecraft:web", "minecraft:water", "minecraft:lava":
 		return true
 	default:
 		return false
@@ -72,9 +72,9 @@ func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
 	case "minecraft:web":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:bed":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 9.0/16.0, 1)}
+		return []cube.BBox{cube.Box(1.0/16.0, 0, 1.0/16.0, 15.0/16.0, 1.5/16.0, 15.0/16.0)}
 	case "minecraft:waterlily":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/64.0, 1)}
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 0.09375, 1)}
 	case "minecraft:soul_sand":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 7.0/8.0, 1)}
 	case "minecraft:snow_layer":
@@ -188,13 +188,15 @@ func GetNearbyBBoxes(aabb cube.BBox, src *world.Tx) []cube.BBox {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
 				block := src.Block(df_cube.Pos(pos))
+				if CanPassBlock(block) {
+					continue
+				}
+
 				for _, box := range BlockBoxes(block, pos, src) {
 					b := box.Translate(pos.Vec3())
-					if !b.IntersectsWith(aabb) || CanPassBlock(block) {
-						continue
+					if b.IntersectsWith(aabb) {
+						bboxList = append(bboxList, b)
 					}
-
-					bboxList = append(bboxList, b)
 				}
 			}
 		}

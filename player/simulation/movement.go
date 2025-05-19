@@ -138,7 +138,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		}
 
 		// Avoid edges if the player is sneaking on the edge of a block.
-		avoidEdge(movement, p.WorldTx())
+		avoidEdge(movement, p.WorldTx(), p.Dbg)
 
 		oldVel := movement.Vel()
 		oldOnGround := movement.OnGround()
@@ -456,8 +456,16 @@ func tryCollisions(movement player.MovementComponent, tx *world.Tx, dbg *player.
 }
 
 // avoidEdge is the function that helps the movement component remain at the edge of a block when sneaking.
-func avoidEdge(movement player.MovementComponent, tx *world.Tx) {
+func avoidEdge(movement player.MovementComponent, tx *world.Tx, dbg *player.Debugger) {
 	if !movement.Sneaking() || !movement.OnGround() || movement.Vel().Y() > 0 {
+		dbg.Notify(
+			player.DebugModeMovementSim,
+			true,
+			"avoidEdge: conditions not met (sneaking=%v onGround=%v yVel=%v)",
+			movement.Sneaking(),
+			movement.OnGround(),
+			movement.Vel().Y(),
+		)
 		return
 	}
 
@@ -510,9 +518,12 @@ func avoidEdge(movement player.MovementComponent, tx *world.Tx) {
 		}
 	}
 
+	oldVel := movement.Vel()
 	newVel[0] = xMov
 	newVel[2] = zMov
 	movement.SetVel(newVel)
+
+	dbg.Notify(player.DebugModeMovementSim, true, "(avoidEdge): oldVel=%v newVel=%v", oldVel, newVel)
 }
 
 func blocksInside(movement player.MovementComponent, tx *world.Tx) ([]world.Block, bool) {
