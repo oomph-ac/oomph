@@ -898,7 +898,7 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 	if !mc.mPlayer.PendingCorrectionACK {
 		mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 			PredictionType: packet.PredictionTypePlayer,
-			Position:       mc.Pos().Add(mgl32.Vec3{0, 1.621}),
+			Position:       mc.Pos().Add(mgl32.Vec3{0, 1.6215}),
 			Delta:          mc.Vel(),
 			OnGround:       mc.OnGround(),
 			Tick:           mc.mPlayer.SimulationFrame,
