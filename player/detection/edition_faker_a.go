@@ -124,8 +124,16 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 		data.Set("givenOS", utils.Device(deviceOS))
 		data.Set("expectedOS", utils.Device(expected))
 		d.mPlayer.FailDetection(d, data)
-	} else if !ok && titleID != "" && titleID != "1904044383" {
-		d.mPlayer.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
-		d.mPlayer.Log().Warnf("unknown title ID %s with OS %v", titleID, deviceOS)
+	} else if !ok {
+		switch titleID {
+		case "":
+			if d.mPlayer.Version != player.GameVersion1_21_80 {
+				d.mPlayer.Disconnect("TitleID not present")
+				d.mPlayer.Log().Warnf("no titleID present in identity data (version=%d)", d.mPlayer.Version)
+			}
+		default:
+			d.mPlayer.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
+			d.mPlayer.Log().Warnf("unknown title ID %s with OS %v", titleID, deviceOS)
+		}
 	}
 }
