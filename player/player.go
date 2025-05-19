@@ -18,6 +18,7 @@ import (
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
@@ -39,6 +40,11 @@ const (
 	GameVersion1_21_2  = 686
 	GameVersion1_21_20 = 712
 	GameVersion1_21_30 = 729
+	GameVersion1_21_40 = 748
+	GameVersion1_21_50 = 766
+	GameVersion1_21_60 = 776
+	GameVersion1_21_70 = 786
+	GameVersion1_21_80 = protocol.CurrentProtocol
 
 	TicksPerSecond = 20
 )
