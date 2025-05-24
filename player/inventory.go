@@ -25,6 +25,7 @@ type InventoryComponent interface {
 	HandleItemStackRequest(pk *packet.ItemStackRequest)
 	HandleItemStackResponse(pk *packet.ItemStackResponse)
 
+	ForceSync()
 	Sync(windowID int32) bool
 	SyncSlot(windowID int32, slot int) bool
 }
