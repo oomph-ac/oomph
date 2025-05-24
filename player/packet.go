@@ -53,7 +53,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.Text:
 		args := strings.Split(pk.Message, " ")
-		if args[0] == "!oomph_debug" {
+		if args[0] == "!oomph_debug" && oconfig.Cfg.UseDebugCommands {
 			// If a player is running an oomph debug command, we don't want to leak that command into the chat.
 			ctx.Cancel()
 			if len(args) < 2 {
