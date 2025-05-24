@@ -171,35 +171,38 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 					// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
 					held := p.inventory.Holding()
 					if _, isFireworks := held.Item().(item.Firework); isFireworks && p.Movement().Gliding() {
-						p.movement.SetGlideBoost(20)
-						p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", 20)
+						p.movement.SetGlideBoost(game.GlideBoostTicks)
+						p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", game.GlideBoostTicks)
 					} else if utils.IsItemProjectile(held.Item()) {
 						delta := p.InputCount - p.lastUseProjectileTick
 						if delta < 4 {
 							ctx.Cancel()
-							_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
-							p.Popup("<red>Item cooldown</red>")
+							p.inventory.ForceSync()
+							p.Popup("<red>Projectile cooldown (%d)</red>", 4-delta)
 							return
 						}
 						p.lastUseProjectileTick = p.InputCount
 						inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 						inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
-					} else if c, ok := held.Item().(item.Consumable); ok {
+					} /* else if c, ok := held.Item().(item.Consumable); ok {
 						if p.startUseConsumableTick == 0 {
 							p.startUseConsumableTick = p.InputCount
 							p.consumedSlot = int(tr.HotBarSlot)
 						} else {
 							duration := p.InputCount - p.startUseConsumableTick
-							if duration < (c.ConsumeDuration().Milliseconds() / 50) {
+							if duration < ((c.ConsumeDuration().Milliseconds() / 50) - 1) {
+								p.startUseConsumableTick = p.InputCount
 								ctx.Cancel()
-								_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
-								p.Popup("<red>Item consumption cooldown</red>")
+								p.inventory.ForceSync()
+								p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
+								//_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
+								//p.Popup("<red>Item consumption cooldown</red>")
 								return
 							}
 							p.startUseConsumableTick = 0
 							p.consumedSlot = 0
 						}
-					}
+					} */
 				} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
 					ctx.Cancel()
 					return

@@ -288,7 +288,6 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	needsCorrection := posDiff.Len() > oconfig.Movement().CorrectionThreshold
 	if needsCorrection && p.movement.PendingTeleports() == 0 && !hasTeleport &&
 		!pk.InputData.Load(packet.InputFlagJumpPressedRaw) && !hasKnockback {
-		p.Message("sent correction on frame %d", p.SimulationFrame)
 		p.movement.Sync()
 	} else if !needsCorrection && !hasTeleport && !hasKnockback && p.movement.PendingCorrections() == 0 {
 		inCooldown := p.movement.InCorrectionCooldown()

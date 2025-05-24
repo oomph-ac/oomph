@@ -124,6 +124,15 @@ func (c *InventoryComponent) SyncSlot(windowID int32, slot int) bool {
 	return true
 }
 
+func (c *InventoryComponent) ForceSync() {
+	// Sending a mismatch transaction to the server forces the server to re-send all inventories.
+	if conn := c.mPlayer.ServerConn(); conn != nil {
+		_ = conn.WritePacket(&packet.InventoryTransaction{
+			TransactionData: &protocol.MismatchTransactionData{},
+		})
+	}
+}
+
 func (c *InventoryComponent) HeldSlot() int32 {
 	return c.heldSlot
 }

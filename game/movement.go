@@ -17,5 +17,6 @@ const (
 	DefaultPlayerHeightOffset  = float32(1.62)
 	SneakingPlayerHeightOffset = float32(1.54)
 
-	JumpDelayTicks = 10
+	JumpDelayTicks  = 10
+	GlideBoostTicks = 20
 )
