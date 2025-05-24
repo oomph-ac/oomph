@@ -84,11 +84,11 @@ func main() {
 	oconfig.Cfg = oconfig.DefaultConfig
 	oconfig.Cfg.Network.Transport = oconfig.NetworkTransportTCP
 
-	oconfig.Cfg.Movement.AcceptClientPosition = true
-	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.001
+	oconfig.Cfg.Movement.AcceptClientPosition = false
+	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.005
 
 	oconfig.Cfg.Movement.AcceptClientVelocity = false
-	oconfig.Cfg.Movement.PersuasionThreshold = 0.0005
+	oconfig.Cfg.Movement.PersuasionThreshold = 0.001
 	oconfig.Cfg.Movement.CorrectionThreshold = 0.001
 
 	oconfig.Cfg.Combat.FullAuthoritative = true

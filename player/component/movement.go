@@ -3,6 +3,7 @@ package component
 import (
 	"fmt"
 
+	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -703,7 +704,9 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		needsSpeedAdjusted = isNewVersionPlayer && !mc.serverUpdatedSpeed
 		mc.airSpeed = 0.02
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
-	} else if clientSprintFlag := pk.InputData.Load(packet.InputFlagSprinting); !stopFlag && !startFlag && !mc.serverSprintApplied && mc.sprinting != mc.serverSprint && clientSprintFlag == mc.serverSprint {
+	} else if clientSprintFlag := pk.InputData.Load(packet.InputFlagSprinting); !stopFlag && !startFlag &&
+		!mc.serverSprintApplied && mc.sprinting != mc.serverSprint && clientSprintFlag == mc.serverSprint &&
+		math32.Abs(pk.MoveVector[1]) >= 0.707 {
 		mc.sprinting = mc.serverSprint
 		mc.serverSprintApplied = true
 		mc.airSpeed = 0.02
@@ -711,6 +714,14 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 			mc.airSpeed = 0.026
 		}
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "(noFlag) air speed adjusted to %f", mc.airSpeed)
+	} else if math32.Abs(pk.MoveVector[1]) < 0.707 && mc.sprinting {
+		mc.airSpeed = 0.02
+		mc.sprinting = false
+		needsSpeedAdjusted = isNewVersionPlayer && !mc.serverUpdatedSpeed
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "forced stop sprint due to insufficient move vector %v", pk.MoveVector)
+	} else if !mc.serverSprintApplied {
+		mc.serverSprintApplied = true
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint not applied on current frame")
 	}
 
 	if needsSpeedAdjusted {
