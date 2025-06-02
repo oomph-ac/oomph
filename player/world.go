@@ -99,6 +99,7 @@ func (p *Player) RegenerateWorld() {
 			p.worldLoader.ChangeWorld(tx, newWorld)
 		})
 		w.Close()
+		p.world = newWorld
 		return
 	}
 
