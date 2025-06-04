@@ -6,6 +6,7 @@ import (
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -278,6 +279,10 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	hasTeleport := p.movement.HasTeleport()
 	hasKnockback := p.movement.HasKnockback()
 
+	p.World().CleanChunks(p.WorldUpdater().ChunkRadius(), protocol.ChunkPos{
+		int32(p.movement.Pos().X()) >> 4,
+		int32(p.movement.Pos().Z()) >> 4,
+	})
 	p.effects.Tick()
 	p.movement.Update(pk)
 
@@ -294,7 +299,7 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 		p.movement.SetCorrectionCooldown(false)
 
 		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
-		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.worldTx)) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.worldTx)) > 0
+		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.World())) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.World())) > 0
 		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
 			if oconfig.Movement().AcceptClientPosition && posDiff.Len() < oconfig.Movement().PositionAcceptanceThreshold {
 				posDiff = mgl32.Vec3{}

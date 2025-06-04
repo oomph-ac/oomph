@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/event"
-	"github.com/df-mc/dragonfly/server/world"
+	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/utils"
+	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -112,9 +113,7 @@ type Player struct {
 	conn       *minecraft.Conn
 	serverConn ServerConn
 
-	world       *world.World
-	worldLoader *world.Loader
-	worldTx     *world.Tx
+	world *world.World
 
 	// listener is the Gophertunnel listener
 	listener *minecraft.Listener
@@ -169,7 +168,7 @@ type Player struct {
 	// remoteEventFunc is the function for sending remote events to the server
 	remoteEventFunc func(e RemoteEvent, p *Player)
 
-	world.NopViewer
+	df_world.NopViewer
 }
 
 // New creates and returns a new Player instance.
@@ -208,7 +207,7 @@ func New(log *logrus.Logger, mState MonitoringState, listener *minecraft.Listene
 		p.LastServerTick = mState.CurrentTime
 	}
 
-	p.RegenerateWorld()
+	p.world = world.New()
 	p.Dbg = NewDebugger(p)
 	return p
 }
@@ -419,7 +418,7 @@ func (p *Player) Close() error {
 			}
 		}
 		p.Dbg.target = nil
-		p.world.Close()
+		p.world.PurgeChunks()
 		close(p.CloseChan)
 
 		go runtime.GC()
