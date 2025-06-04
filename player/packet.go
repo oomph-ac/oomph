@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
-	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
@@ -39,11 +38,9 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	p.pkCtx = ctx
 	defer func() {
 		p.pkCtx = nil
-		p.worldTx = nil
 	}()
 
 	pk := *(ctx.Packet())
-
 	switch pk := pk.(type) {
 	case *packet.ScriptMessage:
 		// TODO: Implement a better way to send messages to remote servers w/o abuse of ScriptMessagePacket.
@@ -117,35 +114,25 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		// to Oomph's predicted position.
 		ctx.SetModified()
 
-		<-p.world.Exec(func(tx *df_world.Tx) {
-			defer p.recoverError()
+		p.InputMode = pk.InputMode
+		missedSwing := false
+		if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
+			missedSwing = true
+			p.combat.Attack(nil)
+		}
+		p.acks.Tick(true)
 
-			p.worldTx = tx
-			p.InputMode = pk.InputMode
+		p.handleBlockActions(pk)
+		p.handleMovement(pk)
 
-			p.worldLoader.Move(tx, game.Vec32To64(p.Movement().Pos()))
-			p.worldLoader.Load(tx, int(p.worldUpdater.ChunkRadius()))
-			p.WorldUpdater().Tick()
+		if !oconfig.Combat().FullAuthoritative {
+			p.entTracker.Tick(p.ClientTick)
+		}
 
-			missedSwing := false
-			if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
-				missedSwing = true
-				p.combat.Attack(nil)
-			}
-			p.acks.Tick(true)
-
-			p.handleBlockActions(pk)
-			p.handleMovement(pk)
-
-			if !oconfig.Combat().FullAuthoritative {
-				p.entTracker.Tick(p.ClientTick)
-			}
-
-			serverVerifiedHit := p.combat.Calculate()
-			if serverVerifiedHit && missedSwing {
-				pk.InputData.Unset(packet.InputFlagMissedSwing)
-			}
-		})
+		serverVerifiedHit := p.combat.Calculate()
+		if serverVerifiedHit && missedSwing {
+			pk.InputData.Unset(packet.InputFlagMissedSwing)
+		}
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {
 			ctx.Cancel()
@@ -154,106 +141,101 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
-		<-p.world.Exec(func(tx *df_world.Tx) {
-			defer p.recoverError()
-
-			p.worldTx = tx
-			if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-				// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
-				// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
-				p.combat.Attack(pk)
-				ctx.Cancel()
-				return
-			} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
-				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
-				if tr.ActionType == protocol.UseItemActionClickAir {
-					// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
-					// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
-					held := p.inventory.Holding()
-					if _, isFireworks := held.Item().(item.Firework); isFireworks && p.Movement().Gliding() {
-						p.movement.SetGlideBoost(game.GlideBoostTicks)
-						p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", game.GlideBoostTicks)
-					} else if utils.IsItemProjectile(held.Item()) {
-						delta := p.InputCount - p.lastUseProjectileTick
-						if delta < 4 {
+		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+			// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
+			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
+			p.combat.Attack(pk)
+			ctx.Cancel()
+			return
+		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
+			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+			if tr.ActionType == protocol.UseItemActionClickAir {
+				// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
+				// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
+				held := p.inventory.Holding()
+				if _, isFireworks := held.Item().(item.Firework); isFireworks && p.Movement().Gliding() {
+					p.movement.SetGlideBoost(game.GlideBoostTicks)
+					p.Dbg.Notify(DebugModeMovementSim, true, "predicted client-sided glide booster for %d ticks", game.GlideBoostTicks)
+				} else if utils.IsItemProjectile(held.Item()) {
+					delta := p.InputCount - p.lastUseProjectileTick
+					if delta < 4 {
+						ctx.Cancel()
+						p.inventory.ForceSync()
+						p.Popup("<red>Projectile cooldown (%d)</red>", 4-delta)
+						return
+					}
+					p.lastUseProjectileTick = p.InputCount
+					inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
+					inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
+				} /* else if c, ok := held.Item().(item.Consumable); ok {
+					if p.startUseConsumableTick == 0 {
+						p.startUseConsumableTick = p.InputCount
+						p.consumedSlot = int(tr.HotBarSlot)
+					} else {
+						duration := p.InputCount - p.startUseConsumableTick
+						if duration < ((c.ConsumeDuration().Milliseconds() / 50) - 1) {
+							p.startUseConsumableTick = p.InputCount
 							ctx.Cancel()
 							p.inventory.ForceSync()
-							p.Popup("<red>Projectile cooldown (%d)</red>", 4-delta)
+							p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
+							//_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
+							//p.Popup("<red>Item consumption cooldown</red>")
 							return
 						}
-						p.lastUseProjectileTick = p.InputCount
-						inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
-						inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
-					} /* else if c, ok := held.Item().(item.Consumable); ok {
-						if p.startUseConsumableTick == 0 {
-							p.startUseConsumableTick = p.InputCount
-							p.consumedSlot = int(tr.HotBarSlot)
-						} else {
-							duration := p.InputCount - p.startUseConsumableTick
-							if duration < ((c.ConsumeDuration().Milliseconds() / 50) - 1) {
-								p.startUseConsumableTick = p.InputCount
-								ctx.Cancel()
-								p.inventory.ForceSync()
-								p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
-								//_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
-								//p.Popup("<red>Item consumption cooldown</red>")
-								return
-							}
-							p.startUseConsumableTick = 0
-							p.consumedSlot = 0
-						}
-					} */
-				} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
-					ctx.Cancel()
-					return
-				}
-			} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
-				p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
-			} else if _, ok := pk.TransactionData.(*protocol.NormalTransactionData); ok {
-				if len(pk.Actions) != 2 {
-					p.Log().Debugf("drop action should have exactly 2 actions, got %d", len(pk.Actions))
-					if len(pk.Actions) > 5 {
-						p.Disconnect("Error: Too many actions in NormalTransactionData")
+						p.startUseConsumableTick = 0
+						p.consumedSlot = 0
 					}
-					return
+				} */
+			} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
+				ctx.Cancel()
+				return
+			}
+		} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
+			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+		} else if _, ok := pk.TransactionData.(*protocol.NormalTransactionData); ok {
+			if len(pk.Actions) != 2 {
+				p.Log().Debugf("drop action should have exactly 2 actions, got %d", len(pk.Actions))
+				if len(pk.Actions) > 5 {
+					p.Disconnect("Error: Too many actions in NormalTransactionData")
 				}
-
-				var (
-					sourceSlot           int = -1
-					droppedCount         int = -1
-					foundClientItemStack bool
-				)
-
-				for _, action := range pk.Actions {
-					if action.SourceType == protocol.InventoryActionSourceWorld && action.InventorySlot == 0 {
-						droppedCount = int(action.NewItem.Stack.Count)
-					} else if action.SourceType == protocol.InventoryActionSourceContainer && action.WindowID == protocol.WindowIDInventory {
-						sourceSlot = int(action.InventorySlot)
-						foundClientItemStack = true
-					}
-				}
-
-				if !foundClientItemStack || sourceSlot == -1 || droppedCount == -1 {
-					p.Log().Debugf("missing information for drop action (foundItem=%v sourceSlot=%d droppedCount=%d)", foundClientItemStack, sourceSlot, droppedCount)
-					return
-				}
-
-				inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
-				sourceSlotItem := inv.Slot(sourceSlot)
-				if droppedCount > sourceSlotItem.Count() {
-					p.Log().Debugf("dropped count (%d) is greater than source slot count (%d)", droppedCount, sourceSlotItem.Count())
-					return
-				}
-				inv.SetSlot(sourceSlot, sourceSlotItem.Grow(-droppedCount))
+				return
 			}
 
-			/* if !p.worldUpdater.ValidateInteraction(pk) {
-				ctx.Cancel()
-			} */
-			if !p.worldUpdater.AttemptBlockPlacement(pk) {
-				ctx.Cancel()
+			var (
+				sourceSlot           int = -1
+				droppedCount         int = -1
+				foundClientItemStack bool
+			)
+
+			for _, action := range pk.Actions {
+				if action.SourceType == protocol.InventoryActionSourceWorld && action.InventorySlot == 0 {
+					droppedCount = int(action.NewItem.Stack.Count)
+				} else if action.SourceType == protocol.InventoryActionSourceContainer && action.WindowID == protocol.WindowIDInventory {
+					sourceSlot = int(action.InventorySlot)
+					foundClientItemStack = true
+				}
 			}
-		})
+
+			if !foundClientItemStack || sourceSlot == -1 || droppedCount == -1 {
+				p.Log().Debugf("missing information for drop action (foundItem=%v sourceSlot=%d droppedCount=%d)", foundClientItemStack, sourceSlot, droppedCount)
+				return
+			}
+
+			inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
+			sourceSlotItem := inv.Slot(sourceSlot)
+			if droppedCount > sourceSlotItem.Count() {
+				p.Log().Debugf("dropped count (%d) is greater than source slot count (%d)", droppedCount, sourceSlotItem.Count())
+				return
+			}
+			inv.SetSlot(sourceSlot, sourceSlotItem.Grow(-droppedCount))
+		}
+
+		/* if !p.worldUpdater.ValidateInteraction(pk) {
+			ctx.Cancel()
+		} */
+		if !p.worldUpdater.AttemptBlockPlacement(pk) {
+			ctx.Cancel()
+		}
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
 		p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
@@ -282,7 +264,6 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	p.pkCtx = ctx
 	defer func() {
 		p.pkCtx = nil
-		p.worldTx = nil
 	}()
 
 	pk := *(ctx.Packet())

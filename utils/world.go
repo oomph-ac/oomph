@@ -65,7 +65,7 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 }
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
-func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
+func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox {
 	switch BlockName(b) {
 	case "minecraft:portal", "minecraft:end_portal":
 		return []cube.BBox{}
@@ -118,7 +118,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, tx *world.Tx) []cube.BBox {
 	}
 
 	var boxes []cube.BBox
-	dfBoxes := b.Model().BBox(df_cube.Pos(pos), tx)
+	dfBoxes := b.Model().BBox(df_cube.Pos(pos), src)
 	boxes = make([]cube.BBox, len(dfBoxes))
 	for i, bb := range dfBoxes {
 		boxes[i] = game.DFBoxToCubeBox(bb)
@@ -140,7 +140,7 @@ func GetBlocksInRadius(pos protocol.BlockPos, radius int32) []protocol.BlockPos 
 }
 
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src *world.Tx) []BlockSearchResult {
+func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src world.BlockSource) []BlockSearchResult {
 	min, max := aabb.Min(), aabb.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
@@ -176,7 +176,7 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src *
 }
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
-func GetNearbyBBoxes(aabb cube.BBox, src *world.Tx) []cube.BBox {
+func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
 	grown := aabb.Grow(0.5)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
