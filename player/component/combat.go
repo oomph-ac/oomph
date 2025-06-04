@@ -262,13 +262,13 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	check_blocks_between_ray:
 		for blockPos := range game.BlocksBetween(start, end) {
 			flooredBlockPos := cube.PosFromVec3(blockPos)
-			blockInWay := c.mPlayer.WorldTx().Block(df_cube.Pos(flooredBlockPos))
+			blockInWay := c.mPlayer.World().Block(df_cube.Pos(flooredBlockPos))
 			if utils.IsBlockPassInteraction(blockInWay) {
 				continue
 			}
 
 			// Iterate through each block's bounding boxes and check if it is in the way of the ray.
-			for _, blockBB := range utils.BlockBoxes(blockInWay, flooredBlockPos, c.mPlayer.WorldTx()) {
+			for _, blockBB := range utils.BlockBoxes(blockInWay, flooredBlockPos, c.mPlayer.World()) {
 				blockBB = blockBB.Translate(blockPos)
 				if _, ok := trace.BBoxIntercept(blockBB, start, end); ok {
 					hitValid = false

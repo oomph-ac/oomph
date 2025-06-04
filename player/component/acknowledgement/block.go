@@ -21,7 +21,5 @@ func NewUpdateBlockACK(p *player.Player, pos df_cube.Pos, b world.Block) *Update
 }
 
 func (ack *UpdateBlock) Run() {
-	ack.mPlayer.World().Exec(func(tx *world.Tx) {
-		tx.SetBlock(ack.pos, ack.b, nil)
-	})
+	ack.mPlayer.World().SetBlock(ack.pos, ack.b, nil)
 }
