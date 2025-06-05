@@ -66,29 +66,33 @@ func (ack *TeleportPlayer) Run() {
 	ack.mPlayer.Movement().RemovePendingTeleport()
 }
 
-// UpdateAbilities is an acknowledgment that is ran when the member player has it's abilities updated.
 type UpdateAbilities struct {
 	mPlayer *player.Player
-	data    protocol.AbilityData
+
+	mayFly bool
+	flying bool
+	noClip bool
 }
 
 func NewUpdateAbilitiesACK(p *player.Player, data protocol.AbilityData) *UpdateAbilities {
-	return &UpdateAbilities{
-		mPlayer: p,
-		data:    data,
+	// Determine if the player has the ability to fly and if they are currently flying.
+	ack := &UpdateAbilities{mPlayer: p}
+	for _, l := range data.Layers {
+		ack.mayFly = ack.mayFly || utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
+		ack.flying = ack.flying || utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
+		ack.noClip = ack.noClip || utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip)
 	}
+	return ack
 }
 
 func (ack *UpdateAbilities) Run() {
-	for _, l := range ack.data.Layers {
-		flying := utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly) || utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
-		ack.mPlayer.Movement().SetFlying(flying)
-		ack.mPlayer.Movement().SetNoClip(utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip))
+	ack.mPlayer.Movement().SetMayFly(ack.mayFly)
+	ack.mPlayer.Movement().SetFlying(ack.flying)
+	ack.mPlayer.Movement().SetNoClip(ack.noClip)
 
-		if ack.mPlayer.Movement().Client().ToggledFly() {
-			ack.mPlayer.Movement().SetTrustFlyStatus(flying)
-			ack.mPlayer.Movement().Client().SetToggledFly(false)
-		}
+	if ack.mPlayer.Movement().Client().ToggledFly() {
+		ack.mPlayer.Movement().SetTrustFlyStatus(ack.flying || ack.mayFly)
+		ack.mPlayer.Movement().Client().SetToggledFly(false)
 	}
 }
 

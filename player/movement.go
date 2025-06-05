@@ -215,6 +215,10 @@ type MovementComponent interface {
 	Flying() bool
 	// SetFlying sets whether the movement component is flying.
 	SetFlying(fly bool)
+	// MayFly returns true if the movement component has the permission to fly.
+	MayFly() bool
+	// SetMayFly sets whether the movement component has the permission to fly.
+	SetMayFly(mayFly bool)
 	// TrustFlyStatus returns whether the movement component can trust the fly status sent by the client.
 	TrustFlyStatus() bool
 	// SetTrustFlyStatus sets whether the movement component can trust the fly status sent by the client.
