@@ -122,7 +122,7 @@ type AuthoritativeMovementComponent struct {
 	gliding         bool
 	glideBoostTicks int64
 
-	flying, trustFlyStatus bool
+	flying, mayFly, trustFlyStatus bool
 
 	allowedInputs int64
 	hasFirstInput bool
@@ -622,6 +622,16 @@ func (mc *AuthoritativeMovementComponent) Flying() bool {
 // SetFlying sets if the movement component is flying.
 func (mc *AuthoritativeMovementComponent) SetFlying(fly bool) {
 	mc.flying = fly
+}
+
+// MayFly returns true if the movement component has the permission to fly.
+func (mc *AuthoritativeMovementComponent) MayFly() bool {
+	return mc.mayFly
+}
+
+// SetMayFly sets whether the movement component has the permission to fly.
+func (mc *AuthoritativeMovementComponent) SetMayFly(mayFly bool) {
+	mc.mayFly = mayFly
 }
 
 // TrustFlyStatus returns whether the movement component can trust the fly status sent by the client.
