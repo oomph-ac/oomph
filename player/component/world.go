@@ -6,6 +6,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/world"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
@@ -82,6 +83,14 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 		return true
 	}
 
+	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) {
+		if dat.ClientPrediction == protocol.ClientPredictionFailure {
+			c.mPlayer.Message("failure :(")
+			return false
+		}
+		c.mPlayer.Message("success :)")
+	}
+
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
 	dfReplacePos := df_cube.Pos(replacePos)
 	replacingBlock := c.mPlayer.World().Block(dfReplacePos)
@@ -117,7 +126,11 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 		return true
 	case item.UsableOnBlock:
 		// TODO: Re-implement all the use block functionality without the use of Dragonfly and world transactions.
-		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "item.UsableOnBlock")
+		if b, ok := heldItem.(world.Block); ok {
+			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "running interaction w/ item.UsableOnBlock")
+			utils.UseOnBlock(c.mPlayer, b, df_cube.Face(dat.BlockFace), dfReplacePos, game.Vec32To64(dat.ClickedPosition), c.mPlayer.World())
+			c.mPlayer.Message("yummy bitch")
+		}
 		/* useCtx := item.UseContext{}
 		heldItem.UseOnBlock(dfReplacePos, df_cube.Face(dat.BlockFace), game.Vec32To64(dat.ClickedPosition), c.mPlayer.World(), c.mPlayer, &useCtx) */
 	case df_world.Block:
