@@ -83,12 +83,11 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 		return true
 	}
 
-	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) {
-		if dat.ClientPrediction == protocol.ClientPredictionFailure {
-			c.mPlayer.Message("failure :(")
-			return false
-		}
-		c.mPlayer.Message("success :)")
+	// ClientPredictionFailure being sent from the client indicates that it has not executed an interaction with a block, or has refused
+	// to place a block (usually because certain conditions aren't met, like having their bounding box intersect with the block). I would prefer if
+	// the client also produced the partialTick/deltaTime value along with the interaction yaw/pitch, but we'll take what we can get from Microsoft :)
+	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) && dat.ClientPrediction == protocol.ClientPredictionFailure {
+		return false
 	}
 
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
