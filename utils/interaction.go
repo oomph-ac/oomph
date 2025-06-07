@@ -18,7 +18,7 @@ type blockPlacer interface {
 
 func UseOnBlock(
 	placer blockPlacer,
-	b world.Block,
+	b item.UsableOnBlock,
 	face cube.Face,
 	blockPos cube.Pos,
 	clickPos mgl64.Vec3,
@@ -791,7 +791,7 @@ func UseOnBlock(
 		}
 		b.Axis = face.Axis()
 		place(placer, src, pos, b)
-		// TODO: figure out if we need to do more interactions that dragonfly doesn't have implemented.
+		// TODO: add neccessary item interactions that do affect the world state (e.g. - water/lava buckets)
 	}
 }
 
