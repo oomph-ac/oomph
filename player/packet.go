@@ -360,5 +360,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
+	default:
+		p.log.Debugf("unhandled server packet: %T", pk)
 	}
 }
