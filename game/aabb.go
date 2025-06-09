@@ -41,7 +41,7 @@ func doBBClipCollide(stationary, moving cube.BBox, velocity mgl32.Vec3) (result 
 	seperatingAxes, seperatingAxis := 0, 0
 	resultPenetration := float32(math32.MaxFloat32 - 1)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		minPenetration := moving.Max()[i] - stationary.Min()[i]
 		maxPenetration := stationary.Max()[i] - moving.Min()[i]
 

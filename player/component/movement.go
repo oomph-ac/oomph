@@ -773,6 +773,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	}
 
 	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
+
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
 	if !isNewVersionPlayer {
 		needsSpeedAdjusted = false

@@ -83,6 +83,7 @@ func main() {
 
 	oconfig.Cfg = oconfig.DefaultConfig
 	oconfig.Cfg.Network.Transport = oconfig.NetworkTransportTCP
+	oconfig.Cfg.UseDebugCommands = true
 
 	oconfig.Cfg.Movement.AcceptClientPosition = false
 	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.005
