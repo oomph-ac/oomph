@@ -367,14 +367,12 @@ func (p *Player) SetLog(log *logrus.Logger) {
 // Disconnect disconnects the player with the given reason.
 func (p *Player) Disconnect(reason string) {
 	if p.MState.IsReplay {
-		panic(fmt.Errorf("disconnect: %v", reason))
+		panic(fmt.Errorf("replay terminated: %v", reason))
 	}
-
 	p.SendPacketToClient(&packet.Disconnect{
 		Message: reason,
 	})
 	p.conn.Close()
-
 	if p.serverConn != nil {
 		p.serverConn.Close()
 	}
@@ -387,12 +385,11 @@ func (p *Player) BlockAddress(duration time.Duration) {
 }
 
 func (p *Player) IsVersion(ver int32) bool {
-	return p.conn.Proto().ID() == ver
+	return p.Version == ver
 }
 
 func (p *Player) VersionInRange(oldest, latest int32) bool {
-	ver := p.conn.Proto().ID()
-	return ver >= oldest && ver <= latest
+	return p.Version >= oldest && p.Version <= latest
 }
 
 // Close closes the player.
