@@ -90,10 +90,10 @@ func main() {
 
 	oconfig.Cfg.Movement.AcceptClientVelocity = false
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.001
-	oconfig.Cfg.Movement.CorrectionThreshold = 0.001
+	oconfig.Cfg.Movement.CorrectionThreshold = 0.3
 
 	oconfig.Cfg.Combat.FullAuthoritative = true
-	oconfig.Cfg.Combat.MaxRewind = 4
+	oconfig.Cfg.Combat.MaxRewind = 6
 
 	packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
 	if err != nil {
