@@ -52,6 +52,8 @@ type AuthoritativeCombatComponent struct {
 	attackInput *packet.InventoryTransaction
 	// checkMisprediction is true if the client swings in the air and the combat component is not ACK dependent.
 	checkMisprediction bool
+
+	attacked bool
 }
 
 func NewAuthoritativeCombatComponent(p *player.Player) *AuthoritativeCombatComponent {
@@ -82,6 +84,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		return
 	}
 
+	c.attacked = true
 	data := input.TransactionData.(*protocol.UseItemOnEntityTransactionData)
 	e := c.mPlayer.EntityTracker().FindEntity(data.TargetEntityRuntimeID)
 	if e == nil {
@@ -98,13 +101,14 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		}
 		c.startEntityPos = rewindPos.PrevPosition
 		c.endEntityPos = rewindPos.Position
+		c.startAttackPos = c.mPlayer.Movement().LastPos()
+		c.endAttackPos = c.mPlayer.Movement().Pos()
 	} else {
 		c.startEntityPos = e.PrevPosition
 		c.endEntityPos = e.Position
+		c.startAttackPos = c.mPlayer.Movement().Client().LastPos()
+		c.endAttackPos = c.mPlayer.Movement().Client().Pos()
 	}
-
-	c.startAttackPos = c.mPlayer.Movement().LastPos()
-	c.endAttackPos = c.mPlayer.Movement().Pos()
 	c.entityBB = e.Box(mgl32.Vec3{})
 
 	if c.mPlayer.Movement().Sneaking() {
@@ -114,14 +118,19 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		c.startAttackPos[1] += 1.62
 		c.endAttackPos[1] += 1.62
 	}
-
 	c.attackInput = input
 }
 
 func (c *AuthoritativeCombatComponent) Calculate() bool {
+	if !c.attacked {
+		return false
+	}
+
 	// There is no attack input for this tick.
 	defer c.reset()
+
 	if !c.checkMisprediction && c.attackInput == nil {
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no attack input for this tick, skipping combat calculation")
 		return false
 	}
 
@@ -152,13 +161,18 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	)
 
 	if c.checkMisprediction {
-		if c.mPlayer.LastEquipmentData == nil || !c.checkForMispredictedEntity() {
+		if c.mPlayer.LastEquipmentData == nil {
+			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no last equipment data available, cannot check for mispredicted entity")
+			return false
+		} else if !c.checkForMispredictedEntity() {
+			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no mispredicted entity found, skipping combat calculation")
 			return false
 		}
 	}
 
 	movement := c.mPlayer.Movement()
 	if movement.PendingCorrections() > 0 && !oconfig.Combat().FullAuthoritative {
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "movement component indicates pending corrections (%d), skipping combat calculation", movement.PendingCorrections())
 		return false
 	}
 
@@ -379,6 +393,7 @@ func (c *AuthoritativeCombatComponent) reset() {
 	c.checkMisprediction = false
 	c.raycastResults = c.raycastResults[:0]
 	c.rawResults = c.rawResults[:0]
+	c.attacked = false
 }
 
 type lerpedResult struct {
