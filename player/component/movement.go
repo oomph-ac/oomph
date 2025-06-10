@@ -904,6 +904,10 @@ func (mc *AuthoritativeMovementComponent) SetCorrectionCooldown(cooldown bool) {
 }
 
 func (mc *AuthoritativeMovementComponent) Sync() {
+	if mc.mPlayer.MState.IsReplay {
+		return
+	}
+
 	// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
 	// (the ones they are colliding with).
 	mc.mPlayer.SyncWorld()
@@ -920,7 +924,7 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 	if !mc.mPlayer.PendingCorrectionACK {
 		mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 			PredictionType: packet.PredictionTypePlayer,
-			Position:       mc.Pos().Add(mgl32.Vec3{0, 1.6215}),
+			Position:       mc.Pos().Add(mgl32.Vec3{0, 1.621}),
 			Delta:          mc.Vel(),
 			OnGround:       mc.OnGround(),
 			Tick:           mc.mPlayer.SimulationFrame,
