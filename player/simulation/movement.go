@@ -427,7 +427,7 @@ func tryCollisions(movement player.MovementComponent, src world.BlockSource, dbg
 			collisionPosDist := collisionPos.Sub(movement.Client().Pos()).Len()
 
 			// We also need to ensure that the client isn't using this mechanic to create some weird movement bypass, so we will check if the
-			// collisionPosDist is within the correction threshold. Even if the stepPosDist is greater than the collisionPosDist, Oomph is predicting
+			// collisionPosDist is within the correction threshold. Even if the stepPosDist is greater than the correction threshold, Oomph is predicting
 			// a step here anyway so it would make zero difference.
 			if collisionPosDist > oconfig.Movement().CorrectionThreshold || stepPosDist <= collisionPosDist {
 				collisionVel = stepVel
