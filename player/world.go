@@ -178,6 +178,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				currentBlockBreakPos := p.worldUpdater.BlockBreakPos()
 				if action.Action == protocol.PlayerActionCrackBreak && currentBlockBreakPos != nil && *currentBlockBreakPos == action.BlockPos && hasCrackBreak {
 					// There should be no more than one crack break action unless the client is breaking another block.
+					p.Message("crack break already sent (well there goes that, free client bypass incoming)")
 					continue
 				}
 

@@ -183,9 +183,9 @@ func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 	bboxList := make([]cube.BBox, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
 
-	for y := minY; y <= maxY; y++ {
-		for x := minX; x <= maxX; x++ {
-			for z := minZ; z <= maxZ; z++ {
+	for x := minX; x <= maxX; x++ {
+		for z := minZ; z <= maxZ; z++ {
+			for y := minY; y <= maxY; y++ {
 				pos := cube.Pos{x, y, z}
 				block := src.Block(df_cube.Pos(pos))
 				if CanPassBlock(block) {
