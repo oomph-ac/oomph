@@ -48,15 +48,7 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
 		delete(w.blockUpdates, chunkPos)
 	}
 	w.chunks[chunkPos] = c
-}
-
-// ExemptChunk adds a chunk to the exemption list. This exemption is removed when
-// the player is within range of the chunk, which is handled in World.CleanChunks()
-func (w *World) ExemptChunk(pos protocol.ChunkPos) {
-	w.Lock()
-	defer w.Unlock()
-
-	w.exemptedChunks[pos] = struct{}{}
+	w.exemptedChunks[chunkPos] = struct{}{}
 }
 
 // GetChunk returns a cached chunk at the position passed. The mutex is
