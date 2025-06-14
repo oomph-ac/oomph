@@ -161,10 +161,11 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	)
 
 	if c.checkMisprediction {
-		if c.mPlayer.LastEquipmentData == nil {
+		/*if c.mPlayer.LastEquipmentData == nil {
 			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no last equipment data available, cannot check for mispredicted entity")
 			return false
-		} else if !c.checkForMispredictedEntity() {
+		} else */
+		if !c.checkForMispredictedEntity() {
 			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no mispredicted entity found, skipping combat calculation")
 			return false
 		}
@@ -349,8 +350,11 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 		c.endAttackPos[1] += 1.62
 	}
 
+	// We subtract the rewind tick by 1 here, because the client has already ticked in this instance (which increases)
+	// the client tick by 1, so we have to rewind to the previous tick.
+	rewTick := c.mPlayer.ClientTick - 1
 	for rid, e := range c.mPlayer.EntityTracker().All() {
-		rewind, ok := e.Rewind(c.mPlayer.ClientTick)
+		rewind, ok := e.Rewind(rewTick)
 		if !ok {
 			continue
 		}
@@ -378,10 +382,10 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 		TransactionData: &protocol.UseItemOnEntityTransactionData{
 			TargetEntityRuntimeID: eid,
 			ActionType:            protocol.UseItemOnEntityActionAttack,
-			HotBarSlot:            int32(c.mPlayer.LastEquipmentData.HotBarSlot),
-			HeldItem:              c.mPlayer.LastEquipmentData.NewItem,
-			Position:              c.endAttackPos,
-			ClickedPosition:       mgl32.Vec3{},
+			HotBarSlot:            c.mPlayer.Inventory().HeldSlot(),
+			//HeldItem:              held,
+			Position:        c.endAttackPos,
+			ClickedPosition: mgl32.Vec3{},
 		},
 	}
 	return true
