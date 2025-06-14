@@ -139,7 +139,7 @@ func main() {
 			v589.Protocol(),
 		},
 		ResourcePacks:        packs,
-		TexturePacksRequired: true,
+		TexturePacksRequired: false,
 
 		AllowInvalidPackets: true,
 		AllowUnknownPackets: true,
