@@ -140,10 +140,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	} */
 
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
-		var (
-			newActions    = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
-			hasCrackBreak bool
-		)
+		var newActions = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
 		for _, action := range pk.BlockActions {
 			switch action.Action {
 			case protocol.PlayerActionPredictDestroyBlock:
@@ -176,19 +173,9 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				}
 
 				currentBlockBreakPos := p.worldUpdater.BlockBreakPos()
-				if action.Action == protocol.PlayerActionCrackBreak && currentBlockBreakPos != nil && *currentBlockBreakPos == action.BlockPos && hasCrackBreak {
-					// There should be no more than one crack break action unless the client is breaking another block.
-					p.Message("crack break already sent (well there goes that, free client bypass incoming)")
-					continue
-				}
-
 				if currentBlockBreakPos == nil || *currentBlockBreakPos != action.BlockPos {
-					hasCrackBreak = false
 					p.blockBreakProgress = 0.0
-				} else {
-					hasCrackBreak = action.Action == protocol.PlayerActionCrackBreak
 				}
-
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
 			case protocol.PlayerActionAbortBreak:
