@@ -72,7 +72,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox 
 	case "minecraft:web":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:bed":
-		return []cube.BBox{cube.Box(1.0/16.0, 0, 1.0/16.0, 15.0/16.0, 1.5/16.0, 15.0/16.0)}
+		return []cube.BBox{cube.Box(1.0/16.0, 0, 1.0/16.0, 15.0/16.0, 9.0/16.0, 15.0/16.0)}
 	case "minecraft:waterlily":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 0.09375, 1)}
 	case "minecraft:soul_sand":
@@ -177,7 +177,7 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src w
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
 func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
-	grown := aabb.Grow(0.5)
+	grown := aabb.Grow(1.0)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
