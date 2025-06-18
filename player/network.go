@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -115,9 +114,8 @@ func (p *Player) Latency() time.Duration {
 
 // StartGameContext starts the game for the conn with a context to cancel it.
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
-	data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
+	//data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
 	p.GameMode = data.PlayerGameMode
-
 	return p.conn.StartGameContext(ctx, data)
 }

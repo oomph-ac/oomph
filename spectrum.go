@@ -11,7 +11,6 @@ import (
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sirupsen/logrus"
@@ -52,7 +51,7 @@ func NewProcessor(
 }
 
 func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameData) {
-	gd.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
+	//gd.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	gd.PlayerMovementSettings.RewindHistorySize = 100
 }
 

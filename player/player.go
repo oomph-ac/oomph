@@ -101,6 +101,9 @@ type Player struct {
 
 	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
 	blockBreakProgress float32
+	// blockBreakInProgress is a boolean indicating whether the player is currently breaking a block. This is used for
+	// when server-authoritative block breaking is enabled on the server.
+	blockBreakInProgress bool
 
 	// lastUseProjectileTick is the last tick the player used a projectile item.
 	lastUseProjectileTick int64

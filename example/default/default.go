@@ -27,7 +27,6 @@ import (
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/go-echarts/statsview"
@@ -138,8 +137,8 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 	g.Add(2)
 	go func() {
 		gameData := serverConn.GameData()
-		gameData.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
-		gameData.PlayerMovementSettings.RewindHistorySize = 40
+		//gameData.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
+		gameData.PlayerMovementSettings.RewindHistorySize = 100
 		if err := conn.StartGame(gameData); err != nil {
 			panic(err)
 		}

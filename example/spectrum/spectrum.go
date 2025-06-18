@@ -32,6 +32,7 @@ import (
 	v766 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v766"
 	v776 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v776"
 	v786 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v786"
+	v800 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v800"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
@@ -121,6 +122,7 @@ func main() {
 		StatusProvider: statusProvider,
 		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
 		AcceptedProtocols: []minecraft.Protocol{
+			v800.Protocol(),
 			v786.Protocol(),
 			v776.Protocol(),
 			v766.Protocol(),

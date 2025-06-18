@@ -139,6 +139,13 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.movement.Pos().Z())) >> 4,
 	} */
 
+	handledBlockBreak := false
+	if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress {
+		p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
+		//p.Message("block break in progress (%d - %.4f)", p.InputCount, p.blockBreakProgress)
+		handledBlockBreak = true
+	}
+
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
 		var newActions = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
 		for _, action := range pk.BlockActions {
@@ -169,7 +176,11 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					// a block, but the server may instead think an entity is in the way of that block, constituting
 					// a misprediction.
 					p.combat.Attack(nil)
+					// In this scenario, the client should be trying to continue breaking a block, which means the one they targeted
+					// previously was broken.
 					p.blockBreakProgress = 0.0
+					p.blockBreakInProgress = true
+					//p.Message("start break")
 				}
 
 				currentBlockBreakPos := p.worldUpdater.BlockBreakPos()
@@ -178,10 +189,19 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				}
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
+			case protocol.PlayerActionContinueDestroyBlock:
+				if !p.blockBreakInProgress {
+					p.blockBreakProgress = 0.0
+				}
+				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
+				//p.Message("continue destroy block...")
 			case protocol.PlayerActionAbortBreak:
+				//p.Message("abort break")
 				p.blockBreakProgress = 0.0
 				p.worldUpdater.SetBlockBreakPos(nil)
+				p.blockBreakInProgress = false
 			case protocol.PlayerActionStopBreak:
+				//p.Message("stop break")
 				if p.worldUpdater.BlockBreakPos() == nil {
 					continue
 				}
@@ -205,6 +225,13 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 			newActions = append(newActions, action)
 		}
 		pk.BlockActions = newActions
+	}
+
+	if !handledBlockBreak {
+		if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress {
+			p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
+			//p.Message("(afterTheFactHack) block break in progress (%d - %.4f)", p.InputCount, p.blockBreakProgress)
+		}
 	}
 
 	/* if p.Ready {
