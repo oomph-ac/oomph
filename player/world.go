@@ -139,8 +139,11 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 		int32(math32.Floor(p.movement.Pos().Z())) >> 4,
 	} */
 
-	handledBlockBreak := false
-	if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress {
+	var (
+		handledBlockBreak             bool
+		isFullServerAuthBlockBreaking = p.ServerConn() == nil || !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking
+	)
+	if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress && isFullServerAuthBlockBreaking {
 		p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
 		//p.Message("block break in progress (%d - %.4f)", p.InputCount, p.blockBreakProgress)
 		handledBlockBreak = true
@@ -151,7 +154,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 		for _, action := range pk.BlockActions {
 			switch action.Action {
 			case protocol.PlayerActionPredictDestroyBlock:
-				if p.ServerConn() == nil || !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking || p.worldUpdater.BlockBreakPos() == nil {
+				if isFullServerAuthBlockBreaking || p.worldUpdater.BlockBreakPos() == nil {
 					continue
 				}
 
@@ -227,7 +230,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 		pk.BlockActions = newActions
 	}
 
-	if !handledBlockBreak {
+	if !handledBlockBreak && isFullServerAuthBlockBreaking {
 		if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress {
 			p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
 			//p.Message("(afterTheFactHack) block break in progress (%d - %.4f)", p.InputCount, p.blockBreakProgress)
