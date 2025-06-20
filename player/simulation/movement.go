@@ -279,7 +279,7 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 	}
 
 	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) &&
-		!movement.Flying() && !movement.NoClip() && p.Alive
+		!(movement.Flying() || movement.NoClip() || p.Alive)
 }
 
 func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder world.Block) {

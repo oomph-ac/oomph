@@ -68,7 +68,7 @@ func (p *Player) SyncWorld() {
 				int32(blockResult.Position[2]),
 			},
 			NewBlockRuntimeID: world.BlockRuntimeID(blockResult.Block),
-			Flags:             packet.BlockUpdateNeighbours,
+			Flags:             packet.BlockUpdatePriority,
 			Layer:             0, // TODO: Implement and account for multi-layer blocks.
 		})
 	}
