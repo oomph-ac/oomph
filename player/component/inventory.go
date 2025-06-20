@@ -216,7 +216,9 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 	for _, response := range pk.Responses {
 		// This should never happen, but it did :/
 		if c.firstRequest == nil {
-			c.mPlayer.Log().Debug("cannot process further responses when InventoryComponent.firstRequest is nil")
+			// Here, we are going to make the server re-send what it thinks should be in the inventory to prevent any type of desync.
+			c.mPlayer.Log().Debug("cannot process further responses when InventoryComponent.firstRequest is nil - force syncing inventory")
+			c.ForceSync()
 			return
 		}
 
