@@ -78,9 +78,17 @@ func NewUpdateAbilitiesACK(p *player.Player, data protocol.AbilityData) *UpdateA
 	// Determine if the player has the ability to fly and if they are currently flying.
 	ack := &UpdateAbilities{mPlayer: p}
 	for _, l := range data.Layers {
-		ack.mayFly = ack.mayFly || utils.HasFlag(uint64(l.Values), protocol.AbilityMayFly)
-		ack.flying = ack.flying || utils.HasFlag(uint64(l.Values), protocol.AbilityFlying)
-		ack.noClip = ack.noClip || utils.HasFlag(uint64(l.Values), protocol.AbilityNoClip)
+		layerSetAbilities := uint64(l.Abilities)
+		layerValues := uint64(l.Values)
+		if utils.HasFlag(layerSetAbilities, protocol.AbilityMayFly) {
+			ack.mayFly = ack.mayFly || utils.HasFlag(layerValues, protocol.AbilityMayFly)
+		}
+		if utils.HasFlag(layerSetAbilities, protocol.AbilityFlying) {
+			ack.flying = ack.flying || utils.HasFlag(layerValues, protocol.AbilityFlying)
+		}
+		if utils.HasFlag(layerSetAbilities, protocol.AbilityNoClip) {
+			ack.noClip = ack.noClip || utils.HasFlag(layerValues, protocol.AbilityNoClip)
+		}
 	}
 	return ack
 }
