@@ -214,6 +214,12 @@ func (c *InventoryComponent) HandleItemStackRequest(pk *packet.ItemStackRequest)
 
 func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackResponse) {
 	for _, response := range pk.Responses {
+		// This should never happen, but it did :/
+		if c.firstRequest == nil {
+			c.mPlayer.Log().Debug("cannot process further responses when InventoryComponent.firstRequest is nil")
+			return
+		}
+
 		if response.RequestID != c.firstRequest.id {
 			c.mPlayer.Log().Debugf("received response for unknown request id %d", response.RequestID)
 			return
