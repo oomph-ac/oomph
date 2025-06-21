@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/oomph-ac/oomph/oerror"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -22,6 +23,7 @@ type InventoryComponent interface {
 
 	HandleInventorySlot(pk *packet.InventorySlot)
 	HandleInventoryContent(pk *packet.InventoryContent)
+	HandleSingleRequest(request protocol.ItemStackRequest)
 	HandleItemStackRequest(pk *packet.ItemStackRequest)
 	HandleItemStackResponse(pk *packet.ItemStackResponse)
 

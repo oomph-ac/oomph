@@ -324,3 +324,28 @@ func (a *destroyAction) revert() {
 	}
 	inv.SetSlot(a.srcSlot, a.oldSrcItem)
 }
+
+type unknownAction struct {
+	mPlayer        atomic.Pointer[player.Player]
+	originalAction string
+}
+
+func newUnknownAction(mPlayer *player.Player, originalAction string) *unknownAction {
+	a := &unknownAction{}
+	a.mPlayer.Store(mPlayer)
+	a.originalAction = originalAction
+	return a
+}
+
+func (a *unknownAction) execute() {}
+
+func (a *unknownAction) revert() {
+	if mPlayer := a.mPlayer.Load(); mPlayer != nil {
+		mPlayer.Log().Debugf("unhandled action %s failed - force syncing inventory", a.originalAction)
+		mPlayer.Inventory().ForceSync()
+	}
+}
+
+func (a *unknownAction) close() {
+	a.mPlayer.Store(nil)
+}
