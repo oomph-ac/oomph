@@ -141,7 +141,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 
 	var (
 		handledBlockBreak             bool
-		isFullServerAuthBlockBreaking = p.ServerConn() == nil || !p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking
+		isFullServerAuthBlockBreaking = p.ServerConn() == nil || p.ServerConn().GameData().PlayerMovementSettings.ServerAuthoritativeBlockBreaking
 	)
 	if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress && isFullServerAuthBlockBreaking {
 		p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
