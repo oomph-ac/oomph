@@ -1,6 +1,8 @@
 package component
 
 import (
+	"fmt"
+
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/oomph-ac/oomph/game"
@@ -181,34 +183,44 @@ func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent)
 	}
 }
 
+func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackRequest) {
+	c.mPlayer.Log().Debugf("received item stack request %d", request.RequestID)
+	tx := newInvRequest(request.RequestID)
+	for _, action := range request.Actions {
+		switch action := action.(type) {
+		case *protocol.TakeStackRequestAction:
+			c.handleTransferRequest(tx, action.Source, action.Destination, int(action.Count))
+		case *protocol.PlaceStackRequestAction:
+			c.handleTransferRequest(tx, action.Source, action.Destination, int(action.Count))
+		case *protocol.SwapStackRequestAction:
+			c.handleSwapRequest(tx, action)
+		case *protocol.DestroyStackRequestAction:
+			c.handleDestroyRequest(tx, action.Source, int(action.Count), false)
+		case *protocol.DropStackRequestAction:
+			c.handleDestroyRequest(tx, action.Source, int(action.Count), true)
+		case *protocol.MineBlockStackRequestAction:
+			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
+		default:
+			c.mPlayer.Log().Debugf("unhandled item stack request action %T", action)
+			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
+		}
+	}
+	if len(tx.actions) > 0 {
+		tx.execute()
+		if c.firstRequest == nil {
+			c.firstRequest = tx
+			c.currentRequest = tx
+		} else {
+			tx.prev = c.currentRequest
+			c.currentRequest.next = tx
+			c.currentRequest = tx
+		}
+	}
+}
+
 func (c *InventoryComponent) HandleItemStackRequest(pk *packet.ItemStackRequest) {
 	for _, request := range pk.Requests {
-		tx := newInvRequest(request.RequestID)
-		for _, action := range request.Actions {
-			switch action := action.(type) {
-			case *protocol.TakeStackRequestAction:
-				c.handleTransferRequest(tx, action.Source, action.Destination, int(action.Count))
-			case *protocol.PlaceStackRequestAction:
-				c.handleTransferRequest(tx, action.Source, action.Destination, int(action.Count))
-			case *protocol.SwapStackRequestAction:
-				c.handleSwapRequest(tx, action)
-			case *protocol.DestroyStackRequestAction:
-				c.handleDestroyRequest(tx, action.Source, int(action.Count), false)
-			case *protocol.DropStackRequestAction:
-				c.handleDestroyRequest(tx, action.Source, int(action.Count), true)
-			}
-		}
-		if len(tx.actions) > 0 {
-			tx.execute()
-			if c.firstRequest == nil {
-				c.firstRequest = tx
-				c.currentRequest = tx
-			} else {
-				tx.prev = c.currentRequest
-				c.currentRequest.next = tx
-				c.currentRequest = tx
-			}
-		}
+		c.HandleSingleRequest(request)
 	}
 }
 
@@ -217,9 +229,9 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 		// This should never happen, but it did :/
 		if c.firstRequest == nil {
 			// Here, we are going to make the server re-send what it thinks should be in the inventory to prevent any type of desync.
-			c.mPlayer.Log().Debug("cannot process further responses when InventoryComponent.firstRequest is nil - force syncing inventory")
-			c.ForceSync()
-			return
+			c.mPlayer.Log().Debugf("cannot process response (%d) when InventoryComponent.firstRequest is nil - force syncing inventory", response.RequestID)
+			//c.ForceSync()
+			continue
 		}
 
 		if response.RequestID != c.firstRequest.id {

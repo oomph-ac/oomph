@@ -14,7 +14,7 @@ require (
 	github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
-	github.com/sandertv/gophertunnel v1.46.0
+	github.com/sandertv/gophertunnel v1.47.2
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.9.3
 )

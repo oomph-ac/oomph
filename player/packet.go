@@ -122,6 +122,9 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 		p.acks.Tick(true)
 
+		if pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
+			p.inventory.HandleSingleRequest(pk.ItemStackRequest)
+		}
 		p.handleBlockActions(pk)
 		p.handleMovement(pk)
 
