@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -11,6 +12,8 @@ type CombatHook func(CombatComponent)
 type CombatComponent interface {
 	// Hook adds a hook to the combat component so it may utilize the results of this combat component.
 	Hook(CombatHook)
+	// UniqueAttacks returns a map of unique attacked entities.
+	UniqueAttacks() map[uint64]*entity.Entity
 
 	// Attack notifies the combat component of an attack.
 	Attack(pk *packet.InventoryTransaction)
