@@ -16,7 +16,6 @@ require (
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
 	github.com/sandertv/gophertunnel v1.47.2
 	github.com/sasha-s/go-deadlock v0.3.1
-	github.com/sirupsen/logrus v1.9.3
 )
 
 require (
