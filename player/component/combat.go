@@ -101,6 +101,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	if input == nil {
 		if oconfig.Combat().FullAuthoritative {
 			c.checkMisprediction = true
+			c.attacked = true
 			c.startAttackPos = c.mPlayer.Movement().LastPos()
 			c.endAttackPos = c.mPlayer.Movement().Pos()
 		}
