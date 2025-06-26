@@ -252,6 +252,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.ItemStackRequest:
 		p.inventory.HandleItemStackRequest(pk)
+	case *packet.LevelSoundEvent:
+		if pk.SoundType == packet.SoundEventAttackNoDamage {
+			p.Combat().Attack(nil)
+		}
 	default:
 		p.log.Debugf("unhandled client packet: %T", pk)
 	}

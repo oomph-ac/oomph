@@ -101,6 +101,8 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	if input == nil {
 		if oconfig.Combat().FullAuthoritative {
 			c.checkMisprediction = true
+			c.startAttackPos = c.mPlayer.Movement().LastPos()
+			c.endAttackPos = c.mPlayer.Movement().Pos()
 		}
 		return
 	}
@@ -356,16 +358,6 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 		eid            uint64
 	)
 
-	c.startAttackPos = c.mPlayer.Movement().LastPos()
-	c.endAttackPos = c.mPlayer.Movement().Pos()
-	if c.mPlayer.Movement().Sneaking() {
-		c.startAttackPos[1] += 1.54
-		c.endAttackPos[1] += 1.54
-	} else {
-		c.startAttackPos[1] += 1.62
-		c.endAttackPos[1] += 1.62
-	}
-
 	// We subtract the rewind tick by 1 here, because the client has already ticked in this instance (which increases)
 	// the client tick by 1, so we have to rewind to the previous tick.
 	rewTick := c.mPlayer.ClientTick - 1
@@ -394,14 +386,20 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 	c.startEntityPos = rewindData.PrevPosition
 	c.endEntityPos = rewindData.Position
 	c.entityBB = targetedEntity.Box(mgl32.Vec3{})
+
+	var newItem protocol.ItemInstance
+	if c.mPlayer.LastEquipmentData != nil {
+		newItem = c.mPlayer.LastEquipmentData.NewItem
+	}
+
 	c.attackInput = &packet.InventoryTransaction{
 		TransactionData: &protocol.UseItemOnEntityTransactionData{
 			TargetEntityRuntimeID: eid,
 			ActionType:            protocol.UseItemOnEntityActionAttack,
 			HotBarSlot:            c.mPlayer.Inventory().HeldSlot(),
-			//HeldItem:              held,
-			Position:        c.endAttackPos,
-			ClickedPosition: mgl32.Vec3{},
+			HeldItem:              newItem,
+			Position:              c.endAttackPos,
+			ClickedPosition:       mgl32.Vec3{},
 		},
 	}
 	return true
