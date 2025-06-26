@@ -1,6 +1,7 @@
 package oomph
 
 import (
+	"log/slog"
 	"os"
 	"sync/atomic"
 	"time"
@@ -13,7 +14,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sirupsen/logrus"
 )
 
 var _ session.Processor = &Processor{}
@@ -32,7 +32,7 @@ func NewProcessor(
 	s *session.Session,
 	registry *session.Registry,
 	listener *minecraft.Listener,
-	log *logrus.Logger,
+	log *slog.Logger,
 ) *Processor {
 	pl := player.New(log, player.MonitoringState{
 		IsReplay:    false,
@@ -109,7 +109,7 @@ func (p *Processor) ProcessEndOfBatch() {
 	if acks := pl.ACKs(); acks != nil {
 		acks.Flush()
 		if err := pl.Conn().Flush(); err != nil {
-			pl.Log().Errorf("error flushing client connection: %v", err)
+			pl.Log().Error("error flushing client connection", "error", err)
 		}
 	}
 }

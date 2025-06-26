@@ -60,7 +60,7 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	pos := df_cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
 	b, ok := df_world.BlockByRuntimeID(pk.NewBlockRuntimeID)
 	if !ok {
-		c.mPlayer.Log().Errorf("unable to find block with runtime ID %v", pk.NewBlockRuntimeID)
+		c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", pk.NewBlockRuntimeID)
 		b = block.Air{}
 	}
 
@@ -203,7 +203,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	for intersectingBlockPos := range game.BlocksBetween(eyePos, interactPos) {
 		iterCount++
 		if iterCount > 49 {
-			c.mPlayer.Log().Debugf("too many iterations for interaction validation (eyePos=%v interactPos=%v uniqueBlocks=%d)", eyePos, interactPos, len(checkedPositions))
+			c.mPlayer.Log().Debug("too many iterations for interaction validation", "eyePos", eyePos, "interactPos", interactPos, "checkedPositions", len(checkedPositions))
 			break
 		}
 
