@@ -1,7 +1,5 @@
 package player
 
-import "github.com/sirupsen/logrus"
-
 const (
 	DebugModeACKs = iota
 	DebugModeRotations
@@ -52,8 +50,6 @@ func NewDebugger(t *Player) *Debugger {
 	for mode := range DebugModeList {
 		d.Modes[mode] = false
 	}
-	t.Log().SetLevel(logrus.DebugLevel)
-
 	return d
 }
 
@@ -84,7 +80,7 @@ func (d *Debugger) Notify(mode int, cond bool, msg string, args ...interface{}) 
 
 	switch d.LoggingType {
 	case LoggingTypeLogFile:
-		d.target.Log().Debugf("["+DebugModeList[mode]+"]: "+msg, args...)
+		d.target.Log().Debug("["+DebugModeList[mode]+"]: "+msg, args...)
 	default:
 		d.target.Message(msg, args...)
 	}

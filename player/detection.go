@@ -98,7 +98,7 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 				float32(m.Violations),
 				extraDatString,
 			))
-			p.Log().Warnf("%s flagged %s (%s) <x%f> %s", p.IdentityDat.DisplayName, d.Type(), d.SubType(), game.Round64(m.Violations, 2), extraDatString)
+			p.Log().Warn(fmt.Sprintf("%s flagged %s (%s) <x%.2f> %s", p.IdentityDat.DisplayName, d.Type(), d.SubType(), game.Round64(m.Violations, 2), extraDatString))
 		} else {
 			p.SendRemoteEvent(oevent.NewMitigationEvent(
 				d.Type(),
@@ -106,7 +106,7 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 				extraDatString,
 				m.Violations,
 			))
-			p.Log().Warnf("%s was mitigated for %s (%s) <%.2f> %s", p.Name(), d.Type(), d.SubType(), m.Violations, extraDatString)
+			p.Log().Warn(fmt.Sprintf("%s was mitigated for %s (%s) <%.2f> %s", p.Name(), d.Type(), d.SubType(), m.Violations, extraDatString))
 		}
 	}
 
@@ -118,7 +118,7 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 			return
 		}
 
-		p.Log().Warnf("%s was removed from the server for usage of third-party modifications (%s-%s).", p.IdentityDat.DisplayName, d.Type(), d.SubType())
+		p.Log().Warn("Player was removed from the server for usage of third-party modifications.", "playerIGN", p.IdentityDat.DisplayName, "detectionType", d.Type(), "detectionSubType", d.SubType())
 		p.Disconnect(message)
 		p.Close()
 	}
