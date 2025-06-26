@@ -40,18 +40,14 @@ import (
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
 )
 
 func main() {
 	logger := slog.Default()
-	oomphLog := logrus.New()
-	oomphLog.SetLevel(logrus.DebugLevel)
-
 	if len(os.Args) < 3 {
-		oomphLog.Fatal("Usage: ./oomph-bin <local_port> <remote_addr> <optional: spectrum_token>")
+		logger.Info("Usage: ./oomph-bin <local_port> <remote_addr> <optional: spectrum_token>")
 		return
 	}
 
@@ -107,7 +103,7 @@ func main() {
 		netTransport = otransport.NewTCP()
 	default:
 		if tr != oconfig.NetworkTransportSpectral {
-			logrus.Warnf("unknown/unsupported transport: %s, defaulting to spectral", tr)
+			logger.Warn("unknown/unsupported transport: %s, defaulting to spectral", tr)
 		}
 		netTransport = transport.NewSpectral(logger)
 	}
@@ -185,15 +181,19 @@ func main() {
 				s.Disconnect("failed to create log file")
 				return
 			}
-			playerLog := logrus.New()
-			playerLog.SetOutput(f)
-			playerLog.SetLevel(logrus.DebugLevel)
-
+			playerLogHandler := slog.NewTextHandler(f, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			})
+			playerLog := slog.New(playerLogHandler)
 			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
+			proc.Player().SetCloser(func() {
+				f.Close()
+			})
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
 				s.Disconnect(err.Error())
+				f.Close()
 				if !errors.Is(err, context.Canceled) {
 					logger.Error("failed to login session", "err", err)
 				}

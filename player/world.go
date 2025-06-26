@@ -163,7 +163,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					p.Popup("<red>Broke block too early!</red>")
-					p.Log().Debugf("broke block too early (progress=%.4f item=%v)", p.blockBreakProgress, p.Inventory().Holding())
+					p.Log().Debug("broke block too early", "progress", p.blockBreakProgress, "heldItem", p.Inventory().Holding())
 					continue
 				}
 
@@ -215,7 +215,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					p.Popup("<red>Broke block too early!</red>")
-					p.Log().Debugf("broke block too early (progress=%.4f item=%v)", p.blockBreakProgress, p.Inventory().Holding())
+					p.Log().Debug("broke block too early", "progress", p.blockBreakProgress, "heldItem", p.Inventory().Holding())
 					continue
 				}
 

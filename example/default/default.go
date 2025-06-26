@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sirupsen/logrus"
 
 	"github.com/go-echarts/statsview"
 	"github.com/go-echarts/statsview/viewer"
@@ -116,13 +116,11 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 		panic(err)
 	}
 
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.TextFormatter{
-		ForceColors:     false,
-		TimestampFormat: "2006-01-02 15:04:05",
-		FullTimestamp:   true,
+	// Create a TextHandler that writes to the file
+	handler := slog.NewTextHandler(f, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
 	})
-	logger.SetOutput(f)
+	logger := slog.New(handler)
 	p := player.New(logger, player.MonitoringState{
 		IsReplay:    false,
 		IsRecording: false,
