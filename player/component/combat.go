@@ -104,6 +104,13 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 			c.attacked = true
 			c.startAttackPos = c.mPlayer.Movement().LastPos()
 			c.endAttackPos = c.mPlayer.Movement().Pos()
+			if c.mPlayer.Movement().Sneaking() {
+				c.startAttackPos[1] += 1.54
+				c.endAttackPos[1] += 1.54
+			} else {
+				c.startAttackPos[1] += 1.62
+				c.endAttackPos[1] += 1.62
+			}
 		}
 		return
 	}

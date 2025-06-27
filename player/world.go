@@ -199,6 +199,11 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
 				p.blockBreakInProgress = true
+
+				// We assume a potential mispredction here because the client while clicking, think it may need to break
+				// a block, but the server may instead think an entity is in the way of that block, constituting
+				// a misprediction.
+				p.combat.Attack(nil)
 			case protocol.PlayerActionAbortBreak:
 				//p.Message("abort break")
 				p.blockBreakProgress = 0.0

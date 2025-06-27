@@ -103,7 +103,7 @@ func main() {
 		netTransport = otransport.NewTCP()
 	default:
 		if tr != oconfig.NetworkTransportSpectral {
-			logger.Warn("unknown/unsupported transport: %s, defaulting to spectral", tr)
+			logger.Warn("unknown/unsupported transport, defaulting to spectral", "transportMode", tr)
 		}
 		netTransport = transport.NewSpectral(logger)
 	}
@@ -114,28 +114,29 @@ func main() {
 		opts,
 		netTransport,
 	)
+	protos := []minecraft.Protocol{
+		v800.Protocol(),
+		v786.Protocol(),
+		v776.Protocol(),
+		v766.Protocol(),
+		v748.Protocol(),
+		v729.Protocol(),
+		v712.Protocol(),
+		v686.Protocol1(),
+		v686.Protocol2(),
+		v671.Protocol(),
+		v662.Protocol(),
+		v649.Protocol(),
+		v630.Protocol(),
+		v622.Protocol(),
+		v618.Protocol(),
+		v594.Protocol(),
+		v589.Protocol(),
+	}
 	if err := proxy.Listen(minecraft.ListenConfig{
-		StatusProvider: statusProvider,
-		FlushRate:      -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
-		AcceptedProtocols: []minecraft.Protocol{
-			v800.Protocol(),
-			v786.Protocol(),
-			v776.Protocol(),
-			v766.Protocol(),
-			v748.Protocol(),
-			v729.Protocol(),
-			v712.Protocol(),
-			v686.Protocol1(),
-			v686.Protocol2(),
-			v671.Protocol(),
-			v662.Protocol(),
-			v649.Protocol(),
-			v630.Protocol(),
-			v622.Protocol(),
-			v618.Protocol(),
-			v594.Protocol(),
-			v589.Protocol(),
-		},
+		StatusProvider:       statusProvider,
+		FlushRate:            -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
+		AcceptedProtocols:    protos,
 		ResourcePacks:        packs,
 		TexturePacksRequired: false,
 
