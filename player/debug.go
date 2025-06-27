@@ -1,5 +1,7 @@
 package player
 
+import "fmt"
+
 const (
 	DebugModeACKs = iota
 	DebugModeRotations
@@ -80,7 +82,7 @@ func (d *Debugger) Notify(mode int, cond bool, msg string, args ...interface{}) 
 
 	switch d.LoggingType {
 	case LoggingTypeLogFile:
-		d.target.Log().Debug("["+DebugModeList[mode]+"]: "+msg, args...)
+		d.target.Log().Debug("[" + DebugModeList[mode] + "]: " + fmt.Sprintf(msg, args...))
 	default:
 		d.target.Message(msg, args...)
 	}
