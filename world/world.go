@@ -1,6 +1,8 @@
 package world
 
 import (
+	"log/slog"
+
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -23,16 +25,20 @@ type World struct {
 	chunks         map[protocol.ChunkPos]ChunkSource
 	exemptedChunks map[protocol.ChunkPos]struct{}
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
+
+	logger **slog.Logger
+
 	deadlock.RWMutex
 }
 
-func New() *World {
+func New(logger **slog.Logger) *World {
 	currentWorldId++
 	return &World{
 		chunks:         make(map[protocol.ChunkPos]ChunkSource),
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
 		id:             currentWorldId,
+		logger:         logger,
 	}
 }
 
@@ -127,6 +133,9 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 		inRange := chunkInRange(radius, chunkPos, pos)
 
 		if exempted && inRange {
+			if w.logger != nil {
+				(*w.logger).Info("removed exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
+			}
 			delete(w.exemptedChunks, chunkPos)
 		} else if !exempted && !inRange {
 			if cached, ok := c.(*CachedChunk); ok {
@@ -134,6 +143,9 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 			}
 			delete(w.chunks, chunkPos)
 			delete(w.blockUpdates, chunkPos)
+			if w.logger != nil {
+				(*w.logger).Info("removed non-exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
+			}
 		}
 	}
 }
