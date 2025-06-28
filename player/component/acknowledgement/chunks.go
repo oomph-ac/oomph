@@ -64,7 +64,7 @@ func (ack *SubChunkUpdate) Run() {
 
 	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)
 	for _, entry := range ack.pk.SubChunkEntries {
-		if entry.Result != protocol.SubChunkResultSuccess {
+		if entry.Result != protocol.SubChunkResultSuccess && entry.Result != protocol.SubChunkResultSuccessAllAir {
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "unhandled subchunk result %d @ %v", entry.Result, ack.pk.Position)
 			continue
 		}
