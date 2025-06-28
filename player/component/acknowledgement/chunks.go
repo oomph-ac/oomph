@@ -64,14 +64,13 @@ func (ack *SubChunkUpdate) Run() {
 
 	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)
 	for _, entry := range ack.pk.SubChunkEntries {
-		if entry.Result != protocol.SubChunkResultSuccess && entry.Result != protocol.SubChunkResultSuccessAllAir {
-			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "unhandled subchunk result %d @ %v", entry.Result, ack.pk.Position)
-			continue
-		}
-
 		chunkPos := protocol.ChunkPos{
 			ack.pk.Position[0] + int32(entry.Offset[0]),
 			ack.pk.Position[2] + int32(entry.Offset[2]),
+		}
+		if entry.Result != protocol.SubChunkResultSuccess {
+			newChunks[chunkPos] = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
+			continue
 		}
 
 		var ch *chunk.Chunk
