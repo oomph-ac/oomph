@@ -99,18 +99,16 @@ func (ack *SubChunkUpdate) Run() {
 		buf.Reset()
 		buf.Write(entry.RawPayload)
 
-		if entry.Result != protocol.SubChunkResultSuccessAllAir {
-			var index byte
-			sub, err := utils.DecodeSubChunk(buf, ch, &index, chunk.NetworkEncoding)
-			if err != nil {
-				//panic(err)
-				ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
-				return
-			}
-
-			ch.Sub()[index] = sub
-			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "decoded subchunk %d at %v", index, chunkPos)
+		var index byte
+		sub, err := utils.DecodeSubChunk(buf, ch, &index, chunk.NetworkEncoding)
+		if err != nil {
+			//panic(err)
+			ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+			return
 		}
+
+		ch.Sub()[index] = sub
+		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "decoded subchunk %d at %v", index, chunkPos)
 
 	}
 
