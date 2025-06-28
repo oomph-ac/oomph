@@ -209,7 +209,7 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 		p.LastServerTick = mState.CurrentTime
 	}
 
-	p.world = world.New()
+	p.world = world.New(&p.log)
 	p.Dbg = NewDebugger(p)
 	return p
 }
