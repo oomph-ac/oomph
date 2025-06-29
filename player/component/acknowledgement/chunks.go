@@ -68,11 +68,6 @@ func (ack *SubChunkUpdate) Run() {
 			ack.pk.Position[0] + int32(entry.Offset[0]),
 			ack.pk.Position[2] + int32(entry.Offset[2]),
 		}
-		if entry.Result != protocol.SubChunkResultSuccess {
-			newChunks[chunkPos] = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
-			continue
-		}
-
 		var ch *chunk.Chunk
 		if new, ok := newChunks[chunkPos]; ok {
 			ch = new
@@ -94,22 +89,27 @@ func (ack *SubChunkUpdate) Run() {
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "new chunk at %v", chunkPos)
 		}
 
-		buf := internal.BufferPool.Get().(*bytes.Buffer)
-		defer internal.BufferPool.Put(buf)
-		buf.Reset()
-		buf.Write(entry.RawPayload)
+		switch entry.Result {
+		case protocol.SubChunkResultSuccess:
+			buf := internal.BufferPool.Get().(*bytes.Buffer)
+			defer internal.BufferPool.Put(buf)
+			buf.Reset()
+			buf.Write(entry.RawPayload)
 
-		var index byte
-		sub, err := utils.DecodeSubChunk(buf, ch, &index, chunk.NetworkEncoding)
-		if err != nil {
-			//panic(err)
-			ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
-			return
+			var index byte
+			sub, err := utils.DecodeSubChunk(buf, ch, &index, chunk.NetworkEncoding)
+			if err != nil {
+				ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+				continue
+			}
+			ch.Sub()[index] = sub
+			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "decoded subchunk %d at %v", index, chunkPos)
+		case protocol.SubChunkResultSuccessAllAir:
+			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all-air chunk at %v", chunkPos)
+		default:
+			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "no subchunk data for %v (result=%d)", chunkPos, entry.Result)
+			continue
 		}
-
-		ch.Sub()[index] = sub
-		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "decoded subchunk %d at %v", index, chunkPos)
-
 	}
 
 	for pos, newChunk := range newChunks {
