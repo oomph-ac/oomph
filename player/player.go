@@ -22,7 +22,6 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/sandertv/gophertunnel/minecraft/text"
-	"github.com/sasha-s/go-deadlock"
 )
 
 const (
@@ -123,7 +122,7 @@ type Player struct {
 	// prevent race conditions, and to maintain accuracy with anti-cheat.
 	// e.g - making sure all acknowledgements are sent in the same batch as the packets they are
 	// being associated with.
-	procMu deadlock.Mutex
+	procMu sync.Mutex
 
 	// Dbg is the debugger of the player. It is used to log debug messages to the player.
 	Dbg *Debugger

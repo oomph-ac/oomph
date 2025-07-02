@@ -15,7 +15,6 @@ require (
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
 	github.com/sandertv/gophertunnel v1.47.2
-	github.com/sasha-s/go-deadlock v0.3.1
 )
 
 require (
@@ -36,7 +35,6 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.23.4 // indirect
-	github.com/petermattis/goid v0.0.0-20240327183114-c42a807a84ba // indirect
 	github.com/quic-go/quic-go v0.50.1 // indirect
 	github.com/rs/cors v1.11.0 // indirect
 	github.com/samber/lo v1.49.1 // indirect
