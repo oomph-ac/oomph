@@ -62,6 +62,13 @@ func (ack *SubChunkUpdate) Run() {
 		return
 	}
 
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	defer func() {
+		buf.Reset()
+		internal.BufferPool.Put(buf)
+	}()
+	var bufUsed bool
+
 	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)
 	for _, entry := range ack.pk.SubChunkEntries {
 		chunkPos := protocol.ChunkPos{
@@ -91,9 +98,10 @@ func (ack *SubChunkUpdate) Run() {
 
 		switch entry.Result {
 		case protocol.SubChunkResultSuccess:
-			buf := internal.BufferPool.Get().(*bytes.Buffer)
-			defer internal.BufferPool.Put(buf)
-			buf.Reset()
+			if bufUsed {
+				buf.Reset()
+			}
+			bufUsed = true
 			buf.Write(entry.RawPayload)
 
 			var index byte
