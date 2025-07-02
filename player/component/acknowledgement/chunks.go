@@ -40,7 +40,9 @@ func (ack *ChunkUpdate) Run() {
 	}
 	c, err := chunk.NetworkDecode(oworld.AirRuntimeID, ack.pk.RawPayload, int(ack.pk.SubChunkCount), world.Overworld.Range())
 	if err != nil {
-		ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+		ack.mPlayer.World().AddChunk(ack.pk.Position, chunk.New(oworld.AirRuntimeID, world.Overworld.Range())) // assume empty chunk if decoding fails
+		ack.mPlayer.Log().Error("failed to decode chunk", "error", err, "position", ack.pk.Position)
+		//ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
 		return
 	}
 	ack.mPlayer.World().AddChunk(ack.pk.Position, c)
@@ -61,6 +63,13 @@ func (ack *SubChunkUpdate) Run() {
 		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
 		return
 	}
+
+	buf := internal.BufferPool.Get().(*bytes.Buffer)
+	defer func() {
+		buf.Reset()
+		internal.BufferPool.Put(buf)
+	}()
+	var bufUsed bool
 
 	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)
 	for _, entry := range ack.pk.SubChunkEntries {
@@ -91,9 +100,10 @@ func (ack *SubChunkUpdate) Run() {
 
 		switch entry.Result {
 		case protocol.SubChunkResultSuccess:
-			buf := internal.BufferPool.Get().(*bytes.Buffer)
-			defer internal.BufferPool.Put(buf)
-			buf.Reset()
+			if bufUsed {
+				buf.Reset()
+			}
+			bufUsed = true
 			buf.Write(entry.RawPayload)
 
 			var index byte
