@@ -40,9 +40,7 @@ func (ack *ChunkUpdate) Run() {
 	}
 	c, err := chunk.NetworkDecode(oworld.AirRuntimeID, ack.pk.RawPayload, int(ack.pk.SubChunkCount), world.Overworld.Range())
 	if err != nil {
-		ack.mPlayer.World().AddChunk(ack.pk.Position, chunk.New(oworld.AirRuntimeID, world.Overworld.Range())) // assume empty chunk if decoding fails
-		ack.mPlayer.Log().Error("failed to decode chunk", "error", err, "position", ack.pk.Position)
-		//ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+		ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
 		return
 	}
 	ack.mPlayer.World().AddChunk(ack.pk.Position, c)
