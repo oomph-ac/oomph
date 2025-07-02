@@ -9,7 +9,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sasha-s/go-deadlock"
 
 	_ "unsafe"
 
@@ -27,8 +26,6 @@ type World struct {
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
 
 	logger **slog.Logger
-
-	deadlock.RWMutex
 }
 
 func New(logger **slog.Logger) *World {
@@ -44,9 +41,6 @@ func New(logger **slog.Logger) *World {
 
 // AddChunk adds a chunk to the world.
 func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
-	w.Lock()
-	defer w.Unlock()
-
 	if old, ok := w.chunks[chunkPos]; ok {
 		if cached, ok := old.(*CachedChunk); ok {
 			cached.Unsubscribe()
@@ -61,11 +55,7 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
 // not locked here because it is assumed that the caller has already locked
 // the mutex before calling this function.
 func (w *World) GetChunk(pos protocol.ChunkPos) ChunkSource {
-	w.RLock()
-	c := w.chunks[pos]
-	w.RUnlock()
-
-	return c
+	return w.chunks[pos]
 }
 
 // Block returns the block at the position passed.
@@ -76,17 +66,13 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 	}
 
 	chunkPos := protocol.ChunkPos{int32(blockPos[0]) >> 4, int32(blockPos[2]) >> 4}
-	w.RLock()
 	blockUpdates, found := w.blockUpdates[chunkPos]
-	w.RUnlock()
 	if found {
 		if b, ok := blockUpdates[df_cube.Pos(blockPos)]; ok {
 			return b
 		}
 	} else {
-		w.Lock()
 		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
-		w.Unlock()
 	}
 
 	c := w.GetChunk(chunkPos)
@@ -108,10 +94,6 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 		return
 	}
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
-
-	w.Lock()
-	defer w.Unlock()
-
 	if w.blockUpdates[chunkPos] == nil {
 		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
 	}
@@ -120,9 +102,6 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 
 // CleanChunks cleans up the chunks in respect to the given chunk radius and chunk position.
 func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
-	w.Lock()
-	defer w.Unlock()
-
 	if pos == w.lastCleanPos {
 		return
 	}
@@ -152,9 +131,6 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 
 // PurgeChunks removes all chunks from the world.
 func (w *World) PurgeChunks() {
-	w.Lock()
-	defer w.Unlock()
-
 	for chunkPos, c := range w.chunks {
 		if cached, ok := c.(*CachedChunk); ok {
 			cached.Unsubscribe()
