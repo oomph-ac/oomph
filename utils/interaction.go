@@ -5,6 +5,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/model"
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/item/enchantment"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl64"
 	oworld "github.com/oomph-ac/oomph/world"
@@ -14,6 +15,71 @@ type blockPlacer interface {
 	Rotation() cube.Rotation
 	HeldItems() (mainHand, offHand item.Stack)
 	block.Placer
+}
+
+func ActivateBlock(
+	placer blockPlacer,
+	b block.Activatable,
+	face cube.Face,
+	blockPos cube.Pos,
+	clickPos mgl64.Vec3,
+	src *oworld.World,
+) {
+	if placer == nil {
+		return
+	}
+
+	held, _ := placer.HeldItems()
+	switch b := b.(type) {
+	case block.Anvil, block.Barrel, block.Beacon, block.BlastFurnace, block.BrewingStand,
+		block.Chest, block.CraftingTable, block.EnchantingTable, block.EnderChest,
+		block.Furnace, block.Grindstone, block.Hopper, block.Loom, block.SmithingTable,
+		block.Smoker, block.Stonecutter:
+		// We don't need to do anything here since the server will send the appropriate windows.
+	case block.Cake:
+		b.Bites++
+		if b.Bites > 6 {
+			src.SetBlock(blockPos, block.Air{}, nil)
+			return
+		}
+		src.SetBlock(blockPos, b, nil)
+	case block.Campfire, block.DecoratedPot, block.DragonEgg, block.ItemFrame, block.Jukebox, block.Lectern,
+		block.Note, block.Sign:
+		// Remote server should implement this logic - since there is no change to meaningful change
+		// to the bounding box - we don't need to do anything here.
+	case block.Composter:
+		if b.Level >= 7 {
+			if b.Level == 8 {
+				b.Level = 0
+				src.SetBlock(blockPos, block.Air{}, nil)
+				return
+			}
+			return
+		}
+		// TODO: Impl random chance of composting??
+		if _, ok := held.Item().(item.Compostable); ok {
+			b.Level++
+		}
+	case block.CopperDoor:
+		b.Open = !b.Open
+		src.SetBlock(blockPos, b, nil)
+	case block.CopperTrapdoor:
+		b.Open = !b.Open
+		src.SetBlock(blockPos, b, nil)
+	case block.TNT:
+		if _, ok := held.Enchantment(enchantment.FireAspect); ok || ItemName(held.Item()) == "minecraft:flint_and_steel" {
+			src.SetBlock(blockPos, block.Air{}, nil)
+		}
+	case block.WoodDoor:
+		b.Open = !b.Open
+		src.SetBlock(blockPos, b, nil)
+	case block.WoodFenceGate:
+		b.Open = !b.Open
+		src.SetBlock(blockPos, b, nil)
+	case block.WoodTrapdoor:
+		b.Open = !b.Open
+		src.SetBlock(blockPos, b, nil)
+	}
 }
 
 func UseOnBlock(

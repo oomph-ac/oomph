@@ -233,7 +233,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		/* if !p.worldUpdater.ValidateInteraction(pk) {
 			ctx.Cancel()
 		} */
-		if !p.worldUpdater.AttemptBlockPlacement(pk) {
+		if !p.worldUpdater.AttemptItemInteractionWithBlock(pk) {
 			ctx.Cancel()
 		}
 	case *packet.MobEquipment:

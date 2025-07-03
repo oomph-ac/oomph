@@ -70,9 +70,9 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
 }
 
-// AttemptBlockPlacement attempts a block placement request from the client. It returns false if the simulation is unable
+// AttemptItemInteractionWithBlock attempts a block placement request from the client. It returns false if the simulation is unable
 // to place a block at the given position.
-func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransaction) bool {
+func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.InventoryTransaction) bool {
 	dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
 	if !ok {
 		return true
@@ -90,6 +90,7 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 		return false
 	}
 
+	holding := c.mPlayer.Inventory().Holding()
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
 	dfReplacePos := df_cube.Pos(replacePos)
 	replacingBlock := c.mPlayer.World().Block(dfReplacePos)
@@ -97,13 +98,13 @@ func (c *WorldUpdaterComponent) AttemptBlockPlacement(pk *packet.InventoryTransa
 	// Ignore the potential block placement if the player clicked air.
 	if _, isAir := replacingBlock.(block.Air); isAir {
 		return true
-	} else if _, ok := replacingBlock.(block.Activatable); ok && !c.mPlayer.Movement().PressingSneak() {
+	} else if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
+		utils.ActivateBlock(c.mPlayer, act, df_cube.Face(dat.BlockFace), df_cube.Pos(replacePos), game.Vec32To64(dat.ClickedPosition), c.mPlayer.World())
 		return true
 	}
 
-	heldItem := c.mPlayer.Inventory().Holding().Item()
+	heldItem := holding.Item()
 	c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "item in hand: %T", heldItem)
-
 	switch heldItem := heldItem.(type) {
 	case *block.Air:
 		// This only happens when Dragonfly is unsure of what the item is (unregistered), so we use the client-authoritative block in hand.
