@@ -159,7 +159,7 @@ func (c *InventoryComponent) HandleInventorySlot(pk *packet.InventorySlot) {
 	}
 
 	if pk.NewItem.Stack.NetworkID == 0 {
-		inv.SetSlot(int(pk.Slot), item.NewStack(block.Air{}, 0))
+		inv.SetSlot(int(pk.Slot), item.NewStack(&block.Air{}, 0))
 	} else {
 		iStack := utils.StackToItem(pk.NewItem.Stack)
 		inv.SetSlot(int(pk.Slot), utils.ReadItem(pk.NewItem.Stack.NBTData, &iStack))
