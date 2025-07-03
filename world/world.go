@@ -7,6 +7,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
@@ -17,11 +18,19 @@ import (
 
 var currentWorldId uint64
 
+type ChunkInfo struct {
+	Cached bool
+	Hash   uint64
+	Chunk  *chunk.Chunk
+}
+
 type World struct {
 	id           uint64
 	lastCleanPos protocol.ChunkPos
 
-	chunks         map[protocol.ChunkPos]ChunkSource
+	chunks    map[protocol.ChunkPos]ChunkInfo
+	subChunks map[protocol.ChunkPos][]uint64
+
 	exemptedChunks map[protocol.ChunkPos]struct{}
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
 
@@ -31,7 +40,9 @@ type World struct {
 func New(logger **slog.Logger) *World {
 	currentWorldId++
 	return &World{
-		chunks:         make(map[protocol.ChunkPos]ChunkSource),
+		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
+		subChunks: make(map[protocol.ChunkPos][]uint64),
+
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
 		id:             currentWorldId,
@@ -40,22 +51,30 @@ func New(logger **slog.Logger) *World {
 }
 
 // AddChunk adds a chunk to the world.
-func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkSource) {
-	if old, ok := w.chunks[chunkPos]; ok {
-		if cached, ok := old.(*CachedChunk); ok {
-			cached.Unsubscribe()
-		}
-		delete(w.blockUpdates, chunkPos)
+func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkInfo) {
+	if oldChunkInfo, ok := w.chunks[chunkPos]; ok {
+		w.removeChunk(oldChunkInfo, chunkPos)
 	}
 	w.chunks[chunkPos] = c
 	w.exemptedChunks[chunkPos] = struct{}{}
 }
 
+// AddSubChunk adds a subchunk to the world.
+func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash uint64) {
+	if _, ok := w.subChunks[chunkPos]; !ok {
+		w.subChunks[chunkPos] = make([]uint64, 0, 16)
+	}
+	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], hash)
+}
+
 // GetChunk returns a cached chunk at the position passed. The mutex is
 // not locked here because it is assumed that the caller has already locked
 // the mutex before calling this function.
-func (w *World) GetChunk(pos protocol.ChunkPos) ChunkSource {
-	return w.chunks[pos]
+func (w *World) GetChunk(pos protocol.ChunkPos) *chunk.Chunk {
+	if info, ok := w.chunks[pos]; ok {
+		return info.Chunk
+	}
+	return nil
 }
 
 // Block returns the block at the position passed.
@@ -117,11 +136,7 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 			}
 			delete(w.exemptedChunks, chunkPos)
 		} else if !exempted && !inRange {
-			if cached, ok := c.(*CachedChunk); ok {
-				cached.Unsubscribe()
-			}
-			delete(w.chunks, chunkPos)
-			delete(w.blockUpdates, chunkPos)
+			w.removeChunk(c, chunkPos)
 			if w.logger != nil {
 				(*w.logger).Info("removed non-exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
 			}
@@ -131,12 +146,21 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 
 // PurgeChunks removes all chunks from the world.
 func (w *World) PurgeChunks() {
-	for chunkPos, c := range w.chunks {
-		if cached, ok := c.(*CachedChunk); ok {
-			cached.Unsubscribe()
-		}
-		delete(w.chunks, chunkPos)
+	for chunkPos, cInfo := range w.chunks {
+		w.removeChunk(cInfo, chunkPos)
 	}
+}
+
+func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
+	unsubC(info.Hash)
+	if subChunks, ok := w.subChunks[chunkPos]; ok {
+		for _, subChunkHash := range subChunks {
+			unsubSC(subChunkHash)
+		}
+	}
+	delete(w.subChunks, chunkPos)
+	delete(w.chunks, chunkPos)
+	delete(w.blockUpdates, chunkPos)
 }
 
 // chunkInRange returns true if the chunk position is within the given radius of the chunk position.

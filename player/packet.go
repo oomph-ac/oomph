@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
@@ -26,6 +27,27 @@ var ClientDecode = []uint32{
 	packet.IDItemStackRequest,
 	packet.IDLevelSoundEvent,
 	packet.IDClientMovementPredictionSync,
+}
+
+var ServerDecode = []uint32{
+	packet.IDAddActor,
+	packet.IDAddPlayer,
+	packet.IDChunkRadiusUpdated,
+	packet.IDInventorySlot,
+	packet.IDInventoryContent,
+	packet.IDItemStackResponse,
+	packet.IDLevelChunk,
+	packet.IDMobEffect,
+	packet.IDMoveActorAbsolute,
+	packet.IDMovePlayer,
+	packet.IDRemoveActor,
+	packet.IDSetActorData,
+	packet.IDSetActorMotion,
+	packet.IDSetPlayerGameType,
+	packet.IDSubChunk,
+	packet.IDUpdateAbilities,
+	packet.IDUpdateAttributes,
+	packet.IDUpdateBlock,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
@@ -364,5 +386,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
+	default:
+		p.log.Debug("unhandled server packet", "packetID", pk.ID(), "type", fmt.Sprintf("%T", pk))
 	}
 }

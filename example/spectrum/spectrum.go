@@ -10,33 +10,16 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/akmalfairuz/legacy-version/legacyver"
 	"github.com/cooldogedev/spectrum"
 	"github.com/cooldogedev/spectrum/server"
 	"github.com/cooldogedev/spectrum/session"
-	"github.com/cooldogedev/spectrum/transport"
 	"github.com/cooldogedev/spectrum/util"
 	"github.com/go-echarts/statsview"
 	"github.com/go-echarts/statsview/viewer"
-	v589 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v589"
-	v594 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v594"
-	v618 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v618"
-	v622 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v622"
-	v630 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v630"
-	v649 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v649"
-	v662 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v662"
-	v671 "github.com/oomph-ac/multiversion/multiversion/protocols/1_20/v671"
-	v686 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v686"
-	v712 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v712"
-	v729 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v729"
-	v748 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v748"
-	v766 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v766"
-	v776 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v776"
-	v786 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v786"
-	v800 "github.com/oomph-ac/multiversion/multiversion/protocols/1_21/v800"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
-	otransport "github.com/oomph-ac/oomph/transport"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -70,16 +53,16 @@ func main() {
 	opts.SyncProtocol = false
 	opts.LatencyInterval = int64(time.Second)
 
-	if len(os.Args) >= 4 {
+	/* if len(os.Args) >= 4 {
 		opts.Token = os.Args[3]
-	}
+	} */
 	statusProvider, err := minecraft.NewForeignStatusProvider(os.Args[2])
 	if err != nil {
 		panic(err)
 	}
 
 	oconfig.Cfg = oconfig.DefaultConfig
-	oconfig.Cfg.Network.Transport = oconfig.NetworkTransportTCP
+	oconfig.Cfg.Network.Transport = oconfig.NetworkTransportSpectral
 	oconfig.Cfg.UseDebugCommands = true
 
 	oconfig.Cfg.Movement.AcceptClientPosition = false
@@ -97,7 +80,7 @@ func main() {
 		panic(err)
 	}
 
-	var netTransport transport.Transport
+	/* var netTransport transport.Transport
 	switch tr := oconfig.Network().Transport; tr {
 	case oconfig.NetworkTransportTCP:
 		netTransport = otransport.NewTCP()
@@ -106,33 +89,15 @@ func main() {
 			logger.Warn("unknown/unsupported transport, defaulting to spectral", "transportMode", tr)
 		}
 		netTransport = transport.NewSpectral(logger)
-	}
+	} */
 
 	proxy := spectrum.NewSpectrum(
 		server.NewStaticDiscovery(os.Args[2], os.Args[2]),
 		logger,
 		opts,
-		netTransport,
+		nil,
 	)
-	protos := []minecraft.Protocol{
-		v800.Protocol(),
-		v786.Protocol(),
-		v776.Protocol(),
-		v766.Protocol(),
-		v748.Protocol(),
-		v729.Protocol(),
-		v712.Protocol(),
-		v686.Protocol1(),
-		v686.Protocol2(),
-		v671.Protocol(),
-		v662.Protocol(),
-		v649.Protocol(),
-		v630.Protocol(),
-		v622.Protocol(),
-		v618.Protocol(),
-		v594.Protocol(),
-		v589.Protocol(),
-	}
+	protos := legacyver.All(false)
 	if err := proxy.Listen(minecraft.ListenConfig{
 		StatusProvider:       statusProvider,
 		FlushRate:            -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
@@ -140,8 +105,8 @@ func main() {
 		ResourcePacks:        packs,
 		TexturePacksRequired: false,
 
-		AllowInvalidPackets: true,
-		AllowUnknownPackets: true,
+		AllowInvalidPackets: false,
+		AllowUnknownPackets: false,
 
 		/* PacketFunc: func(header packet.Header, payload []byte, src, dst net.Addr) {
 			var pk packet.Packet
