@@ -15,10 +15,7 @@ import (
 	_ "github.com/oomph-ac/oomph/world/block"
 )
 
-var currentWorldId uint64
-
 type World struct {
-	id           uint64
 	lastCleanPos protocol.ChunkPos
 
 	chunks         map[protocol.ChunkPos]ChunkSource
@@ -29,12 +26,10 @@ type World struct {
 }
 
 func New(logger **slog.Logger) *World {
-	currentWorldId++
 	return &World{
 		chunks:         make(map[protocol.ChunkPos]ChunkSource),
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
-		id:             currentWorldId,
 		logger:         logger,
 	}
 }
