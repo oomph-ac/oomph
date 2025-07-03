@@ -29,7 +29,8 @@ func (ack *ChunkUpdate) Run() {
 		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
 		return
 	}
-	ack.mPlayer.World().AddChunk(ack.pk.Position, oworld.CacheChunk(ack.pk))
+	cInfo := oworld.CacheChunk(ack.pk)
+	ack.mPlayer.World().AddChunk(ack.pk.Position, cInfo)
 }
 
 // SubChunkUpdate is an acknowledgment that runs when a player receives a SubChunk packet.
