@@ -98,12 +98,14 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 
 	// 1904044383 is the title ID of the preview client in MC:BE. According to @GameParrot, the preview client
 	// can be found on Windows, iOS, and Xbox.
-	if titleID == "1904044383" && !slices.Contains(previewEditionClients, deviceOS) {
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("titleID", titleID)
-		data.Set("givenOS", utils.Device(deviceOS))
-		data.Set("expectedOS", "Windows/iOS/Xbox")
-		d.mPlayer.FailDetection(d, data)
+	if titleID == "1904044383" {
+		if !slices.Contains(previewEditionClients, deviceOS) {
+			data := orderedmap.NewOrderedMap[string, any]()
+			data.Set("titleID", titleID)
+			data.Set("givenOS", utils.Device(deviceOS))
+			data.Set("expectedOS", "Windows/iOS/Xbox")
+			d.mPlayer.FailDetection(d, data)
+		}
 		return
 	}
 
