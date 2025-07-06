@@ -35,7 +35,7 @@ type InventoryComponent struct {
 }
 
 func NewInventoryComponent(p *player.Player) *InventoryComponent {
-	return &InventoryComponent{
+	c := &InventoryComponent{
 		mPlayer: p,
 
 		pInventory:   player.NewInventory(inventorySizePlayer),
@@ -43,6 +43,9 @@ func NewInventoryComponent(p *player.Player) *InventoryComponent {
 		pOffhand:     player.NewInventory(inventorySizeOffhand),
 		pUiInventory: player.NewInventory(inventorySizeUI),
 	}
+	c.pOffhand.SetSpecialSlot(1, 0)
+
+	return c
 }
 
 func (c *InventoryComponent) Helmet() item.Stack {

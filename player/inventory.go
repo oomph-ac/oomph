@@ -36,6 +36,8 @@ type Inventory struct {
 	items        []item.Stack
 	unknownItems map[int]struct{}
 	size         uint32
+
+	specialSlots map[int]int
 }
 
 func NewInventory(size uint32) *Inventory {
@@ -43,10 +45,18 @@ func NewInventory(size uint32) *Inventory {
 		items:        make([]item.Stack, size),
 		unknownItems: make(map[int]struct{}),
 		size:         size,
+		specialSlots: make(map[int]int, 1),
 	}
 }
 
+func (i *Inventory) SetSpecialSlot(slot int, specialSlot int) {
+	i.specialSlots[slot] = specialSlot
+}
+
 func (i *Inventory) Slot(slot int) item.Stack {
+	if specialSlot, ok := i.specialSlots[slot]; ok {
+		slot = specialSlot
+	}
 	if slot < 0 || slot >= int(i.size) {
 		panic(oerror.New("slot %d is invalid for inventory (expecting 0-%d)", slot, i.size-1))
 	}
@@ -54,6 +64,9 @@ func (i *Inventory) Slot(slot int) item.Stack {
 }
 
 func (i *Inventory) SetSlot(slot int, it item.Stack) {
+	if specialSlot, ok := i.specialSlots[slot]; ok {
+		slot = specialSlot
+	}
 	if slot < 0 || slot >= int(i.size) {
 		panic(oerror.New("slot %d is invalid for inventory (expecting 0-%d)", slot, i.size-1))
 	}
