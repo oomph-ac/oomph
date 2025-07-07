@@ -70,7 +70,7 @@ func main() {
 
 	oconfig.Cfg.Movement.AcceptClientVelocity = false
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.003
-	oconfig.Cfg.Movement.CorrectionThreshold = 0.03
+	oconfig.Cfg.Movement.CorrectionThreshold = 0.003
 
 	oconfig.Cfg.Combat.FullAuthoritative = true
 	oconfig.Cfg.Combat.MaxRewind = 6
