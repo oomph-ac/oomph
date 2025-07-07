@@ -50,7 +50,7 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 
 	// Check if this LevelChunk packet is compatiable with oomph's handling.
 	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
-		c.mPlayer.Log().Debug("cannot debug chunk due to subchunk request mode unsupported", "subChunkCount", pk.SubChunkCount)
+		//c.mPlayer.Log().Debug("cannot debug chunk due to subchunk request mode unsupported", "subChunkCount", pk.SubChunkCount)
 		return
 	}
 	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
@@ -63,6 +63,11 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	if !ok {
 		c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", pk.NewBlockRuntimeID)
 		b = block.Air{}
+	}
+
+	if pk.Layer != 0 {
+		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", utils.BlockName(b), "pos", pos)
+		return
 	}
 
 	// TODO: Add a block policy to allow servers to determine whether block updates should be lag-compensated or if movement should

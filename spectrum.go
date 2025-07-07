@@ -97,7 +97,7 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 	}
 }
 
-func (p *Processor) ProcessEndOfBatch() {
+func (p *Processor) ProcessFlush(ctx *session.Context) {
 	pl := p.pl.Load()
 	if pl == nil {
 		return
@@ -105,6 +105,10 @@ func (p *Processor) ProcessEndOfBatch() {
 
 	pl.PauseProcessing()
 	defer pl.ResumeProcessing()
+
+	// We want Oomph to flush the connection whilst processing is stopped to prevent it from handling other packets before the connection
+	// is actually flushed.
+	ctx.Cancel()
 
 	if acks := pl.ACKs(); acks != nil {
 		acks.Flush()
@@ -135,7 +139,7 @@ func (p *Processor) ProcessTransferFailure(_ *session.Context, origin *string, t
 	}
 }
 
-func (p *Processor) ProcessDisconnection(_ *session.Context) {
+func (p *Processor) ProcessDisconnection(_ *session.Context, _ *string) {
 	if pl := p.pl.Load(); pl != nil {
 		_ = pl.Close()
 		p.pl.Store(nil)
