@@ -62,7 +62,7 @@ func main() {
 	}
 
 	oconfig.Cfg = oconfig.DefaultConfig
-	oconfig.Cfg.Network.Transport = oconfig.NetworkTransportSpectral
+	//oconfig.Cfg.Network.Transport = oconfig.NetworkTransportSpectral
 	oconfig.Cfg.UseDebugCommands = true
 
 	oconfig.Cfg.Movement.AcceptClientPosition = false
