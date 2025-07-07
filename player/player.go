@@ -95,6 +95,8 @@ type Player struct {
 	// LastEquipmentData stores the last MobEquipment packet sent by the client to properly
 	// make an attack packet when Oomph's full authoritative combat detects a misprediction.
 	LastEquipmentData *packet.MobEquipment
+	// LastActorMetadata is the last actor metadata packet sent by the client
+	LastSetActorData *packet.SetActorData
 
 	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
 	blockBreakProgress float32

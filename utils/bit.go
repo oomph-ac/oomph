@@ -15,11 +15,11 @@ func HasFlag(flags uint64, flag uint64) bool {
 	return flags&flag > 0
 }
 
-func AddFlag(flags uint64, flag uint64) uint64 {
+func AddFlag[T uint64 | int64](flags T, flag T) T {
 	return flags | flag
 }
 
-func RemoveFlag(flags uint64, flag uint64) uint64 {
+func RemoveFlag[T uint64 | int64](flags T, flag T) T {
 	return flags &^ flag
 }
 

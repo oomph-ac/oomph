@@ -3,9 +3,9 @@ package component
 import (
 	"fmt"
 
-	"github.com/chewxy/math32"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
@@ -695,11 +695,23 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	var needsSpeedAdjusted bool
 	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ start/stop state race condition")
-		mc.sprinting = false
-
 		needsSpeedAdjusted = isNewVersionPlayer
-		mc.airSpeed = 0.02
-		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+		if !mc.serverSprintApplied {
+			if mc.serverSprint {
+				mc.sprinting = true
+				mc.airSpeed = 0.026
+				mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.026")
+			} else {
+				mc.sprinting = false
+				mc.airSpeed = 0.02
+				mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.02")
+			}
+		} else {
+			mc.sprinting = false
+			mc.airSpeed = 0.02
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+		}
+		//mc.mPlayer.Message("%d %v %v", mc.mPlayer.SimulationFrame, mc.serverSprintApplied, mc.serverSprint)
 	} else if startFlag /*  && !mc.sprinting && hasForwardKeyPressed*/ {
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ starts sprint")
 		mc.sprinting = true
@@ -714,25 +726,9 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		needsSpeedAdjusted = isNewVersionPlayer && !mc.serverUpdatedSpeed
 		mc.airSpeed = 0.02
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
-	} else if clientSprintFlag := pk.InputData.Load(packet.InputFlagSprinting); !stopFlag && !startFlag &&
-		!mc.serverSprintApplied && mc.sprinting != mc.serverSprint && clientSprintFlag == mc.serverSprint &&
-		math32.Abs(pk.MoveVector[1]) >= 0.707 {
-		mc.sprinting = mc.serverSprint
-		mc.serverSprintApplied = true
-		mc.airSpeed = 0.02
-		if mc.sprinting {
-			mc.airSpeed = 0.026
-		}
-		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "(noFlag) air speed adjusted to %f", mc.airSpeed)
-	} else if math32.Abs(pk.MoveVector[1]) < 0.707 && mc.sprinting {
-		mc.airSpeed = 0.02
-		mc.sprinting = false
-		needsSpeedAdjusted = isNewVersionPlayer && !mc.serverUpdatedSpeed
-		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "forced stop sprint due to insufficient move vector %v", pk.MoveVector)
-	} else if !mc.serverSprintApplied {
-		mc.serverSprintApplied = true
-		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint not applied on current frame")
 	}
+	mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, !mc.serverSprintApplied, "server sprint not applied on current frame")
+	mc.serverSprintApplied = true
 
 	if needsSpeedAdjusted {
 		mc.serverUpdatedSpeed = false
@@ -849,12 +845,6 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 			mc.mPlayer.ACKs().Add(acknowledgement.NewTeleportPlayerACK(mc.mPlayer, tpPos, pk.OnGround, pk.Mode == packet.MoveModeNormal))
 		}
 	case *packet.SetActorData:
-		/* if v, ok := pk.EntityMetadata[entity.DataKeyFlags]; ok {
-			flags := v.(int64)
-			flags = utils.RemoveDataFlag(flags, entity.DataFlagSprinting)
-			flags = utils.RemoveDataFlag(flags, entity.DataFlagSneaking)
-			pk.EntityMetadata[entity.DataKeyFlags] = int64(flags)
-		} */
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateActorData(mc.mPlayer, pk.EntityMetadata))
 	case *packet.SetActorMotion:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity))
@@ -908,10 +898,6 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 		return
 	}
 
-	// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
-	// (the ones they are colliding with).
-	mc.mPlayer.SyncWorld()
-
 	mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "correcting movement for simulation frame %d", mc.mPlayer.SimulationFrame)
 	if mc.mPlayer.Dbg.Enabled(player.DebugModeMovementSim) {
 		mc.mPlayer.Message("correcting movement for simulation frame %d", mc.mPlayer.SimulationFrame)
@@ -922,6 +908,33 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 	mc.mPlayer.ACKs().Add(acknowledgement.NewMovementCorrectionACK(mc.mPlayer))
 
 	if !mc.mPlayer.PendingCorrectionACK {
+		// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
+		// (the ones they are colliding with).
+		mc.mPlayer.SyncWorld()
+		// Make sure all of the player's actor data is up-to-date with Oomph's prediction.
+		actorData := mc.mPlayer.LastSetActorData
+		actorData.Tick = mc.mPlayer.SimulationFrame
+		if f, ok := actorData.EntityMetadata[entity.DataKeyFlags]; ok {
+			flags := f.(int64)
+			if mc.sprinting {
+				flags = utils.AddFlag(flags, entity.DataFlagSprinting)
+			} else {
+				flags = utils.RemoveFlag(flags, entity.DataFlagSprinting)
+			}
+			if mc.sneaking {
+				flags = utils.AddFlag(flags, entity.DataFlagSneaking)
+			} else {
+				flags = utils.RemoveFlag(flags, entity.DataFlagSneaking)
+			}
+			if mc.immobile {
+				flags = utils.AddFlag(flags, entity.DataFlagImmobile)
+			} else {
+				flags = utils.RemoveFlag(flags, entity.DataFlagImmobile)
+			}
+			actorData.EntityMetadata[entity.DataKeyFlags] = flags
+		}
+		mc.mPlayer.SendPacketToClient(actorData)
+		// Send the actual movement correction to the client.
 		mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 			PredictionType: packet.PredictionTypePlayer,
 			Position:       mc.Pos().Add(mgl32.Vec3{0, 1.621}),

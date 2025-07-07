@@ -360,6 +360,8 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 				e.Width, e.Height, e.Scale = calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
 			}
 		} else {
+			copyPk := *pk
+			p.LastSetActorData = &copyPk
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.SetActorMotion:
