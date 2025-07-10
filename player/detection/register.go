@@ -20,5 +20,5 @@ func Register(p *player.Player) {
 	//p.RegisterDetection(New_NukerA(p))
 
 	// killaura detections
-	//p.RegisterDetection(New_KillauraA(p))
+	p.RegisterDetection(New_KillauraA(p))
 }
