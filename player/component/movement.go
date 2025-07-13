@@ -119,6 +119,10 @@ type AuthoritativeMovementComponent struct {
 	immobile bool
 	noClip   bool
 
+	fluidHeight float32
+	swimming    bool
+	inWater     bool
+
 	gliding         bool
 	glideBoostTicks int64
 
@@ -334,6 +338,36 @@ func (mc *AuthoritativeMovementComponent) PressingSneak() bool {
 // SetPressingSneak sets if the movement component is holding down the key bound o the sneak action.
 func (mc *AuthoritativeMovementComponent) SetPressingSneak(pressing bool) {
 	mc.pressingSneak = pressing
+}
+
+// Swimming returns true if the movement component is currently swimming.
+func (mc *AuthoritativeMovementComponent) Swimming() bool {
+	return mc.swimming
+}
+
+// SetSwimming sets whether the movement component is swimming.
+func (mc *AuthoritativeMovementComponent) SetSwimming(swimming bool) {
+	mc.swimming = swimming
+}
+
+// FluidHeight returns the height of the fluid the movement component is in.
+func (mc *AuthoritativeMovementComponent) FluidHeight() float32 {
+	return mc.fluidHeight
+}
+
+// SetFluidHeight sets the height of the fluid the movement component is in.
+func (mc *AuthoritativeMovementComponent) SetFluidHeight(height float32) {
+	mc.fluidHeight = height
+}
+
+// InWater returns true if the movement component is currently in water.
+func (mc *AuthoritativeMovementComponent) InWater() bool {
+	return mc.inWater
+}
+
+// SetInWater sets whether the movement component is in water.
+func (mc *AuthoritativeMovementComponent) SetInWater(inWater bool) {
+	mc.inWater = inWater
 }
 
 // PenetratedLastFrame returns true if the movement component had penetrated through a block in

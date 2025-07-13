@@ -92,6 +92,21 @@ type MovementComponent interface {
 	// SetPressingSneak sets if the movement component is holding down the key bound o the sneak action.
 	SetPressingSneak(pressing bool)
 
+	// Swimming returns true if the movement component is currently swimming.
+	Swimming() bool
+	// SetSwimming sets whether the movement component is swimming.
+	SetSwimming(swimming bool)
+
+	// FluidHeight returns the height of the fluid the movement component is in.
+	FluidHeight() float32
+	// SetFluidHeight sets the height of the fluid the movement component is in.
+	SetFluidHeight(height float32)
+
+	// InWater returns true if the movement component is currently in water.
+	InWater() bool
+	// SetInWater sets whether the movement component is in water.
+	SetInWater(inWater bool)
+
 	// PenetratedLastFrame returns true if the movement component had penetrated through a block in
 	// the previous simulation frame.
 	PenetratedLastFrame() bool

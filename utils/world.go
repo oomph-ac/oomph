@@ -6,9 +6,9 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
@@ -64,8 +64,21 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 	return oneWayBlocks
 }
 
+// FluidLevelAt returns the fluid level at the given position.
+func FluidLevelAt(src world.BlockSource, pos [3]int) float32 {
+	if l, ok := src.Block(pos).(world.Liquid); ok {
+		return float32(l.LiquidDepth()) / 8.0
+	}
+	return 0.0
+}
+
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
-func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox {
+func BlockBoxes(b world.Block, pos [3]int, src world.BlockSource) []cube.BBox {
+	switch b := b.(type) {
+	case block.Water:
+		return []cube.BBox{cube.Box(0, 0, 0, 1, float32(b.Depth)/8.0, 1)}
+	}
+
 	switch BlockName(b) {
 	case "minecraft:portal", "minecraft:end_portal":
 		return []cube.BBox{}
@@ -118,7 +131,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox 
 	}
 
 	var boxes []cube.BBox
-	dfBoxes := b.Model().BBox(df_cube.Pos(pos), src)
+	dfBoxes := b.Model().BBox(pos, src)
 	boxes = make([]cube.BBox, len(dfBoxes))
 	for i, bb := range dfBoxes {
 		boxes[i] = game.DFBoxToCubeBox(bb)
@@ -149,8 +162,8 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src w
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
-				pos := cube.Pos{x, y, z}
-				b := src.Block(df_cube.Pos(pos))
+				pos := [3]int{x, y, z}
+				b := src.Block(pos)
 				if _, isAir := b.(block.Air); !includeAir && isAir {
 					b = nil
 					continue
@@ -186,14 +199,14 @@ func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
 	for x := minX; x <= maxX; x++ {
 		for z := minZ; z <= maxZ; z++ {
 			for y := minY; y <= maxY; y++ {
-				pos := cube.Pos{x, y, z}
-				block := src.Block(df_cube.Pos(pos))
+				pos := [3]int{x, y, z}
+				block := src.Block(pos)
 				if CanPassBlock(block) {
 					continue
 				}
 
 				for _, box := range BlockBoxes(block, pos, src) {
-					b := box.Translate(pos.Vec3())
+					b := box.Translate(mgl32.Vec3{float32(x), float32(y), float32(z)})
 					if b.IntersectsWith(aabb) {
 						bboxList = append(bboxList, b)
 					}
