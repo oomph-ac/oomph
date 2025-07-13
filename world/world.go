@@ -18,7 +18,7 @@ import (
 
 type ChunkInfo struct {
 	Cached bool
-	Hash   uint64
+	Hash   [32]byte
 	Chunk  *chunk.Chunk
 }
 
@@ -26,7 +26,7 @@ type World struct {
 	lastCleanPos protocol.ChunkPos
 
 	chunks    map[protocol.ChunkPos]ChunkInfo
-	subChunks map[protocol.ChunkPos][]uint64
+	subChunks map[protocol.ChunkPos][][32]byte
 
 	exemptedChunks map[protocol.ChunkPos]struct{}
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
@@ -37,7 +37,7 @@ type World struct {
 func New(logger **slog.Logger) *World {
 	return &World{
 		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
-		subChunks: make(map[protocol.ChunkPos][]uint64),
+		subChunks: make(map[protocol.ChunkPos][][32]byte),
 
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
@@ -55,9 +55,9 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkInfo) {
 }
 
 // AddSubChunk adds a subchunk to the world.
-func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash uint64) {
+func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash [32]byte) {
 	if _, ok := w.subChunks[chunkPos]; !ok {
-		w.subChunks[chunkPos] = make([]uint64, 0, 16)
+		w.subChunks[chunkPos] = make([][32]byte, 0, 16)
 	}
 	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], hash)
 }
