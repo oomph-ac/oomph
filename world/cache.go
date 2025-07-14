@@ -2,7 +2,6 @@ package world
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"sync"
 	"sync/atomic"
 
@@ -10,17 +9,18 @@ import (
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/zeebo/xxh3"
 )
 
 var (
-	chunkCache = make(map[[32]byte]*CachedChunk)
+	chunkCache = make(map[xxh3.Uint128]*CachedChunk)
 	cMu        sync.Mutex
 
-	subChunkCache = make(map[[32]byte]*CachedSubChunk)
+	subChunkCache = make(map[xxh3.Uint128]*CachedSubChunk)
 	scMu          sync.Mutex
 )
 
-func unsubC(hash [32]byte) {
+func unsubC(hash xxh3.Uint128) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
@@ -32,7 +32,7 @@ func unsubC(hash [32]byte) {
 	}
 }
 
-func unsubSC(hash [32]byte) {
+func unsubSC(hash xxh3.Uint128) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
@@ -50,7 +50,7 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	scMu.Lock()
 	defer scMu.Unlock()
 
-	hash := sha256.Sum256(payload.Bytes())
+	hash := xxh3.Hash128(payload.Bytes())
 	if sc, ok := subChunkCache[hash]; ok {
 		sc.subs.Add(1)
 		//fmt.Println("returning cached subchunk", hash)
@@ -75,7 +75,7 @@ func CacheChunk(input *packet.LevelChunk) ChunkInfo {
 	cMu.Lock()
 	defer cMu.Unlock()
 
-	hash := sha256.Sum256(input.RawPayload)
+	hash := xxh3.Hash128(input.RawPayload)
 	if c, ok := chunkCache[hash]; ok {
 		c.subs.Add(1)
 		//fmt.Println("returning cached chunk", hash)
@@ -101,7 +101,7 @@ func CacheChunk(input *packet.LevelChunk) ChunkInfo {
 
 type CachedSubChunk struct {
 	layer byte
-	hash  [32]byte
+	hash  xxh3.Uint128
 	subs  atomic.Int64
 	sc    *chunk.SubChunk
 }
@@ -110,7 +110,7 @@ func (csc *CachedSubChunk) Layer() byte {
 	return csc.layer
 }
 
-func (csc *CachedSubChunk) Hash() [32]byte {
+func (csc *CachedSubChunk) Hash() xxh3.Uint128 {
 	return csc.hash
 }
 
@@ -119,7 +119,7 @@ func (csc *CachedSubChunk) SubChunk() *chunk.SubChunk {
 }
 
 type CachedChunk struct {
-	hash  [32]byte
+	hash  xxh3.Uint128
 	subs  atomic.Int64
 	chunk *chunk.Chunk
 }
@@ -129,7 +129,7 @@ func (cc *CachedChunk) Chunk() *chunk.Chunk {
 	return cc.chunk
 }
 
-func (cc *CachedChunk) Hash() [32]byte {
+func (cc *CachedChunk) Hash() xxh3.Uint128 {
 	return cc.hash
 }
 
