@@ -56,11 +56,11 @@ func liquidFlow(p *player.Player, blockPos df_cube.Pos, liquidBlock world.Liquid
 			blockFirst, blockSecond := p.World().Block(facePos), p.World().Block(altFacePos)
 			solidFirst, solidSecond := len(utils.BlockBoxes(blockFirst, facePos, p.World())) > 0, len(utils.BlockBoxes(blockSecond, altFacePos, p.World())) > 0
 			if solidFirst || solidSecond {
-				flowVel = flowVel.Normalize().Add(mgl32.Vec3{0, -6.0, 0})
+				flowVel = utils.NormalizeVec32(flowVel).Add(mgl32.Vec3{0, -6.0, 0})
 			}
 		}
 	}
-	return flowVel.Normalize()
+	return utils.NormalizeVec32(flowVel)
 }
 
 func affectsFlow(src world.BlockSource, originPos, newPos df_cube.Pos) bool {
@@ -100,13 +100,11 @@ func updateFluidHeightAndDoFluidPushing[T world.Liquid](p *player.Player, someSc
 		if k1 > 0 {
 			vel = vel.Mul(1.0 / float32(k1))
 		}
-		// normalize vectors for non-players?
-
 		playerVel := p.Movement().Vel()
 		vel = vel.Mul(someScale)
 		const d2, d3 float32 = 0.003, 0.0045
 		if math32.Abs(playerVel.X()) < d2 && math32.Abs(playerVel.Y()) < d2 && math32.Abs(playerVel.Z()) < d2 && vel.Len() < d3 {
-			vel = vel.Normalize().Mul(d3)
+			vel = utils.NormalizeVec32(vel).Mul(d3)
 		}
 		movement.SetVel(vel)
 	}

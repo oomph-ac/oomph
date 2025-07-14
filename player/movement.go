@@ -107,6 +107,11 @@ type MovementComponent interface {
 	// SetInWater sets whether the movement component is in water.
 	SetInWater(inWater bool)
 
+	// CurrentFriction returns the friction of the block the movement component is currently on.
+	CurrentFriction() float32
+	// SetCurrentFriction sets the friction of the block the movement component is currently on.
+	SetCurrentFriction(friction float32)
+
 	// PenetratedLastFrame returns true if the movement component had penetrated through a block in
 	// the previous simulation frame.
 	PenetratedLastFrame() bool

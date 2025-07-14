@@ -83,9 +83,10 @@ type AuthoritativeMovementComponent struct {
 	impulse     mgl32.Vec2
 	size        mgl32.Vec2
 
-	gravity      float32
-	jumpHeight   float32
-	fallDistance float32
+	gravity         float32
+	jumpHeight      float32
+	fallDistance    float32
+	currentFriction float32
 
 	movementSpeed        float32
 	defaultMovementSpeed float32
@@ -368,6 +369,16 @@ func (mc *AuthoritativeMovementComponent) InWater() bool {
 // SetInWater sets whether the movement component is in water.
 func (mc *AuthoritativeMovementComponent) SetInWater(inWater bool) {
 	mc.inWater = inWater
+}
+
+// CurrentFriction returns the friction of the block the movement component is currently on.
+func (mc *AuthoritativeMovementComponent) CurrentFriction() float32 {
+	return mc.currentFriction
+}
+
+// SetCurrentFriction sets the friction of the block the movement component is currently on.
+func (mc *AuthoritativeMovementComponent) SetCurrentFriction(friction float32) {
+	mc.currentFriction = friction
 }
 
 // PenetratedLastFrame returns true if the movement component had penetrated through a block in
