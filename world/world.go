@@ -10,6 +10,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/zeebo/xxh3"
 
 	_ "unsafe"
 
@@ -18,7 +19,7 @@ import (
 
 type ChunkInfo struct {
 	Cached bool
-	Hash   [32]byte
+	Hash   xxh3.Uint128
 	Chunk  *chunk.Chunk
 }
 
@@ -26,7 +27,7 @@ type World struct {
 	lastCleanPos protocol.ChunkPos
 
 	chunks    map[protocol.ChunkPos]ChunkInfo
-	subChunks map[protocol.ChunkPos][][32]byte
+	subChunks map[protocol.ChunkPos][]xxh3.Uint128
 
 	exemptedChunks map[protocol.ChunkPos]struct{}
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
@@ -37,7 +38,7 @@ type World struct {
 func New(logger **slog.Logger) *World {
 	return &World{
 		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
-		subChunks: make(map[protocol.ChunkPos][][32]byte),
+		subChunks: make(map[protocol.ChunkPos][]xxh3.Uint128),
 
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
@@ -55,9 +56,9 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkInfo) {
 }
 
 // AddSubChunk adds a subchunk to the world.
-func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash [32]byte) {
+func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128) {
 	if _, ok := w.subChunks[chunkPos]; !ok {
-		w.subChunks[chunkPos] = make([][32]byte, 0, 16)
+		w.subChunks[chunkPos] = make([]xxh3.Uint128, 0, 16)
 	}
 	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], hash)
 }
