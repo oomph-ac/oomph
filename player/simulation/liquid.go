@@ -10,9 +10,38 @@ import (
 	"github.com/oomph-ac/oomph/utils"
 )
 
+func updateInWaterStateAndDoFluidPushing(p *player.Player) bool {
+	movement := p.Movement()
+	movement.SetFluidHeight(0.0)
+	updateInWaterStateAndDoWaterCurrentPushing(p)
+	d0 := float32(0.0023333333333333335) // TODO: check if dimension is ultra-warm (Nether?) and use magic number 0.007 instead
+	lavaPush := updateFluidHeightAndDoFluidPushing[block.Lava](p, d0)
+	return movement.InWater() || lavaPush
+}
+
+func updateFluidOnEyes(p *player.Player) {
+	movement := p.Movement()
+	movement.SetEyeInWater(movement.FluidOnEyes() == utils.FluidTagWater)
+	movement.SetFluidOnEyes(utils.FluidTagNone)
+	eyePos := movement.EyePos()
+	d0 := eyePos.Y()
+	// TODO: Account for vehicle logic.
+	liquidPos := df_cube.Pos{int(eyePos.X()), int(d0), int(eyePos.Z())}
+	d1, ok := utils.TypeFluidLevelAt[block.Water](p.World(), liquidPos)
+	if ok && d1 > d0 {
+		movement.SetFluidOnEyes(utils.FluidTagWater)
+		return
+	}
+	d1, ok = utils.TypeFluidLevelAt[block.Lava](p.World(), liquidPos)
+	if ok && d1 > d0 {
+		movement.SetFluidOnEyes(utils.FluidTagLava)
+	}
+}
+
 func updateInWaterStateAndDoWaterCurrentPushing(p *player.Player) {
-	// TODO: Account for vehicle logic in liquids.
+	oldVel := p.Movement().Vel()
 	p.Movement().SetInWater(updateFluidHeightAndDoFluidPushing[block.Water](p, 0.014))
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "updateInWaterStateAndDoWaterCurrentPushing: inWater=%t, fluidHeight=%.4f oldVel=%v newVel=%v", p.Movement().InWater(), p.Movement().FluidHeight(), oldVel, p.Movement().Vel())
 }
 
 func liquidFlow(p *player.Player, blockPos df_cube.Pos, liquidBlock world.Liquid) mgl32.Vec3 {

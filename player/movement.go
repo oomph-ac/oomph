@@ -24,6 +24,8 @@ type MovementComponent interface {
 
 	// Pos returns the position of the movement component.
 	Pos() mgl32.Vec3
+	// EyePos returns the eye position of the movement component.
+	EyePos() mgl32.Vec3
 	// LastPos returns the previous position of the movement component.
 	LastPos() mgl32.Vec3
 	// SetPos sets the position of the movement component.
@@ -97,6 +99,11 @@ type MovementComponent interface {
 	// SetSwimming sets whether the movement component is swimming.
 	SetSwimming(swimming bool)
 
+	// FluidOnEyes returns the fluid that the movement component is currently in.
+	FluidOnEyes() string
+	// SetFluidOnEyes sets the fluid that the movement component is currently in.
+	SetFluidOnEyes(fluid string)
+
 	// FluidHeight returns the height of the fluid the movement component is in.
 	FluidHeight() float32
 	// SetFluidHeight sets the height of the fluid the movement component is in.
@@ -106,6 +113,10 @@ type MovementComponent interface {
 	InWater() bool
 	// SetInWater sets whether the movement component is in water.
 	SetInWater(inWater bool)
+	// EyeInWater returns true if the movement component's eyes are in water.
+	EyeInWater() bool
+	// SetEyeInWater sets whether the movement component's eyes are in water.
+	SetEyeInWater(inWater bool)
 
 	// CurrentFriction returns the friction of the block the movement component is currently on.
 	CurrentFriction() float32
@@ -183,6 +194,11 @@ type MovementComponent interface {
 	DefaultMovementSpeed() float32
 	// SetDefaultMovementSpeed sets the movement speed the client should default to.
 	SetDefaultMovementSpeed(speed float32)
+
+	// WaterMovementSpeed returns the movement speed of the movement component while in water.
+	WaterMovementSpeed() float32
+	// SetWaterMovementSpeed sets the movement speed of the movement component while in water.
+	SetWaterMovementSpeed(speed float32)
 
 	// AirSpeed returns the movement speed of the movement component while off ground.
 	AirSpeed() float32

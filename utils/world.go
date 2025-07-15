@@ -44,11 +44,12 @@ func BlockFriction(b world.Block) float32 {
 
 // CanPassBlock returns true if an entity can pass through the given block.
 func CanPassBlock(b world.Block) bool {
-	switch BlockName(b) {
-	case "minecraft:web", "minecraft:water", "minecraft:lava":
+	switch b.(type) {
+	case block.Water, block.Lava:
 		return true
 	default:
-		return false
+		n := BlockName(b)
+		return n == "minecraft:web"
 	}
 }
 
@@ -67,16 +68,23 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 // FluidLevelAt returns the fluid level at the given position.
 func FluidLevelAt(src world.BlockSource, pos [3]int) float32 {
 	if l, ok := src.Block(pos).(world.Liquid); ok {
-		return float32(l.LiquidDepth()) / 8.0
+		return float32(l.LiquidDepth()) / 9.0
 	}
 	return 0.0
+}
+
+func TypeFluidLevelAt[T world.Liquid](src world.BlockSource, pos [3]int) (float32, bool) {
+	if l, ok := src.Block(pos).(T); ok {
+		return float32(l.LiquidDepth()) / 9.0, true
+	}
+	return 0.0, false
 }
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
 func BlockBoxes(b world.Block, pos [3]int, src world.BlockSource) []cube.BBox {
 	switch b := b.(type) {
 	case block.Water:
-		return []cube.BBox{cube.Box(0, 0, 0, 1, float32(b.Depth)/8.0, 1)}
+		return []cube.BBox{cube.Box(0, 0, 0, 1, float32(b.Depth)/9.0, 1)}
 	}
 
 	switch BlockName(b) {

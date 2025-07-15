@@ -16,11 +16,11 @@ func HasFlag(flags uint64, flag uint64) bool {
 }
 
 func AddFlag[T uint64 | int64](flags T, flag T) T {
-	return flags | flag
+	return flags | (1 << flag)
 }
 
 func RemoveFlag[T uint64 | int64](flags T, flag T) T {
-	return flags &^ flag
+	return flags &^ (1 << flag)
 }
 
 // HasDataFlag checks if the given flag includes the given data.

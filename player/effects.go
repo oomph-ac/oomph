@@ -1,5 +1,10 @@
 package player
 
+const (
+	// https://www.digminecraft.com/effects/dolphins_grace.php
+	EffectDolphinsGrace = 30
+)
+
 type EffectsComponent interface {
 	// Get returns an effect from the effect component from the passed effect ID. If the effect
 	// is not found, false is returned along with an empty effect.

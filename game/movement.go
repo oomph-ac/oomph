@@ -6,6 +6,7 @@ const (
 	DefaultBlockFriction        = float32(0.6)
 	NormalGravityMultiplier     = float32(0.98)
 	LevitationGravityMultiplier = float32(0.05)
+	WaterGravityMultiplier      = float32(0.8)
 	NormalGravity               = float32(0.08)
 	SlowFallingGravity          = float32(0.01)
 	StepHeight                  = float32(0.6)

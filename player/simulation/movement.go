@@ -51,9 +51,17 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		movement.SetVel(mgl32.Vec3{})
 		return
 	}
-	if movement.Vel().LenSqr() < 1e-12 { // Reset the velocity to zero if it's significantly small.
-		movement.SetVel(mgl32.Vec3{})
+	vel := movement.Vel()
+	if math32.Abs(vel.X()) < 0.00001 {
+		vel[0] = 0
 	}
+	if math32.Abs(vel.Y()) < 0.00001 {
+		vel[1] = 0
+	}
+	if math32.Abs(vel.Z()) < 0.00001 {
+		vel[2] = 0
+	}
+	movement.SetVel(vel)
 	livingEntityTravel(p)
 }
 
@@ -182,6 +190,7 @@ func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder w
 func applyPostCollisionVelocity(p *player.Player, oldVel mgl32.Vec3, oldOnGround bool, blockUnder world.Block) {
 	movement := p.Movement()
 	if !movement.InWater() {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "applyPostCollisionVelocity: not in water, updating state")
 		updateInWaterStateAndDoWaterCurrentPushing(p)
 	}
 
@@ -203,93 +212,23 @@ func applyPostCollisionVelocity(p *player.Player, oldVel mgl32.Vec3, oldOnGround
 	movement.SetVel(newVel)
 }
 
-// avoidEdge is the function that helps the movement component remain at the edge of a block when sneaking.
-func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *player.Debugger) {
-	if !movement.Sneaking() || !movement.OnGround() || movement.Vel().Y() > 0 {
-		dbg.Notify(
-			player.DebugModeMovementSim,
-			true,
-			"avoidEdge: conditions not met (sneaking=%v onGround=%v yVel=%v)",
-			movement.Sneaking(),
-			movement.OnGround(),
-			movement.Vel().Y(),
-		)
+func liquidMoveRelative(movement player.MovementComponent, moveRelativeSpeed float32) {
+	d0 := movement.Vel().LenSqr()
+	if d0 < 1e-7 {
 		return
 	}
-
-	var (
-		// Unlike in MCJE, where the edge boundry is 0.03, looking through a decomplilation of MCBE's 1.16 China
-		// binary shows that on Bedrock the edge boundry is 0.025 on the X and Z axis.
-		edgeBoundry float32 = 0.025
-		offset      float32 = 0.05
-	)
-
-	newVel := movement.Vel()
-	bb := movement.BoundingBox().GrowVec3(mgl32.Vec3{-edgeBoundry, 0, -edgeBoundry})
-	xMov, zMov := newVel.X(), newVel.Z()
-
-	for xMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, 0}), src)) == 0 {
-		if xMov < offset && xMov >= -offset {
-			xMov = 0
-		} else if xMov > 0 {
-			xMov -= offset
-		} else {
-			xMov += offset
-		}
+	normalizedVel := movement.Vel()
+	if d0 > 1.0 {
+		normalizedVel = normalizedVel.Normalize()
 	}
-
-	for zMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight * 1.01, zMov}), src)) == 0 {
-		if zMov < offset && zMov >= -offset {
-			zMov = 0
-		} else if zMov > 0 {
-			zMov -= offset
-		} else {
-			zMov += offset
-		}
-	}
-
-	for xMov != 0.0 && zMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, zMov}), src)) == 0 {
-		if xMov < offset && xMov >= -offset {
-			xMov = 0
-		} else if xMov > 0 {
-			xMov -= offset
-		} else {
-			xMov += offset
-		}
-
-		if zMov < offset && zMov >= -offset {
-			zMov = 0
-		} else if zMov > 0 {
-			zMov -= offset
-		} else {
-			zMov += offset
-		}
-	}
-
-	oldVel := movement.Vel()
-	newVel[0] = xMov
-	newVel[2] = zMov
-	movement.SetVel(newVel)
-
-	dbg.Notify(player.DebugModeMovementSim, true, "(avoidEdge): oldVel=%v newVel=%v", oldVel, newVel)
-}
-
-func blocksInside(movement player.MovementComponent, src world.BlockSource) ([]world.Block, bool) {
-	bb := movement.BoundingBox()
-	blocks := []world.Block{}
-
-	for _, result := range utils.GetNearbyBlocks(bb.Grow(1), false, true, src) {
-		pos := result.Position
-		block := result.Block
-		boxes := utils.BlockBoxes(block, pos, src)
-
-		for _, box := range boxes {
-			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
-				blocks = append(blocks, block)
-			}
-		}
-	}
-	return blocks, len(blocks) > 0
+	normalizedVel = normalizedVel.Mul(moveRelativeSpeed)
+	yaw := movement.Rotation().Z() * math32.Pi / 180.0
+	f, f1 := game.MCSin(yaw), game.MCCos(yaw)
+	movement.SetVel(movement.Vel().Add(mgl32.Vec3{
+		normalizedVel.X()*f1 - normalizedVel.Z()*f,
+		normalizedVel.Y(),
+		normalizedVel.Z()*f1 + normalizedVel.X()*f,
+	}))
 }
 
 func moveRelative(movement player.MovementComponent, moveRelativeSpeed float32) {

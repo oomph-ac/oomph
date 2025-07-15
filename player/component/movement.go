@@ -88,6 +88,8 @@ type AuthoritativeMovementComponent struct {
 	fallDistance    float32
 	currentFriction float32
 
+	waterMovementSpeed float32
+
 	movementSpeed        float32
 	defaultMovementSpeed float32
 	airSpeed             float32
@@ -120,9 +122,11 @@ type AuthoritativeMovementComponent struct {
 	immobile bool
 	noClip   bool
 
+	fluidOnEyes string
 	fluidHeight float32
 	swimming    bool
 	inWater     bool
+	eyeInWater  bool
 
 	gliding         bool
 	glideBoostTicks int64
@@ -141,6 +145,7 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		mPlayer:              p,
 		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
+		fluidOnEyes:          "none",
 	}
 }
 
@@ -196,6 +201,15 @@ func (mc *AuthoritativeMovementComponent) Client() player.NonAuthoritativeMoveme
 // Pos returns the position of the movement component.
 func (mc *AuthoritativeMovementComponent) Pos() mgl32.Vec3 {
 	return mc.pos
+}
+
+// EyePos returns the eye position of the movement component.
+func (mc *AuthoritativeMovementComponent) EyePos() mgl32.Vec3 {
+	eyeHeight := game.DefaultPlayerHeightOffset
+	if mc.sneaking {
+		eyeHeight = game.SneakingPlayerHeightOffset
+	}
+	return mc.pos.Add(mgl32.Vec3{0, eyeHeight, 0})
 }
 
 // LastPos returns the previous position of the movement component.
@@ -351,6 +365,16 @@ func (mc *AuthoritativeMovementComponent) SetSwimming(swimming bool) {
 	mc.swimming = swimming
 }
 
+// SetFluidOnEyes sets the fluid that the movement component is currently in.
+func (mc *AuthoritativeMovementComponent) SetFluidOnEyes(fluid string) {
+	mc.fluidOnEyes = fluid
+}
+
+// FluidOnEyes returns the fluid that the movement component is currently in.
+func (mc *AuthoritativeMovementComponent) FluidOnEyes() string {
+	return mc.fluidOnEyes
+}
+
 // FluidHeight returns the height of the fluid the movement component is in.
 func (mc *AuthoritativeMovementComponent) FluidHeight() float32 {
 	return mc.fluidHeight
@@ -369,6 +393,16 @@ func (mc *AuthoritativeMovementComponent) InWater() bool {
 // SetInWater sets whether the movement component is in water.
 func (mc *AuthoritativeMovementComponent) SetInWater(inWater bool) {
 	mc.inWater = inWater
+}
+
+// EyeInWater returns true if the movement component's eyes are in water.
+func (mc *AuthoritativeMovementComponent) EyeInWater() bool {
+	return mc.eyeInWater
+}
+
+// SetEyeInWater sets whether the movement component's eyes are in water.
+func (mc *AuthoritativeMovementComponent) SetEyeInWater(inWater bool) {
+	mc.eyeInWater = inWater
 }
 
 // CurrentFriction returns the friction of the block the movement component is currently on.
@@ -550,6 +584,16 @@ func (mc *AuthoritativeMovementComponent) FallDistance() float32 {
 // SetFallDistance sets the fall distance of the movement component.
 func (mc *AuthoritativeMovementComponent) SetFallDistance(fallDistance float32) {
 	mc.fallDistance = fallDistance
+}
+
+// WaterMovementSpeed returns the movement speed of the movement component while in water.
+func (mc *AuthoritativeMovementComponent) WaterMovementSpeed() float32 {
+	return mc.waterMovementSpeed
+}
+
+// SetWaterMovementSpeed sets the movement speed of the movement component while in water.
+func (mc *AuthoritativeMovementComponent) SetWaterMovementSpeed(newSpeed float32) {
+	mc.waterMovementSpeed = newSpeed
 }
 
 // MovementSpeed returns the movement speed of the movement component.

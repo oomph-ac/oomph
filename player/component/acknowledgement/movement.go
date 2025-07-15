@@ -124,6 +124,8 @@ func (ack *UpdateAttributes) Run() {
 			ack.mPlayer.Movement().SetDefaultMovementSpeed(attribute.Default)
 		} else if attribute.Name == "minecraft:health" {
 			ack.mPlayer.Alive = attribute.Value > 0
+		} else if attribute.Name == "minecraft:underwater_movement" {
+			ack.mPlayer.Movement().SetWaterMovementSpeed(attribute.Value)
 		}
 	}
 }
