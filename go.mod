@@ -4,10 +4,9 @@ go 1.24.1
 
 require (
 	github.com/akmalfairuz/legacy-version v1.5.4
-	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/chewxy/math32 v1.10.1
 	github.com/cooldogedev/spectrum v0.0.40-0.20250527034552-55ddfe1bba67
-	github.com/df-mc/dragonfly v0.10.3
+	github.com/df-mc/dragonfly v0.10.6-0.20250708145727-07da2e859609
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/getsentry/sentry-go v0.27.0
@@ -16,11 +15,13 @@ require (
 	github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
-	github.com/sandertv/gophertunnel v1.47.6
+	github.com/sandertv/gophertunnel v1.48.1
+	github.com/zeebo/xxh3 v1.0.2
 )
 
 require (
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cooldogedev/spectral v0.0.5 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.19 // indirect
@@ -41,18 +42,17 @@ require (
 	github.com/samber/lo v1.49.1 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
-	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/mock v0.5.2 // indirect
-	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
+	golang.org/x/crypto v0.40.0 // indirect
+	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
+	golang.org/x/mod v0.26.0 // indirect
+	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.15.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
-	golang.org/x/tools v0.34.0 // indirect
+	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/tools v0.35.0 // indirect
 )
 
 //replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
@@ -66,3 +66,5 @@ replace github.com/cooldogedev/spectrum => ../spectrum
 replace github.com/oomph-ac/oconfig => ../oconfig
 
 replace github.com/oomph-ac/multiversion => ../multiversion
+
+replace github.com/akmalfairuz/legacy-version => ../legacy-version
