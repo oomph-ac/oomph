@@ -71,7 +71,7 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	return cachedSC, nil
 }
 
-func CacheChunk(input *packet.LevelChunk) ChunkInfo {
+func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
@@ -79,7 +79,7 @@ func CacheChunk(input *packet.LevelChunk) ChunkInfo {
 	if c, ok := chunkCache[hash]; ok {
 		c.subs.Add(1)
 		//fmt.Println("returning cached chunk", hash)
-		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true}
+		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true}, nil
 	}
 
 	decodedChunk, err := chunk.NetworkDecode(
@@ -89,14 +89,14 @@ func CacheChunk(input *packet.LevelChunk) ChunkInfo {
 		world.Overworld.Range(),
 	)
 	if err != nil {
-		decodedChunk = chunk.New(AirRuntimeID, world.Overworld.Range())
+		return ChunkInfo{}, err
 	}
 	decodedChunk.Compact()
 
 	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk}
 	cachedChunk.subs.Add(1)
 	chunkCache[hash] = cachedChunk
-	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true}
+	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true}, nil
 }
 
 type CachedSubChunk struct {
