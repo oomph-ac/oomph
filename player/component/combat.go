@@ -8,7 +8,6 @@ import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
@@ -99,7 +98,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		return
 	}
 	if input == nil {
-		if oconfig.Combat().FullAuthoritative {
+		if c.mPlayer.Opts().Combat.FullAuthoritative {
 			c.checkMisprediction = true
 			c.attacked = true
 			c.startAttackPos = c.mPlayer.Movement().LastPos()
@@ -119,7 +118,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	c.targetedEntity = e
 	c.targetedRuntimeID = data.TargetEntityRuntimeID
 
-	if oconfig.Combat().FullAuthoritative {
+	if c.mPlayer.Opts().Combat.FullAuthoritative {
 		rewindPos, ok := e.Rewind(c.mPlayer.ClientTick)
 		if !ok {
 			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no rewind positions available for entity %d", data.TargetEntityRuntimeID)
@@ -198,8 +197,8 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	movement := c.mPlayer.Movement()
-	if movement.PendingCorrections() > 0 && !oconfig.Combat().FullAuthoritative {
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "movement component indicates pending corrections (%d), skipping combat calculation", movement.PendingCorrections())
+	if movement.PendingCorrections() > 0 && !c.mPlayer.Opts().Combat.FullAuthoritative {
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "movement component indicates pending corrections (%d) - hit invalidated", movement.PendingCorrections())
 		return false
 	}
 
@@ -217,7 +216,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		altEntityEndPos   mgl32.Vec3
 		altEntityPosDelta mgl32.Vec3
 	)
-	if !oconfig.Combat().FullAuthoritative {
+	if !c.mPlayer.Opts().Combat.FullAuthoritative {
 		altEntityStartPos = c.targetedEntity.PrevPosition
 		altEntityEndPos = c.targetedEntity.Position
 		altEntityPosDelta = altEntityEndPos.Sub(altEntityStartPos)
@@ -261,7 +260,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		// An extra raycast is ran here with the current entity position, as the client may have ticked
 		// the entity to a new position while the frame logic was running (where attacks are done). This is only
 		// required if FullAuthoritative is *disabled*, as we want to match the client's own logic as closely as possible.
-		if !oconfig.Combat().FullAuthoritative {
+		if !c.mPlayer.Opts().Combat.FullAuthoritative {
 			altEntPos := altEntityStartPos.Add(altEntityPosDelta.Mul(partialTicks))
 			altEntityBB := c.entityBB.Translate(altEntPos).Grow(0.1)
 			if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {

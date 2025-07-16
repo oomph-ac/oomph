@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
-	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player/context"
@@ -71,7 +70,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.Text:
 		args := strings.Split(pk.Message, " ")
-		if args[0] == "!oomph_debug" && oconfig.Cfg.UseDebugCommands {
+		if args[0] == "!oomph_debug" && p.Opts().UseDebugCommands {
 			// If a player is running an oomph debug command, we don't want to leak that command into the chat.
 			ctx.Cancel()
 			if len(args) < 2 {
@@ -147,7 +146,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		p.handleBlockActions(pk)
 		p.handleMovement(pk)
 
-		if !oconfig.Combat().FullAuthoritative {
+		if !p.opts.Combat.FullAuthoritative {
 			p.entTracker.Tick(p.ClientTick)
 		}
 
@@ -301,7 +300,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			oconfig.Combat().MaxRewind,
+			p.Opts().Combat.MaxRewind,
 			false,
 			width,
 			height,
@@ -314,7 +313,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			oconfig.Combat().MaxRewind,
+			p.Opts().Combat.MaxRewind,
 			true,
 			width,
 			height,

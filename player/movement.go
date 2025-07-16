@@ -3,7 +3,6 @@ package player
 import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -294,7 +293,7 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	posDiff := p.movement.Pos().Sub(p.movement.Client().Pos())
 	velDiff := p.movement.Vel().Sub(p.movement.Client().Vel())
 
-	needsCorrection := posDiff.Len() > oconfig.Movement().CorrectionThreshold
+	needsCorrection := posDiff.Len() > p.Opts().Movement.CorrectionThreshold
 	if needsCorrection && p.movement.PendingTeleports() == 0 && !hasTeleport &&
 		!pk.InputData.Load(packet.InputFlagJumpPressedRaw) && !hasKnockback {
 		p.movement.Sync()
@@ -305,7 +304,7 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
 		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.World())) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.World())) > 0
 		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
-			if oconfig.Movement().AcceptClientPosition && posDiff.Len() < oconfig.Movement().PositionAcceptanceThreshold {
+			if p.Opts().Movement.AcceptClientPosition && posDiff.Len() < p.Opts().Movement.PositionAcceptanceThreshold {
 				posDiff = mgl32.Vec3{}
 				p.movement.SetPos(p.movement.Client().Pos())
 				p.Dbg.Notify(
@@ -315,7 +314,7 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 					p.movement.Pos(),
 				)
 			}
-			if oconfig.Movement().AcceptClientVelocity && velDiff.Len() < oconfig.Movement().VelocityAcceptanceThreshold {
+			if p.Opts().Movement.AcceptClientVelocity && velDiff.Len() < p.Opts().Movement.VelocityAcceptanceThreshold {
 				p.movement.SetVel(p.movement.Client().Vel())
 				p.Dbg.Notify(
 					DebugModeMovementSim,
@@ -328,8 +327,8 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 			// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
 			// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
 			// the client and server position is desynced consistently without going above the correction threshold.
-			if oconfig.Movement().PersuasionThreshold > 0 {
-				threshold := oconfig.Movement().PersuasionThreshold
+			if p.Opts().Movement.PersuasionThreshold > 0 {
+				threshold := p.Opts().Movement.PersuasionThreshold
 				posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
 				posDiff[1] = 0
 				posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)

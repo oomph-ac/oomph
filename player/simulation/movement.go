@@ -8,7 +8,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -144,7 +143,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		oldVel := movement.Vel()
 		oldOnGround := movement.OnGround()
 
-		tryCollisions(movement, p.World(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60), clientJumpPrevented)
+		tryCollisions(p, p.World(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60), clientJumpPrevented)
 		walkOnBlock(movement, blockUnder)
 		movement.SetMov(movement.Vel())
 
@@ -155,7 +154,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 				blockUnder = b
 			}
 		}
-		setPostCollisionMotion(movement, oldVel, oldOnGround, blockUnder)
+		setPostCollisionMotion(p, oldVel, oldOnGround, blockUnder)
 
 		if inCobweb {
 			p.Dbg.Notify(player.DebugModeMovementSim, true, "post-move cobweb force applied (0 vel)")
@@ -235,7 +234,7 @@ func simulateGlide(p *player.Player, movement player.MovementComponent) {
 	movement.SetVel(vel)
 
 	oldVel := vel
-	tryCollisions(movement, p.World(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60), false)
+	tryCollisions(p, p.World(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60), false)
 	velDiff := movement.Vel().Sub(movement.Client().Vel())
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "(glide) oldVel=%v, collisions=%v diff=%v", oldVel, movement.Vel(), velDiff)
 }
@@ -301,7 +300,8 @@ func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder w
 	movement.SetVel(newVel)
 }
 
-func setPostCollisionMotion(movement player.MovementComponent, oldVel mgl32.Vec3, oldOnGround bool, blockUnder world.Block) {
+func setPostCollisionMotion(p *player.Player, oldVel mgl32.Vec3, oldOnGround bool, blockUnder world.Block) {
+	movement := p.Movement()
 	if !oldOnGround && movement.YCollision() {
 		landOnBlock(movement, oldVel, blockUnder)
 	} else if movement.YCollision() {
@@ -320,9 +320,10 @@ func setPostCollisionMotion(movement player.MovementComponent, oldVel mgl32.Vec3
 	movement.SetVel(newVel)
 }
 
-func tryCollisions(movement player.MovementComponent, src world.BlockSource, dbg *player.Debugger, useSlideOffset bool, clientJumpPrevented bool) {
+func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger, useSlideOffset bool, clientJumpPrevented bool) {
 	var completedStep bool
 
+	movement := p.Movement()
 	collisionBB := movement.BoundingBox()
 	currVel := movement.Vel()
 	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(currVel), src)
@@ -429,7 +430,7 @@ func tryCollisions(movement player.MovementComponent, src world.BlockSource, dbg
 			// We also need to ensure that the client isn't using this mechanic to create some weird movement bypass, so we will check if the
 			// collisionPosDist is within the correction threshold. Even if the stepPosDist is greater than the correction threshold, Oomph is predicting
 			// a step here anyway so it would make zero difference.
-			if collisionPosDist > oconfig.Movement().CorrectionThreshold || stepPosDist <= collisionPosDist {
+			if collisionPosDist > p.Opts().Movement.CorrectionThreshold || stepPosDist <= collisionPosDist {
 				collisionVel = stepVel
 				collisionBB = stepBB
 

@@ -171,6 +171,8 @@ type Player struct {
 	// remoteEventFunc is the function for sending remote events to the server
 	remoteEventFunc func(e RemoteEvent, p *Player)
 
+	opts *Opts
+
 	df_world.NopViewer
 }
 
@@ -209,6 +211,11 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 	if mState.IsReplay {
 		p.LastServerTick = mState.CurrentTime
 	}
+
+	p.opts = new(Opts)
+	p.opts.Combat = oconfig.Combat()
+	p.opts.Movement = oconfig.Movement()
+	p.opts.UseDebugCommands = oconfig.Cfg.UseDebugCommands
 
 	p.world = world.New(&p.log)
 	p.Dbg = NewDebugger(p)
@@ -474,7 +481,7 @@ func (p *Player) Tick() bool {
 	}
 
 	p.Movement().Tick(p.ServerTick - prevTick)
-	if oconfig.Combat().FullAuthoritative {
+	if p.Opts().Combat.FullAuthoritative {
 		p.EntityTracker().Tick(p.ServerTick)
 	}
 

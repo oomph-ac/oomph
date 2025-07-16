@@ -2,7 +2,6 @@ package component
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
@@ -61,7 +60,7 @@ func (c *EntityTrackerComponent) MoveEntity(rid uint64, tick int64, pos mgl32.Ve
 
 // HandleMovePlayer is a function that handles entity position updates sent with MovePlayerPacket.
 func (c *EntityTrackerComponent) HandleMovePlayer(pk *packet.MovePlayer) {
-	if oconfig.Combat().FullAuthoritative {
+	if c.mPlayer.Opts().Combat.FullAuthoritative {
 		c.MoveEntity(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.Position, pk.Mode == packet.MoveModeTeleport)
 		return
 	}
@@ -75,7 +74,7 @@ func (c *EntityTrackerComponent) HandleMovePlayer(pk *packet.MovePlayer) {
 
 // HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute) {
-	if oconfig.Combat().FullAuthoritative {
+	if c.mPlayer.Opts().Combat.FullAuthoritative {
 		c.MoveEntity(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
 		return
 	}
