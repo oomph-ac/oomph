@@ -29,7 +29,11 @@ func (ack *ChunkUpdate) Run() {
 		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
 		return
 	}
-	cInfo := oworld.CacheChunk(ack.pk)
+	cInfo, err := oworld.CacheChunk(ack.pk)
+	if err != nil {
+		ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+		return
+	}
 	ack.mPlayer.World().AddChunk(ack.pk.Position, cInfo)
 }
 
