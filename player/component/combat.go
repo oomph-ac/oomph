@@ -47,6 +47,8 @@ type AuthoritativeCombatComponent struct {
 	// rawResults are the raw closest distance from the entity BB to the attack position for the
 	// combat validation done.
 	rawResults []float32
+	// angleResults are the angles between the attack position and the entity position for the combat validation done.
+	angleResults []float32
 	// hooks are the combat hooks that utilize the results of this combat component.
 	hooks []player.CombatHook
 
@@ -64,6 +66,7 @@ func NewAuthoritativeCombatComponent(p *player.Player, useClientTracker bool) *A
 		mPlayer:                p,
 		raycastResults:         make([]float32, 0, CombatLerpPositionSteps*2),
 		rawResults:             make([]float32, 0, CombatLerpPositionSteps*2),
+		angleResults:           make([]float32, 0, CombatLerpPositionSteps*2),
 		hooks:                  []player.CombatHook{},
 		uniqueAttackedEntities: make(map[uint64]*entity.Entity),
 
@@ -245,7 +248,9 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			break
 		}
 
-		if angle := math32.Abs(game.AngleToPoint(lerpedResult.attackPos, lerpedResult.entityPos, lerpedResult.rotation)[0]); angle < closestAngle {
+		angle := math32.Abs(game.AngleToPoint(lerpedResult.attackPos, lerpedResult.entityPos, lerpedResult.rotation)[0])
+		c.angleResults = append(c.angleResults, angle)
+		if angle < closestAngle {
 			closestAngle = angle
 		}
 
@@ -268,6 +273,13 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		if c.useClientTracker {
 			altEntPos := altEntityStartPos.Add(altEntityPosDelta.Mul(partialTicks))
 			altEntityBB := c.entityBB.Translate(altEntPos).Grow(0.1)
+
+			altAngle := math32.Abs(game.AngleToPoint(lerpedResult.attackPos, altEntPos, lerpedResult.rotation)[0])
+			c.angleResults = append(c.angleResults, altAngle)
+			if altAngle < closestAngle {
+				closestAngle = altAngle
+			}
+
 			if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
 				altRaycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
 				hitValid = hitValid || altRaycastDist <= CombatSurvivalReach
@@ -299,9 +311,9 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	// Only allow the raw distance check to be use for touch players if a raycast is unable to land on the entity. This prevents clients
 	// abusing spoofing their input to gain a slight reach advantage. We also want to make sure we're not allowing the player to hit entities
-	// that are behind them. 110 degrees is MC:BE's maximum camera FOV.
+	// that are behind them.
 	if !hitValid && c.mPlayer.InputMode == packet.InputModeTouch {
-		hitValid = closestRawDist <= CombatSurvivalReach && closestAngle <= 110.0
+		hitValid = closestRawDist <= CombatSurvivalReach && closestAngle <= c.mPlayer.Opts().Combat.MaximumAttackAngle
 	}
 
 	// If the hit is valid and the player is not on touch mode, check if the closest calculated ray from the player's eye position to the bounding box
@@ -332,14 +344,15 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	c.mPlayer.Dbg.Notify(
 		player.DebugModeCombat,
 		!hitValid && !c.checkMisprediction,
-		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f)",
+		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f, angle=%f)",
 		closestRaycastDist,
 		closestRawDist,
+		closestAngle,
 	)
 
 	// If this is the full-authoritative combat component, and the hit is valid, send the attack packet to the server.
 	if hitValid {
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "<green>hit sent to the server</green> (raycast=%f raw=%f)", closestRaycastDist, closestRawDist)
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "<green>hit sent to the server</green> (raycast=%f raw=%f, angle=%f)", closestRaycastDist, closestRawDist, closestAngle)
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, c.checkMisprediction, "<yellow>client mispredicted air hit, but actually attacked entity</yellow>")
 		if !c.useClientTracker {
 			c.mPlayer.SendPacketToServer(c.attackInput)
@@ -366,6 +379,10 @@ func (c *AuthoritativeCombatComponent) Raycasts() []float32 {
 
 func (c *AuthoritativeCombatComponent) Raws() []float32 {
 	return c.rawResults
+}
+
+func (c *AuthoritativeCombatComponent) Angles() []float32 {
+	return c.angleResults
 }
 
 // checkForMispredictedEntity returns true if an entity were found to be in the way of the combat component.
@@ -441,6 +458,7 @@ func (c *AuthoritativeCombatComponent) reset() {
 	c.checkMisprediction = false
 	c.raycastResults = c.raycastResults[:0]
 	c.rawResults = c.rawResults[:0]
+	c.angleResults = c.angleResults[:0]
 	c.attacked = false
 	for rid := range c.uniqueAttackedEntities {
 		delete(c.uniqueAttackedEntities, rid)
