@@ -51,7 +51,7 @@ func main() {
 	opts.AutoLogin = false
 	opts.Addr = ":" + os.Args[1]
 	opts.SyncProtocol = false
-	opts.LatencyInterval = int64(time.Second)
+	opts.LatencyInterval = 1000
 
 	/* if len(os.Args) >= 4 {
 		opts.Token = os.Args[3]
@@ -72,6 +72,7 @@ func main() {
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.003
 	oconfig.Cfg.Movement.CorrectionThreshold = 0.003
 
+	oconfig.Cfg.Combat.MaximumAttackAngle = 90
 	oconfig.Cfg.Combat.EnableClientEntityTracking = true
 	oconfig.Cfg.Combat.MaxRewind = 6
 
