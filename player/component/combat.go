@@ -343,7 +343,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	c.mPlayer.Dbg.Notify(
 		player.DebugModeCombat,
-		!hitValid && !c.checkMisprediction,
+		!c.useClientTracker && !hitValid && !c.checkMisprediction,
 		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f, angle=%f)",
 		closestRaycastDist,
 		closestRawDist,
@@ -352,7 +352,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	// If this is the full-authoritative combat component, and the hit is valid, send the attack packet to the server.
 	if hitValid {
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "<green>hit sent to the server</green> (raycast=%f raw=%f, angle=%f)", closestRaycastDist, closestRawDist, closestAngle)
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, !c.useClientTracker, "<green>hit sent to the server</green> (raycast=%f raw=%f, angle=%f)", closestRaycastDist, closestRawDist, closestAngle)
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, c.checkMisprediction, "<yellow>client mispredicted air hit, but actually attacked entity</yellow>")
 		if !c.useClientTracker {
 			c.mPlayer.SendPacketToServer(c.attackInput)
