@@ -72,7 +72,7 @@ func main() {
 	oconfig.Cfg.Movement.PersuasionThreshold = 0.003
 	oconfig.Cfg.Movement.CorrectionThreshold = 0.003
 
-	oconfig.Cfg.Combat.FullAuthoritative = true
+	oconfig.Cfg.Combat.EnableClientEntityTracking = true
 	oconfig.Cfg.Combat.MaxRewind = 6
 
 	packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
@@ -126,11 +126,11 @@ func main() {
 		var interrupt = make(chan os.Signal, 1)
 		signal.Notify(interrupt, os.Interrupt)
 		<-interrupt
-
 		for _, s := range proxy.Registry().GetSessions() {
 			s.Server().WritePacket(&packet.Disconnect{})
 			s.Disconnect("Proxy restarting...")
 		}
+		time.Sleep(time.Second)
 		os.Exit(0)
 	}()
 

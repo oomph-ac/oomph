@@ -16,7 +16,7 @@ const (
 	ClimbSpeed = float32(0.2)
 
 	DefaultPlayerHeightOffset  = float32(1.62)
-	SneakingPlayerHeightOffset = float32(1.54)
+	SneakingPlayerHeightOffset = float32(1.27)
 
 	JumpDelayTicks  = 10
 	GlideBoostTicks = 20

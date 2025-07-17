@@ -33,7 +33,7 @@ func New_EditionFakerC(p *player.Player) *EditionFakerC {
 }
 
 func (*EditionFakerC) Type() string {
-	return TYPE_EDITION_FAKER
+	return TypeEditionFaker
 }
 
 func (*EditionFakerC) SubType() string {

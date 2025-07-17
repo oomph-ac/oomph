@@ -149,10 +149,17 @@ type Player struct {
 	// entTracker is an entity tracker for server-sided view of entities. It does not rely on the client sending back
 	// acknowledgments to update positions and states of the entity.
 	entTracker EntityTrackerComponent
+	// clientEntTracker is an entity tracker for fully client-sided view of entities. It does rely on the client sending
+	// back acknowledgments to update the position and state of the entity, which can allow exploits like backtrack to function.
+	// However, this component is useful when presice information is needed - such as heuristics and enabling the reach detection
+	// to flag players instead of just mitigating them.
+	clientEntTracker EntityTrackerComponent
 
 	// combat is the component that handles validating combat. This combat component does not rely on client ACKs to determine the position
 	// and state of the entity. This component determines whether an attack should be sent to the server.
 	combat CombatComponent
+	// clientCombat is the component that handles validating combat with the client-state entity tracker.
+	clientCombat CombatComponent
 
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
@@ -480,20 +487,17 @@ func (p *Player) Tick() bool {
 		p.ServerTick++
 	}
 
-	p.Movement().Tick(p.ServerTick - prevTick)
-	if p.Opts().Combat.FullAuthoritative {
-		p.EntityTracker().Tick(p.ServerTick)
-	}
-
-	p.ACKs().Tick(false)
-	if !p.ACKs().Responsive() {
+	p.movement.Tick(p.ServerTick - prevTick)
+	p.entTracker.Tick(p.ServerTick)
+	p.acks.Tick(false)
+	if !p.acks.Responsive() {
 		p.Disconnect(game.ErrorNetworkTimeout)
 		return false
 	}
 	// If the player state is from a replay, we should only flush the acknowledgment component when
 	// requested by the program handling the replay.
 	if !p.MState.IsReplay {
-		p.ACKs().Flush()
+		p.acks.Flush()
 	}
 
 	if h := p.eventHandler; h != nil {

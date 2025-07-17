@@ -178,7 +178,9 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					// We assume a potential mispredction here because the client while clicking, think it may need to break
 					// a block, but the server may instead think an entity is in the way of that block, constituting
 					// a misprediction.
-					p.combat.Attack(nil)
+					if p.InputMode != packet.InputModeTouch {
+						p.combat.Attack(nil)
+					}
 					// In this scenario, the client should be trying to continue breaking a block, which means the one they targeted
 					// previously was broken.
 					p.blockBreakProgress = 0.0
@@ -203,7 +205,9 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				// We assume a potential mispredction here because the client while clicking, think it may need to break
 				// a block, but the server may instead think an entity is in the way of that block, constituting
 				// a misprediction.
-				p.combat.Attack(nil)
+				if p.InputMode != packet.InputModeTouch {
+					p.combat.Attack(nil)
+				}
 			case protocol.PlayerActionAbortBreak:
 				//p.Message("abort break")
 				p.blockBreakProgress = 0.0

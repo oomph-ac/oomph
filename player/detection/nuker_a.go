@@ -23,7 +23,7 @@ func New_NukerA(p *player.Player) *NukerA {
 }
 
 func (*NukerA) Type() string {
-	return TYPE_NUKER
+	return TypeNuker
 }
 
 func (*NukerA) SubType() string {

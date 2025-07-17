@@ -127,15 +127,15 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 		inRange := chunkInRange(radius, chunkPos, pos)
 
 		if exempted && inRange {
-			if w.logger != nil {
-				(*w.logger).Info("removed exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
-			}
+			/* if w.logger != nil {
+				(*w.logger).Debug("removed exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
+			} */
 			delete(w.exemptedChunks, chunkPos)
 		} else if !exempted && !inRange {
 			w.removeChunk(c, chunkPos)
-			if w.logger != nil {
+			/* if w.logger != nil {
 				(*w.logger).Info("removed non-exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
-			}
+			} */
 		}
 	}
 }
