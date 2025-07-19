@@ -195,6 +195,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					// previously was broken.
 					p.blockBreakProgress = 0.0
 					p.blockBreakInProgress = true
+					p.blockBreakStartTick = p.ClientTick
 					p.Dbg.Notify(DebugModeBlockBreaking, true, "(PlayerActionStartBreak) started breaking block at %v", action.BlockPos)
 				}
 
@@ -202,12 +203,14 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				if currentBlockBreakPos == nil || *currentBlockBreakPos != action.BlockPos {
 					p.Dbg.Notify(DebugModeBlockBreaking, true, "reset block break progress (currentBlockBreakPos=%v, action.BlockPos=%v)", currentBlockBreakPos, action.BlockPos)
 					p.blockBreakProgress = 0.0
+					p.blockBreakStartTick = p.ClientTick
 				}
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
 			case protocol.PlayerActionContinueDestroyBlock:
 				if currentBreakPos := p.worldUpdater.BlockBreakPos(); !p.blockBreakInProgress || (currentBreakPos != nil && *currentBreakPos != action.BlockPos) {
 					p.blockBreakProgress = 0.0
+					p.blockBreakStartTick = p.ClientTick
 					p.Dbg.Notify(DebugModeBlockBreaking, true, "different block being broken - reset block break progress (currentBreakPos=%v, action.BlockPos=%v)", currentBreakPos, action.BlockPos)
 				}
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
@@ -242,6 +245,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				}
 
 				p.blockBreakProgress = 0.0
+				p.blockBreakInProgress = false
 				p.World().SetBlock(df_cube.Pos{
 					int(p.worldUpdater.BlockBreakPos().X()),
 					int(p.worldUpdater.BlockBreakPos().Y()),

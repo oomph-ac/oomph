@@ -152,7 +152,14 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			p.clientEntTracker.Tick(p.ClientTick)
 			_ = p.clientCombat.Calculate()
 		}
-		serverVerifiedHit := p.combat.Calculate()
+
+		var serverVerifiedHit bool
+		if !p.blockBreakInProgress {
+			// The client should not be able to hit any entities while breaking a block.
+			serverVerifiedHit = p.combat.Calculate()
+		} else {
+			p.combat.Reset()
+		}
 		if serverVerifiedHit && missedSwing {
 			pk.InputData.Unset(packet.InputFlagMissedSwing)
 		}
