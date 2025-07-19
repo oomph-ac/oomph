@@ -145,7 +145,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	)
 	if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress && isFullServerAuthBlockBreaking {
 		p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
-		//p.Message("block break in progress (%d - %.4f)", p.InputCount, p.blockBreakProgress)
+		p.Dbg.Notify(DebugModeBlockBreaking, true, "(handleBlockActions) assuming block break in progress (blockBreakProgress=%.4f)", p.blockBreakProgress)
 		handledBlockBreak = true
 	}
 
@@ -257,7 +257,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	if !handledBlockBreak && isFullServerAuthBlockBreaking {
 		if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress {
 			p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
-			//p.Message("(afterTheFactHack) block break in progress (%d - %.4f)", p.InputCount, p.blockBreakProgress)
+			p.Dbg.Notify(DebugModeBlockBreaking, true, "(afterTheFactHack) block break in progress (blockBreakProgress=%.4f)", p.blockBreakProgress)
 		}
 	}
 
@@ -293,7 +293,8 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	if _, isAir := b.(block.Air); isAir {
-		return math32.MaxFloat32
+		// Is it possible that the server already thinks the block is broken?
+		return 0
 	} else if utils.BlockName(b) == "minecraft:web" {
 		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
 		// Just return 1 and accept when the client does break the cobweb.
