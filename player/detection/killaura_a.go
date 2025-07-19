@@ -25,7 +25,7 @@ func New_KillauraA(p *player.Player) *KillauraA {
 }
 
 func (*KillauraA) Type() string {
-	return TYPE_KILLAURA
+	return TypeKillaura
 }
 
 func (*KillauraA) SubType() string {

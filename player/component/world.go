@@ -188,9 +188,9 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 
 	eyePos := c.mPlayer.Movement().Pos()
 	if c.mPlayer.Movement().Sneaking() {
-		eyePos[1] += 1.54
+		eyePos[1] += game.SneakingPlayerHeightOffset
 	} else {
-		eyePos[1] += 1.62
+		eyePos[1] += game.DefaultPlayerHeightOffset
 	}
 
 	if dist := eyePos.Sub(interactPos).Len(); dist >= 7.0 {

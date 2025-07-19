@@ -3,6 +3,7 @@ package entity
 import (
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/utils"
 )
 
 const (
@@ -25,7 +26,7 @@ type Entity struct {
 	// RecvVelocity is the velocity of the entity sent by the server in SetActorMotion.
 	RecvVelocity, PrevRecvVelocity mgl32.Vec3
 
-	PositionHistory []HistoricalPosition
+	PositionHistory *utils.CircularQueue[HistoricalPosition]
 
 	InterpolationTicks int
 	TicksSinceTeleport int
@@ -51,11 +52,10 @@ func New(entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySi
 		Height: height,
 		Scale:  scale,
 
-		PositionHistory: make([]HistoricalPosition, 0, historySize),
+		PositionHistory: utils.NewCircularQueue[HistoricalPosition](historySize),
 
 		IsPlayer: isPlayer,
 	}
-
 	e.InterpolationTicks = EntityMobInterpolationTicks
 	if isPlayer {
 		e.InterpolationTicks = EntityPlayerInterpolationTicks
@@ -87,11 +87,7 @@ func (e *Entity) UpdatePosition(hp HistoricalPosition) {
 
 	e.PrevVelocity = e.Velocity
 	e.Velocity = e.Position.Sub(e.PrevPosition)
-
-	if cap(e.PositionHistory) == len(e.PositionHistory) {
-		e.PositionHistory = e.PositionHistory[1:]
-	}
-	e.PositionHistory = append(e.PositionHistory, hp)
+	e.PositionHistory.Append(hp)
 }
 
 // UpdateVelocity updates the velocity of the entity.

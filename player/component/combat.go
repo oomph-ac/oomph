@@ -47,6 +47,8 @@ type AuthoritativeCombatComponent struct {
 	// rawResults are the raw closest distance from the entity BB to the attack position for the
 	// combat validation done.
 	rawResults []float32
+	// angleResults are the angles between the attack position and the entity position for the combat validation done.
+	angleResults []float32
 	// hooks are the combat hooks that utilize the results of this combat component.
 	hooks []player.CombatHook
 
@@ -55,16 +57,20 @@ type AuthoritativeCombatComponent struct {
 	// checkMisprediction is true if the client swings in the air and the combat component is not ACK dependent.
 	checkMisprediction bool
 
-	attacked bool
+	attacked         bool
+	useClientTracker bool
 }
 
-func NewAuthoritativeCombatComponent(p *player.Player) *AuthoritativeCombatComponent {
+func NewAuthoritativeCombatComponent(p *player.Player, useClientTracker bool) *AuthoritativeCombatComponent {
 	return &AuthoritativeCombatComponent{
 		mPlayer:                p,
 		raycastResults:         make([]float32, 0, CombatLerpPositionSteps*2),
-		rawResults:             make([]float32, 0, CombatLerpPositionSteps),
+		rawResults:             make([]float32, 0, CombatLerpPositionSteps*2),
+		angleResults:           make([]float32, 0, CombatLerpPositionSteps*2),
 		hooks:                  []player.CombatHook{},
 		uniqueAttackedEntities: make(map[uint64]*entity.Entity),
+
+		useClientTracker: useClientTracker,
 	}
 }
 
@@ -85,7 +91,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	)
 	if input != nil {
 		data = input.TransactionData.(*protocol.UseItemOnEntityTransactionData)
-		e = c.mPlayer.EntityTracker().FindEntity(data.TargetEntityRuntimeID)
+		e = c.entityTracker().FindEntity(data.TargetEntityRuntimeID)
 		if e == nil {
 			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "entity %d not found", data.TargetEntityRuntimeID)
 			return
@@ -98,17 +104,18 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		return
 	}
 	if input == nil {
-		if c.mPlayer.Opts().Combat.FullAuthoritative {
+		// We should only check for mispredictions if we are utilizing the server-state entity tracker.
+		if !c.useClientTracker {
 			c.checkMisprediction = true
 			c.attacked = true
 			c.startAttackPos = c.mPlayer.Movement().LastPos()
 			c.endAttackPos = c.mPlayer.Movement().Pos()
 			if c.mPlayer.Movement().Sneaking() {
-				c.startAttackPos[1] += 1.54
-				c.endAttackPos[1] += 1.54
+				c.startAttackPos[1] += game.SneakingPlayerHeightOffset
+				c.endAttackPos[1] += game.SneakingPlayerHeightOffset
 			} else {
-				c.startAttackPos[1] += 1.62
-				c.endAttackPos[1] += 1.62
+				c.startAttackPos[1] += game.DefaultPlayerHeightOffset
+				c.endAttackPos[1] += game.DefaultPlayerHeightOffset
 			}
 		}
 		return
@@ -118,7 +125,8 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	c.targetedEntity = e
 	c.targetedRuntimeID = data.TargetEntityRuntimeID
 
-	if c.mPlayer.Opts().Combat.FullAuthoritative {
+	if !c.useClientTracker {
+		// Use the server-side rewound state of the entity, opposed to the fully compensated client-sided view.
 		rewindPos, ok := e.Rewind(c.mPlayer.ClientTick)
 		if !ok {
 			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no rewind positions available for entity %d", data.TargetEntityRuntimeID)
@@ -137,11 +145,11 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	c.entityBB = e.Box(mgl32.Vec3{})
 
 	if c.mPlayer.Movement().Sneaking() {
-		c.startAttackPos[1] += 1.54
-		c.endAttackPos[1] += 1.54
+		c.startAttackPos[1] += game.SneakingPlayerHeightOffset
+		c.endAttackPos[1] += game.SneakingPlayerHeightOffset
 	} else {
-		c.startAttackPos[1] += 1.62
-		c.endAttackPos[1] += 1.62
+		c.startAttackPos[1] += game.DefaultPlayerHeightOffset
+		c.endAttackPos[1] += game.DefaultPlayerHeightOffset
 	}
 	c.attackInput = input
 }
@@ -197,7 +205,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	movement := c.mPlayer.Movement()
-	if movement.PendingCorrections() > 0 && !c.mPlayer.Opts().Combat.FullAuthoritative {
+	if movement.PendingCorrections() > 0 && c.useClientTracker {
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "movement component indicates pending corrections (%d) - hit invalidated", movement.PendingCorrections())
 		return false
 	}
@@ -216,7 +224,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		altEntityEndPos   mgl32.Vec3
 		altEntityPosDelta mgl32.Vec3
 	)
-	if !c.mPlayer.Opts().Combat.FullAuthoritative {
+	if c.useClientTracker {
 		altEntityStartPos = c.targetedEntity.PrevPosition
 		altEntityEndPos = c.targetedEntity.Position
 		altEntityPosDelta = altEntityEndPos.Sub(altEntityStartPos)
@@ -240,7 +248,9 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			break
 		}
 
-		if angle := math32.Abs(game.AngleToPoint(lerpedResult.attackPos, lerpedResult.entityPos, lerpedResult.rotation)[0]); angle < closestAngle {
+		angle := math32.Abs(game.AngleToPoint(lerpedResult.attackPos, lerpedResult.entityPos, lerpedResult.rotation)[0])
+		c.angleResults = append(c.angleResults, angle)
+		if angle < closestAngle {
 			closestAngle = angle
 		}
 
@@ -260,9 +270,16 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		// An extra raycast is ran here with the current entity position, as the client may have ticked
 		// the entity to a new position while the frame logic was running (where attacks are done). This is only
 		// required if FullAuthoritative is *disabled*, as we want to match the client's own logic as closely as possible.
-		if !c.mPlayer.Opts().Combat.FullAuthoritative {
+		if c.useClientTracker {
 			altEntPos := altEntityStartPos.Add(altEntityPosDelta.Mul(partialTicks))
 			altEntityBB := c.entityBB.Translate(altEntPos).Grow(0.1)
+
+			altAngle := math32.Abs(game.AngleToPoint(lerpedResult.attackPos, altEntPos, lerpedResult.rotation)[0])
+			c.angleResults = append(c.angleResults, altAngle)
+			if altAngle < closestAngle {
+				closestAngle = altAngle
+			}
+
 			if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
 				altRaycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
 				hitValid = hitValid || altRaycastDist <= CombatSurvivalReach
@@ -274,9 +291,14 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 				}
 				raycastHit = true
 			}
+			rawDist := lerpedResult.attackPos.Sub(game.ClosestPointToBBox(lerpedResult.attackPos, altEntityBB)).Len()
+			c.rawResults = append(c.rawResults, rawDist)
+			if rawDist < closestRawDist {
+				closestRawDist = rawDist
+			}
 		}
 
-		rawDist := lerpedResult.attackPos.Sub(game.ClosestPointToBBox(lerpedResult.attackPos, entityBB.Grow(0.1))).Len()
+		rawDist := lerpedResult.attackPos.Sub(game.ClosestPointToBBox(lerpedResult.attackPos, entityBB)).Len()
 		c.rawResults = append(c.rawResults, rawDist)
 		if rawDist < closestRawDist {
 			closestRawDist = rawDist
@@ -289,14 +311,14 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	// Only allow the raw distance check to be use for touch players if a raycast is unable to land on the entity. This prevents clients
 	// abusing spoofing their input to gain a slight reach advantage. We also want to make sure we're not allowing the player to hit entities
-	// that are behind them. 110 degrees is MC:BE's maximum camera FOV.
+	// that are behind them.
 	if !hitValid && c.mPlayer.InputMode == packet.InputModeTouch {
-		hitValid = closestRawDist <= CombatSurvivalReach && closestAngle <= 110.0
+		hitValid = closestRawDist <= CombatSurvivalReach && closestAngle <= c.mPlayer.Opts().Combat.MaximumAttackAngle
 	}
 
 	// If the hit is valid and the player is not on touch mode, check if the closest calculated ray from the player's eye position to the bounding box
 	// of the entity, has any intersecting blocks. If there are blocks that are in the way of the ray then the hit is invalid.
-	if hitValid && raycastHit && closestRaycastDist > 0 {
+	if !c.useClientTracker && hitValid && raycastHit && closestRaycastDist > 0 {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 
 	check_blocks_between_ray:
@@ -321,17 +343,20 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	c.mPlayer.Dbg.Notify(
 		player.DebugModeCombat,
-		!hitValid && !c.checkMisprediction,
-		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f)",
+		!c.useClientTracker && !hitValid && !c.checkMisprediction,
+		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f, angle=%f)",
 		closestRaycastDist,
 		closestRawDist,
+		closestAngle,
 	)
 
 	// If this is the full-authoritative combat component, and the hit is valid, send the attack packet to the server.
 	if hitValid {
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "<green>hit sent to the server</green> (raycast=%f raw=%f)", closestRaycastDist, closestRawDist)
+		c.mPlayer.Dbg.Notify(player.DebugModeCombat, !c.useClientTracker, "<green>hit sent to the server</green> (raycast=%f raw=%f, angle=%f)", closestRaycastDist, closestRawDist, closestAngle)
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, c.checkMisprediction, "<yellow>client mispredicted air hit, but actually attacked entity</yellow>")
-		c.mPlayer.SendPacketToServer(c.attackInput)
+		if !c.useClientTracker {
+			c.mPlayer.SendPacketToServer(c.attackInput)
+		}
 	}
 
 	for _, hook := range c.hooks {
@@ -356,8 +381,16 @@ func (c *AuthoritativeCombatComponent) Raws() []float32 {
 	return c.rawResults
 }
 
+func (c *AuthoritativeCombatComponent) Angles() []float32 {
+	return c.angleResults
+}
+
 // checkForMispredictedEntity returns true if an entity were found to be in the way of the combat component.
 func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
+	if c.useClientTracker {
+		return false
+	}
+
 	var (
 		minDist        float32 = 1_000_000
 		targetedEntity *entity.Entity
@@ -368,7 +401,7 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 	// We subtract the rewind tick by 1 here, because the client has already ticked in this instance (which increases)
 	// the client tick by 1, so we have to rewind to the previous tick.
 	rewTick := c.mPlayer.ClientTick - 1
-	for rid, e := range c.mPlayer.EntityTracker().All() {
+	for rid, e := range c.entityTracker().All() {
 		rewind, ok := e.Rewind(rewTick)
 		if !ok {
 			continue
@@ -412,12 +445,20 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 	return true
 }
 
+func (c *AuthoritativeCombatComponent) entityTracker() player.EntityTrackerComponent {
+	if c.useClientTracker {
+		return c.mPlayer.ClientEntityTracker()
+	}
+	return c.mPlayer.EntityTracker()
+}
+
 func (c *AuthoritativeCombatComponent) reset() {
 	c.attackInput = nil
 	c.targetedEntity = nil
 	c.checkMisprediction = false
 	c.raycastResults = c.raycastResults[:0]
 	c.rawResults = c.rawResults[:0]
+	c.angleResults = c.angleResults[:0]
 	c.attacked = false
 	for rid := range c.uniqueAttackedEntities {
 		delete(c.uniqueAttackedEntities, rid)

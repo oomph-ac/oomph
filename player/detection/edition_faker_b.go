@@ -40,7 +40,7 @@ func New_EditionFakerB(p *player.Player) *EditionFakerB {
 }
 
 func (*EditionFakerB) Type() string {
-	return TYPE_EDITION_FAKER
+	return TypeEditionFaker
 }
 
 func (*EditionFakerB) SubType() string {
