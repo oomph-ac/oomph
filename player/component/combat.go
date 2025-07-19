@@ -160,7 +160,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	// There is no attack input for this tick.
-	defer c.reset()
+	defer c.Reset()
 
 	if !c.checkMisprediction && c.attackInput == nil {
 		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "no attack input for this tick, skipping combat calculation")
@@ -452,7 +452,7 @@ func (c *AuthoritativeCombatComponent) entityTracker() player.EntityTrackerCompo
 	return c.mPlayer.EntityTracker()
 }
 
-func (c *AuthoritativeCombatComponent) reset() {
+func (c *AuthoritativeCombatComponent) Reset() {
 	c.attackInput = nil
 	c.targetedEntity = nil
 	c.checkMisprediction = false

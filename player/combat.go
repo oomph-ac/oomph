@@ -21,6 +21,8 @@ type CombatComponent interface {
 	// current position. The data then can be used to validated on other components or detections.
 	// This function should be called when the player ticks on PlayerAuthInput.
 	Calculate() bool
+	// Reset resets the combat component to its initial state.
+	Reset()
 
 	// Swing notifies the combat component of when the member player swings their arm.
 	Swing()
