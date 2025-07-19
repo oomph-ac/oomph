@@ -1,8 +1,6 @@
 package world
 
 import (
-	"log/slog"
-
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -32,17 +30,18 @@ type World struct {
 	exemptedChunks map[protocol.ChunkPos]struct{}
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
 
-	logger **slog.Logger
+	debugFn func(string, ...any)
 }
 
-func New(logger **slog.Logger) *World {
+func New(debugFn func(string, ...any)) *World {
 	return &World{
 		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
 		subChunks: make(map[protocol.ChunkPos][]xxh3.Uint128),
 
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
-		logger:         logger,
+
+		debugFn: debugFn,
 	}
 }
 
@@ -121,21 +120,22 @@ func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 		return
 	}
 	w.lastCleanPos = pos
+	debugFn := w.debugFn
 
 	for chunkPos, c := range w.chunks {
 		_, exempted := w.exemptedChunks[chunkPos]
 		inRange := chunkInRange(radius, chunkPos, pos)
 
 		if exempted && inRange {
-			/* if w.logger != nil {
-				(*w.logger).Debug("removed exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
-			} */
+			if debugFn != nil {
+				debugFn("removed exempted chunk stats chunkPos=%v, radius=%d, pos=%v", chunkPos, radius, pos)
+			}
 			delete(w.exemptedChunks, chunkPos)
 		} else if !exempted && !inRange {
+			if debugFn != nil {
+				debugFn("removed non-exempted chunk stats chunkPos=%v, radius=%d, pos=%v", chunkPos, radius, pos)
+			}
 			w.removeChunk(c, chunkPos)
-			/* if w.logger != nil {
-				(*w.logger).Info("removed non-exempted chunk stats", "chunkPos", chunkPos, "radius", radius, "pos", pos)
-			} */
 		}
 	}
 }
