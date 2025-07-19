@@ -152,18 +152,27 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
 		var newActions = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
 		for _, action := range pk.BlockActions {
+			p.Dbg.Notify(DebugModeBlockBreaking, true, "blockAction=%v", action)
 			switch action.Action {
 			case protocol.PlayerActionPredictDestroyBlock:
 				if !isFullServerAuthBlockBreaking || p.worldUpdater.BlockBreakPos() == nil {
+					p.Dbg.Notify(
+						DebugModeBlockBreaking,
+						true,
+						"ignored PlayerActionPredictDestroyBlock (isFullServerAuthBlockBreaking=%v, blockBreakPos=%v)",
+						isFullServerAuthBlockBreaking,
+						p.worldUpdater.BlockBreakPos(),
+					)
 					continue
 				}
 
 				finalProgress := p.blockBreakProgress + (1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001))
+				p.Dbg.Notify(DebugModeBlockBreaking, true, "finalProgress=%.4f", finalProgress)
 				if finalProgress <= 0.999 {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					p.Popup("<red>Broke block too early!</red>")
-					p.Log().Debug("broke block too early", "progress", p.blockBreakProgress, "heldItem", p.Inventory().Holding())
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "cancelled PlayerActionPredictDestroyBlock (finalProgress=%.4f)", finalProgress)
 					continue
 				}
 
@@ -173,6 +182,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					int(action.BlockPos.Y()),
 					int(action.BlockPos.Z()),
 				}, block.Air{}, nil)
+				p.Dbg.Notify(DebugModeBlockBreaking, true, "(PlayerActionPredictDestroyBlock) broke block at %v", action.BlockPos)
 			case protocol.PlayerActionStartBreak, protocol.PlayerActionCrackBreak:
 				if action.Action == protocol.PlayerActionStartBreak {
 					// We assume a potential mispredction here because the client while clicking, think it may need to break
@@ -185,11 +195,12 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					// previously was broken.
 					p.blockBreakProgress = 0.0
 					p.blockBreakInProgress = true
-					//p.Message("start break")
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "(PlayerActionStartBreak) started breaking block at %v", action.BlockPos)
 				}
 
 				currentBlockBreakPos := p.worldUpdater.BlockBreakPos()
 				if currentBlockBreakPos == nil || *currentBlockBreakPos != action.BlockPos {
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "reset block break progress (currentBlockBreakPos=%v, action.BlockPos=%v)", currentBlockBreakPos, action.BlockPos)
 					p.blockBreakProgress = 0.0
 				}
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
@@ -197,6 +208,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 			case protocol.PlayerActionContinueDestroyBlock:
 				if currentBreakPos := p.worldUpdater.BlockBreakPos(); !p.blockBreakInProgress || (currentBreakPos != nil && *currentBreakPos != action.BlockPos) {
 					p.blockBreakProgress = 0.0
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "different block being broken - reset block break progress (currentBreakPos=%v, action.BlockPos=%v)", currentBreakPos, action.BlockPos)
 				}
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
@@ -211,20 +223,21 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 			case protocol.PlayerActionAbortBreak:
 				//p.Message("abort break")
 				p.blockBreakProgress = 0.0
+				p.Dbg.Notify(DebugModeBlockBreaking, true, "aborted block break (currentBreakPos=%v)", p.worldUpdater.BlockBreakPos())
 				p.worldUpdater.SetBlockBreakPos(nil)
 				p.blockBreakInProgress = false
 			case protocol.PlayerActionStopBreak:
-				//p.Message("stop break")
 				if p.worldUpdater.BlockBreakPos() == nil {
 					continue
 				}
 
 				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001)
+				p.Dbg.Notify(DebugModeBlockBreaking, true, "(PlayerActionStopBreak) block break progress=%.4f", p.blockBreakProgress)
 				if p.blockBreakProgress <= 0.999 {
 					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
 					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
 					p.Popup("<red>Broke block too early!</red>")
-					p.Log().Debug("broke block too early", "progress", p.blockBreakProgress, "heldItem", p.Inventory().Holding())
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "cancelled PlayerActionStopBreak (blockBreakProgress=%.4f)", p.blockBreakProgress)
 					continue
 				}
 
@@ -234,6 +247,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					int(p.worldUpdater.BlockBreakPos().Y()),
 					int(p.worldUpdater.BlockBreakPos().Z()),
 				}, block.Air{}, nil)
+				p.Dbg.Notify(DebugModeBlockBreaking, true, "(PlayerActionStopBreak) broke block at %v", p.worldUpdater.BlockBreakPos())
 			}
 			newActions = append(newActions, action)
 		}

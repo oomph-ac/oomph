@@ -13,6 +13,7 @@ const (
 	DebugModeTimer
 	DebugModeBlockPlacement
 	DebugModeUnhandledPackets
+	DebugModeBlockBreaking
 
 	debugModeCount
 )
@@ -33,6 +34,7 @@ var DebugModeList = []string{
 	"timer-a",
 	"block_placements",
 	"unhandled_packets",
+	"block_breaking",
 }
 
 type Debugger struct {
