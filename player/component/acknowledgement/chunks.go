@@ -35,6 +35,7 @@ func (ack *ChunkUpdate) Run() {
 		return
 	}
 	ack.mPlayer.World().AddChunk(ack.pk.Position, cInfo)
+	ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "added chunk at %v", ack.pk.Position)
 }
 
 // SubChunkUpdate is an acknowledgment that runs when a player receives a SubChunk packet.
