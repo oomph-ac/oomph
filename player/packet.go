@@ -108,6 +108,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				mode = DebugModeBlockPlacement
 			case "unhandled_packets":
 				mode = DebugModeUnhandledPackets
+			case "block_breaking", "block_break":
+				mode = DebugModeBlockBreaking
 			default:
 				p.Message("Unknown debug mode: %s", args[1])
 				return
