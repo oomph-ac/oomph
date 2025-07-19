@@ -23,7 +23,7 @@ func New_ScaffoldA(p *player.Player) *ScaffoldA {
 }
 
 func (*ScaffoldA) Type() string {
-	return TYPE_SCAFFOLD
+	return TypeScaffold
 }
 
 func (*ScaffoldA) SubType() string {

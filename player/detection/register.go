@@ -21,4 +21,11 @@ func Register(p *player.Player) {
 
 	// killaura detections
 	p.RegisterDetection(New_KillauraA(p))
+
+	// reach detections
+	p.RegisterDetection(New_ReachA(p))
+	p.RegisterDetection(New_ReachB(p))
+
+	// hitbox detections
+	p.RegisterDetection(New_HitboxA(p))
 }

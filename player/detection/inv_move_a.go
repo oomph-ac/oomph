@@ -24,7 +24,7 @@ func New_InvMoveA(p *player.Player) *InvMoveA {
 }
 
 func (*InvMoveA) Type() string {
-	return TYPE_INV_MOVE
+	return TypeInvMove
 }
 
 func (*InvMoveA) SubType() string {

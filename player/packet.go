@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
@@ -14,6 +13,7 @@ import (
 )
 
 var ClientDecode = []uint32{
+	packet.IDInteract,
 	packet.IDScriptMessage,
 	packet.IDText,
 	packet.IDPlayerAuthInput,
@@ -146,10 +146,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		p.handleBlockActions(pk)
 		p.handleMovement(pk)
 
-		if !p.opts.Combat.FullAuthoritative {
-			p.entTracker.Tick(p.ClientTick)
+		if p.opts.Combat.EnableClientEntityTracking {
+			p.clientEntTracker.Tick(p.ClientTick)
+			_ = p.clientCombat.Calculate()
 		}
-
 		serverVerifiedHit := p.combat.Calculate()
 		if serverVerifiedHit && missedSwing {
 			pk.InputData.Unset(packet.InputFlagMissedSwing)
@@ -166,6 +166,9 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
 			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
 			p.combat.Attack(pk)
+			if p.opts.Combat.EnableClientEntityTracking {
+				p.clientCombat.Attack(pk)
+			}
 			ctx.Cancel()
 			return
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
@@ -274,8 +277,6 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Combat().Attack(nil)
 		}
-	default:
-		p.log.Debug("unhandled client packet", "packetID", pk.ID())
 	}
 	p.RunDetections(pk)
 }
@@ -306,9 +307,31 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			height,
 			scale,
 		))
+		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityType,
+			pk.EntityMetadata,
+			pk.Position,
+			pk.Velocity,
+			p.Opts().Combat.MaxRewind,
+			false,
+			width,
+			height,
+			scale,
+		))
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			"",
+			pk.EntityMetadata,
+			pk.Position,
+			pk.Velocity,
+			p.Opts().Combat.MaxRewind,
+			true,
+			width,
+			height,
+			scale,
+		))
+		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
 			"",
 			pk.EntityMetadata,
 			pk.Position,
@@ -336,6 +359,9 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMoveActorAbsolute(pk)
+			if p.opts.Combat.EnableClientEntityTracking {
+				p.clientEntTracker.HandleMoveActorAbsolute(pk)
+			}
 		} else {
 			p.movement.ServerUpdate(pk)
 		}
@@ -345,19 +371,22 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMovePlayer(pk)
+			if p.Opts().Combat.EnableClientEntityTracking {
+				p.clientEntTracker.HandleMovePlayer(pk)
+			}
 		} else {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.RemoveActor:
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
+		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 	case *packet.SetActorData:
 		pk.Tick = 0
 		ctx.SetModified()
 
 		if pk.EntityRuntimeID != p.RuntimeId {
-			if e := p.entTracker.FindEntity(pk.EntityRuntimeID); e != nil {
-				e.Width, e.Height, e.Scale = calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
-			}
+			p.entTracker.HandleSetActorData(pk)
+			p.clientEntTracker.HandleSetActorData(pk)
 		} else {
 			copyPk := *pk
 			p.LastSetActorData = &copyPk
@@ -387,7 +416,5 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
-	default:
-		p.log.Debug("unhandled server packet", "packetID", pk.ID(), "type", fmt.Sprintf("%T", pk))
 	}
 }

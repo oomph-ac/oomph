@@ -26,7 +26,7 @@ func New_AimA(p *player.Player) *AimA {
 }
 
 func (*AimA) Type() string {
-	return TYPE_AIM
+	return TypeAim
 }
 
 func (*AimA) SubType() string {

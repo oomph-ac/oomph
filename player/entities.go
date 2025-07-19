@@ -24,6 +24,8 @@ type EntityTrackerComponent interface {
 	HandleMovePlayer(pk *packet.MovePlayer)
 	// HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 	HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute)
+	// HandleSetActorData is a function that handles entity data updates sent with SetActorDataPacket.
+	HandleSetActorData(pk *packet.SetActorData)
 
 	// Tick makes the entity tracker component tick all of the entities. If the player has
 	// full authoritative combat enabled, this is called on the "server" goroutine. On all other
@@ -37,4 +39,12 @@ func (p *Player) SetEntityTracker(et EntityTrackerComponent) {
 
 func (p *Player) EntityTracker() EntityTrackerComponent {
 	return p.entTracker
+}
+
+func (p *Player) SetClientEntityTracker(et EntityTrackerComponent) {
+	p.clientEntTracker = et
+}
+
+func (p *Player) ClientEntityTracker() EntityTrackerComponent {
+	return p.clientEntTracker
 }

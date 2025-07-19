@@ -25,7 +25,7 @@ func New_BadPacketA(p *player.Player) *BadPacketA {
 }
 
 func (*BadPacketA) Type() string {
-	return TYPE_BAD_PACKET
+	return TypeBadPacket
 }
 
 func (*BadPacketA) SubType() string {

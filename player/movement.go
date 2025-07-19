@@ -359,5 +359,5 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	// rubberbanding that is visible on the POVs of the other players if corrections are sent. This also implies the fact that
 	// other players will be unable to see if another client is using a cheat to modify their movement (e.g - fly). Of course, that is
 	// granted that the movement scenario is supported by Oomph.
-	pk.Position = finalPos.Add(mgl32.Vec3{0, 1.621})
+	pk.Position = finalPos.Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset + 0.001})
 }

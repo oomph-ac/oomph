@@ -15,7 +15,7 @@ type HistoricalPosition struct {
 
 // Rewind looks back in the position history of the entity, and returns the position at the given tick.
 func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
-	if len(e.PositionHistory) == 0 {
+	if e.PositionHistory.Len() == 0 {
 		return HistoricalPosition{}, false
 	}
 
@@ -24,7 +24,7 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 		delta  int64 = 1_000_000_000_000
 	)
 
-	for _, hp := range e.PositionHistory {
+	for hp := range e.PositionHistory.Iter() {
 		if hp.Tick == tick {
 			return hp, true
 		}

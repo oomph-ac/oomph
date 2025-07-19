@@ -43,3 +43,11 @@ func (p *Player) SetCombat(c CombatComponent) {
 func (p *Player) Combat() CombatComponent {
 	return p.combat
 }
+
+func (p *Player) SetClientCombat(c CombatComponent) {
+	p.clientCombat = c
+}
+
+func (p *Player) ClientCombat() CombatComponent {
+	return p.clientCombat
+}
