@@ -10,6 +10,8 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+const noInputModeSet uint32 = 4200069
+
 var knownInvalidInputs = map[protocol.DeviceOS][]uint32{
 	protocol.DeviceOrbis: {packet.InputModeTouch}, // Playstation
 	protocol.DeviceXBOX:  {packet.InputModeTouch},
@@ -18,6 +20,9 @@ var knownInvalidInputs = map[protocol.DeviceOS][]uint32{
 type EditionFakerC struct {
 	mPlayer  *player.Player
 	metadata *player.DetectionMetadata
+
+	inputMode uint32
+	isMobile  bool
 }
 
 func New_EditionFakerC(p *player.Player) *EditionFakerC {
@@ -29,6 +34,10 @@ func New_EditionFakerC(p *player.Player) *EditionFakerC {
 
 			MaxViolations: 1,
 		},
+		inputMode: noInputModeSet,
+		isMobile: p.ClientDat.DeviceOS == protocol.DeviceAndroid ||
+			p.ClientDat.DeviceOS == protocol.DeviceIOS ||
+			p.ClientDat.DeviceOS == protocol.DeviceFireOS,
 	}
 }
 
@@ -67,5 +76,12 @@ func (d *EditionFakerC) Detect(pk packet.Packet) {
 			data.Set("inputMode", i.InputMode)
 			data.Set("OS", utils.Device(d.mPlayer.ClientDat.DeviceOS))
 		}
+
+		if !d.mPlayer.Opts().Combat.AllowNonMobileTouch && !d.isMobile && i.InputMode == packet.InputModeTouch {
+			d.mPlayer.Disconnect("Sorry! Using touch on non-mobile devices is not allowed by this server.")
+		} else if !d.mPlayer.Opts().Combat.AllowSwitchInputMode && d.inputMode != noInputModeSet && d.inputMode != i.InputMode {
+			d.mPlayer.Disconnect("Sorry! Switching your input mode is not allowed by this server.")
+		}
+		d.inputMode = i.InputMode
 	}
 }
