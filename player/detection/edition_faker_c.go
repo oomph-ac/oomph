@@ -79,9 +79,9 @@ func (d *EditionFakerC) Detect(pk packet.Packet) {
 
 		if !d.mPlayer.Opts().Combat.AllowNonMobileTouch && !d.isMobile && i.InputMode == packet.InputModeTouch {
 			d.mPlayer.Disconnect("Sorry! Using touch on non-mobile devices is not allowed by this server.")
-		} else if !d.mPlayer.Opts().Combat.AllowSwitchInputMode && d.inputMode != noInputModeSet && d.inputMode != i.InputMode {
+		} /* else if !d.mPlayer.Opts().Combat.AllowSwitchInputMode && d.inputMode != noInputModeSet && d.inputMode != i.InputMode {
 			d.mPlayer.Disconnect("Sorry! Switching your input mode is not allowed by this server.")
-		}
+		} */
 		d.inputMode = i.InputMode
 	}
 }
