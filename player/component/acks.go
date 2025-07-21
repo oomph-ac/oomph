@@ -177,8 +177,6 @@ func (ackC *ACKComponent) Flush() {
 	if ackC.currentBatch == nil {
 		ackC.mPlayer.Disconnect(game.ErrorInternalACKIsNull)
 		return
-	} else if len(ackC.currentBatch.acks) == 0 {
-		return
 	}
 
 	timestamp := ackC.currentBatch.timestamp
