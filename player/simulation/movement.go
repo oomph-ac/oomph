@@ -31,6 +31,13 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "mF=%.4f, mS=%.4f", movement.Impulse().Y(), movement.Impulse().X())
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "yaw=%.4f, pitch=%.4f", movement.Rotation().Z(), movement.Rotation().X())
 
+	// ALWAYS simulate the teleport, as the client will always have the same behavior regardless of if the scenario
+	// is "unreliable", or if the player currently is in an unloaded chunk.
+	if attemptTeleport(movement, p.Dbg) {
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
+		return
+	}
+
 	if !simulationIsReliable(p, movement) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
 		movement.Reset()
@@ -38,19 +45,6 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	} else if p.World().GetChunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
 		movement.SetVel(mgl32.Vec3{})
-		return
-	}
-
-	blockUnder := p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
-	blockFriction := game.DefaultAirFriction
-
-	// If a teleport was able to be handled, do not continue with the simulation.
-	if attemptTeleport(movement, p.Dbg) {
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
-		/* if attemptKnockback(movement) {
-			p.Dbg.Notify(player.DebugModeMovementSim, true, "knockback applied: %v", movement.Vel())
-			movement.SetPos(movement.Pos().Add(movement.Vel()))
-		} */
 		return
 	}
 
@@ -65,6 +59,8 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		movement.SetVel(mgl32.Vec3{})
 	}
 
+	blockUnder := p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
+	blockFriction := game.DefaultAirFriction
 	moveRelativeSpeed := movement.AirSpeed()
 	if movement.OnGround() {
 		blockFriction *= utils.BlockFriction(blockUnder)
