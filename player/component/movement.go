@@ -430,6 +430,11 @@ func (mc *AuthoritativeMovementComponent) RemainingTeleportTicks() int {
 	return int(mc.teleportCompletionTicks) - int(mc.ticksSinceTeleport)
 }
 
+// TicksSinceTeleport returns the amount of ticks since the last teleport was applied.
+func (mc *AuthoritativeMovementComponent) TicksSinceTeleport() uint64 {
+	return mc.ticksSinceTeleport
+}
+
 // Size returns the width and height of the movement component in a Vec2. The X-axis
 // contains the width, and the Y-axis contains the height.
 func (mc *AuthoritativeMovementComponent) Size() mgl32.Vec2 {
