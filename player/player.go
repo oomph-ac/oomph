@@ -422,35 +422,39 @@ func (p *Player) SetCloser(closer func()) {
 func (p *Player) Close() error {
 	p.CloseFunc.Do(func() {
 		p.Closed = true
-		if evHandler := p.eventHandler; evHandler != nil {
-			evHandler.HandleQuit()
-		}
+		go func() {
+			p.procMu.Lock()
+			defer p.procMu.Unlock()
 
-		if !p.MState.IsReplay {
-			if c := p.conn; c != nil {
-				c.Close()
+			if evHandler := p.eventHandler; evHandler != nil {
+				evHandler.HandleQuit()
 			}
-			if c := p.serverConn; c != nil {
-				c.Close()
+			if !p.MState.IsReplay {
+				if c := p.conn; c != nil {
+					c.Close()
+				}
+				if c := p.serverConn; c != nil {
+					c.Close()
+				}
 			}
-		}
 
-		p.log = nil
-		if conn := p.conn; conn != nil {
-			p.conn.Close()
-			p.conn = nil
-		}
-		if serverConn := p.serverConn; serverConn != nil {
-			serverConn.Close()
-			p.serverConn = nil
-		}
-		p.Dbg.target = nil
-		p.world.PurgeChunks()
-		close(p.CloseChan)
+			p.log = nil
+			if conn := p.conn; conn != nil {
+				p.conn.Close()
+				p.conn = nil
+			}
+			if serverConn := p.serverConn; serverConn != nil {
+				serverConn.Close()
+				p.serverConn = nil
+			}
+			p.Dbg.target = nil
+			p.world.PurgeChunks()
+			close(p.CloseChan)
 
-		if closer := p.closer; closer != nil {
-			closer()
-		}
+			if closer := p.closer; closer != nil {
+				closer()
+			}
+		}()
 	})
 
 	return nil
