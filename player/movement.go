@@ -131,6 +131,8 @@ type MovementComponent interface {
 	PendingTeleports() int
 	// RemainingTeleportTicks returns the amount of ticks the teleport still needs to be completed.
 	RemainingTeleportTicks() int
+	// TicksSinceTeleport returns the amount of ticks since the last teleport was applied.
+	TicksSinceTeleport() uint64
 
 	// Size returns the width and height of the movement component in a Vec2. The X-axis
 	// contains the width, and the Y-axis contains the height.
