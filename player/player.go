@@ -474,6 +474,8 @@ func (p *Player) StartTicking() {
 
 // Tick ticks handlers and checks, and also flushes connections. It returns false if the player should be removed.
 func (p *Player) Tick() bool {
+	defer p.recoverError()
+
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
