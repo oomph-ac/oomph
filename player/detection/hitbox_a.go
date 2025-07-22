@@ -18,10 +18,10 @@ func New_HitboxA(p *player.Player) *HitboxA {
 	return &HitboxA{
 		mPlayer: p,
 		metadata: &player.DetectionMetadata{
-			FailBuffer:    1.001,
-			MaxBuffer:     1.5,
+			FailBuffer:    6,
+			MaxBuffer:     6,
 			MaxViolations: 10,
-			TrustDuration: 60 * player.TicksPerSecond,
+			//TrustDuration: 60 * player.TicksPerSecond,
 		},
 	}
 }
