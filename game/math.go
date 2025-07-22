@@ -87,6 +87,16 @@ func DirectionVector(yaw, pitch float32) mgl32.Vec3 {
 	}
 }
 
+// WrapYawDelta ...
+func WrapYawDelta(delta float32) float32 {
+	if delta > 180 {
+		delta -= 360
+	} else if delta < -180 {
+		delta += 360
+	}
+	return delta
+}
+
 // AbsVec64 will return the given vector, but all the values of it are switched to their absolute values.
 func AbsVec64(vec mgl64.Vec3) mgl64.Vec3 {
 	return mgl64.Vec3{math.Abs(vec.X()), math.Abs(vec.Y()), math.Abs(vec.Z())}
