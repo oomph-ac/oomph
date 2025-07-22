@@ -35,24 +35,6 @@ func ClampFloat(num, min, max float32) float32 {
 
 // GetRotationToPoint returns the yaw/pitch needed to be aiming at a certain point.
 func GetRotationToPoint(origin, target mgl32.Vec3) mgl32.Vec2 {
-	hz := math32.Sqrt(math32.Pow(target.X()-origin.X(), 2) + math32.Pow(target.Z()-origin.Z(), 2))
-	v := target.Y() - origin.Y()
-
-	pitch := -math32.Atan2(v, hz) / math32.Pi * 180
-	xDist, zDist := target.X()-origin.X(), target.Z()-origin.Z()
-	yaw := math32.Atan2(zDist, xDist)/math32.Pi*180 - 90
-	if yaw <= -180 {
-		yaw += 360
-	}
-
-	return mgl32.Vec2{yaw, pitch}
-}
-
-func AngleToPoint(
-	origin,
-	target,
-	rotation mgl32.Vec3,
-) mgl32.Vec2 {
 	diff := target.Sub(origin)
 	yaw := (math32.Atan2(diff[2], diff[0]) * 180 / math32.Pi) - 90
 	pitch := math32.Atan2(diff[1], math32.Sqrt(diff[0]*diff[0]+diff[2]*diff[2])) * 180 / math32.Pi
@@ -61,7 +43,16 @@ func AngleToPoint(
 	} else if yaw > 180 {
 		yaw -= 360
 	}
-	yawDiff := yaw - rotation[2]
-	pitchDiff := pitch - rotation[0]
+	return mgl32.Vec2{yaw, pitch}
+}
+
+func AngleToPoint(
+	origin,
+	target,
+	rotation mgl32.Vec3,
+) mgl32.Vec2 {
+	rot := GetRotationToPoint(origin, target)
+	yawDiff := rot[0] - rotation[2]
+	pitchDiff := rot[1] - rotation[0]
 	return mgl32.Vec2{yawDiff, pitchDiff}
 }
