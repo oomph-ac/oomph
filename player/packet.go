@@ -179,7 +179,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				p.clientCombat.Attack(pk)
 			}
 			ctx.Cancel()
-			return
+			//return
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 			if tr.ActionType == protocol.UseItemActionClickAir {
