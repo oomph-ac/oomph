@@ -70,6 +70,8 @@ func (d *HitboxA) Detect(pk packet.Packet) {
 			data := orderedmap.NewOrderedMap[string, any]()
 			data.Set("amt", game.Round32(0.6+(dist*2), 3))
 			d.mPlayer.FailDetection(d, data)
+		} else {
+			d.mPlayer.PassDetection(d, d.metadata.Buffer)
 		}
 	}
 }
