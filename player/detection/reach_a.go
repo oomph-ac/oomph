@@ -49,8 +49,7 @@ func (d *ReachA) Metadata() *player.DetectionMetadata {
 func (d *ReachA) Detect(packet.Packet) {}
 
 func (d *ReachA) run(c player.CombatComponent) {
-	if d.mPlayer.InputMode == packet.InputModeTouch || d.mPlayer.Movement().RemainingTeleportTicks() <= 20 ||
-		d.mPlayer.Movement().PendingTeleports() > 0 || d.mPlayer.Movement().InCorrectionCooldown() {
+	if d.mPlayer.InputMode == packet.InputModeTouch || d.mPlayer.Movement().TicksSinceTeleport() <= 20 || d.mPlayer.Movement().InCorrectionCooldown() {
 		return
 	}
 	raycasts := c.Raycasts()
