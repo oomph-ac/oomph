@@ -96,20 +96,30 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 	}
 
 	// Check if any entity is in the way of the block being placed.
-	for eid, e := range p.EntityTracker().All() {
-		rew, ok := e.Rewind(p.ClientTick)
-		if !ok {
-			continue
+	entityIntersecting := false
+	if p.Opts().Combat.EnableClientEntityTracking {
+		for _, e := range p.ClientEntityTracker().All() {
+			if cube.AnyIntersections(boxes, e.Box(e.Position)) {
+				entityIntersecting = true
+				break
+			}
 		}
+	} else {
+		for _, e := range p.EntityTracker().All() {
+			if rew, ok := e.Rewind(p.ClientTick); ok && cube.AnyIntersections(boxes, e.Box(rew.Position)) {
+				entityIntersecting = true
+				break
+			}
+		}
+	}
 
+	if entityIntersecting {
 		// We sync the world in this instance to avoid any possibility of a long-persisting ghost block.
-		if cube.AnyIntersections(boxes, e.Box(rew.Position)) {
-			p.SendBlockUpdates([]protocol.BlockPos{
-				{int32(pos[0]), int32(pos[1]), int32(pos[2])},
-			})
-			p.Dbg.Notify(DebugModeBlockPlacement, true, "entity %d intersects with block at %v", eid, pos)
-			return
-		}
+		p.SendBlockUpdates([]protocol.BlockPos{
+			{int32(pos[0]), int32(pos[1]), int32(pos[2])},
+		})
+		p.Dbg.Notify(DebugModeBlockPlacement, true, "entity prevents block placement at %v", pos)
+		return
 	}
 
 	/* inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
