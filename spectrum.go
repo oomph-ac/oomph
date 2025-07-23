@@ -9,6 +9,7 @@ import (
 	"github.com/cooldogedev/spectrum/session"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
+	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -121,14 +122,20 @@ func (p *Processor) ProcessFlush(ctx *session.Context) {
 func (p *Processor) ProcessPreTransfer(*session.Context, *string, *string) {
 	if pl := p.pl.Load(); pl != nil {
 		pl.PauseProcessing()
+		if w := pl.World(); w != nil {
+			// Set the save-the-world state to true, this will prevent chunks from being deleted during the transfer.
+			w.SetSaveTheWorld(true)
+		}
 	}
 }
 
 func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string) {
 	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
 		pl.SetServerConn(s.Server())
-		pl.ACKs().Invalidate()
-		pl.RegenerateWorld()
+		// Remove save-the-world state from the player's world, we can start removing chunks once this ACK is processed.
+		// If a malicious client were to try to abuse this ACK to increase the proxy's message usage - they would have a limited amount
+		// of time to do so or they will timeout. It should also be noted that the chunk cache should help out in scenarios like these.
+		pl.ACKs().Add(acknowledgement.NewSaveTheWorldACK(pl, false))
 		pl.ResumeProcessing()
 	}
 }
