@@ -32,8 +32,7 @@ type World struct {
 
 	debugFn func(string, ...any)
 
-	// saveTheWorld is a boolean that is true if the player is in the middle of a proxy transfer - this will prevent all chunks from being deleted.
-	saveTheWorld bool
+	stwTicks uint16
 }
 
 func New(debugFn func(string, ...any)) *World {
@@ -48,8 +47,8 @@ func New(debugFn func(string, ...any)) *World {
 	}
 }
 
-func (w *World) SetSaveTheWorld(save bool) {
-	w.saveTheWorld = save
+func (w *World) SetSTWTicks(ticks uint16) {
+	w.stwTicks = ticks
 }
 
 // AddChunk adds a chunk to the world.
@@ -124,10 +123,11 @@ func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
 // CleanChunks cleans up the chunks in respect to the given chunk radius and chunk position.
 func (w *World) CleanChunks(radius int32, pos protocol.ChunkPos) {
 	debugFn := w.debugFn
-	if w.saveTheWorld {
+	if w.stwTicks > 0 {
 		if debugFn != nil {
-			debugFn("saveTheWorld is active, skipping chunk cleanup")
+			debugFn("not cleaning chunks - stwTicks=%d", w.stwTicks)
 		}
+		w.stwTicks--
 		return
 	}
 
