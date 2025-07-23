@@ -43,7 +43,7 @@ func GetRotationToPoint(origin, target mgl32.Vec3) mgl32.Vec2 {
 	} else if yaw > 180 {
 		yaw -= 360
 	}
-	return mgl32.Vec2{yaw, pitch}
+	return mgl32.Vec2{yaw, -pitch}
 }
 
 func AngleToPoint(
@@ -54,5 +54,5 @@ func AngleToPoint(
 	rot := GetRotationToPoint(origin, target)
 	yawDiff := rot[0] - rotation[2]
 	pitchDiff := rot[1] - rotation[0]
-	return mgl32.Vec2{yawDiff, pitchDiff}
+	return mgl32.Vec2{WrapYawDelta(yawDiff), pitchDiff}
 }
