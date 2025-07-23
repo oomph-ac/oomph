@@ -126,6 +126,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.PlayerAuthInput:
 		if !p.movement.InputAcceptable() {
 			p.Popup("<red>input rate-limited (%d)</red>", p.SimulationFrame)
+			p.tryRunningClientCombat()
 			ctx.Cancel()
 			return
 		}
@@ -145,13 +146,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		if pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
 			p.inventory.HandleSingleRequest(pk.ItemStackRequest)
 		}
+
 		p.handleBlockActions(pk)
 		p.handleMovement(pk)
-
-		if p.opts.Combat.EnableClientEntityTracking {
-			p.clientEntTracker.Tick(p.ClientTick)
-			_ = p.clientCombat.Calculate()
-		}
+		p.tryRunningClientCombat()
 
 		var serverVerifiedHit bool
 		if !p.blockBreakInProgress {

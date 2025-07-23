@@ -53,3 +53,10 @@ func (p *Player) SetClientCombat(c CombatComponent) {
 func (p *Player) ClientCombat() CombatComponent {
 	return p.clientCombat
 }
+
+func (p *Player) tryRunningClientCombat() {
+	if p.opts.Combat.EnableClientEntityTracking {
+		p.clientEntTracker.Tick(p.ClientTick)
+		_ = p.clientCombat.Calculate()
+	}
+}
