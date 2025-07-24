@@ -2,6 +2,7 @@ package world
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -82,11 +83,16 @@ func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
 		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true}, nil
 	}
 
+	dimension, ok := world.DimensionByID(int(input.Dimension))
+	if !ok {
+		return ChunkInfo{}, fmt.Errorf("unknown dimension %v", input.Dimension)
+	}
+
 	decodedChunk, err := chunk.NetworkDecode(
 		AirRuntimeID,
 		input.RawPayload,
 		int(input.SubChunkCount),
-		world.Overworld.Range(),
+		dimension.Range(),
 	)
 	if err != nil {
 		return ChunkInfo{}, err
