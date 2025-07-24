@@ -358,7 +358,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	c.mPlayer.Dbg.Notify(
 		player.DebugModeCombat,
 		!c.useClientTracker && !hitValid && !c.checkMisprediction,
-		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f, angle=%f)",
+		"<red>hit was invalidated</red> (raycast=%f, raw=%f, angle=%f)",
 		closestRaycastDist,
 		closestRawDist,
 		closestAngle,
