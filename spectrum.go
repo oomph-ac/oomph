@@ -21,9 +21,10 @@ var _ session.Processor = &Processor{}
 type Processor struct {
 	session.NopProcessor
 
-	identity login.IdentityData
-	registry *session.Registry
-	pl       atomic.Pointer[player.Player]
+	identity     login.IdentityData
+	registry     *session.Registry
+	pl           atomic.Pointer[player.Player]
+	transferring atomic.Bool
 
 	dbgTransfer bool
 }
@@ -57,7 +58,7 @@ func (p *Processor) ProcessStartGame(ctx *session.Context, gd *minecraft.GameDat
 
 func (p *Processor) ProcessServer(ctx *session.Context, pk *packet.Packet) {
 	pl := p.pl.Load()
-	if pl == nil {
+	if pl == nil || p.transferring.Load() {
 		return
 	}
 
@@ -84,7 +85,7 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 	}
 
 	pl := p.pl.Load()
-	if pl == nil || pl.Conn() == nil {
+	if pl == nil || pl.Conn() == nil || p.transferring.Load() {
 		return
 	}
 
@@ -99,7 +100,7 @@ func (p *Processor) ProcessClient(ctx *session.Context, pk *packet.Packet) {
 
 func (p *Processor) ProcessFlush(ctx *session.Context) {
 	pl := p.pl.Load()
-	if pl == nil {
+	if pl == nil || p.transferring.Load() {
 		return
 	}
 
@@ -119,12 +120,14 @@ func (p *Processor) ProcessFlush(ctx *session.Context) {
 }
 
 func (p *Processor) ProcessPreTransfer(*session.Context, *string, *string) {
+	p.transferring.Store(true)
 	if pl := p.pl.Load(); pl != nil {
 		pl.PauseProcessing()
 	}
 }
 
 func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string) {
+	p.transferring.Store(false)
 	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
 		pl.SetServerConn(s.Server())
 		// Remove save-the-world state from the player's world, we can start removing chunks once this ACK is processed.
@@ -138,6 +141,7 @@ func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string
 }
 
 func (p *Processor) ProcessTransferFailure(_ *session.Context, origin *string, target *string) {
+	p.transferring.Store(false)
 	if s, pl := p.registry.GetSession(p.identity.XUID), p.pl.Load(); s != nil && pl != nil {
 		pl.ResumeProcessing()
 	}
