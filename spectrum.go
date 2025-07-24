@@ -132,6 +132,7 @@ func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string
 			w.SetSTWTicks(300) // 15 seconds
 		}
 		pl.Effects().RemoveAll()
+		pl.ACKs().Invalidate() // Invalidate all pending UpdateBlock acknowledgments.
 		pl.ResumeProcessing()
 	}
 }

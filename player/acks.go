@@ -29,8 +29,7 @@ type AcknowledgmentComponent interface {
 	Flush()
 	// Refresh resets the current timestamp of the acknowledgment component.
 	Refresh()
-	// Invalidate drops and clears all current acknowledgments. This should only be called when the player is
-	// in the process of being transfered to another server.
+	// Invalidate labels all pending UpdateBlock acknowledgments as invalid - this is primarily for transfers.
 	Invalidate()
 }
 
