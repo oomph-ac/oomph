@@ -39,6 +39,13 @@ func (ec *EffectsComponent) Remove(effectID int32) {
 	delete(ec.effects, effectID)
 }
 
+// RemoveAll removes all effects from the effect component.
+func (ec *EffectsComponent) RemoveAll() {
+	for k := range ec.effects {
+		delete(ec.effects, k)
+	}
+}
+
 // All returns all effects that are currently active in the effect component.
 func (ec *EffectsComponent) All() map[int32]player.Effect {
 	return ec.effects
