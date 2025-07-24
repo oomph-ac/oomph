@@ -131,6 +131,7 @@ func (p *Processor) ProcessPostTransfer(_ *session.Context, _ *string, _ *string
 		if w := pl.World(); w != nil {
 			w.SetSTWTicks(300) // 15 seconds
 		}
+		pl.Effects().RemoveAll()
 		pl.ResumeProcessing()
 	}
 }
