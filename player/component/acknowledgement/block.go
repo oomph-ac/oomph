@@ -14,12 +14,22 @@ type UpdateBlock struct {
 	mPlayer *player.Player
 	b       world.Block
 	pos     df_cube.Pos
+
+	valid bool
 }
 
 func NewUpdateBlockACK(p *player.Player, pos df_cube.Pos, b world.Block) *UpdateBlock {
-	return &UpdateBlock{mPlayer: p, pos: pos, b: b}
+	return &UpdateBlock{mPlayer: p, pos: pos, b: b, valid: true}
 }
 
 func (ack *UpdateBlock) Run() {
+	if !ack.valid {
+		return
+	}
 	ack.mPlayer.World().SetBlock(ack.pos, ack.b, nil)
+}
+
+func (ack *UpdateBlock) Invalidate() {
+	ack.valid = false
+	ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "updateBlock ack for %T at %v is invalidated", ack.b, ack.pos)
 }

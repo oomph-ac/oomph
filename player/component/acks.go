@@ -192,11 +192,15 @@ func (ackC *ACKComponent) Flush() {
 	ackC.Refresh()
 }
 
-// Invalidate drops and clears all current acknowledgments. This should only be called when the player is
-// in the process of being transfered to another server.
+// Invalidate labels all pending UpdateBlock acknowledgments as invalid - this is primarily for transfers.
 func (ackC *ACKComponent) Invalidate() {
-	ackC.pending = ackC.pending[:0]
-	ackC.mPlayer.Log().Info("invalidated ACKs due to transfer")
+	for _, batch := range ackC.pending {
+		for _, ack := range batch.acks {
+			if blockACK, ok := ack.(*acknowledgement.UpdateBlock); ok {
+				blockACK.Invalidate()
+			}
+		}
+	}
 }
 
 // Refresh resets the current timestamp of the acknowledgment component.
