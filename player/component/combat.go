@@ -187,8 +187,10 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		lerpedAtClosest  lerpedResult
 
 		closestRaycastDist float32 = 1_000_000
-		closestRawDist     float32 = 1_000_000
 		closestAngle       float32 = 1_000_000
+
+		closestRawDist float32 = 1_000_000
+		closestRawPos  mgl32.Vec3
 
 		raycastHit bool
 	)
@@ -241,6 +243,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		if entityBB.Vec3Within(lerpedResult.attackPos) {
 			closestRaycastDist = 0
 			closestRawDist = 0
+			closestRawPos = lerpedResult.attackPos
 			closestAngle = 0
 			hitValid = true
 			c.raycastResults = append(c.raycastResults, 0.0)
@@ -291,17 +294,21 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 				}
 				raycastHit = true
 			}
-			rawDist := lerpedResult.attackPos.Sub(game.ClosestPointToBBox(lerpedResult.attackPos, altEntityBB)).Len()
+			closestPoint := game.ClosestPointToBBox(lerpedResult.attackPos, altEntityBB)
+			rawDist := lerpedResult.attackPos.Sub(closestPoint).Len()
 			c.rawResults = append(c.rawResults, rawDist)
 			if rawDist < closestRawDist {
 				closestRawDist = rawDist
+				closestRawPos = closestPoint
 			}
 		}
 
-		rawDist := lerpedResult.attackPos.Sub(game.ClosestPointToBBox(lerpedResult.attackPos, entityBB)).Len()
+		closestPoint := game.ClosestPointToBBox(lerpedResult.attackPos, entityBB)
+		rawDist := lerpedResult.attackPos.Sub(closestPoint).Len()
 		c.rawResults = append(c.rawResults, rawDist)
 		if rawDist < closestRawDist {
 			closestRawDist = rawDist
+			closestRawPos = closestPoint
 		}
 
 		/* if c.mPlayer.InputMode == packet.InputModeTouch {
@@ -314,6 +321,13 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	// that are behind them.
 	if !hitValid && c.mPlayer.InputMode == packet.InputModeTouch {
 		hitValid = closestRawDist <= CombatSurvivalReach && closestAngle <= c.mPlayer.Opts().Combat.MaximumAttackAngle
+		if hitValid {
+			lerpedAtClosest.attackPos = c.endAttackPos
+			lerpedAtClosest.entityPos = c.startEntityPos
+			lerpedAtClosest.rotation = c.endRotation
+			utils.ModifyBBoxResult(&closestHitResult, c.entityBB, closestRawPos, 0)
+			raycastHit = true
+		}
 	}
 
 	// If the hit is valid and the player is not on touch mode, check if the closest calculated ray from the player's eye position to the bounding box
@@ -344,7 +358,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	c.mPlayer.Dbg.Notify(
 		player.DebugModeCombat,
 		!c.useClientTracker && !hitValid && !c.checkMisprediction,
-		"<red>hit was invalidated due to distance check</red> (raycast=%f, raw=%f, angle=%f)",
+		"<red>hit was invalidated</red> (raycast=%f, raw=%f, angle=%f)",
 		closestRaycastDist,
 		closestRawDist,
 		closestAngle,
