@@ -461,7 +461,7 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 		mc.pos[0]+width,
 		mc.pos[1]+mc.size[1]+yOffset,
 		mc.pos[2]+width,
-	).GrowVec3(mgl32.Vec3{-1e-3, 0, -1e-3})
+	).GrowVec3(mgl32.Vec3{-1e-4, 0, -1e-4})
 }
 
 // ClientBoundingBox returns the bounding box of the movement component translated to the client's position.
@@ -479,7 +479,7 @@ func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox {
 		mc.nonAuthoritative.pos[0]+width,
 		mc.nonAuthoritative.pos[1]+mc.size[1]+yOffset,
 		mc.nonAuthoritative.pos[2]+width,
-	).GrowVec3(mgl32.Vec3{-0.001, 0, -0.001})
+	).GrowVec3(mgl32.Vec3{-1e-4, 0, -1e-4})
 }
 
 // Gravity returns the gravity of the movement component.
