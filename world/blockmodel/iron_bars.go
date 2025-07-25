@@ -9,32 +9,34 @@ import (
 type IronBars struct{}
 
 func (ib IronBars) BBox(pos cube.Pos, s world.BlockSource) (bbs []cube.BBox) {
-	inset := float64(7.0 / 16.0)
+	const insetDefault = 7.0 / 16.0
+	const insetConnecting = 8.0 / 16.0
+
 	connectWest, connectEast := ib.checkConnection(pos, cube.FaceWest, s), ib.checkConnection(pos, cube.FaceEast, s)
 	if connectWest || connectEast {
-		bb := cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.Z, -inset)
+		bb := cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.Z, -insetDefault)
 		if !connectWest {
-			bb = bb.ExtendTowards(cube.FaceWest, -inset)
+			bb = bb.ExtendTowards(cube.FaceWest, -insetConnecting)
 		} else if !connectEast {
-			bb = bb.ExtendTowards(cube.FaceEast, -inset)
+			bb = bb.ExtendTowards(cube.FaceEast, -insetConnecting)
 		}
 		bbs = append(bbs, bb)
 	}
 
 	connectNorth, connectSouth := ib.checkConnection(pos, cube.FaceNorth, s), ib.checkConnection(pos, cube.FaceSouth, s)
 	if connectNorth || connectSouth {
-		bb := cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.X, -inset)
+		bb := cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.X, -insetDefault)
 		if !connectNorth {
-			bb = bb.ExtendTowards(cube.FaceNorth, -inset)
+			bb = bb.ExtendTowards(cube.FaceNorth, -insetConnecting)
 		} else if !connectSouth {
-			bb = bb.ExtendTowards(cube.FaceSouth, -inset)
+			bb = bb.ExtendTowards(cube.FaceSouth, -insetConnecting)
 		}
 		bbs = append(bbs, bb)
 	}
 
 	// This will happen if there are no connections in any direction.
 	if len(bbs) == 0 {
-		bbs = append(bbs, cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.X, -inset).Stretch(cube.Z, -inset))
+		bbs = append(bbs, cube.Box(0, 0, 0, 1, 1, 1).Stretch(cube.X, -insetDefault).Stretch(cube.Z, -insetDefault))
 	}
 	return
 }
@@ -44,21 +46,13 @@ func (ib IronBars) FaceSolid(pos cube.Pos, face cube.Face, s world.BlockSource) 
 }
 
 func (ib IronBars) checkConnection(pos cube.Pos, f cube.Face, s world.BlockSource) bool {
-	b := s.Block(pos.Side(f))
+	sidePos := pos.Side(f)
+	b := s.Block(sidePos)
 	if _, isIronBar := b.(block.IronBars); isIronBar {
 		return true
 	} else if _, isWall := b.(block.Wall); isWall {
 		return true
-	} else if _, isLeaves := b.(block.Leaves); isLeaves {
-		return false
 	}
+	return b.Model().FaceSolid(sidePos, f.Opposite(), s)
 
-	boxCount := 0
-	for _, bb := range b.Model().BBox(pos.Side(f), s) {
-		boxCount++
-		if bb.Width() != 1 || bb.Height() != 1 || bb.Length() != 1 {
-			return false
-		}
-	}
-	return boxCount > 0
 }
