@@ -219,7 +219,11 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				} */
 			} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
 				ctx.Cancel()
-				return
+			} else if tr.ActionType == protocol.UseItemActionClickBlock {
+				if p.VersionInRange(GameVersion1_21_20, protocol.CurrentProtocol) && tr.TriggerType != protocol.TriggerTypePlayerInput && tr.TriggerType != protocol.TriggerTypeSimulationTick {
+					p.Log().Debug("unknown trigger type", "triggerType", tr.TriggerType)
+					ctx.Cancel()
+				}
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
