@@ -10,6 +10,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/world/blockmodel"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
@@ -117,8 +118,13 @@ func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox 
 		return []cube.BBox{}
 	}
 
+	var bModel = b.Model()
+	if _, isIronBar := b.(block.IronBars); isIronBar {
+		bModel = blockmodel.IronBars{}
+	}
+
 	var boxes []cube.BBox
-	dfBoxes := b.Model().BBox(df_cube.Pos(pos), src)
+	dfBoxes := bModel.BBox(df_cube.Pos(pos), src)
 	boxes = make([]cube.BBox, len(dfBoxes))
 	for i, bb := range dfBoxes {
 		boxes[i] = game.DFBoxToCubeBox(bb)
