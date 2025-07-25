@@ -46,6 +46,14 @@ func Float32ApproxEq(a, b float32) bool {
 	return math32.Abs(a-b) <= 1e-5
 }
 
+// AbsNum
+func AbsNum[T uint | int | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | float32 | float64](a T) T {
+	if a < 0 {
+		return -a
+	}
+	return a
+}
+
 // AbsInt64 will return the absolute value of an int64.
 func AbsInt64(a int64) int64 {
 	if a < 0 {
