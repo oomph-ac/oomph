@@ -100,9 +100,9 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	dfReplacePos := df_cube.Pos(replacePos)
 	replacingBlock := c.mPlayer.World().Block(dfReplacePos)
 
-	// Ignore the potential block placement if the player clicked air.
+	// It is impossible for the replacing block to be air, as the client would send UseItemActionClickAir instead of UseItemActionClickBlock.
 	if _, isAir := replacingBlock.(block.Air); isAir {
-		return true
+		return false
 	} else if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
 		utils.ActivateBlock(c.mPlayer, act, df_cube.Face(dat.BlockFace), df_cube.Pos(replacePos), game.Vec32To64(dat.ClickedPosition), c.mPlayer.World())
 		return true
