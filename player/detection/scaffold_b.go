@@ -1,13 +1,15 @@
 package detection
 
 import (
-	"github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+var faceNotSet cube.Face = -1
 
 type ScaffoldB struct {
 	mPlayer  *player.Player
@@ -22,7 +24,7 @@ func New_ScaffoldB(p *player.Player) *ScaffoldB {
 		metadata: &player.DetectionMetadata{
 			MaxViolations: 10,
 		},
-		initialFace: -1,
+		initialFace: faceNotSet,
 	}
 }
 
@@ -67,8 +69,8 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	currEyePos[1] += eyeOffset
 	blockFace := cube.Face(dat.BlockFace)
 	if dat.TriggerType == protocol.TriggerTypePlayerInput {
-		d.initialFace = -1
-	} else if d.initialFace == -1 && blockFace != cube.FaceDown && blockFace != cube.FaceUp {
+		d.initialFace = faceNotSet
+	} else if d.initialFace == faceNotSet {
 		d.initialFace = blockFace
 	}
 	blockPos := cube.Pos{int(dat.BlockPosition[0]), int(dat.BlockPosition[1]), int(dat.BlockPosition[2])}
@@ -129,7 +131,7 @@ func (d *ScaffoldB) isFaceInteractable(
 		// Check for the X-axis faces.
 		// If floor(eyePos.X) < blockPos.X -> the west face is interactable.
 		// If floor(eyePos.X) > blockPos.X -> the east face is interactable.
-		if (xFloorStart == blockX || xFloorEnd == blockX) && isBelowBlock {
+		/* if (xFloorStart == blockX || xFloorEnd == blockX) && isBelowBlock {
 			interactableFaces[cube.FaceWest] = struct{}{}
 			interactableFaces[cube.FaceEast] = struct{}{}
 		} else {
@@ -139,12 +141,24 @@ func (d *ScaffoldB) isFaceInteractable(
 			if xFloorStart > blockX || xFloorEnd > blockX {
 				interactableFaces[cube.FaceEast] = struct{}{}
 			}
+		} */
+		if xFloorStart <= blockX || xFloorEnd <= blockX {
+			interactableFaces[cube.FaceWest] = struct{}{}
+		}
+		if xFloorStart >= blockX || xFloorEnd >= blockX {
+			interactableFaces[cube.FaceEast] = struct{}{}
 		}
 
 		// Check for the Z-axis faces.
 		// If floor(eyePos.Z) < blockPos.Z -> the north face is interactable.
 		// If floor(eyePos.Z) > blockPos.Z -> the south face is interactable.
-		if (zFloorStart == blockZ || zFloorEnd == blockZ) && isBelowBlock {
+		if zFloorStart <= blockZ || zFloorEnd <= blockZ {
+			interactableFaces[cube.FaceNorth] = struct{}{}
+		}
+		if zFloorStart >= blockZ || zFloorEnd >= blockZ {
+			interactableFaces[cube.FaceSouth] = struct{}{}
+		}
+		/* if (zFloorStart == blockZ || zFloorEnd == blockZ) && isBelowBlock {
 			interactableFaces[cube.FaceNorth] = struct{}{}
 			interactableFaces[cube.FaceSouth] = struct{}{}
 		} else {
@@ -154,9 +168,10 @@ func (d *ScaffoldB) isFaceInteractable(
 			if zFloorStart > blockZ || zFloorEnd > blockZ {
 				interactableFaces[cube.FaceSouth] = struct{}{}
 			}
-		}
+		} */
 	}
 
 	_, interactable := interactableFaces[targetFace]
+	//fmt.Println(blockPos, cube.PosFromVec3(startPos), cube.PosFromVec3(endPos), isClientInput, targetFace, interactableFaces, interactable)
 	return interactable
 }
