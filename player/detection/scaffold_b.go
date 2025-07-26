@@ -70,7 +70,8 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	blockFace := cube.Face(dat.BlockFace)
 	if dat.TriggerType == protocol.TriggerTypePlayerInput {
 		d.initialFace = faceNotSet
-	} else if d.initialFace == faceNotSet {
+	} else if d.initialFace == faceNotSet && blockFace != cube.FaceDown && blockFace != cube.FaceUp {
+		// weird bedrock client behavior.. I LOVE THIS GAME!
 		d.initialFace = blockFace
 	}
 	blockPos := cube.Pos{int(dat.BlockPosition[0]), int(dat.BlockPosition[1]), int(dat.BlockPosition[2])}
@@ -92,8 +93,10 @@ func (d *ScaffoldB) isFaceInteractable(
 	if !isClientInput {
 		interactableFaces[cube.FaceDown] = struct{}{}
 		interactableFaces[cube.FaceUp] = struct{}{}
-		interactableFaces[d.initialFace] = struct{}{}
-		interactableFaces[d.initialFace.Opposite()] = struct{}{}
+		if d.initialFace != -1 {
+			interactableFaces[d.initialFace] = struct{}{}
+			interactableFaces[d.initialFace.Opposite()] = struct{}{}
+		}
 	} else {
 		yFloorStart := int(startPos[1])
 		yFloorEnd := int(endPos[1])
