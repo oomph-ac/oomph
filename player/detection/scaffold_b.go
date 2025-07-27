@@ -9,7 +9,10 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-var faceNotSet cube.Face = -1
+var (
+	faceNotSet  cube.Face = -1
+	faceNotInit cube.Face = -2
+)
 
 type ScaffoldB struct {
 	mPlayer  *player.Player
@@ -24,12 +27,12 @@ func New_ScaffoldB(p *player.Player) *ScaffoldB {
 		metadata: &player.DetectionMetadata{
 			MaxViolations: 10,
 		},
-		initialFace: faceNotSet,
+		initialFace: faceNotInit,
 	}
 }
 
 func (d *ScaffoldB) Type() string {
-	return "Scaffold"
+	return TypeScaffold
 }
 
 func (d *ScaffoldB) SubType() string {
@@ -55,7 +58,22 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	}
 
 	dat, ok := tr.TransactionData.(*protocol.UseItemTransactionData)
-	if !ok || dat.ActionType != protocol.UseItemActionClickBlock || dat.ClientPrediction == protocol.ClientPredictionFailure || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) {
+	if !ok || dat.ActionType != protocol.UseItemActionClickBlock || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) {
+		return
+	}
+
+	// We have to check this regardless of whether the client predicted the interaction failed or not - otherwise we get false positives when
+	// checking during when the trigger type is of TriggerTypeSimulationTick (player frame).
+	blockFace := cube.Face(dat.BlockFace)
+	if dat.TriggerType == protocol.TriggerTypePlayerInput {
+		d.initialFace = faceNotSet
+	} else if d.initialFace == faceNotSet {
+		d.initialFace = blockFace
+	} else if d.initialFace == faceNotInit {
+		d.mPlayer.Log().Debug("scaffold_b", "initFace", "faceNotInit", "face", blockFace)
+		d.mPlayer.FailDetection(d, nil)
+	}
+	if dat.ClientPrediction == protocol.ClientPredictionFailure {
 		return
 	}
 
@@ -67,13 +85,6 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	currEyePos := d.mPlayer.Movement().Client().Pos()
 	prevEyePos[1] += eyeOffset
 	currEyePos[1] += eyeOffset
-	blockFace := cube.Face(dat.BlockFace)
-	if dat.TriggerType == protocol.TriggerTypePlayerInput {
-		d.initialFace = faceNotSet
-	} else if d.initialFace == faceNotSet && blockFace != cube.FaceDown && blockFace != cube.FaceUp {
-		// weird bedrock client behavior.. I LOVE THIS GAME!
-		d.initialFace = blockFace
-	}
 	blockPos := cube.Pos{int(dat.BlockPosition[0]), int(dat.BlockPosition[1]), int(dat.BlockPosition[2])}
 	if !d.isFaceInteractable(prevEyePos, currEyePos, blockPos, blockFace, dat.TriggerType == protocol.TriggerTypePlayerInput) {
 		d.mPlayer.FailDetection(d, nil)
@@ -89,42 +100,37 @@ func (d *ScaffoldB) isFaceInteractable(
 ) bool {
 	interactableFaces := make(map[cube.Face]struct{}, 6)
 	blockX, blockY, blockZ := blockPos[0], blockPos[1], blockPos[2]
+	floorPosStart := cube.PosFromVec3(startPos)
+	floorPosEnd := cube.PosFromVec3(endPos)
 
 	if !isClientInput {
 		interactableFaces[cube.FaceDown] = struct{}{}
 		interactableFaces[cube.FaceUp] = struct{}{}
-		if d.initialFace != -1 {
+		if d.initialFace != faceNotSet {
 			interactableFaces[d.initialFace] = struct{}{}
 			interactableFaces[d.initialFace.Opposite()] = struct{}{}
 		}
 	} else {
-		yFloorStart := int(startPos[1])
-		yFloorEnd := int(endPos[1])
-		xFloorStart := int(startPos[0])
-		xFloorEnd := int(endPos[0])
-		zFloorStart := int(startPos[2])
-		zFloorEnd := int(endPos[2])
-
 		// Check for the Y-axis faces first.
 		// If floor(eyePos.Y) < blockPos.Y -> the bottom face is interactable.
 		// If floor(eyePos.Y) > blockPos.Y -> the top face is interactable.
-		isBelowBlock := yFloorStart < blockY || yFloorEnd < blockY
-		isAboveBlock := yFloorStart > blockY || yFloorEnd > blockY
+		isBelowBlock := floorPosStart[1] < blockY || floorPosEnd[1] < blockY
+		isAboveBlock := floorPosStart[1] > blockY || floorPosEnd[1] > blockY
 		if isBelowBlock {
 			interactableFaces[cube.FaceDown] = struct{}{}
 		}
 		if isAboveBlock {
 			interactableFaces[cube.FaceUp] = struct{}{}
 
-			startXDelta := game.AbsNum(xFloorStart - blockX)
-			endXDelta := game.AbsNum(xFloorEnd - blockX)
+			startXDelta := game.AbsNum(floorPosStart[0] - blockX)
+			endXDelta := game.AbsNum(floorPosEnd[0] - blockX)
 			if startXDelta <= 1 || endXDelta <= 1 {
 				interactableFaces[cube.FaceWest] = struct{}{}
 				interactableFaces[cube.FaceEast] = struct{}{}
 			}
 
-			startZDelta := game.AbsNum(zFloorStart - blockZ)
-			endZDelta := game.AbsNum(zFloorEnd - blockZ)
+			startZDelta := game.AbsNum(floorPosStart[2] - blockZ)
+			endZDelta := game.AbsNum(floorPosEnd[2] - blockZ)
 			if startZDelta <= 1 || endZDelta <= 1 {
 				interactableFaces[cube.FaceNorth] = struct{}{}
 				interactableFaces[cube.FaceSouth] = struct{}{}
@@ -134,47 +140,27 @@ func (d *ScaffoldB) isFaceInteractable(
 		// Check for the X-axis faces.
 		// If floor(eyePos.X) < blockPos.X -> the west face is interactable.
 		// If floor(eyePos.X) > blockPos.X -> the east face is interactable.
-		/* if (xFloorStart == blockX || xFloorEnd == blockX) && isBelowBlock {
-			interactableFaces[cube.FaceWest] = struct{}{}
-			interactableFaces[cube.FaceEast] = struct{}{}
-		} else {
-			if xFloorStart < blockX || xFloorEnd < blockX {
-				interactableFaces[cube.FaceWest] = struct{}{}
-			}
-			if xFloorStart > blockX || xFloorEnd > blockX {
-				interactableFaces[cube.FaceEast] = struct{}{}
-			}
-		} */
-		if xFloorStart <= blockX || xFloorEnd <= blockX {
+		if floorPosStart[0] < blockX || floorPosEnd[0] < blockX {
 			interactableFaces[cube.FaceWest] = struct{}{}
 		}
-		if xFloorStart >= blockX || xFloorEnd >= blockX {
+		if floorPosStart[0] > blockX || floorPosEnd[0] > blockX {
 			interactableFaces[cube.FaceEast] = struct{}{}
 		}
 
 		// Check for the Z-axis faces.
 		// If floor(eyePos.Z) < blockPos.Z -> the north face is interactable.
 		// If floor(eyePos.Z) > blockPos.Z -> the south face is interactable.
-		if zFloorStart <= blockZ || zFloorEnd <= blockZ {
+		if floorPosStart[2] < blockZ || floorPosEnd[2] < blockZ {
 			interactableFaces[cube.FaceNorth] = struct{}{}
 		}
-		if zFloorStart >= blockZ || zFloorEnd >= blockZ {
+		if floorPosStart[2] > blockZ || floorPosEnd[2] > blockZ {
 			interactableFaces[cube.FaceSouth] = struct{}{}
 		}
-		/* if (zFloorStart == blockZ || zFloorEnd == blockZ) && isBelowBlock {
-			interactableFaces[cube.FaceNorth] = struct{}{}
-			interactableFaces[cube.FaceSouth] = struct{}{}
-		} else {
-			if zFloorStart < blockZ || zFloorEnd < blockZ {
-				interactableFaces[cube.FaceNorth] = struct{}{}
-			}
-			if zFloorStart > blockZ || zFloorEnd > blockZ {
-				interactableFaces[cube.FaceSouth] = struct{}{}
-			}
-		} */
 	}
 
 	_, interactable := interactableFaces[targetFace]
-	//fmt.Println(blockPos, cube.PosFromVec3(startPos), cube.PosFromVec3(endPos), isClientInput, targetFace, interactableFaces, interactable)
+	if !interactable {
+		d.mPlayer.Log().Debug("scaffold_b", "blockPos", blockPos, "startPos", startPos, "endPos", endPos, "isClientInput", isClientInput, "targetFace", targetFace, "interactableFaces", interactableFaces)
+	}
 	return interactable
 }

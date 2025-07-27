@@ -15,7 +15,7 @@ import (
 const (
 	inventorySizeArmour  uint32 = 4
 	inventorySizePlayer  uint32 = 36
-	inventorySizeHotbar  uint32 = 10
+	inventorySizeHotbar  uint32 = 9
 	inventorySizeOffhand uint32 = 1
 	inventorySizeUI      uint32 = 54
 )
