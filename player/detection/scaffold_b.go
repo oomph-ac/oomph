@@ -25,6 +25,9 @@ func New_ScaffoldB(p *player.Player) *ScaffoldB {
 	return &ScaffoldB{
 		mPlayer: p,
 		metadata: &player.DetectionMetadata{
+			FailBuffer: 1.01,
+			MaxBuffer:  1.5,
+
 			MaxViolations: 10,
 		},
 		initialFace: faceNotInit,
@@ -67,7 +70,7 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	blockFace := cube.Face(dat.BlockFace)
 	if dat.TriggerType == protocol.TriggerTypePlayerInput {
 		d.initialFace = faceNotSet
-	} else if d.initialFace == faceNotSet {
+	} else if d.initialFace == faceNotSet && blockFace != cube.FaceUp && blockFace != cube.FaceDown {
 		d.initialFace = blockFace
 	} else if d.initialFace == faceNotInit {
 		d.mPlayer.Log().Debug("scaffold_b", "initFace", "faceNotInit", "face", blockFace)
@@ -88,6 +91,8 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	blockPos := cube.Pos{int(dat.BlockPosition[0]), int(dat.BlockPosition[1]), int(dat.BlockPosition[2])}
 	if !d.isFaceInteractable(prevEyePos, currEyePos, blockPos, blockFace, dat.TriggerType == protocol.TriggerTypePlayerInput) {
 		d.mPlayer.FailDetection(d, nil)
+	} else {
+		d.mPlayer.PassDetection(d, 0.5)
 	}
 }
 
