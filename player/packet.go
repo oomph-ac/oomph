@@ -169,7 +169,9 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
-		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+		if tr, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+
 			// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
 			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
 			p.combat.Attack(pk)
