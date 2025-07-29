@@ -47,6 +47,10 @@ func New(log *slog.Logger, conn net.Conn, cd ConnectionInfo) *Client {
 	return c
 }
 
+func (c *Client) Closed() bool {
+	return c.closed.Load()
+}
+
 func (c *Client) Close() {
 	c.once.Do(func() {
 		c.closed.Store(true)
