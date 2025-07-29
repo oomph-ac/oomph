@@ -67,7 +67,7 @@ func (p *Player) tryRunningClientCombat() {
 	}
 
 	for rID, e := range p.clientEntTracker.All() {
-		if e.PrevPosition == e.Position || e.Position.Sub(p.movement.Pos()).LenSqr() > cloudpacket.EntitySnapshotRadius {
+		if e.Position.Sub(p.movement.Pos()).LenSqr() > cloudpacket.EntitySnapshotRadius {
 			continue
 		}
 		p.WriteToCloud(&cloudpacket.EntitySnapshot{

@@ -137,9 +137,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		ctx.SetModified()
 
 		p.InputMode = pk.InputMode
-		missedSwing := false
 		if p.InputMode != packet.InputModeTouch && pk.InputData.Load(packet.InputFlagMissedSwing) {
-			missedSwing = true
 			p.combat.Attack(nil)
 		}
 		p.acks.Tick(true)
@@ -152,15 +150,11 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		p.handleMovement(pk)
 		p.tryRunningClientCombat()
 
-		var serverVerifiedHit bool
 		if !p.blockBreakInProgress {
 			// The client should not be able to hit any entities while breaking a block.
-			serverVerifiedHit = p.combat.Calculate()
+			_ = p.combat.Calculate()
 		} else {
 			p.combat.Reset()
-		}
-		if serverVerifiedHit && missedSwing {
-			pk.InputData.Unset(packet.InputFlagMissedSwing)
 		}
 	case *packet.NetworkStackLatency:
 		if p.ACKs().Execute(pk.Timestamp) {

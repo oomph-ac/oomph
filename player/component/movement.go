@@ -13,6 +13,7 @@ import (
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/player/simulation"
 	"github.com/oomph-ac/oomph/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -808,18 +809,27 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		}
 	}
 
-	var playerSnapshot cloudpacket.PlayerSnapshot
-	playerSnapshot.Pos = mc.mPlayer.Movement().Pos()
-	playerSnapshot.Vel = mc.mPlayer.Movement().Vel()
-	playerSnapshot.Mov = mc.mPlayer.Movement().Mov()
-	playerSnapshot.CPos = mc.mPlayer.Movement().Client().Pos()
-	playerSnapshot.CVel = mc.mPlayer.Movement().Client().Vel()
-	playerSnapshot.CMov = mc.mPlayer.Movement().Client().Mov()
-	playerSnapshot.CRot = mc.mPlayer.Movement().Rotation()
-	playerSnapshot.CInputFlags = pk.InputData
-	playerSnapshot.Timestamp = time.Now().UnixMilli()
-	playerSnapshot.CInputTick = mc.mPlayer.ClientTick
-	playerSnapshot.CSimTick = mc.mPlayer.SimulationFrame
+	clonedInputData := protocol.NewBitset(pk.InputData.Len())
+	for i := range pk.InputData.Len() {
+		if pk.InputData.Load(i) {
+			clonedInputData.Set(i)
+		}
+	}
+
+	playerSnapshot := &cloudpacket.PlayerSnapshot{
+		Pos:         mc.mPlayer.Movement().Pos(),
+		Vel:         mc.mPlayer.Movement().Vel(),
+		Mov:         mc.mPlayer.Movement().Mov(),
+		CPos:        mc.mPlayer.Movement().Client().Pos(),
+		CVel:        mc.mPlayer.Movement().Client().Vel(),
+		CMov:        mc.mPlayer.Movement().Client().Mov(),
+		CRot:        mc.mPlayer.Movement().Rotation(),
+		CInputFlags: clonedInputData,
+		Timestamp:   time.Now().UnixMicro(),
+		CInputTick:  mc.mPlayer.ClientTick,
+		CSimTick:    mc.mPlayer.SimulationFrame,
+		SimFlags:    protocol.NewBitset(cloudpacket.SimFlagsSize),
+	}
 	if mc.InCorrectionCooldown() {
 		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagInCorrectiveState)
 	}
@@ -829,7 +839,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	if mc.HasTeleport() {
 		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagHasTeleport)
 	}
-	mc.mPlayer.WriteToCloud(&playerSnapshot)
+	mc.mPlayer.WriteToCloud(playerSnapshot)
 
 	mc.glideBoostTicks--
 	mc.ticksSinceKb++
