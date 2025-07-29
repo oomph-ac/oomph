@@ -238,20 +238,6 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 	return p
 }
 
-func (p *Player) SetCloudClient(cl *client.Client) {
-	if p.cloudClient != nil {
-		panic(oerror.New("cloud client already set for player"))
-	}
-	if !p.opts.Combat.EnableClientEntityTracking {
-		panic(oerror.New("cloud requires client entity tracking to be enabled"))
-	}
-	p.cloudClient = cl
-}
-
-func (p *Player) CloudClient() *client.Client {
-	return p.cloudClient
-}
-
 func (p *Player) SetRecoverFunc(f func(p *Player, err any)) {
 	p.recoverFunc = f
 }

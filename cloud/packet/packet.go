@@ -10,6 +10,8 @@ const (
 	CurrentProtocol uint32 = 100
 
 	NetworkHeaderSize = 5
+	MaxBatchSize      = 2 * 1024 * 1024
+	MaxPacketSize     = 8 * 1024
 )
 
 var (
