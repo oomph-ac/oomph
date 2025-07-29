@@ -7,7 +7,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/game"
-	"github.com/oomph-ac/oomph/internal"
 	"github.com/oomph-ac/oomph/player"
 	oworld "github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -54,11 +53,7 @@ func (ack *SubChunkUpdate) Run() {
 		return
 	}
 
-	buf := internal.BufferPool.Get().(*bytes.Buffer)
-	defer func() {
-		buf.Reset()
-		internal.BufferPool.Put(buf)
-	}()
+	buf := bytes.NewBuffer(nil)
 	var bufUsed bool
 
 	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)

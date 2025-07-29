@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
+	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player/context"
@@ -169,16 +170,31 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
-		if _, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+		if dat, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && dat.ActionType == protocol.UseItemOnEntityActionAttack {
 			// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
 			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
 			p.combat.Attack(pk)
 			if p.opts.Combat.EnableClientEntityTracking {
 				p.clientCombat.Attack(pk)
 			}
+			p.WriteToCloud(&cloudpacket.AttackSnapshot{
+				HotBarSlot:  dat.HotBarSlot,
+				EntityRID:   dat.TargetEntityRuntimeID,
+				ReportedPos: dat.Position,
+				ClickedPos:  dat.ClickedPosition,
+			})
 			ctx.Cancel()
-			//return
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
+			p.WriteToCloud(&cloudpacket.BlockInteractionSnapshot{
+				ActionType:  tr.ActionType,
+				TriggerType: tr.TriggerType,
+				CPrediction: tr.ClientPrediction,
+				BlockFace:   tr.BlockFace,
+				BlockPos:    tr.BlockPosition,
+				ReportedPos: tr.Position,
+				ClickedPos:  tr.ClickedPosition,
+			})
+
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 			if tr.ActionType == protocol.UseItemActionClickAir {
 				// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
@@ -385,8 +401,10 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.RemoveActor:
+		// TODO: Properly account for entity unique IDs differing from the runtime ID in certain server softwares?
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
+		p.WriteToCloud(&cloudpacket.EntitySnapshot{SnapshotType: cloudpacket.SnapshotTypeRemove, RuntimeId: uint64(pk.EntityUniqueID)})
 	case *packet.SetActorData:
 		pk.Tick = 0
 		ctx.SetModified()

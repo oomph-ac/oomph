@@ -2,9 +2,11 @@ package component
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
@@ -374,6 +376,11 @@ func (mc *AuthoritativeMovementComponent) SetKnockback(newKnockback mgl32.Vec3) 
 // HasKnockback returns true if the movement component needs knockback applied on the next simulation.
 func (mc *AuthoritativeMovementComponent) HasKnockback() bool {
 	return mc.ticksSinceKb == 0
+}
+
+// TicksSinceKnockback returns the amount of ticks since the last knockback was applied.
+func (mc *AuthoritativeMovementComponent) TicksSinceKnockback() uint64 {
+	return mc.ticksSinceKb
 }
 
 // Teleport notifies the movement component of a teleport.
@@ -801,14 +808,28 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		}
 	}
 
-	// Notify any detections that need to handle knockback.
-	if mc.HasKnockback() {
-		for _, d := range mc.mPlayer.Detections() {
-			if d, ok := d.(interface{ HandleKnockback() }); ok {
-				d.HandleKnockback()
-			}
-		}
+	var playerSnapshot cloudpacket.PlayerSnapshot
+	playerSnapshot.Pos = mc.mPlayer.Movement().Pos()
+	playerSnapshot.Vel = mc.mPlayer.Movement().Vel()
+	playerSnapshot.Mov = mc.mPlayer.Movement().Mov()
+	playerSnapshot.CPos = mc.mPlayer.Movement().Client().Pos()
+	playerSnapshot.CVel = mc.mPlayer.Movement().Client().Vel()
+	playerSnapshot.CMov = mc.mPlayer.Movement().Client().Mov()
+	playerSnapshot.CRot = mc.mPlayer.Movement().Rotation()
+	playerSnapshot.CInputFlags = pk.InputData
+	playerSnapshot.Timestamp = time.Now().UnixMilli()
+	playerSnapshot.CInputTick = mc.mPlayer.ClientTick
+	playerSnapshot.CSimTick = mc.mPlayer.SimulationFrame
+	if mc.InCorrectionCooldown() {
+		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagInCorrectiveState)
 	}
+	if mc.HasKnockback() {
+		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagHasKnockback)
+	}
+	if mc.HasTeleport() {
+		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagHasTeleport)
+	}
+	mc.mPlayer.WriteToCloud(&playerSnapshot)
 
 	mc.glideBoostTicks--
 	mc.ticksSinceKb++

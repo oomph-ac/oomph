@@ -1,6 +1,7 @@
 package player
 
 import (
+	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -55,8 +56,28 @@ func (p *Player) ClientCombat() CombatComponent {
 }
 
 func (p *Player) tryRunningClientCombat() {
-	if p.opts.Combat.EnableClientEntityTracking {
-		p.clientEntTracker.Tick(p.ClientTick)
-		_ = p.clientCombat.Calculate()
+	if !p.opts.Combat.EnableClientEntityTracking {
+		return
+	}
+
+	p.clientEntTracker.Tick(p.ClientTick)
+	_ = p.clientCombat.Calculate()
+	if p.cloudClient == nil {
+		return
+	}
+
+	for rID, e := range p.clientEntTracker.All() {
+		if e.PrevPosition == e.Position || e.Position.Sub(p.movement.Pos()).LenSqr() > cloudpacket.EntitySnapshotRadius {
+			continue
+		}
+		p.WriteToCloud(&cloudpacket.EntitySnapshot{
+			SnapshotType: cloudpacket.SnapshotTypeUpdate,
+			RuntimeId:    rID,
+			IsPlayer:     e.IsPlayer,
+			Width:        e.Width,
+			Height:       e.Height,
+			Scale:        e.Scale,
+			Position:     e.Position,
+		})
 	}
 }

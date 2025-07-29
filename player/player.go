@@ -11,6 +11,8 @@ import (
 	"github.com/df-mc/dragonfly/server/event"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oconfig"
+	"github.com/oomph-ac/oomph/cloud/client"
+	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oerror"
@@ -169,6 +171,9 @@ type Player struct {
 	// detections contains the detections for the player.
 	detections []Detection
 
+	// cloudClient is the oomph cloud client that handles remote detections. By default, this is not set.
+	cloudClient *client.Client
+
 	// log is the logger of the player.
 	log *slog.Logger
 
@@ -231,6 +236,20 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 	})
 	p.Dbg = NewDebugger(p)
 	return p
+}
+
+func (p *Player) SetCloudClient(cl *client.Client) {
+	if p.cloudClient != nil {
+		panic(oerror.New("cloud client already set for player"))
+	}
+	if !p.opts.Combat.EnableClientEntityTracking {
+		panic(oerror.New("cloud requires client entity tracking to be enabled"))
+	}
+	p.cloudClient = cl
+}
+
+func (p *Player) CloudClient() *client.Client {
+	return p.cloudClient
 }
 
 func (p *Player) SetRecoverFunc(f func(p *Player, err any)) {
@@ -496,6 +515,8 @@ func (p *Player) Tick() bool {
 	} else {
 		p.ServerTick++
 	}
+
+	p.WriteToCloud(&cloudpacket.Heartbeat{Timestamp: time.Now().Unix()})
 
 	p.movement.Tick(p.ServerTick - prevTick)
 	p.entTracker.Tick(p.ServerTick)

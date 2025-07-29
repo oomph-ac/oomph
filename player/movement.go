@@ -110,6 +110,8 @@ type MovementComponent interface {
 	SetKnockback(vel mgl32.Vec3)
 	// HasKnockback returns true if the movement component needs knockback applied on the next simulation.
 	HasKnockback() bool
+	// TicksSinceKnockback returns the amount of ticks since the last knockback was applied.
+	TicksSinceKnockback() uint64
 
 	// Teleport notifies the movement component of a teleport.
 	Teleport(pos mgl32.Vec3, onGround bool, smoothed bool)
