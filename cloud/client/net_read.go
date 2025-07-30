@@ -43,6 +43,8 @@ func (c *Client) readLoop() {
 				c.Close()
 				return
 			}
+			gbIn += float64(len(header)) * ByteToGBMultiplier
+			gbProcIn += float64(len(header)) * ByteToGBMultiplier
 
 			if header[4] != 0 && header[4] != 1 {
 				c.log.Error("invalid packet header: compression flag must be 0 or 1", "flag", header[4])
@@ -66,8 +68,7 @@ func (c *Client) readLoop() {
 				c.Close()
 				return
 			}
-
-			//fmt.Println("got", len(payload)+packet.NetworkHeaderSize, "bytes from", conn.RemoteAddr())
+			gbIn += float64(len(payload)) * ByteToGBMultiplier
 
 			// Decompress if needed
 			var data []byte
@@ -78,10 +79,10 @@ func (c *Client) readLoop() {
 					c.log.Error("failed to decompress packet", "err", err)
 					return
 				}
-				//fmt.Println("decompressed is", len(data)+packet.NetworkHeaderSize, "bytes")
 			} else {
 				data = payload
 			}
+			gbProcIn += float64(len(data)) * ByteToGBMultiplier
 
 			// Parse the batch data
 			if err := c.parseBatch(data); err != nil {

@@ -19,8 +19,7 @@ type Client struct {
 	wPackets chan packet.Packet
 	rPackets chan packet.Packet
 
-	closed   atomic.Bool
-	sentInit atomic.Bool
+	closed atomic.Bool
 
 	done chan struct{}
 	once sync.Once
