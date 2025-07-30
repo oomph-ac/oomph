@@ -70,14 +70,23 @@ func (p *Player) tryRunningClientCombat() {
 	}
 
 	for rID, e := range p.clientEntTracker.All() {
-		if e.Position == e.PrevPosition {
+		posEqual := e.Position == e.PrevPosition
+		netPosEqual := e.RecvPosition == e.PrevRecvPosition
+		if posEqual && netPosEqual {
 			continue
 		}
-		p.WriteToCloud(&cloudpacket.EntitySnapshot{
+
+		snapshot := &cloudpacket.EntitySnapshot{
 			SnapshotType: cloudpacket.EntitySnapshotTypeUpdate,
 			RuntimeId:    rID,
 			IsPlayer:     e.IsPlayer,
-			Position:     protocol.Option(e.Position),
-		})
+		}
+		if !posEqual {
+			snapshot.Position = protocol.Option(e.Position)
+		}
+		if !netPosEqual {
+			snapshot.NetPos = protocol.Option(e.RecvPosition)
+		}
+		p.WriteToCloud(snapshot)
 	}
 }
