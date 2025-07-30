@@ -698,7 +698,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 
 	isNewVersionPlayer := mc.mPlayer.VersionInRange(player.GameVersion1_21_0, 65536)
 	var needsSpeedAdjusted bool
-	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
+	if (!startFlag && !stopFlag && !mc.serverSprintApplied) || (startFlag && stopFlag) /*&& hasForwardKeyPressed*/ {
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ start/stop state race condition")
 		needsSpeedAdjusted = isNewVersionPlayer
 		if !mc.serverSprintApplied {
