@@ -2,6 +2,8 @@ package client
 
 import (
 	"time"
+
+	"go.uber.org/atomic"
 )
 
 const (
@@ -11,22 +13,24 @@ const (
 )
 
 var (
-	gbIn      float64
-	gbOut     float64
-	gbProcIn  float64
-	gbProcOut float64
+	gbIn      atomic.Float64
+	gbOut     atomic.Float64
+	gbProcIn  atomic.Float64
+	gbProcOut atomic.Float64
 
 	startedAt = time.Now()
 )
 
 func NetworkReport() networkReport {
+	in, out := gbIn.Load(), gbOut.Load()
+	procIn, procOut := gbProcIn.Load(), gbProcOut.Load()
 	return networkReport{
-		CompressionRatioIn:   1 - (gbIn / gbProcIn),
-		CompressionRatioOut:  1 - (gbOut / gbProcOut),
-		WrittenMB:            gbOut * GBToMBMultiplier,
-		ReadMB:               gbIn * GBToMBMultiplier,
-		AvgWriteRateKBPerSec: (gbOut * GBToKBMultiplier) / float64(time.Since(startedAt).Seconds()),
-		AvgReadRateKBPerSec:  (gbIn * GBToKBMultiplier) / float64(time.Since(startedAt).Seconds()),
+		CompressionRatioIn:   1 - (in / procIn),
+		CompressionRatioOut:  1 - (out / procOut),
+		WrittenMB:            out * GBToMBMultiplier,
+		ReadMB:               in * GBToMBMultiplier,
+		AvgWriteRateKBPerSec: (out * GBToKBMultiplier) / float64(time.Since(startedAt).Seconds()),
+		AvgReadRateKBPerSec:  (in * GBToKBMultiplier) / float64(time.Since(startedAt).Seconds()),
 		ElapsedTime:          time.Since(startedAt),
 	}
 }

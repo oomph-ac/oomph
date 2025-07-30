@@ -46,8 +46,9 @@ func (c *Client) flush() error {
 	batchLen := uint32(buf.Len())
 	useCompression := batchLen > c.connInfo.CmpThreshold
 	header := make([]byte, packet.NetworkHeaderSize)
-	gbOut += float64(len(header)) * ByteToGBMultiplier
-	gbProcOut += float64(len(header)) * ByteToGBMultiplier
+	headerGb := float64(len(header)) * ByteToGBMultiplier
+	_ = gbOut.Add(headerGb)
+	_ = gbProcOut.Add(headerGb)
 	if !useCompression {
 		header[0] = byte(batchLen)
 		header[1] = byte(batchLen >> 8)
@@ -59,7 +60,7 @@ func (c *Client) flush() error {
 		} else if err := c.networkWrite(buf.Bytes()); err != nil {
 			return fmt.Errorf("failed to write packet data: %v", err)
 		}
-		gbProcOut += float64(len(buf.Bytes())) * ByteToGBMultiplier
+		_ = gbProcOut.Add(float64(len(buf.Bytes())) * ByteToGBMultiplier)
 		return nil
 	}
 
@@ -76,7 +77,7 @@ func (c *Client) flush() error {
 	if err := c.networkWrite(compressed); err != nil {
 		return fmt.Errorf("failed to write compressed packet data: %v", err)
 	}
-	gbProcOut += float64(len(compressed)) * ByteToGBMultiplier
+	_ = gbProcOut.Add(float64(len(compressed)) * ByteToGBMultiplier)
 	return nil
 }
 

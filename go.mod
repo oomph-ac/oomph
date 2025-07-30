@@ -42,6 +42,7 @@ require (
 	github.com/samber/lo v1.49.1 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/mock v0.5.2 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
