@@ -75,6 +75,33 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
 }
 
+// HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
+func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubChunkBlocks) {
+	if !c.mPlayer.Ready {
+		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
+	}
+
+	// TODO: Does the sub-chunk position sent in this packet even matter?
+	for _, entry := range pk.Blocks {
+		pos := df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}
+		b, ok := df_world.BlockByRuntimeID(entry.BlockRuntimeID)
+		if !ok {
+			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
+			b = block.Air{}
+		}
+		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+	}
+	for _, entry := range pk.Extra {
+		pos := df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}
+		b, ok := df_world.BlockByRuntimeID(entry.BlockRuntimeID)
+		if !ok {
+			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
+			b = block.Air{}
+		}
+		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+	}
+}
+
 // AttemptItemInteractionWithBlock attempts a block placement request from the client. It returns false if the simulation is unable
 // to place a block at the given position.
 func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.InventoryTransaction) bool {

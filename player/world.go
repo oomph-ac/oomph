@@ -24,6 +24,8 @@ type WorldUpdaterComponent interface {
 	HandleSubChunk(pk *packet.SubChunk)
 	// HandleUpdateBlock allows the world updater component to handle an UpdateBlock packet sent by the server.
 	HandleUpdateBlock(pk *packet.UpdateBlock)
+	// HandleUpdateSubChunkBlocks allows the world updater component to handle a UpdateSubChunkBlocks packet sent by the server.
+	HandleUpdateSubChunkBlocks(pk *packet.UpdateSubChunkBlocks)
 	// AttemptItemInteractionWithBlock attempts an item interaction with a block request from the client. It returns false if the simulation is unable
 	// to place a block at the given position.
 	AttemptItemInteractionWithBlock(pk *packet.InventoryTransaction) bool

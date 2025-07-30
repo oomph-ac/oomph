@@ -47,6 +47,7 @@ var ServerDecode = []uint32{
 	packet.IDUpdateAbilities,
 	packet.IDUpdateAttributes,
 	packet.IDUpdateBlock,
+	packet.IDUpdateSubChunkBlocks,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
@@ -423,5 +424,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
+	case *packet.UpdateSubChunkBlocks:
+		p.worldUpdater.HandleUpdateSubChunkBlocks(pk)
 	}
 }
