@@ -54,6 +54,8 @@ type AuthoritativeCombatComponent struct {
 
 	// attackInput is the input the client sent to attack an entity.
 	attackInput *packet.InventoryTransaction
+	// prevAttackData is the previous attack data that was sent to the server.
+	prevAttackData *protocol.UseItemOnEntityTransactionData
 	// checkMisprediction is true if the client swings in the air and the combat component is not ACK dependent.
 	checkMisprediction bool
 
@@ -83,6 +85,10 @@ func (c *AuthoritativeCombatComponent) UniqueAttacks() map[uint64]*entity.Entity
 	return c.uniqueAttackedEntities
 }
 
+func (c *AuthoritativeCombatComponent) LastAttack() *protocol.UseItemOnEntityTransactionData {
+	return c.prevAttackData
+}
+
 // Attack notifies the combat component of an attack.
 func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction) {
 	var (
@@ -91,6 +97,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 	)
 	if input != nil {
 		data = input.TransactionData.(*protocol.UseItemOnEntityTransactionData)
+		c.prevAttackData = data
 		e = c.entityTracker().FindEntity(data.TargetEntityRuntimeID)
 		if e == nil {
 			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "entity %d not found", data.TargetEntityRuntimeID)

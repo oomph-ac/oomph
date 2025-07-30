@@ -18,6 +18,9 @@ import (
 
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
 type WorldUpdaterComponent interface {
+	// UseItemData returns the last UseItemTransactionData packet received by the world updater component.
+	UseItemData() *protocol.UseItemTransactionData
+
 	// HandleLevelChunk allows the world updater component to handle a LevelChunk packet sent by the server.
 	HandleLevelChunk(pk *packet.LevelChunk)
 	// HandleSubChunk allows the world updater component to handle a SubChunk packet sent by the server.

@@ -20,10 +20,10 @@ func init() {
 }
 
 type PlayerSnapshot struct {
-	Pos, CPos mgl32.Vec3 // 24 bytes
-	Vel, CVel mgl32.Vec3 // 24 bytes
-	Mov, CMov mgl32.Vec3 // 24 bytes
-	CRot      mgl32.Vec3 // 12 bytes
+	Pos, CPos protocol.Optional[mgl32.Vec3] // 2-25 bytes
+	Vel, CVel protocol.Optional[mgl32.Vec3] // 2-25 bytes
+	Mov, CMov protocol.Optional[mgl32.Vec3] // 2-25 bytes
+	CRot      protocol.Optional[mgl32.Vec3] // 1-13 bytes
 
 	CInputFlags protocol.Bitset // 9 bytes (?)
 	SimFlags    protocol.Bitset // ???
@@ -39,13 +39,13 @@ func (*PlayerSnapshot) ID() uint32 {
 }
 
 func (pk *PlayerSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
-	io.Vec3(&pk.Pos)
-	io.Vec3(&pk.Vel)
-	io.Vec3(&pk.Mov)
-	io.Vec3(&pk.CPos)
-	io.Vec3(&pk.CVel)
-	io.Vec3(&pk.CMov)
-	io.Vec3(&pk.CRot)
+	protocol.OptionalFunc(io, &pk.Pos, io.Vec3)
+	protocol.OptionalFunc(io, &pk.Vel, io.Vec3)
+	protocol.OptionalFunc(io, &pk.Mov, io.Vec3)
+	protocol.OptionalFunc(io, &pk.CPos, io.Vec3)
+	protocol.OptionalFunc(io, &pk.CVel, io.Vec3)
+	protocol.OptionalFunc(io, &pk.CMov, io.Vec3)
+	protocol.OptionalFunc(io, &pk.CRot, io.Vec3)
 	io.Bitset(&pk.CInputFlags, gtpacket.PlayerAuthInputBitsetSize)
 	io.Bitset(&pk.SimFlags, SimFlagsSize)
 	io.Int64(&pk.Timestamp)

@@ -3,6 +3,7 @@ package player
 import (
 	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -16,6 +17,8 @@ type CombatComponent interface {
 	// UniqueAttacks returns a map of unique attacked entities.
 	UniqueAttacks() map[uint64]*entity.Entity
 
+	// LastAttack returns the last attack data sent by the player related to this combat component.
+	LastAttack() *protocol.UseItemOnEntityTransactionData
 	// Attack notifies the combat component of an attack.
 	Attack(pk *packet.InventoryTransaction)
 	// Calculate calculates the different distances from the attacked entity to the combat component's
@@ -67,17 +70,14 @@ func (p *Player) tryRunningClientCombat() {
 	}
 
 	for rID, e := range p.clientEntTracker.All() {
-		if e.Position.Sub(p.movement.Pos()).LenSqr() > cloudpacket.EntitySnapshotRadius {
+		if e.Position == e.PrevPosition {
 			continue
 		}
 		p.WriteToCloud(&cloudpacket.EntitySnapshot{
-			SnapshotType: cloudpacket.SnapshotTypeUpdate,
+			SnapshotType: cloudpacket.EntitySnapshotTypeUpdate,
 			RuntimeId:    rID,
 			IsPlayer:     e.IsPlayer,
-			Width:        e.Width,
-			Height:       e.Height,
-			Scale:        e.Scale,
-			Position:     e.Position,
+			Position:     protocol.Option(e.Position),
 		})
 	}
 }

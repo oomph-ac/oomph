@@ -7,7 +7,7 @@ import (
 )
 
 func (p *Player) SetCloudClient(cl *client.Client) {
-	if p.cloudClient != nil {
+	if p.cloudClient != nil && cl != nil {
 		panic(oerror.New("cloud client already set for player"))
 	}
 	if !p.opts.Combat.EnableClientEntityTracking {

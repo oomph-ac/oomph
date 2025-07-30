@@ -169,26 +169,32 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
 			p.combat.Attack(pk)
 			if p.opts.Combat.EnableClientEntityTracking {
+				var snapshot cloudpacket.AttackSnapshot
+				if prevDat := p.clientCombat.LastAttack(); prevDat == nil {
+					snapshot.HotBarSlot = protocol.Option(int32(dat.HotBarSlot))
+					snapshot.EntityRID = protocol.Option(dat.TargetEntityRuntimeID)
+					snapshot.ReportedPos = protocol.Option(dat.Position)
+					snapshot.ClickedPos = protocol.Option(dat.ClickedPosition)
+				} else {
+					if dat.HotBarSlot != prevDat.HotBarSlot {
+						snapshot.HotBarSlot = protocol.Option(int32(dat.HotBarSlot))
+					}
+					if dat.TargetEntityRuntimeID != prevDat.TargetEntityRuntimeID {
+						snapshot.EntityRID = protocol.Option(dat.TargetEntityRuntimeID)
+					}
+					if dat.Position != prevDat.Position {
+						snapshot.ReportedPos = protocol.Option(dat.Position)
+					}
+					if dat.ClickedPosition != prevDat.ClickedPosition {
+						snapshot.ClickedPos = protocol.Option(dat.ClickedPosition)
+					}
+				}
+
+				p.WriteToCloud(&snapshot)
 				p.clientCombat.Attack(pk)
 			}
-			p.WriteToCloud(&cloudpacket.AttackSnapshot{
-				HotBarSlot:  dat.HotBarSlot,
-				EntityRID:   dat.TargetEntityRuntimeID,
-				ReportedPos: dat.Position,
-				ClickedPos:  dat.ClickedPosition,
-			})
 			ctx.Cancel()
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
-			p.WriteToCloud(&cloudpacket.BlockInteractionSnapshot{
-				ActionType:  tr.ActionType,
-				TriggerType: tr.TriggerType,
-				CPrediction: tr.ClientPrediction,
-				BlockFace:   tr.BlockFace,
-				BlockPos:    tr.BlockPosition,
-				ReportedPos: tr.Position,
-				ClickedPos:  tr.ClickedPosition,
-			})
-
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 			if tr.ActionType == protocol.UseItemActionClickAir {
 				// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
@@ -314,6 +320,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.AddActor:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			pk.EntityType,
 			pk.EntityMetadata,
 			pk.Position,
@@ -325,6 +332,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			scale,
 		))
 		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			pk.EntityType,
 			pk.EntityMetadata,
 			pk.Position,
@@ -338,6 +346,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			"",
 			pk.EntityMetadata,
 			pk.Position,
@@ -349,6 +358,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			scale,
 		))
 		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			"",
 			pk.EntityMetadata,
 			pk.Position,
@@ -398,7 +408,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		// TODO: Properly account for entity unique IDs differing from the runtime ID in certain server softwares?
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
-		p.WriteToCloud(&cloudpacket.EntitySnapshot{SnapshotType: cloudpacket.SnapshotTypeRemove, RuntimeId: uint64(pk.EntityUniqueID)})
+		p.WriteToCloud(&cloudpacket.EntitySnapshot{SnapshotType: cloudpacket.EntitySnapshotTypeRemove, RuntimeId: uint64(pk.EntityUniqueID)})
 	case *packet.SetActorData:
 		pk.Tick = 0
 		ctx.SetModified()

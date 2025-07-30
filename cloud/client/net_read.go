@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -11,6 +12,10 @@ import (
 )
 
 func (c *Client) ReadPacket() (packet.Packet, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("client is not connected")
+	}
+
 	select {
 	case <-c.done:
 		return nil, fmt.Errorf("client is closed")
@@ -62,6 +67,8 @@ func (c *Client) readLoop() {
 				return
 			}
 
+			//fmt.Println("got", len(payload)+packet.NetworkHeaderSize, "bytes from", conn.RemoteAddr())
+
 			// Decompress if needed
 			var data []byte
 			if compressed {
@@ -71,6 +78,7 @@ func (c *Client) readLoop() {
 					c.log.Error("failed to decompress packet", "err", err)
 					return
 				}
+				//fmt.Println("decompressed is", len(data)+packet.NetworkHeaderSize, "bytes")
 			} else {
 				data = payload
 			}
@@ -86,32 +94,25 @@ func (c *Client) readLoop() {
 }
 
 func (c *Client) parseBatch(data []byte) error {
-	buf := internal.NewBatchBuf()
-	defer internal.PutBatchBuf(buf)
-	buf.Write(data)
-
-	reader := protocol.NewReader(buf, 0, false)
-	for buf.Len() > 0 {
+	batchBuf := bytes.NewBuffer(data)
+	reader := protocol.NewReader(batchBuf, 0, false)
+	for batchBuf.Len() > 0 {
 		var pkId, pkLen uint32
 		reader.Varuint32(&pkId)
 		reader.Varuint32(&pkLen)
 
-		if buf.Len() < int(pkLen) {
-			return fmt.Errorf("insufficient data for packet %d: expected %d bytes, have %d", pkId, pkLen, buf.Len())
+		if batchBuf.Len() < int(pkLen) {
+			return fmt.Errorf("insufficient data for packet %d: expected %d bytes, have %d", pkId, pkLen, batchBuf.Len())
 		}
 
-		pkData := make([]byte, pkLen)
-		reader.Bytes(&pkData)
+		pkBuf := bytes.NewBuffer(batchBuf.Next(int(pkLen)))
+		pkReader := protocol.NewReader(pkBuf, 0, false)
 
 		pk, ok := packet.Get(pkId)
 		if !ok {
 			c.log.Warn("unknown packet ID", "id", pkId)
 			continue
 		}
-
-		pkBuf := internal.NewPacketBuf()
-		pkBuf.Write(pkData)
-		pkReader := protocol.NewReader(pkBuf, 0, false)
 		pk.Marshal(pkReader, packet.CurrentProtocol)
 		internal.PutPacketBuf(pkBuf)
 

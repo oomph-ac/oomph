@@ -14,13 +14,6 @@ func (c *Client) WritePacket(pk packet.Packet) error {
 	if c.conn == nil {
 		return fmt.Errorf("cannot write packet to disconnected client")
 	}
-	if !c.sentInit.Load() {
-		// InitConnectionRequest needs to be the first packet the client sends to the remote server.
-		if pk.ID() != packet.IDInitConnectionRequest {
-			return nil
-		}
-		c.sentInit.Store(true)
-	}
 
 	select {
 	case <-c.done:
@@ -39,10 +32,9 @@ func (c *Client) flush() error {
 	defer internal.PutBatchBuf(buf)
 
 	batchWriter := protocol.NewWriter(buf, 0)
-	pkWriter := protocol.NewWriter(nil, 0)
 	for _, pk := range c.batched {
 		pkBuf := internal.NewPacketBuf()
-		internal.ModifyWriterOutput(pkWriter, pkBuf)
+		pkWriter := protocol.NewWriter(pkBuf, 0)
 		pk.Marshal(pkWriter, packet.CurrentProtocol)
 		pkId, pkLen, pkBytes := pk.ID(), uint32(pkBuf.Len()), pkBuf.Bytes()
 		batchWriter.Varuint32(&pkId)

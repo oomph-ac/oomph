@@ -96,7 +96,7 @@ func (c *EntityTrackerComponent) HandleSetActorData(pk *packet.SetActorData) {
 	if e := c.FindEntity(pk.EntityRuntimeID); e != nil {
 		width, height, scale := calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
 		if c.isClientTracker {
-			c.mPlayer.ACKs().Add(acknowledgement.NewEntitySizeACK(e, width, height, scale))
+			c.mPlayer.ACKs().Add(acknowledgement.NewEntitySizeACK(c.mPlayer, e, width, height, scale))
 		} else {
 			e.Width, e.Height, e.Scale = width, height, scale
 		}

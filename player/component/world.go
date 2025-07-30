@@ -9,6 +9,7 @@ import (
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
+	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
@@ -22,7 +23,7 @@ type WorldUpdaterComponent struct {
 	mPlayer *player.Player
 
 	breakingBlockPos          *protocol.BlockPos
-	prevPlaceRequest          *protocol.UseItemTransactionData
+	prevUseItemData           *protocol.UseItemTransactionData
 	chunkRadius               int32
 	initalInteractionAccepted bool
 }
@@ -32,6 +33,10 @@ func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 		mPlayer:     p,
 		chunkRadius: 1_000_000_000,
 	}
+}
+
+func (c *WorldUpdaterComponent) UseItemData() *protocol.UseItemTransactionData {
+	return c.prevUseItemData
 }
 
 // HandleSubChunk handles a SubChunk packet from the server.
@@ -83,7 +88,41 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		return true
 	}
 
-	c.prevPlaceRequest = dat
+	var snapshot cloudpacket.BlockInteractionSnapshot
+	if c.prevUseItemData == nil {
+		snapshot.ActionType = protocol.Option(dat.ActionType)
+		snapshot.TriggerType = protocol.Option(dat.TriggerType)
+		snapshot.CPrediction = protocol.Option(dat.ClientPrediction)
+		snapshot.BlockFace = protocol.Option(dat.BlockFace)
+		snapshot.BlockPos = protocol.Option(dat.BlockPosition)
+		snapshot.ReportedPos = protocol.Option(dat.Position)
+		snapshot.ClickedPos = protocol.Option(dat.ClickedPosition)
+	} else {
+		if dat.ActionType != c.prevUseItemData.ActionType {
+			snapshot.ActionType = protocol.Option(c.prevUseItemData.ActionType)
+		}
+		if dat.TriggerType != c.prevUseItemData.TriggerType {
+			snapshot.TriggerType = protocol.Option(c.prevUseItemData.TriggerType)
+		}
+		if dat.ClientPrediction != c.prevUseItemData.ClientPrediction {
+			snapshot.CPrediction = protocol.Option(c.prevUseItemData.ClientPrediction)
+		}
+		if dat.BlockFace != c.prevUseItemData.BlockFace {
+			snapshot.BlockFace = protocol.Option(c.prevUseItemData.BlockFace)
+		}
+		if dat.BlockPosition != c.prevUseItemData.BlockPosition {
+			snapshot.BlockPos = protocol.Option(c.prevUseItemData.BlockPosition)
+		}
+		if dat.Position != c.prevUseItemData.Position {
+			snapshot.ReportedPos = protocol.Option(c.prevUseItemData.Position)
+		}
+		if dat.ClickedPosition != c.prevUseItemData.ClickedPosition {
+			snapshot.ClickedPos = protocol.Option(c.prevUseItemData.ClickedPosition)
+		}
+	}
+	c.mPlayer.WriteToCloud(&snapshot)
+	c.prevUseItemData = dat
+
 	if dat.ActionType != protocol.UseItemActionClickBlock {
 		return true
 	}
@@ -158,9 +197,9 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return true
 	}
 
-	if c.prevPlaceRequest != nil && dat.BlockRuntimeID == c.prevPlaceRequest.BlockRuntimeID && dat.BlockFace == c.prevPlaceRequest.BlockFace &&
-		dat.BlockPosition == c.prevPlaceRequest.BlockPosition && dat.HotBarSlot == c.prevPlaceRequest.HotBarSlot &&
-		dat.Position == c.prevPlaceRequest.Position && dat.ClickedPosition == c.prevPlaceRequest.ClickedPosition {
+	if c.prevUseItemData != nil && dat.BlockRuntimeID == c.prevUseItemData.BlockRuntimeID && dat.BlockFace == c.prevUseItemData.BlockFace &&
+		dat.BlockPosition == c.prevUseItemData.BlockPosition && dat.HotBarSlot == c.prevUseItemData.HotBarSlot &&
+		dat.Position == c.prevUseItemData.Position && dat.ClickedPosition == c.prevUseItemData.ClickedPosition {
 		return false
 	}
 

@@ -12,8 +12,9 @@ const (
 )
 
 type Entity struct {
-	Metadata map[uint32]any
-	Type     string
+	RuntimeId uint64
+	Metadata  map[uint32]any
+	Type      string
 
 	// Position is the current position of the entity, after interpolation.
 	Position, PrevPosition mgl32.Vec3
@@ -39,10 +40,11 @@ type Entity struct {
 }
 
 // New creates and returns a new Entity instance.
-func New(entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySize int, isPlayer bool, width, height, scale float32) *Entity {
+func New(runtimeId uint64, entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySize int, isPlayer bool, width, height, scale float32) *Entity {
 	e := &Entity{
-		Type:     entType,
-		Metadata: metadata,
+		RuntimeId: runtimeId,
+		Type:      entType,
+		Metadata:  metadata,
 
 		Position:     pos,
 		PrevPosition: pos,

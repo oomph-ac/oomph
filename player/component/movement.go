@@ -817,18 +817,33 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	}
 
 	playerSnapshot := &cloudpacket.PlayerSnapshot{
-		Pos:         mc.mPlayer.Movement().Pos(),
-		Vel:         mc.mPlayer.Movement().Vel(),
-		Mov:         mc.mPlayer.Movement().Mov(),
-		CPos:        mc.mPlayer.Movement().Client().Pos(),
-		CVel:        mc.mPlayer.Movement().Client().Vel(),
-		CMov:        mc.mPlayer.Movement().Client().Mov(),
-		CRot:        mc.mPlayer.Movement().Rotation(),
 		CInputFlags: clonedInputData,
 		Timestamp:   time.Now().UnixMicro(),
 		CInputTick:  mc.mPlayer.ClientTick,
 		CSimTick:    mc.mPlayer.SimulationFrame,
 		SimFlags:    protocol.NewBitset(cloudpacket.SimFlagsSize),
+	}
+	const sendThreshold float32 = 5e-8
+	if mc.pos.Sub(mc.lastPos).LenSqr() > sendThreshold {
+		playerSnapshot.Pos = protocol.Option(mc.pos)
+	}
+	if mc.vel.Sub(mc.lastVel).LenSqr() > sendThreshold {
+		playerSnapshot.Vel = protocol.Option(mc.vel)
+	}
+	if mc.mov.Sub(mc.lastMov).LenSqr() > sendThreshold {
+		playerSnapshot.Mov = protocol.Option(mc.mov)
+	}
+	if mc.nonAuthoritative.pos.Sub(mc.nonAuthoritative.lastPos).LenSqr() > sendThreshold {
+		playerSnapshot.CPos = protocol.Option(mc.nonAuthoritative.pos)
+	}
+	if mc.nonAuthoritative.vel.Sub(mc.nonAuthoritative.lastVel).LenSqr() > sendThreshold {
+		playerSnapshot.CVel = protocol.Option(mc.nonAuthoritative.vel)
+	}
+	if mc.nonAuthoritative.mov.Sub(mc.nonAuthoritative.lastMov).LenSqr() > sendThreshold {
+		playerSnapshot.CMov = protocol.Option(mc.nonAuthoritative.mov)
+	}
+	if mc.rotation.Sub(mc.lastRotation).LenSqr() > sendThreshold {
+		playerSnapshot.CRot = protocol.Option(mc.rotation)
 	}
 	if mc.InCorrectionCooldown() {
 		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagInCorrectiveState)
@@ -948,28 +963,29 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 		// (the ones they are colliding with).
 		mc.mPlayer.SyncWorld()
 		// Make sure all of the player's actor data is up-to-date with Oomph's prediction.
-		actorData := mc.mPlayer.LastSetActorData
-		actorData.Tick = mc.mPlayer.SimulationFrame
-		if f, ok := actorData.EntityMetadata[entity.DataKeyFlags]; ok {
-			flags := f.(int64)
-			if mc.sprinting {
-				flags = utils.AddFlag(flags, entity.DataFlagSprinting)
-			} else {
-				flags = utils.RemoveFlag(flags, entity.DataFlagSprinting)
+		if actorData := mc.mPlayer.LastSetActorData; actorData != nil {
+			actorData.Tick = mc.mPlayer.SimulationFrame
+			if f, ok := actorData.EntityMetadata[entity.DataKeyFlags]; ok {
+				flags := f.(int64)
+				if mc.sprinting {
+					flags = utils.AddFlag(flags, entity.DataFlagSprinting)
+				} else {
+					flags = utils.RemoveFlag(flags, entity.DataFlagSprinting)
+				}
+				if mc.sneaking {
+					flags = utils.AddFlag(flags, entity.DataFlagSneaking)
+				} else {
+					flags = utils.RemoveFlag(flags, entity.DataFlagSneaking)
+				}
+				if mc.immobile {
+					flags = utils.AddFlag(flags, entity.DataFlagImmobile)
+				} else {
+					flags = utils.RemoveFlag(flags, entity.DataFlagImmobile)
+				}
+				actorData.EntityMetadata[entity.DataKeyFlags] = flags
 			}
-			if mc.sneaking {
-				flags = utils.AddFlag(flags, entity.DataFlagSneaking)
-			} else {
-				flags = utils.RemoveFlag(flags, entity.DataFlagSneaking)
-			}
-			if mc.immobile {
-				flags = utils.AddFlag(flags, entity.DataFlagImmobile)
-			} else {
-				flags = utils.RemoveFlag(flags, entity.DataFlagImmobile)
-			}
-			actorData.EntityMetadata[entity.DataKeyFlags] = flags
+			mc.mPlayer.SendPacketToClient(actorData)
 		}
-		mc.mPlayer.SendPacketToClient(actorData)
 		// Send the actual movement correction to the client.
 		mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 			PredictionType: packet.PredictionTypePlayer,
