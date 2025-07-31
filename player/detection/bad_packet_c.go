@@ -44,6 +44,10 @@ func (d *BadPacketC) Metadata() *player.DetectionMetadata {
 
 func (d *BadPacketC) Detect(pk packet.Packet) {
 	switch pk := pk.(type) {
+	case *packet.InventoryTransaction:
+		if dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && dat.ActionType == protocol.UseItemActionBreakBlock && d.mPlayer.GameMode != packet.GameTypeCreative {
+			d.mPlayer.FailDetection(d, nil)
+		}
 	case *packet.PlayerAction:
 		switch pk.ActionType {
 		case protocol.PlayerActionPredictDestroyBlock, protocol.PlayerActionStartBreak, protocol.PlayerActionCrackBreak,
