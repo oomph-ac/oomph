@@ -8,4 +8,5 @@ const (
 	IDEntitySnapshot
 	IDBlockInteractionSnapshot
 	IDAttackSnapshot
+	IDPlayerDisconnect
 )
