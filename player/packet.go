@@ -26,6 +26,7 @@ var ClientDecode = []uint32{
 	packet.IDItemStackRequest,
 	packet.IDLevelSoundEvent,
 	packet.IDClientMovementPredictionSync,
+	packet.IDPlayerAction,
 }
 
 var ServerDecode = []uint32{
@@ -218,7 +219,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 						p.consumedSlot = 0
 					}
 				} */
-			} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
+			} else if tr.ActionType == protocol.UseItemActionBreakBlock {
+				p.Message("hi")
 				ctx.Cancel()
 				return
 			}
