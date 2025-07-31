@@ -243,6 +243,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				p.blockBreakInProgress = false
 			case protocol.PlayerActionStopBreak:
 				if p.worldUpdater.BlockBreakPos() == nil {
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "ignored PlayerActionStopBreak (blockBreakPos is nil)")
 					continue
 				}
 
