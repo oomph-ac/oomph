@@ -246,6 +246,8 @@ type MovementComponent interface {
 
 	// Sync sends a correction to the client to re-sync the client's movement with the server's.
 	Sync()
+	// ResetConsecutiveCorrections resets the amount of consecutive corrections count.
+	ResetConsecutiveCorrections()
 }
 
 // NonAuthoritativeMovementInfo represents movement information that the player has sent to the server but has not validated/verified.
@@ -299,51 +301,54 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	if needsCorrection && p.movement.PendingTeleports() == 0 && !hasTeleport &&
 		!pk.InputData.Load(packet.InputFlagJumpPressedRaw) && !hasKnockback {
 		p.movement.Sync()
-	} else if !needsCorrection && !hasTeleport && !hasKnockback && p.movement.PendingCorrections() == 0 {
-		inCooldown := p.movement.InCorrectionCooldown()
-		p.movement.SetCorrectionCooldown(false)
+	} else {
+		p.movement.ResetConsecutiveCorrections()
+		if !needsCorrection && !hasTeleport && !hasKnockback && p.movement.PendingCorrections() == 0 {
+			inCooldown := p.movement.InCorrectionCooldown()
+			p.movement.SetCorrectionCooldown(false)
 
-		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
-		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.World())) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.World())) > 0
-		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
-			if p.Opts().Movement.AcceptClientPosition && posDiff.Len() < p.Opts().Movement.PositionAcceptanceThreshold {
-				posDiff = mgl32.Vec3{}
-				p.movement.SetPos(p.movement.Client().Pos())
-				p.Dbg.Notify(
-					DebugModeMovementSim,
-					true,
-					"accepted client position (newPos=%v)",
-					p.movement.Pos(),
-				)
-			}
-			if p.Opts().Movement.AcceptClientVelocity && velDiff.Len() < p.Opts().Movement.VelocityAcceptanceThreshold {
-				p.movement.SetVel(p.movement.Client().Vel())
-				p.Dbg.Notify(
-					DebugModeMovementSim,
-					true,
-					"accepted client velocity (newVel=%v)",
-					p.movement.Vel(),
-				)
-			}
+			// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
+			srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.World())) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.World())) > 0
+			if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
+				if p.Opts().Movement.AcceptClientPosition && posDiff.Len() < p.Opts().Movement.PositionAcceptanceThreshold {
+					posDiff = mgl32.Vec3{}
+					p.movement.SetPos(p.movement.Client().Pos())
+					p.Dbg.Notify(
+						DebugModeMovementSim,
+						true,
+						"accepted client position (newPos=%v)",
+						p.movement.Pos(),
+					)
+				}
+				if p.Opts().Movement.AcceptClientVelocity && velDiff.Len() < p.Opts().Movement.VelocityAcceptanceThreshold {
+					p.movement.SetVel(p.movement.Client().Vel())
+					p.Dbg.Notify(
+						DebugModeMovementSim,
+						true,
+						"accepted client velocity (newVel=%v)",
+						p.movement.Vel(),
+					)
+				}
 
-			// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
-			// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
-			// the client and server position is desynced consistently without going above the correction threshold.
-			if p.Opts().Movement.PersuasionThreshold > 0 {
-				threshold := p.Opts().Movement.PersuasionThreshold
-				posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
-				posDiff[1] = 0
-				posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
+				// Attempt to shift the server's position slowly towards the client's if the client has the same velocity
+				// as the server. This is to prevent sudden unexpected rubberbanding (mainly from collisions) that may occur if
+				// the client and server position is desynced consistently without going above the correction threshold.
+				if p.Opts().Movement.PersuasionThreshold > 0 {
+					threshold := p.Opts().Movement.PersuasionThreshold
+					posDiff[0] = game.ClampFloat(posDiff[0], -threshold, threshold)
+					posDiff[1] = 0
+					posDiff[2] = game.ClampFloat(posDiff[2], -threshold, threshold)
 
-				p.movement.SetPos(p.movement.Pos().Sub(posDiff))
-				p.Dbg.Notify(
-					DebugModeMovementSim,
-					posDiff.Len() >= 5e-4,
-					"shifted server position by %v (newPos=%v diff=%v)",
-					posDiff,
-					p.movement.Pos(),
-					p.movement.Pos().Sub(p.movement.Client().Pos()),
-				)
+					p.movement.SetPos(p.movement.Pos().Sub(posDiff))
+					p.Dbg.Notify(
+						DebugModeMovementSim,
+						posDiff.Len() >= 5e-4,
+						"shifted server position by %v (newPos=%v diff=%v)",
+						posDiff,
+						p.movement.Pos(),
+						p.movement.Pos().Sub(p.movement.Client().Pos()),
+					)
+				}
 			}
 		}
 	}

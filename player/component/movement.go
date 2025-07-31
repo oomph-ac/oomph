@@ -129,6 +129,8 @@ type AuthoritativeMovementComponent struct {
 
 	pendingCorrections   int
 	inCorrectionCooldown bool
+
+	consecutiveCorrections int
 }
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
@@ -920,11 +922,14 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 	mc.AddPendingCorrection()
 	mc.SetCorrectionCooldown(true)
 	mc.mPlayer.ACKs().Add(acknowledgement.NewMovementCorrectionACK(mc.mPlayer))
-
-	if !mc.mPlayer.PendingCorrectionACK {
+	mc.consecutiveCorrections++
+	if mc.consecutiveCorrections >= 20 {
 		// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
 		// (the ones they are colliding with).
 		mc.mPlayer.SyncWorld()
+	}
+
+	if !mc.mPlayer.PendingCorrectionACK {
 		// Make sure all of the player's actor data is up-to-date with Oomph's prediction.
 		actorData := mc.mPlayer.LastSetActorData
 		actorData.Tick = mc.mPlayer.SimulationFrame
@@ -958,4 +963,8 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 		})
 		mc.mPlayer.PendingCorrectionACK = true
 	}
+}
+
+func (mc *AuthoritativeMovementComponent) ResetConsecutiveCorrections() {
+	mc.consecutiveCorrections = 0
 }
