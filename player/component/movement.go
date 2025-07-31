@@ -698,10 +698,10 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 
 	isNewVersionPlayer := mc.mPlayer.VersionInRange(player.GameVersion1_21_0, 65536)
 	var needsSpeedAdjusted bool
-	if (!startFlag && !stopFlag && !mc.serverSprintApplied) || (startFlag && stopFlag) /*&& hasForwardKeyPressed*/ {
+	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ start/stop state race condition")
 		needsSpeedAdjusted = isNewVersionPlayer
-		if !mc.serverSprintApplied {
+		/*if !mc.serverSprintApplied {
 			if mc.serverSprint {
 				mc.sprinting = true
 				mc.airSpeed = 0.026
@@ -711,12 +711,21 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 				mc.airSpeed = 0.02
 				mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.02")
 			}
+		}*/
+		mc.sprinting = false
+		mc.airSpeed = 0.02
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+	} else if !startFlag && !stopFlag && !mc.serverSprintApplied && mc.serverSprint != mc.sprinting {
+		// TODO: Do we have to apply the speed adjustment herer?
+		if mc.serverSprint {
+			mc.sprinting = true
+			mc.airSpeed = 0.026
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.026")
 		} else {
 			mc.sprinting = false
 			mc.airSpeed = 0.02
-			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.02")
 		}
-		//mc.mPlayer.Message("%d %v %v", mc.mPlayer.SimulationFrame, mc.serverSprintApplied, mc.serverSprint)
 	} else if startFlag /*  && !mc.sprinting && hasForwardKeyPressed*/ {
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ starts sprint")
 		mc.sprinting = true
