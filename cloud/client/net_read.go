@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/golang/snappy"
 	"github.com/oomph-ac/oomph/cloud/packet"
@@ -21,6 +22,21 @@ func (c *Client) ReadPacket() (packet.Packet, error) {
 		return nil, fmt.Errorf("client is closed")
 	case pk := <-c.rPackets:
 		return pk, nil
+	}
+}
+
+func (c *Client) ReadPacketTimeout(timeout time.Duration) (packet.Packet, error) {
+	if c.conn == nil {
+		return nil, fmt.Errorf("client is not connected")
+	}
+
+	select {
+	case <-c.done:
+		return nil, fmt.Errorf("client is closed")
+	case pk := <-c.rPackets:
+		return pk, nil
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("timeout waiting for packet")
 	}
 }
 
