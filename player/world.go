@@ -189,6 +189,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				}
 
 				p.blockBreakProgress = 0.0
+				p.blockBreakInProgress = false
 				p.World().SetBlock(df_cube.Pos{
 					int(action.BlockPos.X()),
 					int(action.BlockPos.Y()),
@@ -311,7 +312,7 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 
 	if _, isAir := b.(block.Air); isAir {
 		// Is it possible that the server already thinks the block is broken?
-		return 0
+		return 1_000_000_000
 	} else if utils.BlockName(b) == "minecraft:web" {
 		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
 		// Just return 1 and accept when the client does break the cobweb.

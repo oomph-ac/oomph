@@ -219,10 +219,6 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 						p.consumedSlot = 0
 					}
 				} */
-			} else if tr.ActionType == protocol.UseItemActionBreakBlock {
-				p.Message("hi")
-				ctx.Cancel()
-				return
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
