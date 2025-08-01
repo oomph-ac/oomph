@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/go-gl/mathgl/mgl32"
 	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
@@ -342,6 +343,12 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			height,
 			scale,
 		))
+		p.WriteToCloud(&cloudpacket.UpdateEntityStatus{
+			RuntimeId:  pk.EntityRuntimeID,
+			Position:   pk.Position,
+			Dimensions: mgl32.Vec3{width, height, scale},
+			EntityType: pk.EntityType,
+		})
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
@@ -368,6 +375,13 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			height,
 			scale,
 		))
+		p.WriteToCloud(&cloudpacket.UpdateEntityStatus{
+			RuntimeId:  pk.EntityRuntimeID,
+			Position:   pk.Position,
+			Dimensions: mgl32.Vec3{width, height, scale},
+			EntityType: "",
+			Flags:      cloudpacket.UpdateEntityStatusFlagIsPlayer,
+		})
 	case *packet.ChunkRadiusUpdated:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventorySlot:
@@ -407,7 +421,10 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		// TODO: Properly account for entity unique IDs differing from the runtime ID in certain server softwares?
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
-		p.WriteToCloud(&cloudpacket.EntitySnapshot{SnapshotType: cloudpacket.EntitySnapshotTypeRemove, RuntimeId: uint64(pk.EntityUniqueID)})
+		p.WriteToCloud(&cloudpacket.UpdateEntityStatus{
+			RuntimeId: uint64(pk.EntityUniqueID),
+			Flags:     cloudpacket.UpdateEntityStatusFlagIsRemoval,
+		})
 	case *packet.SetActorData:
 		pk.Tick = 0
 		ctx.SetModified()

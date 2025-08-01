@@ -431,6 +431,10 @@ func (p *Player) Close() error {
 			p.procMu.Lock()
 			defer p.procMu.Unlock()
 
+			if cc := p.cloudClient; cc != nil {
+				cc.Close()
+			}
+
 			if evHandler := p.eventHandler; evHandler != nil {
 				evHandler.HandleQuit()
 			}

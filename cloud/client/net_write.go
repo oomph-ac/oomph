@@ -110,6 +110,7 @@ func (c *Client) writeLoop() {
 	for {
 		select {
 		case <-c.done:
+			_ = c.flush()
 			return
 		case <-t.C:
 			if err := c.flush(); err != nil {

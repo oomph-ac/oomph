@@ -2,6 +2,7 @@ package acknowledgement
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/cloud/packet"
 	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/player"
@@ -19,6 +20,7 @@ type EntitySize struct {
 
 func NewEntitySizeACK(p *player.Player, e *entity.Entity, width, height, scale float32) *EntitySize {
 	return &EntitySize{
+		mPlayer: p,
 		mEntity: e,
 
 		width:  width,
@@ -28,35 +30,25 @@ func NewEntitySizeACK(p *player.Player, e *entity.Entity, width, height, scale f
 }
 
 func (ack *EntitySize) Run() {
-	prevWidth, prevHeight, prevScale := ack.mEntity.Width, ack.mEntity.Height, ack.mEntity.Scale
+	widthModified, heightModified, scaleModified := ack.width != ack.mEntity.Width, ack.height != ack.mEntity.Height, ack.scale != ack.mEntity.Scale
 	ack.mEntity.Width = ack.width
 	ack.mEntity.Height = ack.height
 	ack.mEntity.Scale = ack.scale
 
-	entitySnapshot := &cloudpacket.EntitySnapshot{
-		SnapshotType: cloudpacket.EntitySnapshotTypeUpdate,
-		RuntimeId:    ack.mEntity.RuntimeId,
-		IsPlayer:     ack.mEntity.IsPlayer,
+	if widthModified || heightModified || scaleModified {
+		var pk cloudpacket.UpdateEntityDimensions
+		pk.RuntimeId = ack.mEntity.RuntimeId
+		if widthModified {
+			pk.Width = protocol.Option(ack.width)
+		}
+		if heightModified {
+			pk.Height = protocol.Option(ack.height)
+		}
+		if scaleModified {
+			pk.Scale = protocol.Option(ack.scale)
+		}
+		ack.mPlayer.WriteToCloud(&pk)
 	}
-	// We only want to send the snapshot if the size has actually changed - and the server isn't just doing some weird logic
-	// where it wastes bandwidth re-sending this without needing to.
-	sendSnapshot := false
-	if prevWidth != ack.width {
-		entitySnapshot.Width = protocol.Option(ack.width)
-		sendSnapshot = true
-	}
-	if prevHeight != ack.height {
-		entitySnapshot.Height = protocol.Option(ack.height)
-		sendSnapshot = true
-	}
-	if prevScale != ack.scale {
-		entitySnapshot.Scale = protocol.Option(ack.scale)
-		sendSnapshot = true
-	}
-	if sendSnapshot {
-		ack.mPlayer.WriteToCloud(entitySnapshot)
-	}
-	ack.mEntity = nil
 }
 
 type EntityPosition struct {
@@ -83,5 +75,13 @@ func (ack *EntityPosition) Run() {
 		ack.position,
 		ack.teleport,
 	)
-	ack.mPlayer = nil
+	e := ack.mPlayer.ClientEntityTracker().FindEntity(ack.runtimeID)
+	if e == nil || e.PrevRecvPosition == e.RecvPosition {
+		return
+	}
+	ack.mPlayer.WriteToCloud(&packet.UpdateEntityPosition{
+		RuntimeId:    ack.runtimeID,
+		Position:     e.RecvPosition,
+		IsClientView: false,
+	})
 }

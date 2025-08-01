@@ -38,7 +38,7 @@ func New(log *slog.Logger, conn net.Conn, cd ConnectionInfo) *Client {
 		wPackets: make(chan packet.Packet, 128),
 		rPackets: make(chan packet.Packet, 32),
 
-		done: make(chan struct{}, 1),
+		done: make(chan struct{}),
 	}
 	c.closed.Store(false)
 	go c.readLoop()

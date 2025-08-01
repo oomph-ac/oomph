@@ -5,8 +5,10 @@ const (
 	IDInitConnectionResponse
 	IDHeartbeat
 	IDPlayerSnapshot
-	IDEntitySnapshot
 	IDBlockInteractionSnapshot
 	IDAttackSnapshot
 	IDPlayerDisconnect
+	IDUpdateEntityPosition
+	IDUpdateEntityDimensions
+	IDUpdateEntityStatus
 )
