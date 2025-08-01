@@ -126,25 +126,25 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		snapshot.ClickedPos = protocol.Option(dat.ClickedPosition)
 	} else {
 		if dat.ActionType != c.prevUseItemData.ActionType {
-			snapshot.ActionType = protocol.Option(c.prevUseItemData.ActionType)
+			snapshot.ActionType = protocol.Option(dat.ActionType)
 		}
 		if dat.TriggerType != c.prevUseItemData.TriggerType {
-			snapshot.TriggerType = protocol.Option(c.prevUseItemData.TriggerType)
+			snapshot.TriggerType = protocol.Option(dat.TriggerType)
 		}
 		if dat.ClientPrediction != c.prevUseItemData.ClientPrediction {
-			snapshot.CPrediction = protocol.Option(c.prevUseItemData.ClientPrediction)
+			snapshot.CPrediction = protocol.Option(dat.ClientPrediction)
 		}
 		if dat.BlockFace != c.prevUseItemData.BlockFace {
-			snapshot.BlockFace = protocol.Option(c.prevUseItemData.BlockFace)
+			snapshot.BlockFace = protocol.Option(dat.BlockFace)
 		}
 		if dat.BlockPosition != c.prevUseItemData.BlockPosition {
-			snapshot.BlockPos = protocol.Option(c.prevUseItemData.BlockPosition)
+			snapshot.BlockPos = protocol.Option(dat.BlockPosition)
 		}
 		if dat.Position != c.prevUseItemData.Position {
-			snapshot.ReportedPos = protocol.Option(c.prevUseItemData.Position)
+			snapshot.ReportedPos = protocol.Option(dat.Position)
 		}
 		if dat.ClickedPosition != c.prevUseItemData.ClickedPosition {
-			snapshot.ClickedPos = protocol.Option(c.prevUseItemData.ClickedPosition)
+			snapshot.ClickedPos = protocol.Option(dat.ClickedPosition)
 		}
 	}
 	c.mPlayer.WriteToCloud(&snapshot)
