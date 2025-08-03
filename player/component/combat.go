@@ -121,6 +121,11 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		return
 	}
 
+	// The reach/hitbox detection should only be applied to other players.
+	if c.useClientTracker && !e.IsPlayer {
+		return
+	}
+
 	c.attacked = true
 	c.targetedEntity = e
 	c.targetedRuntimeID = data.TargetEntityRuntimeID
