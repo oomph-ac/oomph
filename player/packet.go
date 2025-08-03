@@ -424,5 +424,9 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.worldUpdater.HandleUpdateBlock(pk)
 	case *packet.UpdateSubChunkBlocks:
 		p.worldUpdater.HandleUpdateSubChunkBlocks(pk)
+	case *packet.ContainerOpen:
+		p.inventory.CreateWindow(pk.WindowID, pk.ContainerType)
+	case *packet.ContainerClose:
+		p.inventory.RemoveWindow(pk.WindowID)
 	}
 }

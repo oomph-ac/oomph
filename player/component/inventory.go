@@ -28,6 +28,9 @@ type InventoryComponent struct {
 	pOffhand     *player.Inventory
 	pUiInventory *player.Inventory
 
+	altOpenWindow   *player.Inventory
+	altOpenWindowId byte
+
 	firstRequest   *invReq
 	currentRequest *invReq
 
@@ -78,7 +81,7 @@ func (c *InventoryComponent) WindowFromContainerID(id int32) (*player.Inventory,
 		// Armour inventory.
 		return c.pArmour, true
 	default:
-		return nil, false
+		return c.altOpenWindow, c.altOpenWindow != nil
 	}
 }
 
@@ -93,7 +96,7 @@ func (c *InventoryComponent) WindowFromWindowID(id int32) (*player.Inventory, bo
 	case protocol.WindowIDUI:
 		return c.pUiInventory, true
 	default:
-		return nil, false
+		return c.altOpenWindow, c.altOpenWindow != nil
 	}
 }
 
@@ -115,6 +118,30 @@ func (c *InventoryComponent) Sync(windowID int32) bool {
 	return true
 }
 
+func (c *InventoryComponent) CreateWindow(windowId byte, containerType byte) {
+	switch windowId {
+	case protocol.WindowIDInventory, protocol.WindowIDOffHand, protocol.WindowIDArmour, protocol.WindowIDUI:
+		return
+	default:
+		if c.altOpenWindow != nil {
+			c.mPlayer.Log().Debug("creating new window, but alternative is already open", "currWindowID", c.altOpenWindowId, "newWindowID", windowId)
+		}
+
+		// TODO: Determine the actual sizes of these inventory based on the container type. CBA to do for now, but this should work.
+		c.mPlayer.Log().Debug("created container inventory", "windowID", windowId, "containerType", containerType)
+		c.altOpenWindow = player.NewInventory(64)
+		c.altOpenWindowId = windowId
+	}
+}
+
+func (c *InventoryComponent) RemoveWindow(windowId byte) {
+	if windowId != c.altOpenWindowId {
+		return
+	}
+	c.altOpenWindow = nil
+	c.mPlayer.Log().Debug("removed container inventory", "windowID", windowId)
+}
+
 func (c *InventoryComponent) SyncSlot(windowID int32, slot int) bool {
 	inv, found := c.WindowFromWindowID(windowID)
 	if !found {
@@ -126,6 +153,7 @@ func (c *InventoryComponent) SyncSlot(windowID int32, slot int) bool {
 		Slot:     uint32(slot),
 		NewItem:  utils.InstanceFromItem(inv.Slot(slot)),
 	})
+
 	return true
 }
 
@@ -189,6 +217,7 @@ func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent)
 func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackRequest) {
 	c.mPlayer.Log().Debug("received item stack request", "requestID", request.RequestID)
 	tx := newInvRequest(request.RequestID)
+
 	for _, action := range request.Actions {
 		switch action := action.(type) {
 		case *protocol.TakeStackRequestAction:
