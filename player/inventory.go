@@ -21,6 +21,9 @@ type InventoryComponent interface {
 	SetHeldSlot(int32)
 	Holding() item.Stack
 
+	CreateWindow(windowId byte, containerType byte)
+	RemoveWindow(windowId byte)
+
 	HandleInventorySlot(pk *packet.InventorySlot)
 	HandleInventoryContent(pk *packet.InventoryContent)
 	HandleSingleRequest(request protocol.ItemStackRequest)
@@ -35,17 +38,18 @@ type InventoryComponent interface {
 type Inventory struct {
 	items        []item.Stack
 	unknownItems map[int]struct{}
-	size         uint32
-
 	specialSlots map[int]int
+
+	size uint32
 }
 
 func NewInventory(size uint32) *Inventory {
 	return &Inventory{
 		items:        make([]item.Stack, size),
 		unknownItems: make(map[int]struct{}),
-		size:         size,
 		specialSlots: make(map[int]int, 1),
+
+		size: size,
 	}
 }
 
