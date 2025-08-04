@@ -364,7 +364,7 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 			recpOutput[index] = utils.StackToItem(stack)
 		}
 	default:
-		fmt.Println("not shaped or shapeless recipe")
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "not shaped or shapeless recipe")
 		return
 	}
 
