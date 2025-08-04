@@ -98,6 +98,9 @@ type Player struct {
 	// LastActorMetadata is the last actor metadata packet sent by the client
 	LastSetActorData *packet.SetActorData
 
+	// Recipies is a map of recipe network IDs to recipes.
+	Recipies map[uint32]protocol.Recipe
+
 	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
 	blockBreakProgress float32
 	// blockBreakStartTick is the tick that the player started breaking a block.
@@ -198,6 +201,8 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
+
+		Recipies: make(map[uint32]protocol.Recipe),
 
 		deferredPackets: make([]packet.Packet, 0, 256),
 

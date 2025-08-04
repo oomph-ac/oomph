@@ -49,6 +49,9 @@ var ServerDecode = []uint32{
 	packet.IDUpdateAttributes,
 	packet.IDUpdateBlock,
 	packet.IDUpdateSubChunkBlocks,
+	packet.IDContainerOpen,
+	packet.IDContainerClose,
+	packet.IDCraftingData,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
@@ -428,5 +431,23 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.inventory.CreateWindow(pk.WindowID, pk.ContainerType)
 	case *packet.ContainerClose:
 		p.inventory.RemoveWindow(pk.WindowID)
+	case *packet.CraftingData:
+		if pk.ClearRecipes {
+			p.Recipies = make(map[uint32]protocol.Recipe)
+		}
+		for _, recp := range pk.Recipes {
+			switch recp := recp.(type) {
+			case *protocol.ShapedRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.ShapelessRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.MultiRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.SmithingTransformRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.SmithingTrimRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			}
+		}
 	}
 }

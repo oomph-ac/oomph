@@ -2,9 +2,12 @@ package component
 
 import (
 	"fmt"
+	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/item/recipe"
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -119,6 +122,10 @@ func (c *InventoryComponent) Sync(windowID int32) bool {
 }
 
 func (c *InventoryComponent) CreateWindow(windowId byte, containerType byte) {
+	if containerType == 255 {
+		return
+	}
+
 	switch windowId {
 	case protocol.WindowIDInventory, protocol.WindowIDOffHand, protocol.WindowIDArmour, protocol.WindowIDUI:
 		return
@@ -232,6 +239,9 @@ func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackReque
 			c.handleDestroyRequest(tx, action.Source, int(action.Count), true)
 		case *protocol.MineBlockStackRequestAction:
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
+		case *protocol.CraftRecipeStackRequestAction:
+			//tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
+			c.handleCraftStackRequest(tx, action)
 		default:
 			c.mPlayer.Log().Debug("unhandled item stack request action", "actionType", fmt.Sprintf("%T", action))
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
@@ -287,6 +297,148 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 			nextReq.prev = nil
 			c.firstRequest.next = nil
 			c.firstRequest = nextReq
+		}
+	}
+}
+
+func (c *InventoryComponent) craftingSize() uint32 {
+	if c.altOpenWindow != nil {
+		return 9
+	}
+	return 4
+}
+
+func (c *InventoryComponent) craftingOffset() uint32 {
+	if c.altOpenWindow != nil {
+		return 32
+	}
+	return 28
+}
+
+func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protocol.CraftRecipeStackRequestAction) {
+	recp, ok := c.mPlayer.Recipies[action.RecipeNetworkID]
+	if !ok {
+		c.mPlayer.Log().Debug("no recipe found", "recipeNetworkID", action.RecipeNetworkID)
+		return
+	}
+
+	var (
+		recpBlock  string
+		recpInput  []recipe.Item
+		recpOutput []item.Stack
+	)
+	switch recp := recp.(type) {
+	case *protocol.ShapedRecipe:
+		recpBlock = recp.Block
+		recpInput = make([]recipe.Item, len(recp.Input))
+		for index, desc := range recp.Input {
+			switch d := desc.Descriptor.(type) {
+			case *protocol.DefaultItemDescriptor:
+				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
+					recpInput[index] = item.NewStack(i, int(desc.Count))
+				} else {
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %d %d (index %d)", d.NetworkID, d.MetadataValue, index)
+				}
+			case *protocol.ItemTagItemDescriptor:
+				recpInput[index] = recipe.NewItemTag(d.Tag, int(desc.Count))
+			}
+		}
+		recpOutput = make([]item.Stack, len(recp.Output))
+		for index, stack := range recp.Output {
+			recpOutput[index] = utils.StackToItem(stack)
+		}
+	case *protocol.ShapelessRecipe:
+		recpBlock = recp.Block
+		recpInput = make([]recipe.Item, len(recp.Input))
+		for index, desc := range recp.Input {
+			switch d := desc.Descriptor.(type) {
+			case *protocol.DefaultItemDescriptor:
+				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
+					fmt.Printf("item found %T\n", i)
+					recpInput[index] = item.NewStack(i, int(desc.Count))
+				} else {
+					fmt.Println("no item found", d.NetworkID, d.MetadataValue)
+				}
+			case *protocol.ItemTagItemDescriptor:
+				recpInput[index] = recipe.NewItemTag(d.Tag, int(desc.Count))
+			}
+		}
+		recpOutput = make([]item.Stack, len(recp.Output))
+		for index, stack := range recp.Output {
+			recpOutput[index] = utils.StackToItem(stack)
+		}
+	default:
+		fmt.Println("not shaped or shapeless recipe")
+		return
+	}
+
+	if recpBlock != "crafting_table" {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "recp is %s not crafting table", recpBlock)
+		return
+	}
+	if action.NumberOfCrafts < 1 {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "invalid num crafts %d", action.NumberOfCrafts)
+		return
+	}
+	for _, i := range recpOutput {
+		fmt.Println("output", i)
+	}
+
+	size, offset := c.craftingSize(), c.craftingOffset()
+	consumed := make([]bool, size)
+	craftingInv := c.pUiInventory
+
+	craftAllowed := true
+	for _, expected := range recpInput {
+		if expected == nil || expected.Empty() {
+			continue
+		}
+
+		var processed bool
+		for slot := offset; slot < offset+size; slot++ {
+			if consumed[slot-offset] {
+				// We've already consumed this slot, skip it.
+				continue
+			}
+			has := craftingInv.Slot(int(slot))
+			if has.Empty() != expected.Empty() || has.Count() < expected.Count()*int(action.NumberOfCrafts) {
+				// We can't process this item, as it's not a part of the recipe.
+				continue
+			}
+			if !crafting_matchingStacks(has, expected) {
+				// Not the same item.
+				continue
+			}
+			processed, consumed[slot-offset] = true, true
+			tx.append(newDestroyAction(
+				has,
+				expected.Count()*int(action.NumberOfCrafts),
+				int(slot),
+				protocol.ContainerCraftingInput,
+				false,
+				c.mPlayer,
+			))
+			//st := has.Grow(-expected.Count() * int(action.NumberOfCrafts))
+			//craftingInv.SetSlot(int(slot), st)
+			break
+		}
+		if !processed {
+			c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "recipe %v: could not consume expected item: %v", action.RecipeNetworkID, expected)
+			craftAllowed = false
+			//break
+		}
+	}
+
+	if craftAllowed {
+		result := crafting_repeatStacks(recpOutput, int(action.NumberOfCrafts))
+		for _, out := range result {
+			tx.append(newCreateAction(
+				50,
+				protocol.ContainerCreatedOutput,
+				out,
+				c.mPlayer,
+			))
+			c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "created %v", out)
 		}
 	}
 }
@@ -355,3 +507,18 @@ func (c *InventoryComponent) handleDestroyRequest(tx *invReq, src protocol.Stack
 		c.mPlayer,
 	))
 }
+
+// noinspection ALL
+//
+//go:linkname crafting_matchingStacks github.com/df-mc/dragonfly/server/session.matchingStacks
+func crafting_matchingStacks(a, b recipe.Item) bool
+
+// noinspection ALL
+//
+//go:linkname crafting_grow github.com/df-mc/dragonfly/server/session.grow
+func crafting_grow(recipe.Item, int) recipe.Item
+
+// noinspection ALL
+//
+//go:linkname crafting_repeatStacks github.com/df-mc/dragonfly/server/session.repeatStacks
+func crafting_repeatStacks([]item.Stack, int) []item.Stack
