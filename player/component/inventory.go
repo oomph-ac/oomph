@@ -23,6 +23,13 @@ const (
 	inventorySizeUI      uint32 = 54
 )
 
+const (
+	craftingSmallUI     = 4
+	craftingSmallOffset = 28
+	craftingBigUI       = 9
+	craftingBigOffset   = 32
+)
+
 type InventoryComponent struct {
 	mPlayer *player.Player
 
@@ -240,8 +247,9 @@ func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackReque
 		case *protocol.MineBlockStackRequestAction:
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
 		case *protocol.CraftRecipeStackRequestAction:
-			//tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
 			c.handleCraftStackRequest(tx, action)
+		case *protocol.CraftResultsDeprecatedStackRequestAction, *protocol.ConsumeStackRequestAction:
+			tx.append(newNopAction())
 		default:
 			c.mPlayer.Log().Debug("unhandled item stack request action", "actionType", fmt.Sprintf("%T", action))
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
@@ -301,20 +309,6 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 	}
 }
 
-func (c *InventoryComponent) craftingSize() uint32 {
-	if c.altOpenWindow != nil {
-		return 9
-	}
-	return 4
-}
-
-func (c *InventoryComponent) craftingOffset() uint32 {
-	if c.altOpenWindow != nil {
-		return 32
-	}
-	return 28
-}
-
 func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protocol.CraftRecipeStackRequestAction) {
 	recp, ok := c.mPlayer.Recipies[action.RecipeNetworkID]
 	if !ok {
@@ -335,11 +329,13 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 			switch d := desc.Descriptor.(type) {
 			case *protocol.DefaultItemDescriptor:
 				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item found %T for index %d", i, index)
 					recpInput[index] = item.NewStack(i, int(desc.Count))
 				} else {
 					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %d %d (index %d)", d.NetworkID, d.MetadataValue, index)
 				}
 			case *protocol.ItemTagItemDescriptor:
+				c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item tag found %s for index %d", d.Tag, index)
 				recpInput[index] = recipe.NewItemTag(d.Tag, int(desc.Count))
 			}
 		}
@@ -354,13 +350,14 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 			switch d := desc.Descriptor.(type) {
 			case *protocol.DefaultItemDescriptor:
 				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
-					fmt.Printf("item found %T\n", i)
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item found %T for index %d", i, index)
 					recpInput[index] = item.NewStack(i, int(desc.Count))
 				} else {
-					fmt.Println("no item found", d.NetworkID, d.MetadataValue)
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %d %d (index %d)", d.NetworkID, d.MetadataValue, index)
 				}
 			case *protocol.ItemTagItemDescriptor:
 				recpInput[index] = recipe.NewItemTag(d.Tag, int(desc.Count))
+				c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item tag found %s for index %d", d.Tag, index)
 			}
 		}
 		recpOutput = make([]item.Stack, len(recp.Output))
@@ -380,12 +377,14 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "invalid num crafts %d", action.NumberOfCrafts)
 		return
 	}
-	for _, i := range recpOutput {
-		fmt.Println("output", i)
-	}
 
-	size, offset := c.craftingSize(), c.craftingOffset()
-	consumed := make([]bool, size)
+	var craftingTableSize, craftingTableOffset uint32
+	if c.altOpenWindow != nil {
+		craftingTableSize, craftingTableOffset = craftingBigUI, craftingBigOffset
+	} else {
+		craftingTableSize, craftingTableOffset = craftingSmallUI, craftingSmallOffset
+	}
+	consumed := make([]bool, craftingTableSize)
 	craftingInv := c.pUiInventory
 
 	craftAllowed := true
@@ -395,8 +394,8 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 		}
 
 		var processed bool
-		for slot := offset; slot < offset+size; slot++ {
-			if consumed[slot-offset] {
+		for slot := craftingTableOffset; slot < craftingTableOffset+craftingTableSize; slot++ {
+			if consumed[slot-craftingTableOffset] {
 				// We've already consumed this slot, skip it.
 				continue
 			}
@@ -409,7 +408,7 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 				// Not the same item.
 				continue
 			}
-			processed, consumed[slot-offset] = true, true
+			processed, consumed[slot-craftingTableOffset] = true, true
 			tx.append(newDestroyAction(
 				has,
 				expected.Count()*int(action.NumberOfCrafts),

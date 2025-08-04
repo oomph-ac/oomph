@@ -384,6 +384,19 @@ func (a *createAction) revert() {
 	inv.SetSlot(a.slot, a.oldStack)
 }
 
+type nopAction struct {
+}
+
+func newNopAction() *nopAction {
+	return &nopAction{}
+}
+
+func (a *nopAction) execute() {}
+
+func (a *nopAction) revert() {}
+
+func (a *nopAction) close() {}
+
 type unknownAction struct {
 	mPlayer        atomic.Pointer[player.Player]
 	originalAction string
