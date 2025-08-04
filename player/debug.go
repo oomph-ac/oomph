@@ -15,6 +15,7 @@ const (
 	DebugModeUnhandledPackets
 	DebugModeBlockBreaking
 	DebugModeCrafting
+	DebugModeItemRequests
 
 	debugModeCount
 )
@@ -37,6 +38,7 @@ var DebugModeList = []string{
 	"unhandled_packets",
 	"block_breaking",
 	"crafting",
+	"item_requests",
 }
 
 type Debugger struct {

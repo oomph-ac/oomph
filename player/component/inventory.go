@@ -18,7 +18,7 @@ import (
 const (
 	inventorySizeArmour  uint32 = 4
 	inventorySizePlayer  uint32 = 36
-	inventorySizeHotbar  uint32 = 10
+	inventorySizeHotbar  uint32 = 9
 	inventorySizeOffhand uint32 = 1
 	inventorySizeUI      uint32 = 54
 )
@@ -138,11 +138,11 @@ func (c *InventoryComponent) CreateWindow(windowId byte, containerType byte) {
 		return
 	default:
 		if c.altOpenWindow != nil {
-			c.mPlayer.Log().Debug("creating new window, but alternative is already open", "currWindowID", c.altOpenWindowId, "newWindowID", windowId)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "creating new window (%d), but alternative (%d) is already open", windowId, c.altOpenWindowId)
 		}
 
 		// TODO: Determine the actual sizes of these inventory based on the container type. CBA to do for now, but this should work.
-		c.mPlayer.Log().Debug("created container inventory", "windowID", windowId, "containerType", containerType)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "created container inventory %d (%d)", windowId, containerType)
 		c.altOpenWindow = player.NewInventory(64)
 		c.altOpenWindowId = windowId
 	}
@@ -251,7 +251,7 @@ func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackReque
 		case *protocol.CraftResultsDeprecatedStackRequestAction, *protocol.ConsumeStackRequestAction:
 			tx.append(newNopAction())
 		default:
-			c.mPlayer.Log().Debug("unhandled item stack request action", "actionType", fmt.Sprintf("%T", action))
+			//c.mPlayer.Log().Debug("unhandled item stack request action", "actionType", fmt.Sprintf("%T", action))
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
 		}
 	}
@@ -279,21 +279,20 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 		// This should never happen, but it did :/
 		if c.firstRequest == nil {
 			// Here, we are going to make the server re-send what it thinks should be in the inventory to prevent any type of desync.
-			c.mPlayer.Log().Debug("cannot process response when InventoryComponent.firstRequest is nil - force syncing inventory", "requestID", response.RequestID)
-			//c.ForceSync()
+			c.ForceSync()
 			continue
 		}
 
 		if response.RequestID != c.firstRequest.id {
-			c.mPlayer.Log().Debug("received response for unknown request id", "requestID", response.RequestID)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "received response for unknown request id %d", response.RequestID)
 			return
 		}
 
 		if response.Status == protocol.ItemStackResponseStatusOK {
-			c.mPlayer.Log().Debug("request succeeded", "requestID", response.RequestID)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "request %d succeeded", response.RequestID)
 			c.firstRequest.accept()
 		} else {
-			c.mPlayer.Log().Debug("request failed", "requestID", response.RequestID, "status", response.Status)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "request %d failed", response.RequestID)
 			c.firstRequest.reject()
 		}
 
@@ -312,7 +311,7 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protocol.CraftRecipeStackRequestAction) {
 	recp, ok := c.mPlayer.Recipies[action.RecipeNetworkID]
 	if !ok {
-		c.mPlayer.Log().Debug("no recipe found", "recipeNetworkID", action.RecipeNetworkID)
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no recipe found %d", action.RecipeNetworkID)
 		return
 	}
 
@@ -445,13 +444,13 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 func (c *InventoryComponent) handleTransferRequest(tx *invReq, src, dst protocol.StackRequestSlotInfo, count int) {
 	srcInv, ok := c.WindowFromContainerID(int32(src.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", src.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", src.Container.ContainerID)
 		return
 	}
 
 	dstInv, ok := c.WindowFromContainerID(int32(dst.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", dst.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", dst.Container.ContainerID)
 		return
 	}
 
@@ -470,13 +469,13 @@ func (c *InventoryComponent) handleTransferRequest(tx *invReq, src, dst protocol
 func (c *InventoryComponent) handleSwapRequest(tx *invReq, action *protocol.SwapStackRequestAction) {
 	srcInv, ok := c.WindowFromContainerID(int32(action.Source.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", action.Source.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", action.Source.Container.ContainerID)
 		return
 	}
 
 	dstInv, ok := c.WindowFromContainerID(int32(action.Destination.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", action.Destination.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", action.Destination.Container.ContainerID)
 		return
 	}
 
@@ -494,7 +493,7 @@ func (c *InventoryComponent) handleSwapRequest(tx *invReq, action *protocol.Swap
 func (c *InventoryComponent) handleDestroyRequest(tx *invReq, src protocol.StackRequestSlotInfo, count int, isDrop bool) {
 	inv, foundInv := c.WindowFromContainerID(int32(src.Container.ContainerID))
 	if !foundInv {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", src.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", src.Container.ContainerID)
 		return
 	}
 	tx.append(newDestroyAction(
