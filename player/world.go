@@ -65,7 +65,7 @@ func (p *Player) RegenerateWorld() {
 
 func (p *Player) SyncWorld() {
 	// Update the blocks in the world so the client can sync itself properly.
-	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World()) {
+	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox().Grow(3.0), true, true, p.World()) {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: protocol.BlockPos{
 				int32(blockResult.Position[0]),
