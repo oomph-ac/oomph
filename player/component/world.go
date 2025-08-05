@@ -223,13 +223,11 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 
 	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) && dat.ClientPrediction != protocol.ClientPredictionSuccess {
 		return false
-	} else if dat.ClickedPosition.LenSqr() == 0.0 {
-		return true
 	}
 
 	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
-	interactedBlock := c.mPlayer.World().Block(df_cube.Pos(blockPos))
 	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
+	interactedBlock := c.mPlayer.World().Block(df_cube.Pos(blockPos))
 
 	if _, isActivatable := interactedBlock.(block.Activatable); !isActivatable {
 		return true
