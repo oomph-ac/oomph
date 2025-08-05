@@ -76,6 +76,19 @@ func (p *Player) SyncWorld() {
 	}
 }
 
+func (p *Player) SyncBlock(pos df_cube.Pos) {
+	p.SendPacketToClient(&packet.UpdateBlock{
+		Position: protocol.BlockPos{
+			int32(pos[0]),
+			int32(pos[1]),
+			int32(pos[2]),
+		},
+		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
+		Flags:             packet.BlockUpdatePriority,
+		Layer:             0, // TODO: Implement and account for multi-layer blocks.
+	})
+}
+
 func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext) {
 	replacingBlock := p.World().Block(pos)
 	if _, isReplaceable := replacingBlock.(block.Replaceable); !isReplaceable {
