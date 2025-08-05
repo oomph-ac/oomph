@@ -1,6 +1,7 @@
 package player
 
 import (
+	"os"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
@@ -52,6 +53,7 @@ var ServerDecode = []uint32{
 	packet.IDContainerOpen,
 	packet.IDContainerClose,
 	packet.IDCraftingData,
+	packet.IDCreativeContent,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
@@ -85,6 +87,15 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 			var mode int
 			switch args[1] {
+			case "gmc":
+				if len(os.Getenv("GMC_TEST_BECAUSE_DEVLOL")) > 0 {
+					p.SendPacketToClient(&packet.SetPlayerGameType{
+						GameType: packet.GameTypeCreative,
+					})
+				} else {
+					p.Message("hi there :3c")
+				}
+				return
 			case "type:log":
 				p.Dbg.LoggingType = LoggingTypeLogFile
 				p.Message("Set debug logging type to <green>log file</green>.")
@@ -448,6 +459,11 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			case *protocol.SmithingTrimRecipe:
 				p.Recipies[recp.RecipeNetworkID] = recp
 			}
+		}
+	case *packet.CreativeContent:
+		p.CreativeItems = make(map[uint32]protocol.CreativeItem)
+		for _, item := range pk.Items {
+			p.CreativeItems[item.CreativeItemNetworkID] = item
 		}
 	}
 }

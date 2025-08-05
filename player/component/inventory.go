@@ -250,6 +250,8 @@ func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackReque
 			c.handleCraftStackRequest(tx, action)
 		case *protocol.CraftResultsDeprecatedStackRequestAction, *protocol.ConsumeStackRequestAction:
 			tx.append(newNopAction())
+		case *protocol.CraftCreativeStackRequestAction:
+			c.handleCreativeCraftStackRequest(tx, action)
 		default:
 			//c.mPlayer.Log().Debug("unhandled item stack request action", "actionType", fmt.Sprintf("%T", action))
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
@@ -306,6 +308,26 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 			c.firstRequest = nextReq
 		}
 	}
+}
+
+func (c *InventoryComponent) handleCreativeCraftStackRequest(tx *invReq, action *protocol.CraftCreativeStackRequestAction) {
+	if c.mPlayer.GameMode != packet.GameTypeCreative {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "unable to use CraftCreativeStackRequestAction in non-creative gamemode")
+		return
+	}
+
+	creativeItem, ok := c.mPlayer.CreativeItems[action.CreativeItemNetworkID]
+	if !ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no creative item found %d", action.CreativeItemNetworkID)
+		return
+	}
+	c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "creative crafting request %d (item=%v)", action.CreativeItemNetworkID, creativeItem.Item)
+	tx.append(newCreateAction(
+		50,
+		protocol.ContainerCreatedOutput,
+		utils.StackToItem(creativeItem.Item),
+		c.mPlayer,
+	))
 }
 
 func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protocol.CraftRecipeStackRequestAction) {
