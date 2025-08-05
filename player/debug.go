@@ -16,6 +16,7 @@ const (
 	DebugModeBlockBreaking
 	DebugModeCrafting
 	DebugModeItemRequests
+	DebugModeBlockInteraction
 
 	debugModeCount
 )
@@ -39,6 +40,7 @@ var DebugModeList = []string{
 	"block_breaking",
 	"crafting",
 	"item_requests",
+	"block_interaction",
 }
 
 type Debugger struct {

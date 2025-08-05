@@ -126,6 +126,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				mode = DebugModeUnhandledPackets
 			case "block_breaking", "block_break":
 				mode = DebugModeBlockBreaking
+			case "block_interaction":
+				mode = DebugModeBlockInteraction
 			default:
 				p.Message("Unknown debug mode: %s", args[1])
 				return
@@ -274,10 +276,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			inv.SetSlot(sourceSlot, sourceSlotItem.Grow(-droppedCount))
 		}
 
-		/* if !p.worldUpdater.ValidateInteraction(pk) {
+		interactionValid := p.worldUpdater.ValidateInteraction(pk)
+		if !interactionValid {
 			ctx.Cancel()
-		} */
-		if !p.worldUpdater.AttemptItemInteractionWithBlock(pk) {
+		} else if !p.worldUpdater.AttemptItemInteractionWithBlock(pk) {
 			ctx.Cancel()
 		}
 	case *packet.MobEquipment:
