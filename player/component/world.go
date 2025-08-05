@@ -153,7 +153,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	}
 
 	// TODO: Figure out why it seems that this works for both creative and survival mode. Though, we will exempt creative mode from this check for now...
-	if c.mPlayer.GameMode != packet.GameTypeCreative && closestDistance > 6 {
+	if c.mPlayer.GameMode != packet.GameTypeCreative && closestDistance > game.MaxBlockInteractionDistance {
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction too far away (%.4f blocks)", closestDistance)
 		c.mPlayer.Popup("<red>Interaction too far away (%.2f blocks)</red>", closestDistance)
 		c.mPlayer.SyncBlock(dfReplacePos)
@@ -221,38 +221,38 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return false
 	}
 
-	// On newer versions of the game (1.21.20+), we are able to determine whether the input was from a
-	// simulation frame, or from the player itself. However, on older versions there's no other way to
-	// distinguish this besides a zero-vector click position that is usually from jump-bridging.
-	var isInitalInput bool
-	if c.mPlayer.Conn().Proto().ID() >= player.GameVersion1_21_20 {
-		isInitalInput = dat.TriggerType == protocol.TriggerTypePlayerInput
-	} else {
-		isInitalInput = dat.ClickedPosition.LenSqr() > 0.0 && dat.ClickedPosition.LenSqr() <= 1.0
-	}
-	if !isInitalInput {
-		return c.initalInteractionAccepted
+	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) && dat.ClientPrediction != protocol.ClientPredictionSuccess {
+		return false
+	} else if dat.ClickedPosition.LenSqr() == 0.0 {
+		return true
 	}
 
 	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
 	interactedBlock := c.mPlayer.World().Block(df_cube.Pos(blockPos))
 	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
 
+	if _, isActivatable := interactedBlock.(block.Activatable); !isActivatable {
+		return true
+	}
+
 	if len(utils.BlockBoxes(interactedBlock, blockPos, c.mPlayer.World())) == 0 {
 		c.initalInteractionAccepted = true
 		return true
 	}
 
-	eyePos := c.mPlayer.Movement().Pos()
+	prevPos, currPos := c.mPlayer.Movement().LastPos(), c.mPlayer.Movement().Pos()
 	if c.mPlayer.Movement().Sneaking() {
-		eyePos[1] += game.SneakingPlayerHeightOffset
+		prevPos[1] += game.SneakingPlayerHeightOffset
+		currPos[1] += game.SneakingPlayerHeightOffset
 	} else {
-		eyePos[1] += game.DefaultPlayerHeightOffset
+		prevPos[1] += game.DefaultPlayerHeightOffset
+		currPos[1] += game.DefaultPlayerHeightOffset
 	}
+	closestEyePos := game.ClosestPointInLineToPoint(prevPos, currPos, interactPos)
 
-	if dist := eyePos.Sub(interactPos).Len(); dist >= 7.0 {
+	if dist := closestEyePos.Sub(interactPos).Len(); dist > game.MaxBlockInteractionDistance {
 		c.initalInteractionAccepted = false
-		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Interaction denied: too far away (%.4f blocks).", dist)
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "Interaction denied: too far away (%.4f blocks).", dist)
 		//c.mPlayer.NMessage("<red>Interaction denied: too far away.</red>")
 		return false
 	}
@@ -264,10 +264,10 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		iterCount        int
 	)
 
-	for intersectingBlockPos := range game.BlocksBetween(eyePos, interactPos) {
+	for intersectingBlockPos := range game.BlocksBetween(closestEyePos, interactPos) {
 		iterCount++
 		if iterCount > 49 {
-			c.mPlayer.Log().Debug("too many iterations for interaction validation", "eyePos", eyePos, "interactPos", interactPos, "checkedPositions", len(checkedPositions))
+			c.mPlayer.Log().Debug("too many iterations for interaction validation", "eyePos", closestEyePos, "interactPos", interactPos, "checkedPositions", len(checkedPositions))
 			break
 		}
 
@@ -293,9 +293,9 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			iBB = iBB.Translate(intersectingBlockPos)
 
 			// If there is an intersection, the interaction is invalid.
-			if _, ok := trace.BBoxIntercept(iBB, eyePos, interactPos); ok {
+			if _, ok := trace.BBoxIntercept(iBB, closestEyePos, interactPos); ok {
 				//c.mPlayer.NMessage("<red>Interaction denied: block obstructs path.</red>")
-				c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Interaction denied: block obstructs path.")
+				c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "Interaction denied: block obstructs path.")
 				c.initalInteractionAccepted = false
 				return false
 			}
