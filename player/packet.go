@@ -126,6 +126,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				mode = DebugModeUnhandledPackets
 			case "block_breaking", "block_break":
 				mode = DebugModeBlockBreaking
+			case "item_requests":
+				mode = DebugModeItemRequests
+			case "crafting":
+				mode = DebugModeCrafting
 			case "block_interaction":
 				mode = DebugModeBlockInteraction
 			default:
