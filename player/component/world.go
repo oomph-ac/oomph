@@ -1,6 +1,7 @@
 package component
 
 import (
+	"math"
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -130,7 +131,36 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	// It is impossible for the replacing block to be air, as the client would send UseItemActionClickAir instead of UseItemActionClickBlock.
 	if _, isAir := replacingBlock.(block.Air); isAir {
 		return false
-	} else if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
+	}
+
+	// Check if the clicked block is too far away from the player's position.
+	prevPos, currPos := c.mPlayer.Movement().LastPos(), c.mPlayer.Movement().Pos()
+	if c.mPlayer.Movement().Sneaking() {
+		prevPos[1] += game.SneakingPlayerHeightOffset
+		currPos[1] += game.SneakingPlayerHeightOffset
+	} else {
+		prevPos[1] += game.DefaultPlayerHeightOffset
+		currPos[1] += game.DefaultPlayerHeightOffset
+	}
+
+	closestDistance := float32(math.MaxFloat32 - 1)
+	for _, bb := range utils.BlockBoxes(replacingBlock, replacePos, c.mPlayer.World()) {
+		bb = bb.Translate(replacePos.Vec3())
+		closestOrigin := game.ClosestPointInLineToPoint(prevPos, currPos, game.BBoxCenter(bb))
+		if dist := game.ClosestPointToBBox(closestOrigin, bb).Sub(closestOrigin).Len(); dist < closestDistance {
+			closestDistance = dist
+		}
+	}
+
+	// TODO: Figure out why it seems that this works for both creative and survival mode. Though, we will exempt creative mode from this check for now...
+	if c.mPlayer.GameMode != packet.GameTypeCreative && closestDistance > 6 {
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction too far away (%.4f blocks)", closestDistance)
+		c.mPlayer.Popup("<red>Interaction too far away (%.2f blocks)</red>", closestDistance)
+		c.mPlayer.SyncBlock(dfReplacePos)
+		return false
+	}
+
+	if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
 		utils.ActivateBlock(c.mPlayer, act, df_cube.Face(dat.BlockFace), df_cube.Pos(replacePos), game.Vec32To64(dat.ClickedPosition), c.mPlayer.World())
 		return true
 	}
