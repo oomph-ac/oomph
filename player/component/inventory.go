@@ -3,10 +3,10 @@ package component
 import (
 	"fmt"
 
-	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -183,35 +183,11 @@ func (c *InventoryComponent) Holding() item.Stack {
 }
 
 func (c *InventoryComponent) HandleInventorySlot(pk *packet.InventorySlot) {
-	inv, found := c.WindowFromWindowID(int32(pk.WindowID))
-	if !found {
-		c.mPlayer.Log().Debug("no inventory with window id found", "windowID", pk.WindowID)
-		return
-	}
-
-	if pk.NewItem.Stack.NetworkID == 0 {
-		inv.SetSlot(int(pk.Slot), item.NewStack(&block.Air{}, 0))
-	} else {
-		iStack := utils.StackToItem(pk.NewItem.Stack)
-		inv.SetSlot(int(pk.Slot), utils.ReadItem(pk.NewItem.Stack.NBTData, &iStack))
-	}
+	c.mPlayer.ACKs().Add(acknowledgement.NewSetInventorySlotACK(c.mPlayer, pk.WindowID, pk.Slot, pk.NewItem))
 }
 
 func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent) {
-	inv, found := c.WindowFromWindowID(int32(pk.WindowID))
-	if !found {
-		c.mPlayer.Log().Debug("no inventory with id found", "windowID", pk.WindowID)
-		return
-	}
-
-	for index, itemInstance := range pk.Content {
-		if itemInstance.Stack.NetworkID == 0 {
-			inv.SetSlot(index, item.NewStack(&block.Air{}, 0))
-		} else {
-			iStack := utils.StackToItem(itemInstance.Stack)
-			inv.SetSlot(index, utils.ReadItem(itemInstance.Stack.NBTData, &iStack))
-		}
-	}
+	c.mPlayer.ACKs().Add(acknowledgement.NewSetInventoryContentsACK(c.mPlayer, pk.WindowID, pk.Content))
 }
 
 func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackRequest) {
