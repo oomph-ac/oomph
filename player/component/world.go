@@ -144,7 +144,11 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	}
 
 	closestDistance := float32(math.MaxFloat32 - 1)
-	for _, bb := range utils.BlockBoxes(replacingBlock, replacePos, c.mPlayer.World()) {
+	blockBBoxes := utils.BlockBoxes(replacingBlock, replacePos, c.mPlayer.World())
+	if len(blockBBoxes) == 0 {
+		blockBBoxes = []cube.BBox{{}}
+	}
+	for _, bb := range blockBBoxes {
 		bb = bb.Translate(replacePos.Vec3())
 		closestOrigin := game.ClosestPointInLineToPoint(prevPos, currPos, game.BBoxCenter(bb))
 		if dist := game.ClosestPointToBBox(closestOrigin, bb).Sub(closestOrigin).Len(); dist < closestDistance {
