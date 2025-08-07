@@ -59,6 +59,8 @@ require (
 
 //replace github.com/sandertv/gophertunnel => ../tedac-gophertunnel
 
+replace github.com/sandertv/gophertunnel => github.com/cooldogedev/gophertunnel v0.0.0-20250806215416-758d5047d822
+
 replace github.com/df-mc/dragonfly => ../dragonfly
 
 replace github.com/cooldogedev/spectrum => ../spectrum
