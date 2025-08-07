@@ -118,6 +118,23 @@ func BBHasZeroVolume(bb cube.BBox) bool {
 	return bb.Min() == bb.Max()
 }
 
+func ClosestPointInLineToPoint(origin, end mgl32.Vec3, point mgl32.Vec3) mgl32.Vec3 {
+	line := end.Sub(origin)
+	if line.LenSqr() <= 1e-4 {
+		return origin
+	}
+
+	t := (point.Sub(origin)).Dot(line) / line.LenSqr()
+	// Clamp to stay on the line segment
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+
+	return origin.Add(line.Mul(t))
+}
+
 // ClosestPointToBBox returns the shortest point from a given origin to a given bounding box.
 func ClosestPointToBBox(origin mgl32.Vec3, bb cube.BBox) mgl32.Vec3 {
 	var shortest mgl32.Vec3
@@ -222,17 +239,13 @@ func AABBVectorDistance(a cube.BBox, v mgl32.Vec3) float32 {
 	return dist
 }
 
-// AABBMiddlePosition gets the middle X/Z position of an AABB.
-func AABBMiddlePosition(bb cube.BBox) mgl32.Vec3 {
-	return mgl32.Vec3{
-		(bb.Min().X() + bb.Max().X()) / 2,
-		bb.Min().Y(),
-		(bb.Min().Z() + bb.Max().Z()) / 2,
-	}
+// BBoxCenter gets the center of a bounding box.
+func BBoxCenter(bb cube.BBox) mgl32.Vec3 {
+	return bb.Min().Add(bb.Max()).Mul(0.5)
 }
 
-// AABBSidePoints returns all the side points of a given bounding box.
-func AABBSidePoints(bb cube.BBox) []mgl32.Vec3 {
+// BBoxPoints returns all the side points of a given bounding box.
+func BBoxPoints(bb cube.BBox) []mgl32.Vec3 {
 	min := bb.Min()
 	max := bb.Max()
 
@@ -245,5 +258,6 @@ func AABBSidePoints(bb cube.BBox) []mgl32.Vec3 {
 		{max.X(), min.Y(), max.Z()}, // 5: max.x, max.z
 		{max.X(), max.Y(), min.Z()}, // 6: max.x, max.y, min.z
 		max,                         // 7: max
+		BBoxCenter(bb),              // 8: center
 	}
 }
