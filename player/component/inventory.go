@@ -2,8 +2,11 @@ package component
 
 import (
 	"fmt"
+	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/item/recipe"
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
@@ -15,9 +18,16 @@ import (
 const (
 	inventorySizeArmour  uint32 = 4
 	inventorySizePlayer  uint32 = 36
-	inventorySizeHotbar  uint32 = 10
+	inventorySizeHotbar  uint32 = 9
 	inventorySizeOffhand uint32 = 1
 	inventorySizeUI      uint32 = 54
+)
+
+const (
+	craftingSmallUI     = 4
+	craftingSmallOffset = 28
+	craftingBigUI       = 9
+	craftingBigOffset   = 32
 )
 
 type InventoryComponent struct {
@@ -119,16 +129,20 @@ func (c *InventoryComponent) Sync(windowID int32) bool {
 }
 
 func (c *InventoryComponent) CreateWindow(windowId byte, containerType byte) {
+	if containerType == 255 {
+		return
+	}
+
 	switch windowId {
 	case protocol.WindowIDInventory, protocol.WindowIDOffHand, protocol.WindowIDArmour, protocol.WindowIDUI:
 		return
 	default:
 		if c.altOpenWindow != nil {
-			c.mPlayer.Log().Debug("creating new window, but alternative is already open", "currWindowID", c.altOpenWindowId, "newWindowID", windowId)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "creating new window (%d), but alternative (%d) is already open", windowId, c.altOpenWindowId)
 		}
 
 		// TODO: Determine the actual sizes of these inventory based on the container type. CBA to do for now, but this should work.
-		c.mPlayer.Log().Debug("created container inventory", "windowID", windowId, "containerType", containerType)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "created container inventory %d (%d)", windowId, containerType)
 		c.altOpenWindow = player.NewInventory(64)
 		c.altOpenWindowId = windowId
 	}
@@ -208,8 +222,14 @@ func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackReque
 			c.handleDestroyRequest(tx, action.Source, int(action.Count), true)
 		case *protocol.MineBlockStackRequestAction:
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
+		case *protocol.CraftRecipeStackRequestAction:
+			c.handleCraftStackRequest(tx, action)
+		case *protocol.CraftResultsDeprecatedStackRequestAction, *protocol.ConsumeStackRequestAction:
+			tx.append(newNopAction())
+		case *protocol.CraftCreativeStackRequestAction:
+			c.handleCreativeCraftStackRequest(tx, action)
 		default:
-			c.mPlayer.Log().Debug("unhandled item stack request action", "actionType", fmt.Sprintf("%T", action))
+			//c.mPlayer.Log().Debug("unhandled item stack request action", "actionType", fmt.Sprintf("%T", action))
 			tx.append(newUnknownAction(c.mPlayer, fmt.Sprintf("%T", action)))
 		}
 	}
@@ -237,21 +257,20 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 		// This should never happen, but it did :/
 		if c.firstRequest == nil {
 			// Here, we are going to make the server re-send what it thinks should be in the inventory to prevent any type of desync.
-			c.mPlayer.Log().Debug("cannot process response when InventoryComponent.firstRequest is nil - force syncing inventory", "requestID", response.RequestID)
-			//c.ForceSync()
+			c.ForceSync()
 			continue
 		}
 
 		if response.RequestID != c.firstRequest.id {
-			c.mPlayer.Log().Debug("received response for unknown request id", "requestID", response.RequestID)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "received response for unknown request id %d", response.RequestID)
 			return
 		}
 
 		if response.Status == protocol.ItemStackResponseStatusOK {
-			c.mPlayer.Log().Debug("request succeeded", "requestID", response.RequestID)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "request %d succeeded", response.RequestID)
 			c.firstRequest.accept()
 		} else {
-			c.mPlayer.Log().Debug("request failed", "requestID", response.RequestID, "status", response.Status)
+			c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "request %d failed", response.RequestID)
 			c.firstRequest.reject()
 		}
 
@@ -267,16 +286,169 @@ func (c *InventoryComponent) HandleItemStackResponse(pk *packet.ItemStackRespons
 	}
 }
 
+func (c *InventoryComponent) handleCreativeCraftStackRequest(tx *invReq, action *protocol.CraftCreativeStackRequestAction) {
+	if c.mPlayer.GameMode != packet.GameTypeCreative {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "unable to use CraftCreativeStackRequestAction in non-creative gamemode")
+		return
+	}
+
+	creativeItem, ok := c.mPlayer.CreativeItems[action.CreativeItemNetworkID]
+	if !ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no creative item found %d", action.CreativeItemNetworkID)
+		return
+	}
+	c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "creative crafting request %d (item=%v)", action.CreativeItemNetworkID, creativeItem.Item)
+	tx.append(newCreateAction(
+		50,
+		protocol.ContainerCreatedOutput,
+		utils.StackToItem(creativeItem.Item),
+		c.mPlayer,
+	))
+}
+
+func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protocol.CraftRecipeStackRequestAction) {
+	recp, ok := c.mPlayer.Recipies[action.RecipeNetworkID]
+	if !ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no recipe found %d", action.RecipeNetworkID)
+		return
+	}
+
+	var (
+		recpBlock  string
+		recpInput  []recipe.Item
+		recpOutput []item.Stack
+	)
+	switch recp := recp.(type) {
+	case *protocol.ShapedRecipe:
+		recpBlock = recp.Block
+		recpInput = make([]recipe.Item, len(recp.Input))
+		for index, desc := range recp.Input {
+			switch d := desc.Descriptor.(type) {
+			case *protocol.DefaultItemDescriptor:
+				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item found %T for index %d", i, index)
+					recpInput[index] = item.NewStack(i, int(desc.Count))
+				} else {
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %d %d (index %d)", d.NetworkID, d.MetadataValue, index)
+				}
+			case *protocol.ItemTagItemDescriptor:
+				c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item tag found %s for index %d", d.Tag, index)
+				recpInput[index] = recipe.NewItemTag(d.Tag, int(desc.Count))
+			}
+		}
+		recpOutput = make([]item.Stack, len(recp.Output))
+		for index, stack := range recp.Output {
+			recpOutput[index] = utils.StackToItem(stack)
+		}
+	case *protocol.ShapelessRecipe:
+		recpBlock = recp.Block
+		recpInput = make([]recipe.Item, len(recp.Input))
+		for index, desc := range recp.Input {
+			switch d := desc.Descriptor.(type) {
+			case *protocol.DefaultItemDescriptor:
+				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item found %T for index %d", i, index)
+					recpInput[index] = item.NewStack(i, int(desc.Count))
+				} else {
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %d %d (index %d)", d.NetworkID, d.MetadataValue, index)
+				}
+			case *protocol.ItemTagItemDescriptor:
+				recpInput[index] = recipe.NewItemTag(d.Tag, int(desc.Count))
+				c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item tag found %s for index %d", d.Tag, index)
+			}
+		}
+		recpOutput = make([]item.Stack, len(recp.Output))
+		for index, stack := range recp.Output {
+			recpOutput[index] = utils.StackToItem(stack)
+		}
+	default:
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "not shaped or shapeless recipe")
+		return
+	}
+
+	if recpBlock != "crafting_table" {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "recp is %s not crafting table", recpBlock)
+		return
+	}
+	if action.NumberOfCrafts < 1 {
+		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "invalid num crafts %d", action.NumberOfCrafts)
+		return
+	}
+
+	var craftingTableSize, craftingTableOffset uint32
+	if c.altOpenWindow != nil {
+		craftingTableSize, craftingTableOffset = craftingBigUI, craftingBigOffset
+	} else {
+		craftingTableSize, craftingTableOffset = craftingSmallUI, craftingSmallOffset
+	}
+	consumed := make([]bool, craftingTableSize)
+	craftingInv := c.pUiInventory
+
+	craftAllowed := true
+	for _, expected := range recpInput {
+		if expected == nil || expected.Empty() {
+			continue
+		}
+
+		var processed bool
+		for slot := craftingTableOffset; slot < craftingTableOffset+craftingTableSize; slot++ {
+			if consumed[slot-craftingTableOffset] {
+				// We've already consumed this slot, skip it.
+				continue
+			}
+			has := craftingInv.Slot(int(slot))
+			if has.Empty() != expected.Empty() || has.Count() < expected.Count()*int(action.NumberOfCrafts) {
+				// We can't process this item, as it's not a part of the recipe.
+				continue
+			}
+			if !crafting_matchingStacks(has, expected) {
+				// Not the same item.
+				continue
+			}
+			processed, consumed[slot-craftingTableOffset] = true, true
+			tx.append(newDestroyAction(
+				has,
+				expected.Count()*int(action.NumberOfCrafts),
+				int(slot),
+				protocol.ContainerCraftingInput,
+				false,
+				c.mPlayer,
+			))
+			//st := has.Grow(-expected.Count() * int(action.NumberOfCrafts))
+			//craftingInv.SetSlot(int(slot), st)
+			break
+		}
+		if !processed {
+			c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "recipe %v: could not consume expected item: %v", action.RecipeNetworkID, expected)
+			craftAllowed = false
+			//break
+		}
+	}
+
+	if craftAllowed {
+		result := crafting_repeatStacks(recpOutput, int(action.NumberOfCrafts))
+		for _, out := range result {
+			tx.append(newCreateAction(
+				50,
+				protocol.ContainerCreatedOutput,
+				out,
+				c.mPlayer,
+			))
+			c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "created %v", out)
+		}
+	}
+}
+
 func (c *InventoryComponent) handleTransferRequest(tx *invReq, src, dst protocol.StackRequestSlotInfo, count int) {
 	srcInv, ok := c.WindowFromContainerID(int32(src.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", src.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", src.Container.ContainerID)
 		return
 	}
 
 	dstInv, ok := c.WindowFromContainerID(int32(dst.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", dst.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", dst.Container.ContainerID)
 		return
 	}
 
@@ -295,13 +467,13 @@ func (c *InventoryComponent) handleTransferRequest(tx *invReq, src, dst protocol
 func (c *InventoryComponent) handleSwapRequest(tx *invReq, action *protocol.SwapStackRequestAction) {
 	srcInv, ok := c.WindowFromContainerID(int32(action.Source.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", action.Source.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", action.Source.Container.ContainerID)
 		return
 	}
 
 	dstInv, ok := c.WindowFromContainerID(int32(action.Destination.Container.ContainerID))
 	if !ok {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", action.Destination.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", action.Destination.Container.ContainerID)
 		return
 	}
 
@@ -319,7 +491,7 @@ func (c *InventoryComponent) handleSwapRequest(tx *invReq, action *protocol.Swap
 func (c *InventoryComponent) handleDestroyRequest(tx *invReq, src protocol.StackRequestSlotInfo, count int, isDrop bool) {
 	inv, foundInv := c.WindowFromContainerID(int32(src.Container.ContainerID))
 	if !foundInv {
-		c.mPlayer.Log().Debug("no inventory with container id found", "containerID", src.Container.ContainerID)
+		c.mPlayer.Dbg.Notify(player.DebugModeItemRequests, true, "no inventory with container id %d found", src.Container.ContainerID)
 		return
 	}
 	tx.append(newDestroyAction(
@@ -331,3 +503,18 @@ func (c *InventoryComponent) handleDestroyRequest(tx *invReq, src protocol.Stack
 		c.mPlayer,
 	))
 }
+
+// noinspection ALL
+//
+//go:linkname crafting_matchingStacks github.com/df-mc/dragonfly/server/session.matchingStacks
+func crafting_matchingStacks(a, b recipe.Item) bool
+
+// noinspection ALL
+//
+//go:linkname crafting_grow github.com/df-mc/dragonfly/server/session.grow
+func crafting_grow(recipe.Item, int) recipe.Item
+
+// noinspection ALL
+//
+//go:linkname crafting_repeatStacks github.com/df-mc/dragonfly/server/session.repeatStacks
+func crafting_repeatStacks([]item.Stack, int) []item.Stack

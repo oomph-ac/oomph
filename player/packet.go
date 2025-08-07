@@ -1,6 +1,7 @@
 package player
 
 import (
+	"os"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/item"
@@ -49,6 +50,10 @@ var ServerDecode = []uint32{
 	packet.IDUpdateAttributes,
 	packet.IDUpdateBlock,
 	packet.IDUpdateSubChunkBlocks,
+	packet.IDContainerOpen,
+	packet.IDContainerClose,
+	packet.IDCraftingData,
+	packet.IDCreativeContent,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
@@ -82,6 +87,15 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 			var mode int
 			switch args[1] {
+			case "gmc":
+				if len(os.Getenv("GMC_TEST_BECAUSE_DEVLOL")) > 0 {
+					p.SendPacketToClient(&packet.SetPlayerGameType{
+						GameType: packet.GameTypeCreative,
+					})
+				} else {
+					p.Message("hi there :3c")
+				}
+				return
 			case "type:log":
 				p.Dbg.LoggingType = LoggingTypeLogFile
 				p.Message("Set debug logging type to <green>log file</green>.")
@@ -112,6 +126,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				mode = DebugModeUnhandledPackets
 			case "block_breaking", "block_break":
 				mode = DebugModeBlockBreaking
+			case "item_requests":
+				mode = DebugModeItemRequests
+			case "crafting":
+				mode = DebugModeCrafting
 			case "block_interaction":
 				mode = DebugModeBlockInteraction
 			default:
@@ -430,5 +448,28 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.inventory.CreateWindow(pk.WindowID, pk.ContainerType)
 	case *packet.ContainerClose:
 		p.inventory.RemoveWindow(pk.WindowID)
+	case *packet.CraftingData:
+		if pk.ClearRecipes {
+			p.Recipies = make(map[uint32]protocol.Recipe)
+		}
+		for _, recp := range pk.Recipes {
+			switch recp := recp.(type) {
+			case *protocol.ShapedRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.ShapelessRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.MultiRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.SmithingTransformRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.SmithingTrimRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			}
+		}
+	case *packet.CreativeContent:
+		p.CreativeItems = make(map[uint32]protocol.CreativeItem)
+		for _, item := range pk.Items {
+			p.CreativeItems[item.CreativeItemNetworkID] = item
+		}
 	}
 }
