@@ -34,6 +34,14 @@ func (*AttackSnapshot) ID() uint32 {
 
 func (pk *AttackSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
 	io.Uint8(&pk.Flags)
+	if pk.CheckFlag(AttackSnapshotFlagIsInital) {
+		io.Varint32(&pk.HotBarSlot)
+		io.Varuint64(&pk.EntityRID)
+		io.Vec3(&pk.ReportedPos)
+		io.Vec3(&pk.ClickedPos)
+		return
+	}
+
 	if pk.CheckFlag(AttackSnapshotFlagUpdatedHotBarSlot) {
 		io.Varint32(&pk.HotBarSlot)
 	}
