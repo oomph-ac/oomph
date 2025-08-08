@@ -6,7 +6,6 @@ import (
 	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/player"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
 type EntitySize struct {
@@ -36,18 +35,18 @@ func (ack *EntitySize) Run() {
 	ack.mEntity.Scale = ack.scale
 
 	if widthModified || heightModified || scaleModified {
-		var pk cloudpacket.UpdateEntityDimensions
+		pk := &cloudpacket.UpdateEntityDimensions{}
 		pk.RuntimeId = ack.mEntity.RuntimeId
 		if widthModified {
-			pk.Width = protocol.Option(ack.width)
+			pk.SetWidth(ack.width)
 		}
 		if heightModified {
-			pk.Height = protocol.Option(ack.height)
+			pk.SetHeight(ack.height)
 		}
 		if scaleModified {
-			pk.Scale = protocol.Option(ack.scale)
+			pk.SetScale(ack.scale)
 		}
-		ack.mPlayer.WriteToCloud(&pk)
+		ack.mPlayer.WriteToCloud(pk)
 	}
 }
 

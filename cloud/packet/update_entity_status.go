@@ -15,14 +15,13 @@ func init() {
 }
 
 type UpdateEntityStatus struct {
-	RuntimeId uint64
+	Flags     uint8  // 1 byte
+	RuntimeId uint64 // 1-9 bytes
 
-	NetPosition protocol.Optional[mgl32.Vec3]
-	Position    mgl32.Vec3
-	Dimensions  mgl32.Vec3 // [width, height, scale]
-	EntityType  string
+	Position   mgl32.Vec3 // 0-12 bytes
+	Dimensions mgl32.Vec3 // 0-12 bytes ([w, h, s])
+	EntityType string     // 0-12 bytes
 
-	Flags uint8
 }
 
 func (*UpdateEntityStatus) ID() uint32 {
@@ -30,11 +29,10 @@ func (*UpdateEntityStatus) ID() uint32 {
 }
 
 func (pk *UpdateEntityStatus) Marshal(io protocol.IO, cloudProto uint32) {
-	io.Uint64(&pk.RuntimeId)
 	io.Uint8(&pk.Flags)
+	io.Varuint64(&pk.RuntimeId)
 
 	if !pk.CheckFlag(UpdateEntityStatusFlagIsRemoval) {
-		protocol.OptionalFunc(io, &pk.NetPosition, io.Vec3)
 		io.Vec3(&pk.Position)
 		io.Vec3(&pk.Dimensions)
 		io.String(&pk.EntityType)

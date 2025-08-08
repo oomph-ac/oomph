@@ -132,8 +132,6 @@ type AuthoritativeMovementComponent struct {
 
 	pendingCorrections   int
 	inCorrectionCooldown bool
-
-	consecutiveCorrections int
 }
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
@@ -832,38 +830,37 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		Timestamp:   time.Now().UnixMicro(),
 		CInputTick:  mc.mPlayer.ClientTick,
 		CSimTick:    mc.mPlayer.SimulationFrame,
-		SimFlags:    protocol.NewBitset(cloudpacket.SimFlagsSize),
 	}
 	const sendThreshold float32 = 5e-8
 	if mc.pos.Sub(mc.lastPos).LenSqr() > sendThreshold {
-		playerSnapshot.Pos = protocol.Option(mc.pos)
+		playerSnapshot.SetPos(mc.pos)
 	}
 	if mc.vel.Sub(mc.lastVel).LenSqr() > sendThreshold {
-		playerSnapshot.Vel = protocol.Option(mc.vel)
+		playerSnapshot.SetVel(mc.vel)
 	}
 	if mc.mov.Sub(mc.lastMov).LenSqr() > sendThreshold {
-		playerSnapshot.Mov = protocol.Option(mc.mov)
+		playerSnapshot.SetMov(mc.mov)
 	}
 	if mc.nonAuthoritative.pos.Sub(mc.nonAuthoritative.lastPos).LenSqr() > sendThreshold {
-		playerSnapshot.CPos = protocol.Option(mc.nonAuthoritative.pos)
+		playerSnapshot.SetCPos(mc.nonAuthoritative.pos)
 	}
 	if mc.nonAuthoritative.vel.Sub(mc.nonAuthoritative.lastVel).LenSqr() > sendThreshold {
-		playerSnapshot.CVel = protocol.Option(mc.nonAuthoritative.vel)
+		playerSnapshot.SetCVel(mc.nonAuthoritative.vel)
 	}
 	if mc.nonAuthoritative.mov.Sub(mc.nonAuthoritative.lastMov).LenSqr() > sendThreshold {
-		playerSnapshot.CMov = protocol.Option(mc.nonAuthoritative.mov)
+		playerSnapshot.SetCMov(mc.nonAuthoritative.mov)
 	}
 	if mc.rotation.Sub(mc.lastRotation).LenSqr() > sendThreshold {
-		playerSnapshot.CRot = protocol.Option(mc.rotation)
+		playerSnapshot.SetCRot(mc.rotation)
 	}
 	if mc.InCorrectionCooldown() {
-		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagInCorrectiveState)
-	}
-	if mc.HasKnockback() {
-		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagHasKnockback)
+		playerSnapshot.SnapshotFlags |= cloudpacket.PlayerSnapshotFlagInCorrectiveState
 	}
 	if mc.HasTeleport() {
-		playerSnapshot.SimFlags.Set(cloudpacket.SimFlagHasTeleport)
+		playerSnapshot.SnapshotFlags |= cloudpacket.PlayerSnapshotFlagHasTeleport
+	}
+	if mc.HasKnockback() {
+		playerSnapshot.SnapshotFlags |= cloudpacket.PlayerSnapshotFlagHasKnockback
 	}
 	mc.mPlayer.WriteToCloud(playerSnapshot)
 

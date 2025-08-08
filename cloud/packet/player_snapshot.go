@@ -7,10 +7,16 @@ import (
 )
 
 const (
-	SimFlagInCorrectiveState = iota
-	SimFlagHasTeleport
-	SimFlagHasKnockback
-	SimFlagsSize
+	PlayerSnapshotFlagInCorrectiveState = 1 << iota
+	PlayerSnapshotFlagHasTeleport
+	PlayerSnapshotFlagHasKnockback
+	PlayerSnapshotFlagUpdatedPosition
+	PlayerSnapshotFlagUpdatedClientPosition
+	PlayerSnapshotFlagUpdatedVelocity
+	PlayerSnapshotFlagUpdatedClientVelocity
+	PlayerSnapshotFlagUpdatedMovement
+	PlayerSnapshotFlagUpdatedClientMovement
+	PlayerSnapshotFlagUpdatedRotation
 )
 
 func init() {
@@ -20,13 +26,13 @@ func init() {
 }
 
 type PlayerSnapshot struct {
-	Pos, CPos protocol.Optional[mgl32.Vec3] // 2-25 bytes
-	Vel, CVel protocol.Optional[mgl32.Vec3] // 2-25 bytes
-	Mov, CMov protocol.Optional[mgl32.Vec3] // 2-25 bytes
-	CRot      protocol.Optional[mgl32.Vec3] // 1-13 bytes
+	SnapshotFlags uint16          // 2 bytes
+	CInputFlags   protocol.Bitset // 9 bytes (?)
 
-	CInputFlags protocol.Bitset // 9 bytes (?)
-	SimFlags    protocol.Bitset // ???
+	Pos, CPos mgl32.Vec3 // 0-24 bytes
+	Vel, CVel mgl32.Vec3 // 0-24 bytes
+	Mov, CMov mgl32.Vec3 // 0-24 bytes
+	CRot      mgl32.Vec3 // 0-12 bytes
 
 	Timestamp  int64  // 8 bytes
 	CInputTick int64  // 8 bytes
@@ -39,16 +45,71 @@ func (*PlayerSnapshot) ID() uint32 {
 }
 
 func (pk *PlayerSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
-	protocol.OptionalFunc(io, &pk.Pos, io.Vec3)
-	protocol.OptionalFunc(io, &pk.Vel, io.Vec3)
-	protocol.OptionalFunc(io, &pk.Mov, io.Vec3)
-	protocol.OptionalFunc(io, &pk.CPos, io.Vec3)
-	protocol.OptionalFunc(io, &pk.CVel, io.Vec3)
-	protocol.OptionalFunc(io, &pk.CMov, io.Vec3)
-	protocol.OptionalFunc(io, &pk.CRot, io.Vec3)
+	io.Uint16(&pk.SnapshotFlags)
 	io.Bitset(&pk.CInputFlags, gtpacket.PlayerAuthInputBitsetSize)
-	io.Bitset(&pk.SimFlags, SimFlagsSize)
-	io.Int64(&pk.Timestamp)
-	io.Int64(&pk.CInputTick)
-	io.Uint64(&pk.CSimTick)
+
+	if pk.CheckFlag(PlayerSnapshotFlagUpdatedPosition) {
+		io.Vec3(&pk.Pos)
+	}
+	if pk.CheckFlag(PlayerSnapshotFlagUpdatedClientPosition) {
+		io.Vec3(&pk.CPos)
+	}
+	if pk.CheckFlag(PlayerSnapshotFlagUpdatedVelocity) {
+		io.Vec3(&pk.Vel)
+	}
+	if pk.CheckFlag(PlayerSnapshotFlagUpdatedClientVelocity) {
+		io.Vec3(&pk.CVel)
+	}
+	if pk.CheckFlag(PlayerSnapshotFlagUpdatedMovement) {
+		io.Vec3(&pk.Mov)
+	}
+	if pk.CheckFlag(PlayerSnapshotFlagUpdatedClientMovement) {
+		io.Vec3(&pk.CMov)
+	}
+	if pk.CheckFlag(PlayerSnapshotFlagUpdatedRotation) {
+		io.Vec3(&pk.CRot)
+	}
+
+	io.Varint64(&pk.Timestamp)
+	io.Varint64(&pk.CInputTick)
+	io.Varuint64(&pk.CSimTick)
+}
+
+func (pk *PlayerSnapshot) SetPos(pos mgl32.Vec3) {
+	pk.Pos = pos
+	pk.SnapshotFlags |= PlayerSnapshotFlagUpdatedPosition
+}
+
+func (pk *PlayerSnapshot) SetCPos(pos mgl32.Vec3) {
+	pk.CPos = pos
+	pk.SnapshotFlags |= PlayerSnapshotFlagUpdatedClientPosition
+}
+
+func (pk *PlayerSnapshot) SetVel(vel mgl32.Vec3) {
+	pk.Vel = vel
+	pk.SnapshotFlags |= PlayerSnapshotFlagUpdatedVelocity
+}
+
+func (pk *PlayerSnapshot) SetCVel(vel mgl32.Vec3) {
+	pk.CVel = vel
+	pk.SnapshotFlags |= PlayerSnapshotFlagUpdatedClientVelocity
+}
+
+func (pk *PlayerSnapshot) SetMov(mov mgl32.Vec3) {
+	pk.Mov = mov
+	pk.SnapshotFlags |= PlayerSnapshotFlagUpdatedMovement
+}
+
+func (pk *PlayerSnapshot) SetCMov(mov mgl32.Vec3) {
+	pk.CMov = mov
+	pk.SnapshotFlags |= PlayerSnapshotFlagUpdatedClientMovement
+}
+
+func (pk *PlayerSnapshot) SetCRot(rot mgl32.Vec3) {
+	pk.CRot = rot
+	pk.SnapshotFlags |= PlayerSnapshotFlagUpdatedRotation
+}
+
+func (pk *PlayerSnapshot) CheckFlag(flag uint16) bool {
+	return pk.SnapshotFlags&flag == flag
 }

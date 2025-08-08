@@ -192,28 +192,27 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
 			p.combat.Attack(pk)
 			if p.opts.Combat.EnableClientEntityTracking {
-				var snapshot cloudpacket.AttackSnapshot
+				snapshot := &cloudpacket.AttackSnapshot{}
 				if prevDat := p.clientCombat.LastAttack(); prevDat == nil {
-					snapshot.HotBarSlot = protocol.Option(int32(dat.HotBarSlot))
-					snapshot.EntityRID = protocol.Option(dat.TargetEntityRuntimeID)
-					snapshot.ReportedPos = protocol.Option(dat.Position)
-					snapshot.ClickedPos = protocol.Option(dat.ClickedPosition)
+					snapshot.SetHotBarSlot(int32(dat.HotBarSlot))
+					snapshot.SetEntityRID(dat.TargetEntityRuntimeID)
+					snapshot.SetReportedPos(dat.Position)
+					snapshot.SetClickedPos(dat.ClickedPosition)
 				} else {
 					if dat.HotBarSlot != prevDat.HotBarSlot {
-						snapshot.HotBarSlot = protocol.Option(int32(dat.HotBarSlot))
+						snapshot.SetHotBarSlot(int32(dat.HotBarSlot))
 					}
 					if dat.TargetEntityRuntimeID != prevDat.TargetEntityRuntimeID {
-						snapshot.EntityRID = protocol.Option(dat.TargetEntityRuntimeID)
+						snapshot.SetEntityRID(dat.TargetEntityRuntimeID)
 					}
 					if dat.Position != prevDat.Position {
-						snapshot.ReportedPos = protocol.Option(dat.Position)
+						snapshot.SetReportedPos(dat.Position)
 					}
 					if dat.ClickedPosition != prevDat.ClickedPosition {
-						snapshot.ClickedPos = protocol.Option(dat.ClickedPosition)
+						snapshot.SetClickedPos(dat.ClickedPosition)
 					}
 				}
-
-				p.WriteToCloud(&snapshot)
+				p.WriteToCloud(snapshot)
 				p.clientCombat.Attack(pk)
 			}
 			ctx.Cancel()

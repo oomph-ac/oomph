@@ -11,13 +11,21 @@ func init() {
 	})
 }
 
-type AttackSnapshot struct {
-	IsInital bool // 1 byte
+const (
+	AttackSnapshotFlagIsInital = 1 << iota
+	AttackSnapshotFlagUpdatedHotBarSlot
+	AttackSnapshotFlagUpdatedEntityRID
+	AttackSnapshotFlagUpdatedReportedPos
+	AttackSnapshotFlagUpdatedClickedPos
+)
 
-	HotBarSlot  protocol.Optional[int32]      // 1-5 bytes
-	EntityRID   protocol.Optional[uint64]     // 1-9 bytes
-	ReportedPos protocol.Optional[mgl32.Vec3] // 1-13 bytes
-	ClickedPos  protocol.Optional[mgl32.Vec3] // 1-13 bytes
+type AttackSnapshot struct {
+	Flags uint8 // 1 byte
+
+	HotBarSlot  int32      // 0-5 bytes
+	EntityRID   uint64     // 0-9 bytes
+	ReportedPos mgl32.Vec3 // 0-12 bytes
+	ClickedPos  mgl32.Vec3 // 0-12 bytes
 }
 
 func (*AttackSnapshot) ID() uint32 {
@@ -25,9 +33,41 @@ func (*AttackSnapshot) ID() uint32 {
 }
 
 func (pk *AttackSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
-	io.Bool(&pk.IsInital)
-	protocol.OptionalFunc(io, &pk.HotBarSlot, io.Varint32)
-	protocol.OptionalFunc(io, &pk.EntityRID, io.Uint64)
-	protocol.OptionalFunc(io, &pk.ReportedPos, io.Vec3)
-	protocol.OptionalFunc(io, &pk.ClickedPos, io.Vec3)
+	io.Uint8(&pk.Flags)
+	if pk.CheckFlag(AttackSnapshotFlagUpdatedHotBarSlot) {
+		io.Varint32(&pk.HotBarSlot)
+	}
+	if pk.CheckFlag(AttackSnapshotFlagUpdatedEntityRID) {
+		io.Varuint64(&pk.EntityRID)
+	}
+	if pk.CheckFlag(AttackSnapshotFlagUpdatedReportedPos) {
+		io.Vec3(&pk.ReportedPos)
+	}
+	if pk.CheckFlag(AttackSnapshotFlagUpdatedClickedPos) {
+		io.Vec3(&pk.ClickedPos)
+	}
+}
+
+func (pk *AttackSnapshot) SetHotBarSlot(s int32) {
+	pk.HotBarSlot = s
+	pk.Flags |= AttackSnapshotFlagUpdatedHotBarSlot
+}
+
+func (pk *AttackSnapshot) SetEntityRID(rid uint64) {
+	pk.EntityRID = rid
+	pk.Flags |= AttackSnapshotFlagUpdatedEntityRID
+}
+
+func (pk *AttackSnapshot) SetReportedPos(pos mgl32.Vec3) {
+	pk.ReportedPos = pos
+	pk.Flags |= AttackSnapshotFlagUpdatedReportedPos
+}
+
+func (pk *AttackSnapshot) SetClickedPos(pos mgl32.Vec3) {
+	pk.ClickedPos = pos
+	pk.Flags |= AttackSnapshotFlagUpdatedClickedPos
+}
+
+func (pk *AttackSnapshot) CheckFlag(flag uint8) bool {
+	return pk.Flags&flag == flag
 }
