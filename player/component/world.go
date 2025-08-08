@@ -130,6 +130,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 
 	// It is impossible for the replacing block to be air, as the client would send UseItemActionClickAir instead of UseItemActionClickBlock.
 	if _, isAir := replacingBlock.(block.Air); isAir {
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction denied: clicked block is air on UseItemClickBlock")
 		return false
 	}
 
@@ -166,6 +167,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 
 	if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
 		utils.ActivateBlock(c.mPlayer, act, df_cube.Face(dat.BlockFace), df_cube.Pos(replacePos), game.Vec32To64(dat.ClickedPosition), c.mPlayer.World())
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "called utils.ActivateBlock: clicked block is activatable")
 		return true
 	}
 
@@ -174,7 +176,10 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	switch heldItem := heldItem.(type) {
 	case *block.Air:
 		// This only happens when Dragonfly is unsure of what the item is (unregistered), so we use the client-authoritative block in hand.
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "called c.mPlayer.PlaceBlock: using client-authoritative block in hand")
 		if b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID)); ok {
+			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "placing block with runtime ID: %d", dat.HeldItem.Stack.BlockRuntimeID)
+
 			// If the block at the position is not replacable, we want to place the block on the side of the block.
 			if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
 				replacePos = replacePos.Side(cube.Face(dat.BlockFace))
@@ -182,6 +187,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "using client-authoritative block in hand: %T", b)
 			c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), b, nil)
+		} else {
+			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "unable to find block with runtime ID: %d", dat.HeldItem.Stack.BlockRuntimeID)
 		}
 	case nil:
 		// The player has nothing in this slot, ignore the block placement.
@@ -201,6 +208,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 			replacePos = replacePos.Side(cube.Face(dat.BlockFace))
 		}
 		c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), heldItem, nil)
+	default:
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "unsupported item type for block placement: %T", heldItem)
 	}
 	return true
 }
