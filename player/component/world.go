@@ -120,7 +120,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	// to place a block (usually because certain conditions aren't met, like having their bounding box intersect with the block). I would prefer if
 	// the client also produced the partialTick/deltaTime value along with the interaction yaw/pitch, but we'll take what we can get from Microsoft :)
 	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) && dat.ClientPrediction == protocol.ClientPredictionFailure {
-		return false
+		// We don't cancel sending this to the server to allow for interactions with certain items.
+		return true
 	}
 
 	holding := c.mPlayer.Inventory().Holding()
@@ -294,7 +295,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		checkedPositions[flooredPos] = struct{}{}
 
 		intersectingBlock := c.mPlayer.World().Block(flooredPos)
-		
+
 		switch intersectingBlock.(type) {
 		case block.InvisibleBedrock, block.Barrier:
 			continue
