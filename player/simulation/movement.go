@@ -33,7 +33,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 
 	// ALWAYS simulate the teleport, as the client will always have the same behavior regardless of if the scenario
 	// is "unreliable", or if the player currently is in an unloaded chunk.
-	if attemptTeleport(movement, p.Dbg) {
+	if attemptTeleport(p, p.Dbg) {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "teleport (newPos=%v)", movement.Pos())
 		return
 	}
@@ -86,7 +86,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		// Apply knockback if applicable.
 		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied: %v", movement.Vel())
 		// Attempt jump velocity if applicable.
-		p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(movement, p.Dbg, &clientJumpPrevented), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
+		p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(p, p.Dbg, &clientJumpPrevented), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
 
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "blockUnder=%s, blockFriction=%v, speed=%v", utils.BlockName(blockUnder), blockFriction, moveRelativeSpeed)
 		moveRelative(movement, moveRelativeSpeed)
@@ -604,17 +604,11 @@ func attemptKnockback(movement player.MovementComponent) bool {
 	return false
 }
 
-func attemptJump(movement player.MovementComponent, dbg *player.Debugger, clientJumpPrevented *bool) bool {
+func attemptJump(p *player.Player, dbg *player.Debugger, clientJumpPrevented *bool) bool {
+	movement := p.Movement()
 	if !movement.Jumping() || !movement.OnGround() || movement.JumpDelay() > 0 {
 		dbg.Notify(player.DebugModeMovementSim, movement.Jumping(), "rejected jump from client (onGround=%v jumpDelay=%d)", movement.OnGround(), movement.JumpDelay())
 		return false
-	}
-
-	// FIXME: The client seems to sometimes prevent it's own jump from happening - it is unclear how it is determined, however.
-	// This is a temporary hack to get around this issue for now.
-	clientJump := movement.Client().Pos().Y() - movement.Client().LastPos().Y()
-	if math32.Abs(clientJump) <= 1e-4 && !movement.HasKnockback() && !movement.HasTeleport() && clientJumpPrevented != nil {
-		*clientJumpPrevented = true
 	}
 
 	newVel := movement.Vel()
@@ -627,11 +621,27 @@ func attemptJump(movement player.MovementComponent, dbg *player.Debugger, client
 		newVel[2] += game.MCCos(force) * 0.2
 	}
 
+	// FIXME: The client seems to sometimes prevent it's own jump from happening - it is unclear how it is determined, however.
+	// This is a temporary hack to get around this issue for now.
+	clientJump := movement.Client().Pos().Y() - movement.Client().LastPos().Y()
+	hasBlockAbove := false
+	jumpBB := movement.BoundingBox().Translate(newVel)
+	for _, bb := range utils.GetNearbyBBoxes(jumpBB, p.World()) {
+		if bb.Min().Y() > jumpBB.Min().Y() {
+			hasBlockAbove = true
+			break
+		}
+	}
+	if hasBlockAbove && math32.Abs(clientJump) <= 1e-4 && !movement.HasKnockback() && !movement.HasTeleport() && clientJumpPrevented != nil {
+		*clientJumpPrevented = true
+	}
+
 	movement.SetVel(newVel)
 	return true
 }
 
-func attemptTeleport(movement player.MovementComponent, dbg *player.Debugger) bool {
+func attemptTeleport(p *player.Player, dbg *player.Debugger) bool {
+	movement := p.Movement()
 	if !movement.HasTeleport() {
 		return false
 	}
@@ -640,7 +650,7 @@ func attemptTeleport(movement player.MovementComponent, dbg *player.Debugger) bo
 		movement.SetPos(movement.TeleportPos())
 		movement.SetVel(mgl32.Vec3{})
 		movement.SetJumpDelay(0)
-		attemptJump(movement, dbg, nil)
+		attemptJump(p, dbg, nil)
 		return true
 	}
 	// Calculate the smooth teleport's next position.
