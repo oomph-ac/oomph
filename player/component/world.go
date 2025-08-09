@@ -294,6 +294,12 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		checkedPositions[flooredPos] = struct{}{}
 
 		intersectingBlock := c.mPlayer.World().Block(flooredPos)
+		
+		switch intersectingBlock.(type) {
+		case block.InvisibleBedrock, block.Barrier:
+			continue
+		}
+
 		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World())
 		if len(iBBs) == 0 {
 			continue
