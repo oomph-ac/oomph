@@ -135,6 +135,9 @@ type Player struct {
 	// packet to the destination server.
 	deferredPackets []packet.Packet
 
+	// items ...
+	items map[int16]df_world.Item
+
 	// acks is the component that handles acknowledgments from the player.
 	acks AcknowledgmentComponent
 	// effects is the component that handles effect from the server sent to the player.
@@ -202,6 +205,8 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 		deferredPackets: make([]packet.Packet, 0, 256),
 
 		detections: []Detection{},
+
+		items: make(map[int16]df_world.Item),
 
 		eventHandler: &NopEventHandler{},
 
