@@ -307,6 +307,7 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		// FFS???
 		return 1
 	}
+	p.Dbg.Notify(DebugModeBlockBreaking, true, "itemInHand=%v", held)
 
 	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
 	// hack to allow netherite tools to work. However, it introduces a bypass where any nethite tool will be able to break
