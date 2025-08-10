@@ -2,7 +2,6 @@ package player
 
 import (
 	"math"
-	"strings"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
@@ -312,9 +311,10 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
 	// hack to allow netherite tools to work. However, it introduces a bypass where any nethite tool will be able to break
 	// blocks instantly.
-	if strings.Contains(utils.ItemName(held.Item()), "netherite") {
+	// NOTE: This was removed because we use the items the server sends us, instead of relying on Dragonfly's 100%.
+	/* if strings.Contains(utils.ItemName(held.Item()), "netherite") {
 		return 0
-	}
+	} */
 
 	b := p.World().Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
 	if blockHash, _ := b.Hash(); blockHash == math.MaxUint64 {
