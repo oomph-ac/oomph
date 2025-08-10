@@ -302,10 +302,10 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	held, _ := p.HeldItems()
-	if _, isShear := held.Item().(item.Shears); isShear {
+	/* if _, isShear := held.Item().(item.Shears); isShear {
 		// FFS???
 		return 1
-	}
+	} */
 	p.Dbg.Notify(DebugModeBlockBreaking, true, "itemInHand=%v", held)
 
 	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
