@@ -81,6 +81,10 @@ func (i *Inventory) Size() uint32 {
 	return i.size
 }
 
+func (i *Inventory) Slots() []item.Stack {
+	return i.items
+}
+
 func (p *Player) SetInventory(invComponent InventoryComponent) {
 	p.inventory = invComponent
 }
