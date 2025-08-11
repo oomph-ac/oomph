@@ -116,15 +116,13 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		return true
 	}
 
-	// ClientPredictionFailure being sent from the client indicates that it has not executed an interaction with a block, or has refused
-	// to place a block (usually because certain conditions aren't met, like having their bounding box intersect with the block). I would prefer if
-	// the client also produced the partialTick/deltaTime value along with the interaction yaw/pitch, but we'll take what we can get from Microsoft :)
-	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) && dat.ClientPrediction == protocol.ClientPredictionFailure {
-		// We don't cancel sending this to the server to allow for interactions with certain items.
-		return true
+	holding := c.mPlayer.Inventory().Holding()
+	_, heldIsBlock := holding.Item().(df_world.Block)
+	if heldIsBlock && c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) && dat.ClientPrediction == protocol.ClientPredictionFailure {
+		// We don't want to force a sync here, as the client has already predicted their interaction has failed.
+		return false
 	}
 
-	holding := c.mPlayer.Inventory().Holding()
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
 	dfReplacePos := df_cube.Pos(replacePos)
 	replacingBlock := c.mPlayer.World().Block(dfReplacePos)
@@ -132,6 +130,9 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	// It is impossible for the replacing block to be air, as the client would send UseItemActionClickAir instead of UseItemActionClickBlock.
 	if _, isAir := replacingBlock.(block.Air); isAir {
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction denied: clicked block is air on UseItemClickBlock")
+		c.mPlayer.SyncBlock(dfReplacePos)
+		c.mPlayer.SyncBlock(dfReplacePos.Side(df_cube.Face(dat.BlockFace)))
+		c.mPlayer.Inventory().ForceSync()
 		return false
 	}
 
@@ -163,6 +164,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction too far away (%.4f blocks)", closestDistance)
 		c.mPlayer.Popup("<red>Interaction too far away (%.2f blocks)</red>", closestDistance)
 		c.mPlayer.SyncBlock(dfReplacePos)
+		c.mPlayer.SyncBlock(dfReplacePos.Side(df_cube.Face(dat.BlockFace)))
+		c.mPlayer.Inventory().ForceSync()
 		return false
 	}
 

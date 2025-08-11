@@ -129,8 +129,6 @@ type AuthoritativeMovementComponent struct {
 
 	pendingCorrections   int
 	inCorrectionCooldown bool
-
-	consecutiveCorrections int
 }
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
