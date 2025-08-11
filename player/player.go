@@ -237,7 +237,7 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 	p.opts = new(Opts)
 	p.opts.Combat = oconfig.Combat()
 	p.opts.Movement = oconfig.Movement()
-	p.opts.UseDebugCommands = oconfig.Cfg.UseDebugCommands
+	p.opts.UseDebugCommands = oconfig.Global.UseDebugCommands
 
 	p.world = world.New(func(msg string, args ...any) {
 		p.Dbg.Notify(DebugModeChunks, true, msg, args...)

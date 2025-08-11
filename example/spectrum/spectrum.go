@@ -61,20 +61,21 @@ func main() {
 		panic(err)
 	}
 
-	oconfig.Cfg = oconfig.DefaultConfig
-	//oconfig.Cfg.Network.Transport = oconfig.NetworkTransportSpectral
-	oconfig.Cfg.UseDebugCommands = true
+	oconfig.Global = oconfig.DefaultConfig
+	//oconfig.Global.Network.Transport = oconfig.NetworkTransportSpectral
+	oconfig.Global.UseDebugCommands = true
 
-	oconfig.Cfg.Movement.AcceptClientPosition = false
-	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.003
+	oconfig.Global.Movement.AcceptClientPosition = false
+	oconfig.Global.Movement.PositionAcceptanceThreshold = 0.003
+	oconfig.Global.Movement.AcceptClientVelocity = false
+	oconfig.Global.Movement.VelocityAcceptanceThreshold = 0.077
 
-	oconfig.Cfg.Movement.AcceptClientVelocity = false
-	oconfig.Cfg.Movement.PersuasionThreshold = 0.003
-	oconfig.Cfg.Movement.CorrectionThreshold = 0.003
+	oconfig.Global.Movement.PersuasionThreshold = 0.002
+	oconfig.Global.Movement.CorrectionThreshold = 0.3
 
-	oconfig.Cfg.Combat.MaximumAttackAngle = 90
-	oconfig.Cfg.Combat.EnableClientEntityTracking = true
-	oconfig.Cfg.Combat.MaxRewind = 6
+	oconfig.Global.Combat.MaximumAttackAngle = 90
+	oconfig.Global.Combat.EnableClientEntityTracking = true
+	oconfig.Global.Combat.MaxRewind = 6
 
 	packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
 	if err != nil {
