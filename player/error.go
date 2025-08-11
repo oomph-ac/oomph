@@ -1,7 +1,9 @@
 package player
 
 func (p *Player) recoverError() {
-	if v := recover(); v != nil && p.recoverFunc != nil {
-		p.recoverFunc(p, v)
+	if recvFn := p.recoverFunc; recvFn != nil {
+		if v := recover(); v != nil {
+			recvFn(p, v)
+		}
 	}
 }

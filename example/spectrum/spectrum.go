@@ -156,6 +156,9 @@ func main() {
 			proc.Player().SetCloser(func() {
 				f.Close()
 			})
+			proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
+				debug.PrintStack()
+			})
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
