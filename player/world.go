@@ -83,7 +83,7 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 			int32(pos[2]),
 		},
 		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
-		Flags:             packet.BlockUpdatePriority,
+		Flags:             packet.BlockUpdateNeighbours | packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	})
 }
@@ -104,7 +104,8 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
 	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
-		//p.SyncWorld()
+		p.SyncBlock(pos)
+		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", pos)
 		return
 	}
@@ -129,9 +130,8 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 
 	if entityIntersecting {
 		// We sync the world in this instance to avoid any possibility of a long-persisting ghost block.
-		p.SendBlockUpdates([]protocol.BlockPos{
-			{int32(pos[0]), int32(pos[1]), int32(pos[2])},
-		})
+		p.SyncBlock(pos)
+		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "entity prevents block placement at %v", pos)
 		return
 	}
