@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -23,11 +24,6 @@ func (p *Player) ServerConn() ServerConn {
 
 // SetConn sets the connection to the client.
 func (p *Player) SetConn(conn *minecraft.Conn) {
-	conn.WritePacket(&packet.ScriptMessage{
-		Identifier: "oomph_is_here_proceed_with_caution",
-		Data:       []byte("Smile! You're on camera."),
-	})
-
 	p.conn = conn
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID
@@ -46,15 +42,22 @@ func (p *Player) SetServerConn(conn ServerConn) {
 		return
 	}
 
+	if p.serverConn == nil {
+		p.GameDat = conn.GameData()
+		for _, item := range p.GameDat.Items {
+			if i, ok := world.ItemByName(item.Name, 0); ok {
+				p.items[item.RuntimeID] = i
+			}
+		}
+	}
+
 	p.serverConn = conn
+	p.RuntimeId = conn.GameData().EntityRuntimeID
+	p.UniqueId = conn.GameData().EntityUniqueID
 	p.GameMode = conn.GameData().PlayerGameMode
 	if p.GameMode == 5 {
 		p.GameMode = conn.GameData().WorldGameMode
 	}
-
-	p.RuntimeId = conn.GameData().EntityRuntimeID
-	p.UniqueId = conn.GameData().EntityUniqueID
-	p.GameDat = conn.GameData()
 
 	p.movement.SetPos(p.GameDat.PlayerPosition)
 	p.movement.SetVel(mgl32.Vec3{})

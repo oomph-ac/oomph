@@ -2,7 +2,6 @@ package player
 
 import (
 	"math"
-	"strings"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
@@ -87,7 +86,7 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 			int32(pos[2]),
 		},
 		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
-		Flags:             packet.BlockUpdatePriority,
+		Flags:             packet.BlockUpdateNeighbours | packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	})
 }
@@ -108,7 +107,8 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
 	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
-		//p.SyncWorld()
+		p.SyncBlock(pos)
+		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", pos)
 		return
 	}
@@ -133,9 +133,8 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 
 	if entityIntersecting {
 		// We sync the world in this instance to avoid any possibility of a long-persisting ghost block.
-		p.SendBlockUpdates([]protocol.BlockPos{
-			{int32(pos[0]), int32(pos[1]), int32(pos[2])},
-		})
+		p.SyncBlock(pos)
+		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "entity prevents block placement at %v", pos)
 		return
 	}
@@ -306,17 +305,19 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	held, _ := p.HeldItems()
-	if _, isShear := held.Item().(item.Shears); isShear {
+	/* if _, isShear := held.Item().(item.Shears); isShear {
 		// FFS???
 		return 1
-	}
+	} */
+	p.Dbg.Notify(DebugModeBlockBreaking, true, "itemInHand=%v", held)
 
 	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
 	// hack to allow netherite tools to work. However, it introduces a bypass where any nethite tool will be able to break
 	// blocks instantly.
-	if strings.Contains(utils.ItemName(held.Item()), "netherite") {
+	// NOTE: This was removed because we use the items the server sends us, instead of relying on Dragonfly's 100%.
+	/* if strings.Contains(utils.ItemName(held.Item()), "netherite") {
 		return 0
-	}
+	} */
 
 	b := p.World().Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
 	if blockHash, _ := b.Hash(); blockHash == math.MaxUint64 {
