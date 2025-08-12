@@ -207,7 +207,7 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 		MState: mState,
 
 		ReceiveAlerts: true,
-		AlertDelay:    time.Second,
+		AlertDelay:    0,
 
 		ClientTick:      0,
 		SimulationFrame: 0,
