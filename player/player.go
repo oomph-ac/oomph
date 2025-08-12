@@ -423,8 +423,9 @@ func (p *Player) Disconnect(reason string) {
 		panic(fmt.Errorf("replay terminated: %v", reason))
 	}
 	p.SendPacketToClient(&packet.Disconnect{
-		Message: reason,
-		Reason:  -1,
+		Message:         reason,
+		FilteredMessage: reason,
+		Reason:          packet.DisconnectReasonKicked,
 	})
 	p.Close()
 }
