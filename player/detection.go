@@ -3,9 +3,11 @@ package player
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
+	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/game"
 	oevent "github.com/oomph-ac/oomph/player/event"
 	"github.com/oomph-ac/oomph/utils"
@@ -13,12 +15,12 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
-var DETECTION_DEFAULT_KICK_MESSAGE = text.Colourf(
+var DefaultDetectionDisconnectMessage = text.Colourf(
 	"<red><bold>Cheating Detected</bold></red>\n" +
 		"<red>We've identified suspicious behavior from your gameplay</red>\n" +
 		"<red>and removed you from the server.</red>\n" +
 		"<purple><italic>Cheating ruins the fun of the game for other players.</italic></purple>\n" +
-		"<yellow>Read our Fair Play Policy @ github.com/oomph-ac/fpp</yellow>",
+		"<yellow>Read our Fair Play Policy @ https://oomph.ac/fpp</yellow>",
 )
 
 type Detection interface {
@@ -48,12 +50,6 @@ type DetectionMetadata struct {
 
 	TrustDuration int64
 	LastFlagged   int64
-
-	// Mitigation is true if the detection is simply meant to notify the remote server if there
-	// was a certain action that was mitigated (for combat and movement). For instance, a detection
-	// that would be considered a mitigation would be Velocity, as all movement is full-authoritative
-	// anyway, and no other player would be able to see the movement cheat in action.
-	Mitigation bool
 }
 
 func (p *Player) PassDetection(d Detection, sub float64) {
@@ -88,9 +84,9 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 	}
 
 	m.LastFlagged = p.ServerTick
-	if m.Violations >= 0.5 {
+	if m.Violations >= 0.01 {
 		extraDatString := utils.OrderedMapToString(*extraData)
-		if !m.Mitigation {
+		if oconfig.Global.UseLegacyEvents {
 			p.SendRemoteEvent(oevent.NewFlaggedEvent(
 				p.IdentityDat.DisplayName,
 				d.Type(),
@@ -98,21 +94,13 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 				float32(m.Violations),
 				extraDatString,
 			))
-			p.Log().Warn(fmt.Sprintf("%s flagged %s (%s) <x%.2f> %s", p.IdentityDat.DisplayName, d.Type(), d.SubType(), game.Round64(m.Violations, 2), extraDatString))
-		} else {
-			p.SendRemoteEvent(oevent.NewMitigationEvent(
-				d.Type(),
-				d.SubType(),
-				extraDatString,
-				m.Violations,
-			))
-			p.Log().Warn(fmt.Sprintf("%s was mitigated for %s (%s) <%.2f> %s", p.Name(), d.Type(), d.SubType(), m.Violations, extraDatString))
 		}
+		p.Log().Warn(fmt.Sprintf("%s flagged %s (%s) <x%.2f> %s", p.IdentityDat.DisplayName, d.Type(), d.SubType(), game.Round64(m.Violations, 2), extraDatString))
 	}
 
 	if d.Punishable() && m.Violations >= m.MaxViolations {
 		ctx = event.C(p)
-		message := DETECTION_DEFAULT_KICK_MESSAGE
+		message := DefaultDetectionDisconnectMessage
 		p.EventHandler().HandlePunishment(ctx, d, &message)
 		if ctx.Cancelled() {
 			return
@@ -122,4 +110,12 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 		p.Disconnect(message)
 		p.Close()
 	}
+}
+
+func (p *Player) ReceiveAlert(alertMsg string) {
+	if !p.ReceiveAlerts || time.Since(p.LastAlert) < p.AlertDelay {
+		return
+	}
+	p.LastAlert = time.Now()
+	p.RawMessage(alertMsg)
 }

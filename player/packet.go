@@ -1,9 +1,9 @@
 package player
 
 import (
-	"os"
 	"strings"
 
+	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
@@ -28,6 +28,7 @@ var ClientDecode = []uint32{
 	packet.IDLevelSoundEvent,
 	packet.IDClientMovementPredictionSync,
 	packet.IDPlayerAction,
+	packet.IDCommandRequest,
 }
 
 var ServerDecode = []uint32{
@@ -54,6 +55,7 @@ var ServerDecode = []uint32{
 	packet.IDContainerClose,
 	packet.IDCraftingData,
 	packet.IDCreativeContent,
+	packet.IDAvailableCommands,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
@@ -69,80 +71,22 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
+	case *packet.CommandRequest:
+		args := strings.Split(pk.CommandLine, " ")
+		if len(args) >= 2 && args[0] == "/ac" {
+			subcommand := args[1]
+			args = args[2:]
+			cmdCtx := event.C(p)
+			p.EventHandler().HandleCommand(cmdCtx, subcommand, args)
+			if !cmdCtx.Cancelled() {
+				ctx.Cancel()
+			}
+			return
+		}
 	case *packet.ScriptMessage:
 		// TODO: Implement a better way to send messages to remote servers w/o abuse of ScriptMessagePacket.
 		if strings.Contains(pk.Identifier, "oomph:") {
 			p.Disconnect("\t")
-			return
-		}
-	case *packet.Text:
-		args := strings.Split(pk.Message, " ")
-		if args[0] == "!oomph_debug" && p.Opts().UseDebugCommands {
-			// If a player is running an oomph debug command, we don't want to leak that command into the chat.
-			ctx.Cancel()
-			if len(args) < 2 {
-				p.Message("Usage: !oomph_debug <mode>")
-				return
-			}
-
-			var mode int
-			switch args[1] {
-			case "gmc":
-				if len(os.Getenv("GMC_TEST_BECAUSE_DEVLOL")) > 0 {
-					p.SendPacketToClient(&packet.SetPlayerGameType{
-						GameType: packet.GameTypeCreative,
-					})
-				} else {
-					p.Message("hi there :3c")
-				}
-				return
-			case "type:log":
-				p.Dbg.LoggingType = LoggingTypeLogFile
-				p.Message("Set debug logging type to <green>log file</green>.")
-				return
-			case "type:message":
-				p.Dbg.LoggingType = LoggingTypeMessage
-				p.Message("Set debug logging type to <green>message</green>.")
-				return
-			case "acks":
-				mode = DebugModeACKs
-			case "rotations":
-				mode = DebugModeRotations
-			case "combat":
-				mode = DebugModeCombat
-			case "movement":
-				mode = DebugModeMovementSim
-			case "latency":
-				mode = DebugModeLatency
-			case "chunks":
-				mode = DebugModeChunks
-			case "aim-a":
-				mode = DebugModeAimA
-			case "timer":
-				mode = DebugModeTimer
-			case "block_placement":
-				mode = DebugModeBlockPlacement
-			case "unhandled_packets":
-				mode = DebugModeUnhandledPackets
-			case "block_breaking", "block_break":
-				mode = DebugModeBlockBreaking
-			case "item_requests":
-				mode = DebugModeItemRequests
-			case "crafting":
-				mode = DebugModeCrafting
-			case "block_interaction":
-				mode = DebugModeBlockInteraction
-			default:
-				p.Message("Unknown debug mode: %s", args[1])
-				return
-			}
-
-			p.Dbg.Toggle(mode)
-			if p.Dbg.Enabled(mode) {
-				p.Message("<green>Enabled</green> debug mode: %s", args[1])
-			} else {
-				p.Message("<red>Disabled</red> debug mode: %s", args[1])
-			}
 			return
 		}
 	case *packet.PlayerAuthInput:
@@ -320,6 +264,8 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 
 	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
+	case *packet.AvailableCommands:
+		p.initOomphCommand(pk)
 	case *packet.AddActor:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
