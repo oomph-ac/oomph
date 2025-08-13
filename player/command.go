@@ -59,7 +59,7 @@ func (p *Player) initOomphCommand(pk *packet.AvailableCommands) {
 	alertsEnumIdx := findOrCreateEnum("oomph:alerts", []string{"alerts"})
 	logsEnumIdx := findOrCreateEnum("oomph:logs", []string{"logs"})
 	debugEnumIdx := findOrCreateEnum("oomph:debug", []string{"debug"})
-	boolEnumIdx := findOrCreateEnum("bool_opt", []string{"true", "false", "enable", "disable"})
+	enableEnumIdx := findOrCreateEnum("enabled", []string{"true", "false", "enable", "disable"})
 
 	debugModes := append(DebugModeList, "type_message", "type_log")
 	debugModesEnumIdx := findOrCreateDynamicEnum("oomph:debug_modes", debugModes)
@@ -83,19 +83,16 @@ func (p *Player) initOomphCommand(pk *packet.AvailableCommands) {
 			Options:  0,
 		}
 	}
-	mkBoolParam := func(name string, optional bool) protocol.CommandParameter {
-		return protocol.CommandParameter{
-			Name:     name,
-			Type:     protocol.CommandArgValid | protocol.CommandArgEnum | boolEnumIdx,
-			Optional: optional,
-		}
-	}
 
 	overloads := []protocol.CommandOverload{}
 	if p.HasPerm(PermissionAlerts) {
 		overloads = append(overloads, protocol.CommandOverload{Parameters: []protocol.CommandParameter{
 			mkEnumParam("alerts", alertsEnumIdx, false, false),
-			mkBoolParam("enable", false),
+			protocol.CommandParameter{
+				Name:     "enable_alerts",
+				Type:     protocol.CommandArgValid | protocol.CommandArgEnum | enableEnumIdx,
+				Optional: false,
+			},
 		}})
 		overloads = append(overloads, protocol.CommandOverload{Parameters: []protocol.CommandParameter{
 			mkEnumParam("alerts", alertsEnumIdx, false, false),
