@@ -34,15 +34,18 @@ const (
 	GameVersion1_20_70 = 662
 	GameVersion1_20_80 = 671
 
-	GameVersion1_21_0  = 685
-	GameVersion1_21_2  = 686
-	GameVersion1_21_20 = 712
-	GameVersion1_21_30 = 729
-	GameVersion1_21_40 = 748
-	GameVersion1_21_50 = 766
-	GameVersion1_21_60 = 776
-	GameVersion1_21_70 = 786
-	GameVersion1_21_80 = protocol.CurrentProtocol
+	GameVersion1_21_0   = 685
+	GameVersion1_21_2   = 686
+	GameVersion1_21_20  = 712
+	GameVersion1_21_30  = 729
+	GameVersion1_21_40  = 748
+	GameVersion1_21_50  = 766
+	GameVersion1_21_60  = 776
+	GameVersion1_21_70  = 786
+	GameVersion1_21_80  = 800
+	GameVersion1_21_90  = 818
+	GameVersion1_21_93  = 819
+	GameVersion1_21_100 = protocol.CurrentProtocol
 
 	TicksPerSecond = 20
 )
