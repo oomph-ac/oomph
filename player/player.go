@@ -381,7 +381,7 @@ func (p *Player) RunDetections(pk packet.Packet) {
 func (p *Player) Message(msg string, args ...interface{}) {
 	p.SendPacketToClient(&packet.Text{
 		TextType: packet.TextTypeChat,
-		Message:  "§l§eoomph§7§r » " + text.Colourf(msg, args...),
+		Message:  oconfig.Global.Prefix + " " + text.Colourf(msg, args...),
 	})
 }
 
