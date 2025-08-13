@@ -11,4 +11,5 @@ const (
 	IDUpdateEntityPosition
 	IDUpdateEntityDimensions
 	IDUpdateEntityStatus
+	IDDetectionEvent
 )
