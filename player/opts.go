@@ -3,9 +3,8 @@ package player
 import "github.com/oomph-ac/oconfig"
 
 type Opts struct {
-	Combat           oconfig.CombatOpts
-	Movement         oconfig.MovementOpts
-	UseDebugCommands bool
+	Combat   oconfig.CombatOpts
+	Movement oconfig.MovementOpts
 }
 
 func (p *Player) Opts() *Opts {
