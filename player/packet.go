@@ -131,35 +131,38 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.RequestChunkRadius:
 		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventoryTransaction:
-		if dat, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && dat.ActionType == protocol.UseItemOnEntityActionAttack {
+		if dat, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
 			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
-			p.combat.Attack(pk)
-			if p.opts.Combat.EnableClientEntityTracking {
-				snapshot := &cloudpacket.AttackSnapshot{}
-				if prevDat := p.clientCombat.LastAttack(); prevDat == nil {
-					snapshot.SetHotBarSlot(int32(dat.HotBarSlot))
-					snapshot.SetEntityRID(dat.TargetEntityRuntimeID)
-					snapshot.SetReportedPos(dat.Position)
-					snapshot.SetClickedPos(dat.ClickedPosition)
-				} else {
-					if dat.HotBarSlot != prevDat.HotBarSlot {
+			p.inventory.SetHeldSlot(int32(dat.HotBarSlot))
+			if dat.ActionType == protocol.UseItemOnEntityActionAttack {
+				p.combat.Attack(pk)
+				if p.opts.Combat.EnableClientEntityTracking {
+					snapshot := &cloudpacket.AttackSnapshot{}
+					if prevDat := p.clientCombat.LastAttack(); prevDat == nil {
 						snapshot.SetHotBarSlot(int32(dat.HotBarSlot))
-					}
-					if dat.TargetEntityRuntimeID != prevDat.TargetEntityRuntimeID {
 						snapshot.SetEntityRID(dat.TargetEntityRuntimeID)
-					}
-					if dat.Position != prevDat.Position {
 						snapshot.SetReportedPos(dat.Position)
-					}
-					if dat.ClickedPosition != prevDat.ClickedPosition {
 						snapshot.SetClickedPos(dat.ClickedPosition)
+					} else {
+						if dat.HotBarSlot != prevDat.HotBarSlot {
+							snapshot.SetHotBarSlot(int32(dat.HotBarSlot))
+						}
+						if dat.TargetEntityRuntimeID != prevDat.TargetEntityRuntimeID {
+							snapshot.SetEntityRID(dat.TargetEntityRuntimeID)
+						}
+						if dat.Position != prevDat.Position {
+							snapshot.SetReportedPos(dat.Position)
+						}
+						if dat.ClickedPosition != prevDat.ClickedPosition {
+							snapshot.SetClickedPos(dat.ClickedPosition)
+						}
 					}
+					p.WriteToCloud(snapshot)
+					p.clientCombat.Attack(pk)
 				}
-				p.WriteToCloud(snapshot)
-				p.clientCombat.Attack(pk)
+				ctx.Cancel()
 			}
-			ctx.Cancel()
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 			if tr.ActionType == protocol.UseItemActionClickAir {

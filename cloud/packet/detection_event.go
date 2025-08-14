@@ -13,9 +13,11 @@ func init() {
 }
 
 type DetectionEvent struct {
-	EventType   byte
-	Violations  float32
-	DetectionID string
+	EventType  byte
+	Violations float32
+
+	DetectionType    string
+	DetectionSubType string
 }
 
 func (pk *DetectionEvent) ID() uint32 {
@@ -24,7 +26,8 @@ func (pk *DetectionEvent) ID() uint32 {
 
 func (pk *DetectionEvent) Marshal(io protocol.IO, cloudProto uint32) {
 	io.Uint8(&pk.EventType)
-	io.String(&pk.DetectionID)
+	io.String(&pk.DetectionType)
+	io.String(&pk.DetectionSubType)
 	if pk.EventType == DetectionEventFlagged {
 		io.Float32(&pk.Violations)
 	}

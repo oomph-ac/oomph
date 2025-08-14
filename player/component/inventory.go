@@ -185,7 +185,7 @@ func (c *InventoryComponent) HeldSlot() int32 {
 }
 
 func (c *InventoryComponent) SetHeldSlot(heldSlot int32) {
-	if heldSlot < 0 || heldSlot >= int32(inventorySizeHotbar) {
+	if heldSlot < 0 || heldSlot > int32(inventorySizeHotbar) {
 		c.mPlayer.Disconnect(game.ErrorInvalidInventorySlot)
 		return
 	}
