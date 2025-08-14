@@ -24,7 +24,7 @@ func (p *Player) initOomphCommand(pk *packet.AvailableCommands) {
 
 	pk.Commands = append(pk.Commands, protocol.Command{
 		Name:                     oconfig.Global.CommandName,
-		Description:              "Command for anti-cheat functionality",
+		Description:              oconfig.Global.CommandDescription,
 		Flags:                    0,
 		PermissionLevel:          0,
 		AliasesOffset:            ^uint32(0), // MaxUint32 (no aliases)
