@@ -196,7 +196,7 @@ type Player struct {
 	remoteEventFunc func(e RemoteEvent, p *Player)
 
 	opts  *Opts
-	perms Permissions
+	perms uint64
 
 	df_world.NopViewer
 }
