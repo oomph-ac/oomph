@@ -136,8 +136,8 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 		return
 	}
 
-	/* inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
-	inv.SetSlot(int(p.inventory.HeldSlot()), p.inventory.Holding().Grow(-1)) */
+	inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
+	inv.SetSlot(int(p.inventory.HeldSlot()), p.inventory.Holding().Grow(-1))
 	p.World().SetBlock(pos, b, nil)
 	p.Dbg.Notify(DebugModeBlockPlacement, true, "placed block at %v", pos)
 }
