@@ -10,6 +10,8 @@ import (
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oconfig"
+	"github.com/oomph-ac/oomph/player/command"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"golang.org/x/exp/maps"
 )
@@ -50,6 +52,69 @@ func NewExampleEventHandler() *ExampleEventHandler {
 		connected:     make(map[string]*Player),
 		allowedAlerts: make(map[string]*Player),
 	}
+	// Example alert command w/ enable sub-command
+	command.RegisterSubCommand("alerts", func(p command.Permissible, pk *packet.AvailableCommands) *protocol.CommandOverload {
+		if !p.HasPerm(PermissionAlerts) {
+			return nil
+		}
+		alertsEnumIdx := command.FindOrCreateEnum(pk, "oomph:alerts", []string{"alerts"})
+		enableEnumIdx := command.FindOrCreateEnum(pk, "enabled", []string{"true", "false", "enable", "disable"})
+
+		return &protocol.CommandOverload{
+			Parameters: []protocol.CommandParameter{
+				command.MakeEnumParam("alerts", alertsEnumIdx, false, false),
+				{
+					Name:     "enable_alerts",
+					Type:     protocol.CommandArgValid | protocol.CommandArgEnum | enableEnumIdx,
+					Optional: false,
+				},
+			},
+		}
+	})
+	// Example alert command w/ delay sub-command
+	command.RegisterSubCommand("alerts", func(p command.Permissible, pk *packet.AvailableCommands) *protocol.CommandOverload {
+		if !p.HasPerm(PermissionAlerts) {
+			return nil
+		}
+		alertsEnumIdx := command.FindOrCreateEnum(pk, "oomph:alerts", []string{"alerts"})
+		return &protocol.CommandOverload{
+			Parameters: []protocol.CommandParameter{
+				command.MakeEnumParam("alerts", alertsEnumIdx, false, false),
+				mkNormalParam("delayMs", protocol.CommandArgTypeInt, false),
+			},
+		}
+	})
+	// Example logs command
+	command.RegisterSubCommand("logs", func(p command.Permissible, pk *packet.AvailableCommands) *protocol.CommandOverload {
+		if !p.HasPerm(PermissionLogs) {
+			return nil
+		}
+		logsEnumIdx := command.FindOrCreateEnum(pk, "oomph:logs", []string{"logs"})
+
+		return &protocol.CommandOverload{
+			Parameters: []protocol.CommandParameter{
+				command.MakeEnumParam("logs", logsEnumIdx, false, false),
+				mkNormalParam("player", protocol.CommandArgTypeTarget, false),
+			},
+		}
+	})
+
+	// Example debug command
+	command.RegisterSubCommand("debug", func(p command.Permissible, pk *packet.AvailableCommands) *protocol.CommandOverload {
+		if !p.HasPerm(PermissionDebug) {
+			return nil
+		}
+		debugEnumIdx := command.FindOrCreateEnum(pk, "oomph:debug", []string{"debug"})
+		debugModes := append(DebugModeList, "type_message", "type_log")
+		debugModesEnumIdx := command.FindOrCreateDynamicEnum(pk, "oomph:debug_modes", debugModes)
+
+		return &protocol.CommandOverload{
+			Parameters: []protocol.CommandParameter{
+				command.MakeEnumParam("debug", debugEnumIdx, false, false),
+				command.MakeEnumParam("mode", debugModesEnumIdx, true, true),
+			},
+		}
+	})
 	go h.refreshAlertList()
 	return h
 }
