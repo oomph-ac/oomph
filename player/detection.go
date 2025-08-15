@@ -15,7 +15,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
-var DefaultDetectionDisconnectMessage = text.Colourf("<bold><red>You've been removed from the server for cheating.</red></bold>")
+var DefaultDetectionDisconnectMessage = text.Colourf("<bold><red>You've been removed from the server for cheating.</red></bold>\n<yellow>Please refrain from using illegitimate modifications in the future.</yellow>")
 
 type Detection interface {
 	// Type returns the primary type of the detection. E.G - "Reach", "KillAura", etc.

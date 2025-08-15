@@ -4,7 +4,6 @@ import "github.com/sandertv/gophertunnel/minecraft/protocol"
 
 const (
 	DetectionEventFlagged byte = iota
-	DetectionEventPunishmentQueued
 	DetectionEventPunishmentIssued
 )
 
@@ -18,6 +17,8 @@ type DetectionEvent struct {
 
 	DetectionType    string
 	DetectionSubType string
+
+	PunishmentEffectiveAt int64
 }
 
 func (pk *DetectionEvent) ID() uint32 {
@@ -30,5 +31,7 @@ func (pk *DetectionEvent) Marshal(io protocol.IO, cloudProto uint32) {
 	io.String(&pk.DetectionSubType)
 	if pk.EventType == DetectionEventFlagged {
 		io.Float32(&pk.Violations)
+	} else if pk.EventType == DetectionEventPunishmentIssued {
+		io.Int64(&pk.PunishmentEffectiveAt)
 	}
 }

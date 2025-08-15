@@ -29,6 +29,11 @@ type EventHandler interface {
 	HandlePunishment(ctx *event.Context[*Player], detection Detection, message *string)
 	// HandleFlag is called when a detection flags a player.
 	HandleFlag(ctx *event.Context[*Player], detection Detection, data *orderedmap.OrderedMap[string, any])
+
+	// HandleCloudFlag is called when a cloud detection flag event is received.
+	HandleCloudFlag(ctx *event.Context[*Player], dtcType, dtcSubType string, violations float32)
+	// HandleCloudQueuedPunishment is called when a cloud detection queued punishment event is received.
+	HandleCloudPunishment(ctx *event.Context[*Player], dtcType, dtcSubType string, effectiveAt time.Time)
 }
 
 // NopEventHandler is an event handler that does nothing.
@@ -40,6 +45,8 @@ func (NopEventHandler) HandleCommand(*event.Context[*Player], string, []string) 
 func (NopEventHandler) HandlePunishment(*event.Context[*Player], Detection, *string) {}
 func (NopEventHandler) HandleFlag(*event.Context[*Player], Detection, *orderedmap.OrderedMap[string, any]) {
 }
+func (NopEventHandler) HandleCloudFlag(*event.Context[*Player], string, string, float32)         {}
+func (NopEventHandler) HandleCloudPunishment(*event.Context[*Player], string, string, time.Time) {}
 
 type ExampleEventHandler struct {
 	connected     map[string]*Player
@@ -241,7 +248,35 @@ func (h *ExampleEventHandler) HandleFlag(ctx *event.Context[*Player], dtc Detect
 		"{detection_subtype}", dtc.SubType(),
 		"{violations}", viol,
 	).Replace(msgTmpl)
+	h.broadcastAlert(alertMsg)
+}
 
+func (h *ExampleEventHandler) HandleCloudFlag(ctx *event.Context[*Player], dtcType, dtcSubType string, violations float32) {
+	p := ctx.Val()
+	dtcKey := dtcType + "_" + dtcSubType
+	msgTmpl := oconfig.DtcOpts(dtcKey).FlagMsg
+	viol := strconv.FormatFloat(float64(violations), 'f', 2, 64)
+
+	alertMsg := strings.NewReplacer(
+		"{prefix}", oconfig.Global.Prefix,
+		"{player}", p.IdentityDat.DisplayName,
+		"{xuid}", p.IdentityDat.XUID,
+		"{detection_type}", dtcType,
+		"{detection_subtype}", dtcSubType,
+		"{violations}", viol,
+	).Replace(msgTmpl)
+	h.broadcastAlert(alertMsg)
+}
+
+func (h *ExampleEventHandler) HandleCloudPunishment(ctx *event.Context[*Player], dtcType, dtcSubType string, effectiveAt time.Time) {
+	// Ideally - this implementation allows for the ban to be delayed and not acted upon the effectiveAt time for best results.
+	// However, for this example handler we can just issue the punishment immediately.
+	p := ctx.Val()
+	p.Log().Info("cloud punishment issued to player", "detection_type", dtcType, "detection_subtype", dtcSubType, "effective_at", effectiveAt)
+	p.Disconnect(DefaultDetectionDisconnectMessage)
+}
+
+func (h *ExampleEventHandler) broadcastAlert(alertMsg string) {
 	h.pMu.RLock()
 	recipients := make([]*Player, 0, len(h.allowedAlerts))
 	for _, r := range h.allowedAlerts {
