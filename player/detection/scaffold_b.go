@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"fmt"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -121,25 +123,28 @@ func (d *ScaffoldB) isFaceInteractable(
 		// If floor(eyePos.Y) > blockPos.Y -> the top face is interactable.
 		isBelowBlock := floorPosStart[1] < blockY || floorPosEnd[1] < blockY
 		isAboveBlock := floorPosStart[1] > blockY || floorPosEnd[1] > blockY
+		isOnBlock := floorPosStart[1] == blockY+2 || floorPosEnd[1] == blockY+2
 		if isBelowBlock {
 			interactableFaces[cube.FaceDown] = struct{}{}
 		}
 		if isAboveBlock {
 			interactableFaces[cube.FaceUp] = struct{}{}
+			if isOnBlock {
+				startXDelta := game.AbsNum(floorPosStart[0] - blockX)
+				endXDelta := game.AbsNum(floorPosEnd[0] - blockX)
+				if startXDelta <= 1 || endXDelta <= 1 {
+					interactableFaces[cube.FaceWest] = struct{}{}
+					interactableFaces[cube.FaceEast] = struct{}{}
+				}
 
-			startXDelta := game.AbsNum(floorPosStart[0] - blockX)
-			endXDelta := game.AbsNum(floorPosEnd[0] - blockX)
-			if startXDelta <= 1 || endXDelta <= 1 {
-				interactableFaces[cube.FaceWest] = struct{}{}
-				interactableFaces[cube.FaceEast] = struct{}{}
+				startZDelta := game.AbsNum(floorPosStart[2] - blockZ)
+				endZDelta := game.AbsNum(floorPosEnd[2] - blockZ)
+				if startZDelta <= 1 || endZDelta <= 1 {
+					interactableFaces[cube.FaceNorth] = struct{}{}
+					interactableFaces[cube.FaceSouth] = struct{}{}
+				}
 			}
-
-			startZDelta := game.AbsNum(floorPosStart[2] - blockZ)
-			endZDelta := game.AbsNum(floorPosEnd[2] - blockZ)
-			if startZDelta <= 1 || endZDelta <= 1 {
-				interactableFaces[cube.FaceNorth] = struct{}{}
-				interactableFaces[cube.FaceSouth] = struct{}{}
-			}
+			fmt.Println(isOnBlock, floorPosStart[1], floorPosEnd[1], blockY)
 		}
 
 		// Check for the X-axis faces.
