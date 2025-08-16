@@ -121,6 +121,11 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		return
 	}
 
+	// The reach/hitbox detection should only be applied to other players.
+	if c.useClientTracker && !e.IsPlayer {
+		return
+	}
+
 	c.attacked = true
 	c.targetedEntity = e
 	c.targetedRuntimeID = data.TargetEntityRuntimeID
@@ -335,8 +340,15 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	if !c.useClientTracker && hitValid && raycastHit && closestRaycastDist > 0 {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 
+		iter := 0
 	check_blocks_between_ray:
 		for blockPos := range game.BlocksBetween(start, end) {
+			iter++
+			if iter == 50 {
+				c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "too many blocks between ray, invalidating hit")
+				hitValid = false
+				break
+			}
 			flooredBlockPos := cube.PosFromVec3(blockPos)
 			blockInWay := c.mPlayer.World().Block(df_cube.Pos(flooredBlockPos))
 			if utils.IsBlockPassInteraction(blockInWay) {

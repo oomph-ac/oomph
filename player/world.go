@@ -2,7 +2,6 @@ package player
 
 import (
 	"math"
-	"strings"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
@@ -24,6 +23,8 @@ type WorldUpdaterComponent interface {
 	HandleSubChunk(pk *packet.SubChunk)
 	// HandleUpdateBlock allows the world updater component to handle an UpdateBlock packet sent by the server.
 	HandleUpdateBlock(pk *packet.UpdateBlock)
+	// HandleUpdateSubChunkBlocks allows the world updater component to handle a UpdateSubChunkBlocks packet sent by the server.
+	HandleUpdateSubChunkBlocks(pk *packet.UpdateSubChunkBlocks)
 	// AttemptItemInteractionWithBlock attempts an item interaction with a block request from the client. It returns false if the simulation is unable
 	// to place a block at the given position.
 	AttemptItemInteractionWithBlock(pk *packet.InventoryTransaction) bool
@@ -60,7 +61,7 @@ func (p *Player) RegenerateWorld() {
 
 func (p *Player) SyncWorld() {
 	// Update the blocks in the world so the client can sync itself properly.
-	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox(), true, true, p.World()) {
+	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox().Grow(3.0), true, true, p.World()) {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: protocol.BlockPos{
 				int32(blockResult.Position[0]),
@@ -72,6 +73,19 @@ func (p *Player) SyncWorld() {
 			Layer:             0, // TODO: Implement and account for multi-layer blocks.
 		})
 	}
+}
+
+func (p *Player) SyncBlock(pos df_cube.Pos) {
+	p.SendPacketToClient(&packet.UpdateBlock{
+		Position: protocol.BlockPos{
+			int32(pos[0]),
+			int32(pos[1]),
+			int32(pos[2]),
+		},
+		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
+		Flags:             packet.BlockUpdateNeighbours | packet.BlockUpdateNetwork,
+		Layer:             0, // TODO: Implement and account for multi-layer blocks.
+	})
 }
 
 func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext) {
@@ -90,7 +104,8 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
 	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
-		//p.SyncWorld()
+		p.SyncBlock(pos)
+		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", pos)
 		return
 	}
@@ -115,15 +130,14 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 
 	if entityIntersecting {
 		// We sync the world in this instance to avoid any possibility of a long-persisting ghost block.
-		p.SendBlockUpdates([]protocol.BlockPos{
-			{int32(pos[0]), int32(pos[1]), int32(pos[2])},
-		})
+		p.SyncBlock(pos)
+		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "entity prevents block placement at %v", pos)
 		return
 	}
 
-	/* inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
-	inv.SetSlot(int(p.inventory.HeldSlot()), p.inventory.Holding().Grow(-1)) */
+	inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
+	inv.SetSlot(int(p.inventory.HeldSlot()), p.inventory.Holding().Grow(-1))
 	p.World().SetBlock(pos, b, nil)
 	p.Dbg.Notify(DebugModeBlockPlacement, true, "placed block at %v", pos)
 }
@@ -187,6 +201,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				}
 
 				p.blockBreakProgress = 0.0
+				p.blockBreakInProgress = false
 				p.World().SetBlock(df_cube.Pos{
 					int(action.BlockPos.X()),
 					int(action.BlockPos.Y()),
@@ -241,6 +256,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				p.blockBreakInProgress = false
 			case protocol.PlayerActionStopBreak:
 				if p.worldUpdater.BlockBreakPos() == nil {
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "ignored PlayerActionStopBreak (blockBreakPos is nil)")
 					continue
 				}
 
@@ -286,17 +302,19 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	held, _ := p.HeldItems()
-	if _, isShear := held.Item().(item.Shears); isShear {
+	/* if _, isShear := held.Item().(item.Shears); isShear {
 		// FFS???
 		return 1
-	}
+	} */
+	p.Dbg.Notify(DebugModeBlockBreaking, true, "itemInHand=%v", held)
 
 	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
 	// hack to allow netherite tools to work. However, it introduces a bypass where any nethite tool will be able to break
 	// blocks instantly.
-	if strings.Contains(utils.ItemName(held.Item()), "netherite") {
+	// NOTE: This was removed because we use the items the server sends us, instead of relying on Dragonfly's 100%.
+	/* if strings.Contains(utils.ItemName(held.Item()), "netherite") {
 		return 0
-	}
+	} */
 
 	b := p.World().Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
 	if blockHash, _ := b.Hash(); blockHash == math.MaxUint64 {
@@ -308,7 +326,7 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 
 	if _, isAir := b.(block.Air); isAir {
 		// Is it possible that the server already thinks the block is broken?
-		return 0
+		return 1_000_000_000
 	} else if utils.BlockName(b) == "minecraft:web" {
 		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
 		// Just return 1 and accept when the client does break the cobweb.

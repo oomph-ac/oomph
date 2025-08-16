@@ -3,6 +3,7 @@ package player
 import (
 	"strings"
 
+	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
@@ -26,6 +27,8 @@ var ClientDecode = []uint32{
 	packet.IDItemStackRequest,
 	packet.IDLevelSoundEvent,
 	packet.IDClientMovementPredictionSync,
+	packet.IDPlayerAction,
+	packet.IDCommandRequest,
 }
 
 var ServerDecode = []uint32{
@@ -47,6 +50,12 @@ var ServerDecode = []uint32{
 	packet.IDUpdateAbilities,
 	packet.IDUpdateAttributes,
 	packet.IDUpdateBlock,
+	packet.IDUpdateSubChunkBlocks,
+	packet.IDContainerOpen,
+	packet.IDContainerClose,
+	packet.IDCraftingData,
+	packet.IDCreativeContent,
+	packet.IDAvailableCommands,
 }
 
 func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
@@ -62,65 +71,22 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
+	case *packet.CommandRequest:
+		args := strings.Split(pk.CommandLine, " ")
+		if len(args) >= 2 && args[0] == "/ac" {
+			subcommand := args[1]
+			args = args[2:]
+			cmdCtx := event.C(p)
+			p.EventHandler().HandleCommand(cmdCtx, subcommand, args)
+			if !cmdCtx.Cancelled() {
+				ctx.Cancel()
+			}
+			return
+		}
 	case *packet.ScriptMessage:
 		// TODO: Implement a better way to send messages to remote servers w/o abuse of ScriptMessagePacket.
 		if strings.Contains(pk.Identifier, "oomph:") {
 			p.Disconnect("\t")
-			return
-		}
-	case *packet.Text:
-		args := strings.Split(pk.Message, " ")
-		if args[0] == "!oomph_debug" && p.Opts().UseDebugCommands {
-			// If a player is running an oomph debug command, we don't want to leak that command into the chat.
-			ctx.Cancel()
-			if len(args) < 2 {
-				p.Message("Usage: !oomph_debug <mode>")
-				return
-			}
-
-			var mode int
-			switch args[1] {
-			case "type:log":
-				p.Dbg.LoggingType = LoggingTypeLogFile
-				p.Message("Set debug logging type to <green>log file</green>.")
-				return
-			case "type:message":
-				p.Dbg.LoggingType = LoggingTypeMessage
-				p.Message("Set debug logging type to <green>message</green>.")
-				return
-			case "acks":
-				mode = DebugModeACKs
-			case "rotations":
-				mode = DebugModeRotations
-			case "combat":
-				mode = DebugModeCombat
-			case "movement":
-				mode = DebugModeMovementSim
-			case "latency":
-				mode = DebugModeLatency
-			case "chunks":
-				mode = DebugModeChunks
-			case "aim-a":
-				mode = DebugModeAimA
-			case "timer":
-				mode = DebugModeTimer
-			case "block_placement":
-				mode = DebugModeBlockPlacement
-			case "unhandled_packets":
-				mode = DebugModeUnhandledPackets
-			case "block_breaking", "block_break":
-				mode = DebugModeBlockBreaking
-			default:
-				p.Message("Unknown debug mode: %s", args[1])
-				return
-			}
-
-			p.Dbg.Toggle(mode)
-			if p.Dbg.Enabled(mode) {
-				p.Message("<green>Enabled</green> debug mode: %s", args[1])
-			} else {
-				p.Message("<red>Disabled</red> debug mode: %s", args[1])
-			}
 			return
 		}
 	case *packet.PlayerAuthInput:
@@ -171,15 +137,15 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.InventoryTransaction:
 		if tr, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
-
-			// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
-			// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
-			p.combat.Attack(pk)
-			if p.opts.Combat.EnableClientEntityTracking {
-				p.clientCombat.Attack(pk)
+			if tr.ActionType == protocol.UseItemOnEntityActionAttack {
+				// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
+				// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
+				p.combat.Attack(pk)
+				if p.opts.Combat.EnableClientEntityTracking {
+					p.clientCombat.Attack(pk)
+				}
+				ctx.Cancel()
 			}
-			ctx.Cancel()
-			//return
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
 			if tr.ActionType == protocol.UseItemActionClickAir {
@@ -219,13 +185,6 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 						p.consumedSlot = 0
 					}
 				} */
-			} else if tr.ActionType == protocol.UseItemActionBreakBlock && (p.GameMode == packet.GameTypeAdventure || p.GameMode == packet.GameTypeSurvival) {
-				ctx.Cancel()
-			} else if tr.ActionType == protocol.UseItemActionClickBlock {
-				if p.VersionInRange(GameVersion1_21_20, protocol.CurrentProtocol) && tr.TriggerType != protocol.TriggerTypePlayerInput && tr.TriggerType != protocol.TriggerTypeSimulationTick {
-					p.Log().Debug("unknown trigger type", "triggerType", tr.TriggerType)
-					ctx.Cancel()
-				}
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
@@ -267,10 +226,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			inv.SetSlot(sourceSlot, sourceSlotItem.Grow(-droppedCount))
 		}
 
-		/* if !p.worldUpdater.ValidateInteraction(pk) {
+		interactionValid := p.worldUpdater.ValidateInteraction(pk)
+		if !interactionValid {
 			ctx.Cancel()
-		} */
-		if !p.worldUpdater.AttemptItemInteractionWithBlock(pk) {
+		} else if !p.worldUpdater.AttemptItemInteractionWithBlock(pk) {
 			ctx.Cancel()
 		}
 	case *packet.MobEquipment:
@@ -307,6 +266,8 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 
 	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
+	case *packet.AvailableCommands:
+		p.initOomphCommand(pk)
 	case *packet.AddActor:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
@@ -429,5 +390,34 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
+	case *packet.UpdateSubChunkBlocks:
+		p.worldUpdater.HandleUpdateSubChunkBlocks(pk)
+	case *packet.ContainerOpen:
+		p.inventory.CreateWindow(pk.WindowID, pk.ContainerType)
+	case *packet.ContainerClose:
+		p.inventory.RemoveWindow(pk.WindowID)
+	case *packet.CraftingData:
+		if pk.ClearRecipes {
+			p.Recipies = make(map[uint32]protocol.Recipe)
+		}
+		for _, recp := range pk.Recipes {
+			switch recp := recp.(type) {
+			case *protocol.ShapedRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.ShapelessRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.MultiRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.SmithingTransformRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			case *protocol.SmithingTrimRecipe:
+				p.Recipies[recp.RecipeNetworkID] = recp
+			}
+		}
+	case *packet.CreativeContent:
+		p.CreativeItems = make(map[uint32]protocol.CreativeItem)
+		for _, item := range pk.Items {
+			p.CreativeItems[item.CreativeItemNetworkID] = item
+		}
 	}
 }

@@ -701,7 +701,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ start/stop state race condition")
 		needsSpeedAdjusted = isNewVersionPlayer
-		if !mc.serverSprintApplied {
+		/*if !mc.serverSprintApplied {
 			if mc.serverSprint {
 				mc.sprinting = true
 				mc.airSpeed = 0.026
@@ -711,12 +711,21 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 				mc.airSpeed = 0.02
 				mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.02")
 			}
+		}*/
+		mc.sprinting = false
+		mc.airSpeed = 0.02
+		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+	} else if !startFlag && !stopFlag && !mc.serverSprintApplied && mc.serverSprint != mc.sprinting {
+		// TODO: Do we have to apply the speed adjustment herer?
+		if mc.serverSprint {
+			mc.sprinting = true
+			mc.airSpeed = 0.026
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.026")
 		} else {
 			mc.sprinting = false
 			mc.airSpeed = 0.02
-			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "airSpeed adjusted to 0.02")
+			mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, true, "server sprint applied - airSpeed adjusted to 0.02")
 		}
-		//mc.mPlayer.Message("%d %v %v", mc.mPlayer.SimulationFrame, mc.serverSprintApplied, mc.serverSprint)
 	} else if startFlag /*  && !mc.sprinting && hasForwardKeyPressed*/ {
 		mc.mPlayer.Dbg.Notify(player.DebugModeMovementSim, isNewVersionPlayer, "1.21.0+ starts sprint")
 		mc.sprinting = true
@@ -911,11 +920,11 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 	mc.AddPendingCorrection()
 	mc.SetCorrectionCooldown(true)
 	mc.mPlayer.ACKs().Add(acknowledgement.NewMovementCorrectionACK(mc.mPlayer))
+	// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
+	// (the ones they are colliding with).
+	mc.mPlayer.SyncWorld()
 
 	if !mc.mPlayer.PendingCorrectionACK {
-		// Update the blocks in the world so the client can sync itself properly. We only want to update blocks that have the potential to affect the player's movement
-		// (the ones they are colliding with).
-		mc.mPlayer.SyncWorld()
 		// Make sure all of the player's actor data is up-to-date with Oomph's prediction.
 		actorData := mc.mPlayer.LastSetActorData
 		actorData.Tick = mc.mPlayer.SimulationFrame

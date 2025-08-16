@@ -325,6 +325,78 @@ func (a *destroyAction) revert() {
 	inv.SetSlot(a.srcSlot, a.oldSrcItem)
 }
 
+type createAction struct {
+	mPlayer atomic.Pointer[player.Player]
+
+	slot int
+	inv  int32
+
+	stack    item.Stack
+	oldStack item.Stack
+}
+
+func newCreateAction(
+	slot int,
+	inv int32,
+	stack item.Stack,
+	mPlayer *player.Player,
+) *createAction {
+	a := &createAction{
+		slot:  slot,
+		inv:   inv,
+		stack: stack,
+	}
+	a.mPlayer.Store(mPlayer)
+	return a
+}
+
+func (a *createAction) close() {
+	a.mPlayer.Store(nil)
+}
+
+func (a *createAction) execute() {
+	mPlayer := a.mPlayer.Load()
+	if mPlayer == nil {
+		return
+	}
+
+	inv, foundInv := mPlayer.Inventory().WindowFromContainerID(a.inv)
+	if !foundInv {
+		mPlayer.Log().Debug("no inventory with given container ID found", "containerID", a.inv)
+		return
+	}
+
+	a.oldStack = inv.Slot(a.slot)
+	inv.SetSlot(a.slot, a.stack)
+}
+
+func (a *createAction) revert() {
+	mPlayer := a.mPlayer.Load()
+	if mPlayer == nil {
+		return
+	}
+
+	inv, foundInv := mPlayer.Inventory().WindowFromContainerID(a.inv)
+	if !foundInv {
+		mPlayer.Log().Debug("no inventory with given container ID found", "containerID", a.inv)
+		return
+	}
+	inv.SetSlot(a.slot, a.oldStack)
+}
+
+type nopAction struct {
+}
+
+func newNopAction() *nopAction {
+	return &nopAction{}
+}
+
+func (a *nopAction) execute() {}
+
+func (a *nopAction) revert() {}
+
+func (a *nopAction) close() {}
+
 type unknownAction struct {
 	mPlayer        atomic.Pointer[player.Player]
 	originalAction string

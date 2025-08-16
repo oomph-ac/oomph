@@ -5,6 +5,10 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
+const (
+	MaxBlockInteractionDistance float32 = 6.01
+)
+
 // sinTable ...
 var sinTable []float32
 

@@ -14,6 +14,9 @@ const (
 	DebugModeBlockPlacement
 	DebugModeUnhandledPackets
 	DebugModeBlockBreaking
+	DebugModeCrafting
+	DebugModeItemRequests
+	DebugModeBlockInteraction
 
 	debugModeCount
 )
@@ -23,19 +26,40 @@ const (
 	LoggingTypeLogFile
 )
 
-var DebugModeList = []string{
-	"acks",
-	"rotations",
-	"combat",
-	"movement_sim",
-	"latency",
-	"chunks",
-	"aim-a",
-	"timer-a",
-	"block_placements",
-	"unhandled_packets",
-	"block_breaking",
-}
+var (
+	DebugModeList = []string{
+		"acks",
+		"rotations",
+		"combat",
+		"movement_sim",
+		"latency",
+		"chunks",
+		"aim-a",
+		"timer-a",
+		"block_placements",
+		"unhandled_packets",
+		"block_breaking",
+		"crafting",
+		"item_requests",
+		"block_interaction",
+	}
+	DebugModeMap = map[string]int{
+		"acks":              DebugModeACKs,
+		"rotations":         DebugModeRotations,
+		"combat":            DebugModeCombat,
+		"movement_sim":      DebugModeMovementSim,
+		"latency":           DebugModeLatency,
+		"chunks":            DebugModeChunks,
+		"aim-a":             DebugModeAimA,
+		"timer-a":           DebugModeTimer,
+		"block_placements":  DebugModeBlockPlacement,
+		"unhandled_packets": DebugModeUnhandledPackets,
+		"block_breaking":    DebugModeBlockBreaking,
+		"crafting":          DebugModeCrafting,
+		"item_requests":     DebugModeItemRequests,
+		"block_interaction": DebugModeBlockInteraction,
+	}
+)
 
 type Debugger struct {
 	Modes       map[int]bool

@@ -20,12 +20,13 @@ import (
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
-	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 
 	_ "net/http/pprof"
 )
+
+var evHandler = player.NewExampleEventHandler()
 
 func main() {
 	logger := slog.Default()
@@ -61,25 +62,25 @@ func main() {
 		panic(err)
 	}
 
-	oconfig.Cfg = oconfig.DefaultConfig
-	//oconfig.Cfg.Network.Transport = oconfig.NetworkTransportSpectral
-	oconfig.Cfg.UseDebugCommands = true
+	oconfig.Global = oconfig.DefaultConfig
+	//oconfig.Global.Network.Transport = oconfig.NetworkTransportSpectral
 
-	oconfig.Cfg.Movement.AcceptClientPosition = false
-	oconfig.Cfg.Movement.PositionAcceptanceThreshold = 0.003
+	oconfig.Global.Movement.AcceptClientPosition = false
+	oconfig.Global.Movement.PositionAcceptanceThreshold = 0.003
+	oconfig.Global.Movement.AcceptClientVelocity = false
+	oconfig.Global.Movement.VelocityAcceptanceThreshold = 0.077
 
-	oconfig.Cfg.Movement.AcceptClientVelocity = false
-	oconfig.Cfg.Movement.PersuasionThreshold = 0.003
-	oconfig.Cfg.Movement.CorrectionThreshold = 0.003
+	oconfig.Global.Movement.PersuasionThreshold = 0.002
+	oconfig.Global.Movement.CorrectionThreshold = 0.3
 
-	oconfig.Cfg.Combat.MaximumAttackAngle = 90
-	oconfig.Cfg.Combat.EnableClientEntityTracking = true
-	oconfig.Cfg.Combat.MaxRewind = 6
+	oconfig.Global.Combat.MaximumAttackAngle = 90
+	oconfig.Global.Combat.EnableClientEntityTracking = true
+	oconfig.Global.Combat.MaxRewind = 6
 
-	packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
+	/* packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
 	if err != nil {
 		panic(err)
-	}
+	} */
 
 	/* var netTransport transport.Transport
 	switch tr := oconfig.Network().Transport; tr {
@@ -100,10 +101,10 @@ func main() {
 	)
 	protos := legacyver.All(false)
 	if err := proxy.Listen(minecraft.ListenConfig{
-		StatusProvider:       statusProvider,
-		FlushRate:            -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
-		AcceptedProtocols:    protos,
-		ResourcePacks:        packs,
+		StatusProvider:    statusProvider,
+		FlushRate:         -1, // FlushRate is set to -1 to allow Oomph to manually flush the connection.
+		AcceptedProtocols: protos,
+		//ResourcePacks:        packs,
 		TexturePacksRequired: false,
 
 		AllowInvalidPackets: false,
@@ -156,6 +157,13 @@ func main() {
 			proc.Player().SetCloser(func() {
 				f.Close()
 			})
+			proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
+				debug.PrintStack()
+			})
+			proc.Player().AddPerm(player.PermissionDebug)
+			proc.Player().AddPerm(player.PermissionAlerts)
+			proc.Player().AddPerm(player.PermissionLogs)
+			proc.Player().HandleEvents(evHandler)
 			s.SetProcessor(proc)
 
 			if err := s.Login(); err != nil {
