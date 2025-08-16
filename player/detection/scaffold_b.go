@@ -1,8 +1,6 @@
 package detection
 
 import (
-	"fmt"
-
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -144,7 +142,7 @@ func (d *ScaffoldB) isFaceInteractable(
 					interactableFaces[cube.FaceSouth] = struct{}{}
 				}
 			}
-			fmt.Println(isOnBlock, floorPosStart[1], floorPosEnd[1], blockY)
+			//fmt.Println(isOnBlock, floorPosStart[1], floorPosEnd[1], blockY)
 		}
 
 		// Check for the X-axis faces.
