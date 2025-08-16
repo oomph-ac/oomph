@@ -87,7 +87,7 @@ func NewExampleEventHandler() *ExampleEventHandler {
 		return &protocol.CommandOverload{
 			Parameters: []protocol.CommandParameter{
 				command.MakeEnumParam("alerts", alertsEnumIdx, false, false),
-				mkNormalParam("delayMs", protocol.CommandArgTypeInt, false),
+				command.MakeNormalParam("delayMs", protocol.CommandArgTypeInt, false),
 			},
 		}
 	})
@@ -101,7 +101,7 @@ func NewExampleEventHandler() *ExampleEventHandler {
 		return &protocol.CommandOverload{
 			Parameters: []protocol.CommandParameter{
 				command.MakeEnumParam("logs", logsEnumIdx, false, false),
-				mkNormalParam("player", protocol.CommandArgTypeTarget, false),
+				command.MakeNormalParam("player", protocol.CommandArgTypeTarget, false),
 			},
 		}
 	})

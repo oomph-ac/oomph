@@ -32,12 +32,3 @@ func (p *Player) initOomphCommand(pk *packet.AvailableCommands) {
 		Overloads:                overloads,
 	})
 }
-
-func mkNormalParam(name string, pType uint32, optional bool) protocol.CommandParameter {
-	return protocol.CommandParameter{
-		Name:     name,
-		Type:     protocol.CommandArgValid | pType,
-		Optional: optional,
-		Options:  0,
-	}
-}

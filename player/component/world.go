@@ -118,13 +118,13 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 
 	snapshot := &cloudpacket.BlockInteractionSnapshot{}
 	if c.prevUseItemData == nil {
-		snapshot.ActionType = dat.ActionType
-		snapshot.TriggerType = dat.TriggerType
-		snapshot.CPrediction = dat.ClientPrediction
-		snapshot.BlockFace = dat.BlockFace
-		snapshot.BlockPos = dat.BlockPosition
-		snapshot.ReportedPos = dat.Position
-		snapshot.ClickedPos = dat.ClickedPosition
+		snapshot.SetActionType(dat.ActionType)
+		snapshot.SetTriggerType(dat.TriggerType)
+		snapshot.SetClientPrediction(dat.ClientPrediction)
+		snapshot.SetBlockFace(dat.BlockFace)
+		snapshot.SetBlockPos(dat.BlockPosition)
+		snapshot.SetReportedPos(dat.Position)
+		snapshot.SetClickedPos(dat.ClickedPosition)
 	} else {
 		if dat.ActionType != c.prevUseItemData.ActionType {
 			snapshot.SetActionType(dat.ActionType)
