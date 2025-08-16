@@ -205,6 +205,13 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "running interaction w/ item.UsableOnBlock")
 		utils.UseOnBlock(c.mPlayer, heldItem, df_cube.Face(dat.BlockFace), dfReplacePos, game.Vec32To64(dat.ClickedPosition), c.mPlayer.World())
 	case df_world.Block:
+		if _, isGlowstone := heldItem.(block.Glowstone); isGlowstone {
+			if utils.BlockName(c.mPlayer.World().Block(df_cube.Pos(replacePos))) == "minecraft:respawn_anchor" {
+				c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "charging respawn anchor with glowstone")
+				return true
+			}
+		}
+
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "placing world.Block")
 
 		// If the block at the position is not replacable, we want to place the block on the side of the block.
