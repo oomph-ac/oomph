@@ -1,6 +1,7 @@
 package component
 
 import (
+	"math"
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -75,6 +76,33 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
 }
 
+// HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
+func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubChunkBlocks) {
+	if !c.mPlayer.Ready {
+		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
+	}
+
+	// TODO: Does the sub-chunk position sent in this packet even matter?
+	for _, entry := range pk.Blocks {
+		pos := df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}
+		b, ok := df_world.BlockByRuntimeID(entry.BlockRuntimeID)
+		if !ok {
+			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
+			b = block.Air{}
+		}
+		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+	}
+	for _, entry := range pk.Extra {
+		pos := df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}
+		b, ok := df_world.BlockByRuntimeID(entry.BlockRuntimeID)
+		if !ok {
+			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
+			b = block.Air{}
+		}
+		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+	}
+}
+
 // AttemptItemInteractionWithBlock attempts a block placement request from the client. It returns false if the simulation is unable
 // to place a block at the given position.
 func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.InventoryTransaction) bool {
@@ -88,23 +116,62 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		return true
 	}
 
-	// ClientPredictionFailure being sent from the client indicates that it has not executed an interaction with a block, or has refused
-	// to place a block (usually because certain conditions aren't met, like having their bounding box intersect with the block). I would prefer if
-	// the client also produced the partialTick/deltaTime value along with the interaction yaw/pitch, but we'll take what we can get from Microsoft :)
-	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) && dat.ClientPrediction == protocol.ClientPredictionFailure {
+	holding := c.mPlayer.Inventory().Holding()
+	_, heldIsBlock := holding.Item().(df_world.Block)
+	if heldIsBlock && c.mPlayer.VersionInRange(player.GameVersion1_21_20, 99999999) && dat.ClientPrediction == protocol.ClientPredictionFailure {
+		// We don't want to force a sync here, as the client has already predicted their interaction has failed.
 		return false
 	}
 
-	holding := c.mPlayer.Inventory().Holding()
 	replacePos := utils.BlockToCubePos(dat.BlockPosition)
 	dfReplacePos := df_cube.Pos(replacePos)
 	replacingBlock := c.mPlayer.World().Block(dfReplacePos)
 
 	// It is impossible for the replacing block to be air, as the client would send UseItemActionClickAir instead of UseItemActionClickBlock.
 	if _, isAir := replacingBlock.(block.Air); isAir {
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction denied: clicked block is air on UseItemClickBlock")
+		c.mPlayer.SyncBlock(dfReplacePos)
+		c.mPlayer.SyncBlock(dfReplacePos.Side(df_cube.Face(dat.BlockFace)))
+		c.mPlayer.Inventory().ForceSync()
 		return false
-	} else if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
+	}
+
+	// Check if the clicked block is too far away from the player's position.
+	prevPos, currPos := c.mPlayer.Movement().LastPos(), c.mPlayer.Movement().Pos()
+	if c.mPlayer.Movement().Sneaking() {
+		prevPos[1] += game.SneakingPlayerHeightOffset
+		currPos[1] += game.SneakingPlayerHeightOffset
+	} else {
+		prevPos[1] += game.DefaultPlayerHeightOffset
+		currPos[1] += game.DefaultPlayerHeightOffset
+	}
+
+	closestDistance := float32(math.MaxFloat32 - 1)
+	blockBBoxes := utils.BlockBoxes(replacingBlock, replacePos, c.mPlayer.World())
+	if len(blockBBoxes) == 0 {
+		blockBBoxes = []cube.BBox{{}}
+	}
+	for _, bb := range blockBBoxes {
+		bb = bb.Translate(replacePos.Vec3())
+		closestOrigin := game.ClosestPointInLineToPoint(prevPos, currPos, game.BBoxCenter(bb))
+		if dist := game.ClosestPointToBBox(closestOrigin, bb).Sub(closestOrigin).Len(); dist < closestDistance {
+			closestDistance = dist
+		}
+	}
+
+	// TODO: Figure out why it seems that this works for both creative and survival mode. Though, we will exempt creative mode from this check for now...
+	if c.mPlayer.GameMode != packet.GameTypeCreative && closestDistance > game.MaxBlockInteractionDistance {
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction too far away (%.4f blocks)", closestDistance)
+		c.mPlayer.Popup("<red>Interaction too far away (%.2f blocks)</red>", closestDistance)
+		c.mPlayer.SyncBlock(dfReplacePos)
+		c.mPlayer.SyncBlock(dfReplacePos.Side(df_cube.Face(dat.BlockFace)))
+		c.mPlayer.Inventory().ForceSync()
+		return false
+	}
+
+	if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
 		utils.ActivateBlock(c.mPlayer, act, df_cube.Face(dat.BlockFace), df_cube.Pos(replacePos), game.Vec32To64(dat.ClickedPosition), c.mPlayer.World())
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "called utils.ActivateBlock: clicked block is activatable")
 		return true
 	}
 
@@ -113,7 +180,10 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	switch heldItem := heldItem.(type) {
 	case *block.Air:
 		// This only happens when Dragonfly is unsure of what the item is (unregistered), so we use the client-authoritative block in hand.
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "called c.mPlayer.PlaceBlock: using client-authoritative block in hand")
 		if b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID)); ok {
+			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "placing block with runtime ID: %d", dat.HeldItem.Stack.BlockRuntimeID)
+
 			// If the block at the position is not replacable, we want to place the block on the side of the block.
 			if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
 				replacePos = replacePos.Side(cube.Face(dat.BlockFace))
@@ -121,6 +191,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "using client-authoritative block in hand: %T", b)
 			c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), b, nil)
+		} else {
+			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "unable to find block with runtime ID: %d", dat.HeldItem.Stack.BlockRuntimeID)
 		}
 	case nil:
 		// The player has nothing in this slot, ignore the block placement.
@@ -140,6 +212,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 			replacePos = replacePos.Side(cube.Face(dat.BlockFace))
 		}
 		c.mPlayer.PlaceBlock(df_cube.Pos(replacePos), heldItem, nil)
+	default:
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "unsupported item type for block placement: %T", heldItem)
 	}
 	return true
 }
@@ -164,38 +238,36 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return false
 	}
 
-	// On newer versions of the game (1.21.20+), we are able to determine whether the input was from a
-	// simulation frame, or from the player itself. However, on older versions there's no other way to
-	// distinguish this besides a zero-vector click position that is usually from jump-bridging.
-	var isInitalInput bool
-	if c.mPlayer.Conn().Proto().ID() >= player.GameVersion1_21_20 {
-		isInitalInput = dat.TriggerType == protocol.TriggerTypePlayerInput
-	} else {
-		isInitalInput = dat.ClickedPosition.LenSqr() > 0.0 && dat.ClickedPosition.LenSqr() <= 1.0
-	}
-	if !isInitalInput {
-		return c.initalInteractionAccepted
+	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) && dat.ClientPrediction != protocol.ClientPredictionSuccess {
+		return false
 	}
 
 	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
-	interactedBlock := c.mPlayer.World().Block(df_cube.Pos(blockPos))
 	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
+	interactedBlock := c.mPlayer.World().Block(df_cube.Pos(blockPos))
+
+	if _, isActivatable := interactedBlock.(block.Activatable); !isActivatable {
+		return true
+	}
 
 	if len(utils.BlockBoxes(interactedBlock, blockPos, c.mPlayer.World())) == 0 {
 		c.initalInteractionAccepted = true
 		return true
 	}
 
-	eyePos := c.mPlayer.Movement().Pos()
+	prevPos, currPos := c.mPlayer.Movement().LastPos(), c.mPlayer.Movement().Pos()
 	if c.mPlayer.Movement().Sneaking() {
-		eyePos[1] += game.SneakingPlayerHeightOffset
+		prevPos[1] += game.SneakingPlayerHeightOffset
+		currPos[1] += game.SneakingPlayerHeightOffset
 	} else {
-		eyePos[1] += game.DefaultPlayerHeightOffset
+		prevPos[1] += game.DefaultPlayerHeightOffset
+		currPos[1] += game.DefaultPlayerHeightOffset
 	}
+	closestEyePos := game.ClosestPointInLineToPoint(prevPos, currPos, interactPos)
 
-	if dist := eyePos.Sub(interactPos).Len(); dist >= 7.0 {
+	if dist := closestEyePos.Sub(interactPos).Len(); dist > game.MaxBlockInteractionDistance {
 		c.initalInteractionAccepted = false
-		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Interaction denied: too far away (%.4f blocks).", dist)
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "Interaction denied: too far away (%.4f blocks).", dist)
 		//c.mPlayer.NMessage("<red>Interaction denied: too far away.</red>")
 		return false
 	}
@@ -207,10 +279,10 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		iterCount        int
 	)
 
-	for intersectingBlockPos := range game.BlocksBetween(eyePos, interactPos) {
+	for intersectingBlockPos := range game.BlocksBetween(closestEyePos, interactPos) {
 		iterCount++
 		if iterCount > 49 {
-			c.mPlayer.Log().Debug("too many iterations for interaction validation", "eyePos", eyePos, "interactPos", interactPos, "checkedPositions", len(checkedPositions))
+			c.mPlayer.Log().Debug("too many iterations for interaction validation", "eyePos", closestEyePos, "interactPos", interactPos, "checkedPositions", len(checkedPositions))
 			break
 		}
 
@@ -226,6 +298,12 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		checkedPositions[flooredPos] = struct{}{}
 
 		intersectingBlock := c.mPlayer.World().Block(flooredPos)
+
+		switch intersectingBlock.(type) {
+		case block.InvisibleBedrock, block.Barrier:
+			continue
+		}
+
 		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World())
 		if len(iBBs) == 0 {
 			continue
@@ -236,9 +314,9 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			iBB = iBB.Translate(intersectingBlockPos)
 
 			// If there is an intersection, the interaction is invalid.
-			if _, ok := trace.BBoxIntercept(iBB, eyePos, interactPos); ok {
+			if _, ok := trace.BBoxIntercept(iBB, closestEyePos, interactPos); ok {
 				//c.mPlayer.NMessage("<red>Interaction denied: block obstructs path.</red>")
-				c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Interaction denied: block obstructs path.")
+				c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "Interaction denied: block obstructs path.")
 				c.initalInteractionAccepted = false
 				return false
 			}

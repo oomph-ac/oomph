@@ -26,10 +26,6 @@ func (ec *EffectsComponent) Get(effectID int32) (player.Effect, bool) {
 
 // Add adds an effect to the effect component.
 func (ec *EffectsComponent) Add(effectID int32, e player.Effect) {
-	// If the effect component already has this effect at a higher level, reject.
-	if current, ok := ec.effects[effectID]; ok && current.Amplifier > e.Amplifier {
-		return
-	}
 	ec.effects[effectID] = e
 }
 

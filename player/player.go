@@ -34,15 +34,18 @@ const (
 	GameVersion1_20_70 = 662
 	GameVersion1_20_80 = 671
 
-	GameVersion1_21_0  = 685
-	GameVersion1_21_2  = 686
-	GameVersion1_21_20 = 712
-	GameVersion1_21_30 = 729
-	GameVersion1_21_40 = 748
-	GameVersion1_21_50 = 766
-	GameVersion1_21_60 = 776
-	GameVersion1_21_70 = 786
-	GameVersion1_21_80 = protocol.CurrentProtocol
+	GameVersion1_21_0   = 685
+	GameVersion1_21_2   = 686
+	GameVersion1_21_20  = 712
+	GameVersion1_21_30  = 729
+	GameVersion1_21_40  = 748
+	GameVersion1_21_50  = 766
+	GameVersion1_21_60  = 776
+	GameVersion1_21_70  = 786
+	GameVersion1_21_80  = 800
+	GameVersion1_21_90  = 818
+	GameVersion1_21_93  = 819
+	GameVersion1_21_100 = protocol.CurrentProtocol
 
 	TicksPerSecond = 20
 )
@@ -98,6 +101,18 @@ type Player struct {
 	// LastActorMetadata is the last actor metadata packet sent by the client
 	LastSetActorData *packet.SetActorData
 
+	// Recipies is a map of recipe network IDs to recipes.
+	Recipies map[uint32]protocol.Recipe
+	// CreativeItems is a map of creative item network IDs to creative items.
+	CreativeItems map[uint32]protocol.CreativeItem
+
+	// ReceiveAlerts is a boolean indicating whether the player should receive alerts.
+	ReceiveAlerts bool
+	// AlertDelay is how long the player should wait before receiving another alert.
+	AlertDelay time.Duration
+	// LastAlert is the last time the player received an alert.
+	LastAlert time.Time
+
 	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
 	blockBreakProgress float32
 	// blockBreakStartTick is the tick that the player started breaking a block.
@@ -134,6 +149,9 @@ type Player struct {
 	// deferredPackets is a slice of packets that is used when we are unable to write a
 	// packet to the destination server.
 	deferredPackets []packet.Packet
+
+	// items ...
+	items map[int16]df_world.Item
 
 	// acks is the component that handles acknowledgments from the player.
 	acks AcknowledgmentComponent
@@ -180,7 +198,8 @@ type Player struct {
 	// remoteEventFunc is the function for sending remote events to the server
 	remoteEventFunc func(e RemoteEvent, p *Player)
 
-	opts *Opts
+	opts  *Opts
+	perms uint64
 
 	df_world.NopViewer
 }
@@ -189,6 +208,9 @@ type Player struct {
 func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener) *Player {
 	p := &Player{
 		MState: mState,
+
+		ReceiveAlerts: true,
+		AlertDelay:    0,
 
 		ClientTick:      0,
 		SimulationFrame: 0,
@@ -199,9 +221,14 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
 
+		Recipies:      make(map[uint32]protocol.Recipe),
+		CreativeItems: make(map[uint32]protocol.CreativeItem),
+
 		deferredPackets: make([]packet.Packet, 0, 256),
 
 		detections: []Detection{},
+
+		items: make(map[int16]df_world.Item),
 
 		eventHandler: &NopEventHandler{},
 
@@ -224,7 +251,6 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 	p.opts = new(Opts)
 	p.opts.Combat = oconfig.Combat()
 	p.opts.Movement = oconfig.Movement()
-	p.opts.UseDebugCommands = oconfig.Cfg.UseDebugCommands
 
 	p.world = world.New(func(msg string, args ...any) {
 		p.Dbg.Notify(DebugModeChunks, true, msg, args...)
@@ -318,6 +344,7 @@ func (p *Player) SendPacketToServer(pk packet.Packet) error {
 // HandleEvents sets the event handler for the player.
 func (p *Player) HandleEvents(h EventHandler) {
 	p.eventHandler = h
+	h.HandleJoin(event.C(p))
 }
 
 // EventHandler returns the event handler for the player.
@@ -336,6 +363,7 @@ func (p *Player) SendRemoteEvent(e RemoteEvent) {
 
 // RegisterDetection registers a detection to the player.
 func (p *Player) RegisterDetection(d Detection) {
+	d.Metadata().MaxViolations = float64(oconfig.DtcOpts(fmt.Sprintf("%s_%s", d.Type(), d.SubType())).MaxVl)
 	p.detections = append(p.detections, d)
 }
 
@@ -356,7 +384,7 @@ func (p *Player) RunDetections(pk packet.Packet) {
 func (p *Player) Message(msg string, args ...interface{}) {
 	p.SendPacketToClient(&packet.Text{
 		TextType: packet.TextTypeChat,
-		Message:  "§l§eoomph§7§r » " + text.Colourf(msg, args...),
+		Message:  oconfig.Global.Prefix + " " + text.Colourf(msg, args...),
 	})
 }
 
@@ -365,6 +393,13 @@ func (p *Player) NMessage(msg string, args ...interface{}) {
 	p.SendPacketToClient(&packet.Text{
 		TextType: packet.TextTypeChat,
 		Message:  text.Colourf(msg, args...),
+	})
+}
+
+func (p *Player) RawMessage(msg string) {
+	p.SendPacketToClient(&packet.Text{
+		TextType: packet.TextTypeChat,
+		Message:  msg,
 	})
 }
 
@@ -391,7 +426,9 @@ func (p *Player) Disconnect(reason string) {
 		panic(fmt.Errorf("replay terminated: %v", reason))
 	}
 	p.SendPacketToClient(&packet.Disconnect{
-		Message: reason,
+		Message:         reason,
+		FilteredMessage: reason,
+		Reason:          packet.DisconnectReasonKicked,
 	})
 	p.Close()
 }
@@ -427,7 +464,7 @@ func (p *Player) Close() error {
 			defer p.procMu.Unlock()
 
 			if evHandler := p.eventHandler; evHandler != nil {
-				evHandler.HandleQuit()
+				evHandler.HandleQuit(event.C(p))
 			}
 			if !p.MState.IsReplay {
 				if c := p.conn; c != nil {
@@ -508,10 +545,6 @@ func (p *Player) Tick() bool {
 	// requested by the program handling the replay.
 	if !p.MState.IsReplay {
 		p.acks.Flush()
-	}
-
-	if h := p.eventHandler; h != nil {
-		h.HandleTick(event.C(p))
 	}
 
 	if !p.MState.IsReplay {
