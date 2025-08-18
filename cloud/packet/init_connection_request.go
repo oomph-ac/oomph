@@ -24,6 +24,9 @@ type InitConnectionRequest struct {
 	// ClientData is a JSON byte slice that contains information
 	ClientData   []byte // 1-5 bytes + len(ClientData) bytes
 	IdentityData []byte // 1-5 bytes + len(IdentityData) bytes
+
+	// PlayerAddr is the IP address of the player.
+	PlayerAddr string
 }
 
 func (*InitConnectionRequest) ID() uint32 {
@@ -37,5 +40,6 @@ func (pk *InitConnectionRequest) Marshal(io protocol.IO, _ uint32) {
 		io.Varint32(&pk.PlayerProtocol)
 		io.ByteSlice(&pk.ClientData)
 		io.ByteSlice(&pk.IdentityData)
+		io.String(&pk.PlayerAddr)
 	}
 }
