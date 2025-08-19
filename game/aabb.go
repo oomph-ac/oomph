@@ -118,13 +118,13 @@ func BBHasZeroVolume(bb cube.BBox) bool {
 	return bb.Min() == bb.Max()
 }
 
-func ClosestPointInLineToPoint(origin, end mgl32.Vec3, point mgl32.Vec3) mgl32.Vec3 {
-	line := end.Sub(origin)
+func ClosestPointInLineToPoint(start, end, point mgl32.Vec3) mgl32.Vec3 {
+	line := end.Sub(start)
 	if line.LenSqr() <= 1e-4 {
-		return origin
+		return start
 	}
 
-	t := (point.Sub(origin)).Dot(line) / line.LenSqr()
+	t := (point.Sub(start)).Dot(line) / line.LenSqr()
 	// Clamp to stay on the line segment
 	if t < 0 {
 		t = 0
@@ -132,7 +132,7 @@ func ClosestPointInLineToPoint(origin, end mgl32.Vec3, point mgl32.Vec3) mgl32.V
 		t = 1
 	}
 
-	return origin.Add(line.Mul(t))
+	return start.Add(line.Mul(t))
 }
 
 // ClosestPointToBBox returns the shortest point from a given origin to a given bounding box.
@@ -194,6 +194,8 @@ func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb cub
 			return point2, true
 		}
 		return point1, true
+	} else if point1.X() == point2.X() || point1.Y() == point2.Y() || point1.Z() == point2.Z() {
+		return mgl32.Vec3{}, false
 	}
 
 	possibleBB := cube.Box(point1.X(), point1.Y(), point1.Z(), point2.X(), point2.Y(), point2.Z())

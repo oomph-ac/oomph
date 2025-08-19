@@ -23,6 +23,7 @@ func Register(p *player.Player) {
 	// scaffold detections
 	p.RegisterDetection(New_ScaffoldA(p))
 	p.RegisterDetection(New_ScaffoldB(p))
+	//p.RegisterDetection(New_ScaffoldC(p))
 
 	//p.RegisterDetection(New_NukerA(p))
 
