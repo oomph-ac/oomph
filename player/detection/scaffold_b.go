@@ -62,7 +62,7 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	}
 
 	dat, ok := tr.TransactionData.(*protocol.UseItemTransactionData)
-	if !ok || dat.ActionType != protocol.UseItemActionClickBlock || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) || dat.ClientPrediction != protocol.ClientPredictionSuccess {
+	if !ok || dat.ActionType != protocol.UseItemActionClickBlock || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) {
 		return
 	}
 	inHand := d.mPlayer.Inventory().Holding()
