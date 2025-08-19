@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -61,7 +62,11 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	}
 
 	dat, ok := tr.TransactionData.(*protocol.UseItemTransactionData)
-	if !ok || dat.ActionType != protocol.UseItemActionClickBlock || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) {
+	if !ok || dat.ActionType != protocol.UseItemActionClickBlock || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) || dat.ClientPrediction != protocol.ClientPredictionSuccess {
+		return
+	}
+	inHand := d.mPlayer.Inventory().Holding()
+	if _, isBlock := inHand.Item().(world.Block); !isBlock {
 		return
 	}
 
