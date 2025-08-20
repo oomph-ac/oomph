@@ -157,9 +157,9 @@ func main() {
 			proc.Player().SetCloser(func() {
 				f.Close()
 			})
-			proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
+			/* proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
 				debug.PrintStack()
-			})
+			}) */
 			proc.Player().AddPerm(player.PermissionDebug)
 			proc.Player().AddPerm(player.PermissionAlerts)
 			proc.Player().AddPerm(player.PermissionLogs)
