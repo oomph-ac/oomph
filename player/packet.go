@@ -168,28 +168,30 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 					p.lastUseProjectileTick = p.InputCount
 					inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 					inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
-				} /* else if c, ok := held.Item().(item.Consumable); ok {
-					if p.startUseConsumableTick == 0 {
-						p.startUseConsumableTick = p.InputCount
+				} else if c, ok := held.Item().(item.Consumable); ok {
+					if p.StartUseConsumableTick == 0 {
+						p.StartUseConsumableTick = p.InputCount
 						p.consumedSlot = int(tr.HotBarSlot)
 					} else {
-						duration := p.InputCount - p.startUseConsumableTick
+						duration := p.InputCount - p.StartUseConsumableTick
 						if duration < ((c.ConsumeDuration().Milliseconds() / 50) - 1) {
-							p.startUseConsumableTick = p.InputCount
+							p.StartUseConsumableTick = p.InputCount
 							ctx.Cancel()
 							p.inventory.ForceSync()
-							p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
+							//p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
 							//_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
-							//p.Popup("<red>Item consumption cooldown</red>")
+							p.Popup("<red>Item consumption cooldown</red>")
 							return
 						}
-						p.startUseConsumableTick = 0
+						p.StartUseConsumableTick = 0
 						p.consumedSlot = 0
 					}
-				} */
+				}
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+			p.StartUseConsumableTick = 0
+			//p.Message("released item")
 		} else if _, ok := pk.TransactionData.(*protocol.NormalTransactionData); ok {
 			if len(pk.Actions) != 2 {
 				p.Log().Debug("drop action should have exactly 2 actions, got different amount", "actionCount", len(pk.Actions))
@@ -237,8 +239,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
 		p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
-		if p.startUseConsumableTick != 0 && p.consumedSlot != int(pk.HotBarSlot) {
-			p.startUseConsumableTick = 0
+		if p.StartUseConsumableTick != 0 && p.consumedSlot != int(pk.HotBarSlot) {
+			p.StartUseConsumableTick = 0
 			p.consumedSlot = 0
 		}
 	case *packet.Animate:

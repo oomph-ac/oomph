@@ -654,7 +654,6 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	//assert.IsTrue(mc.mPlayer != nil, "parent player is null")
 	//assert.IsTrue(pk != nil, "given player input is nil")
 	//assert.IsTrue(mc.nonAuthoritative != nil, "non-authoritative data is null")
-
 	mc.nonAuthoritative.horizontalCollision = pk.InputData.Load(packet.InputFlagHorizontalCollision)
 	mc.nonAuthoritative.verticalCollision = pk.InputData.Load(packet.InputFlagVerticalCollision)
 
@@ -664,8 +663,6 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.nonAuthoritative.vel = pk.Delta
 	mc.nonAuthoritative.lastMov = mc.nonAuthoritative.mov
 	mc.nonAuthoritative.mov = mc.nonAuthoritative.pos.Sub(mc.nonAuthoritative.lastPos)
-
-	mc.impulse = pk.MoveVector.Mul(0.98)
 
 	if pk.InputData.Load(packet.InputFlagStartFlying) {
 		mc.nonAuthoritative.toggledFly = true
@@ -760,6 +757,16 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.sneaking = pk.InputData.Load(packet.InputFlagSneakDown)
 	}
 
+	if mc.mPlayer.StartUseConsumableTick != 0 {
+		baseConsumeSpeed := float32(0.3)
+		if mc.sneaking {
+			baseConsumeSpeed *= 0.3
+		}
+		pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -baseConsumeSpeed, baseConsumeSpeed)
+		pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -baseConsumeSpeed, baseConsumeSpeed)
+		//mc.mPlayer.Message("consuming (curr=%d start=%d)", mc.mPlayer.InputCount, mc.mPlayer.StartUseConsumableTick)
+	}
+
 	mc.jumping = pk.InputData.Load(packet.InputFlagStartJumping)
 	mc.pressingJump = pk.InputData.Load(packet.InputFlagJumping)
 	mc.jumpHeight = game.DefaultJumpHeight
@@ -782,6 +789,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.gliding = true
 	}
 
+	mc.impulse = pk.MoveVector.Mul(0.98)
 	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
 
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
