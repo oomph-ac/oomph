@@ -181,6 +181,9 @@ type Player struct {
 	// clientCombat is the component that handles validating combat with the client-state entity tracker.
 	clientCombat CombatComponent
 
+	// clicks is the component that handles click actions from the player.
+	clicks ClicksComponent
+
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
 

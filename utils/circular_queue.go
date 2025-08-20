@@ -45,6 +45,15 @@ func (q *CircularQueue[T]) Get(index int) T {
 	return q.items[(q.head+index)%len(q.items)]
 }
 
+// Set sets the element at logical position index (0 = oldest).
+// It panics if index is out of range.
+func (q *CircularQueue[T]) Set(index int, item T) {
+	if index < 0 || index >= q.size {
+		panic("circular queue: index out of range")
+	}
+	q.items[(q.head+index)%len(q.items)] = item
+}
+
 func (q *CircularQueue[T]) Iter() iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for index := range q.size {
