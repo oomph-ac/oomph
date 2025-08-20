@@ -92,7 +92,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.PlayerAuthInput:
 		if !p.movement.InputAcceptable() {
 			p.Popup("<red>input rate-limited (%d)</red>", p.SimulationFrame)
-			p.tryRunningClientCombat()
+			p.tryRunningClientCombat(pk)
 			ctx.Cancel()
 			return
 		}
@@ -115,7 +115,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 		p.handleBlockActions(pk)
 		p.handleMovement(pk)
-		p.tryRunningClientCombat()
+		p.tryRunningClientCombat(pk)
 
 		var serverVerifiedHit bool
 		if !p.blockBreakInProgress {
@@ -140,14 +140,16 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			if tr.ActionType == protocol.UseItemOnEntityActionAttack {
 				// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
 				// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
-				p.combat.Attack(pk)
+				p.Combat().Attack(pk)
+				p.Clicks().HandleAttack(tr)
 				if p.opts.Combat.EnableClientEntityTracking {
-					p.clientCombat.Attack(pk)
+					p.ClientCombat().Attack(pk)
 				}
 				ctx.Cancel()
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+			p.Clicks().HandleRight(tr)
 			if tr.ActionType == protocol.UseItemActionClickAir {
 				// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
 				// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
@@ -248,6 +250,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Combat().Attack(nil)
+			p.Clicks().HandleSwing()
 		}
 	}
 	p.RunDetections(pk)
