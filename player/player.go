@@ -123,8 +123,8 @@ type Player struct {
 
 	// lastUseProjectileTick is the last tick the player used a projectile item.
 	lastUseProjectileTick int64
-	// startUseConsumableTick is the tick that the player started using a consumable item.
-	startUseConsumableTick int64
+	// StartUseConsumableTick is the tick that the player started using a consumable item.
+	StartUseConsumableTick int64
 	// consumedSlot is the slot of the item that the player started consuming.
 	consumedSlot int
 
