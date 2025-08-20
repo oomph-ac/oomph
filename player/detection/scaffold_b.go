@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	faceNotSet  cube.Face = -1
-	faceNotInit cube.Face = -2
+	faceNotSet cube.Face = -1
 )
 
 type ScaffoldB struct {
@@ -31,7 +30,7 @@ func New_ScaffoldB(p *player.Player) *ScaffoldB {
 
 			MaxViolations: 10,
 		},
-		initialFace: faceNotInit,
+		initialFace: faceNotSet,
 	}
 }
 
@@ -77,24 +76,19 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 		d.initialFace = faceNotSet
 	} else if d.initialFace == faceNotSet && blockFace != cube.FaceUp && blockFace != cube.FaceDown {
 		d.initialFace = blockFace
-	} else if d.initialFace == faceNotInit {
-		d.mPlayer.Log().Debug("scaffold_b", "initFace", "faceNotInit", "face", blockFace)
-		d.mPlayer.FailDetection(d, nil)
 	}
 	if dat.ClientPrediction == protocol.ClientPredictionFailure {
 		return
 	}
 
-	eyeOffset := game.DefaultPlayerHeightOffset
-	if d.mPlayer.Movement().Sneaking() {
-		eyeOffset = game.SneakingPlayerHeightOffset
-	}
-	prevEyePos := d.mPlayer.Movement().Client().LastPos()
-	currEyePos := d.mPlayer.Movement().Client().Pos()
-	prevEyePos[1] += eyeOffset
-	currEyePos[1] += eyeOffset
 	blockPos := cube.Pos{int(dat.BlockPosition[0]), int(dat.BlockPosition[1]), int(dat.BlockPosition[2])}
-	if !d.isFaceInteractable(prevEyePos, currEyePos, blockPos, blockFace, dat.TriggerType == protocol.TriggerTypePlayerInput) {
+	if !d.isFaceInteractable(
+		d.mPlayer.Movement().Client().LastPos(),
+		d.mPlayer.Movement().Client().Pos(),
+		blockPos,
+		blockFace,
+		dat.TriggerType == protocol.TriggerTypePlayerInput,
+	) {
 		d.mPlayer.FailDetection(d, nil)
 	} else {
 		d.mPlayer.PassDetection(d, 0.5)
@@ -126,23 +120,24 @@ func (d *ScaffoldB) isFaceInteractable(
 		// If floor(eyePos.Y) > blockPos.Y -> the top face is interactable.
 		isBelowBlock := floorPosStart[1] < blockY || floorPosEnd[1] < blockY
 		isAboveBlock := floorPosStart[1] > blockY || floorPosEnd[1] > blockY
-		isOnBlock := floorPosStart[1] == blockY+2 || floorPosEnd[1] == blockY+2
+		isOnBlock := floorPosStart[1] == blockY+1 || floorPosEnd[1] == blockY+1
 		if isBelowBlock {
 			interactableFaces[cube.FaceDown] = struct{}{}
 		}
 		if isAboveBlock {
+			//d.mPlayer.Message("isOnBlock=%t prevY=%f currY=%f", isOnBlock, startPos[1], endPos[1])
 			interactableFaces[cube.FaceUp] = struct{}{}
 			if isOnBlock {
 				startXDelta := game.AbsNum(floorPosStart[0] - blockX)
 				endXDelta := game.AbsNum(floorPosEnd[0] - blockX)
-				if startXDelta <= 1 || endXDelta <= 1 {
+				if startXDelta == 0 || endXDelta == 0 {
 					interactableFaces[cube.FaceWest] = struct{}{}
 					interactableFaces[cube.FaceEast] = struct{}{}
 				}
 
 				startZDelta := game.AbsNum(floorPosStart[2] - blockZ)
 				endZDelta := game.AbsNum(floorPosEnd[2] - blockZ)
-				if startZDelta <= 1 || endZDelta <= 1 {
+				if startZDelta == 0 || endZDelta == 0 {
 					interactableFaces[cube.FaceNorth] = struct{}{}
 					interactableFaces[cube.FaceSouth] = struct{}{}
 				}

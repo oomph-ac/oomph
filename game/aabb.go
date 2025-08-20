@@ -185,19 +185,15 @@ func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb cub
 		point2 = ClosestPointToBBox(point2, bb)
 	}
 
-	if point1 == point2 {
-		if !hit1 {
-			if !hit2 {
-				// Here, there is no possible way that any point between the two rays can intersect with the bounding box.
-				return mgl32.Vec3{}, false
-			}
-			return point2, true
+	if !hit1 && !hit2 {
+		if point1 == point2 || point1.Y() == point2.Y() || (point1.X() == point2.X() && point1.Z() == point2.Z()) {
+			return mgl32.Vec3{}, false
 		}
+	} else if hit1 {
 		return point1, true
-	} else if point1.X() == point2.X() || point1.Y() == point2.Y() || point1.Z() == point2.Z() {
-		return mgl32.Vec3{}, false
+	} else if hit2 {
+		return point2, true
 	}
-
 	possibleBB := cube.Box(point1.X(), point1.Y(), point1.Z(), point2.X(), point2.Y(), point2.Z())
 	return ClosestPointToBBox(origin, possibleBB), true
 }
