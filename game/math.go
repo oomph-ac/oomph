@@ -64,6 +64,16 @@ func Round[T float32 | float64, V uint | int | uint8 | int8 | uint16 | int16 | u
 	return base
 }
 
+// PrecisionFloor32 floors a number to the given precision.
+func PrecisionFloor32(a float32, precision float32) int {
+	increaseValueAt := float32(1) - precision
+	floorVal := int(a)
+	if a-float32(floorVal) >= increaseValueAt {
+		floorVal++
+	}
+	return floorVal
+}
+
 // AbsInt64 will return the absolute value of an int64.
 func AbsInt64(a int64) int64 {
 	if a < 0 {
