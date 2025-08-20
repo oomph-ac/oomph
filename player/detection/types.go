@@ -2,6 +2,7 @@ package detection
 
 const (
 	TypeAim          = "Aim"
+	TypeAutoclicker  = "Autoclicker"
 	TypeBadPacket    = "BadPacket"
 	TypeEditionFaker = "EditionFaker"
 	TypeKillaura     = "Killaura"

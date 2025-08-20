@@ -3,6 +3,9 @@ package detection
 import "github.com/oomph-ac/oomph/player"
 
 func Register(p *player.Player) {
+	// autoclicker detections
+	p.RegisterDetection(New_AutoclickerA(p))
+
 	// aim detections
 	p.RegisterDetection(New_AimA(p))
 

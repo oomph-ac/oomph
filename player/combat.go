@@ -54,7 +54,11 @@ func (p *Player) ClientCombat() CombatComponent {
 	return p.clientCombat
 }
 
-func (p *Player) tryRunningClientCombat() {
+func (p *Player) tryRunningClientCombat(pk *packet.PlayerAuthInput) {
+	if pk.InputData.Load(packet.InputFlagMissedSwing) {
+		p.Clicks().HandleSwing()
+	}
+	p.Clicks().Tick()
 	if p.opts.Combat.EnableClientEntityTracking {
 		p.clientEntTracker.Tick(p.ClientTick)
 		_ = p.clientCombat.Calculate()
