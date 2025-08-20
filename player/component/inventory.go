@@ -7,7 +7,6 @@ import (
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/item/recipe"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/utils"
@@ -186,7 +185,7 @@ func (c *InventoryComponent) HeldSlot() int32 {
 
 func (c *InventoryComponent) SetHeldSlot(heldSlot int32) {
 	if heldSlot < 0 || heldSlot >= int32(inventorySizeHotbar) {
-		c.mPlayer.Disconnect(game.ErrorInvalidInventorySlot)
+		//c.mPlayer.Disconnect(game.ErrorInvalidInventorySlot)
 		return
 	}
 	c.heldSlot = heldSlot
