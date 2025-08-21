@@ -690,9 +690,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.pressingSneak = pk.InputData.Load(packet.InputFlagSneaking)
 	mc.pressingSprint = pk.InputData.Load(packet.InputFlagSprintDown)
 
-	hasForwardKeyPressed := mc.impulse.Y() > 1e-4
-	startFlag, stopFlag := pk.InputData.Load(packet.InputFlagStartSprinting), pk.InputData.Load(packet.InputFlagStopSprinting) || !hasForwardKeyPressed
-
+	startFlag, stopFlag := pk.InputData.Load(packet.InputFlagStartSprinting), pk.InputData.Load(packet.InputFlagStopSprinting)
 	isNewVersionPlayer := mc.mPlayer.VersionInRange(player.GameVersion1_21_0, 65536)
 	var needsSpeedAdjusted bool
 	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
