@@ -71,7 +71,7 @@ func main() {
 	oconfig.Global.Movement.VelocityAcceptanceThreshold = 0.077
 
 	oconfig.Global.Movement.PersuasionThreshold = 0.002
-	oconfig.Global.Movement.CorrectionThreshold = 0.3
+	oconfig.Global.Movement.CorrectionThreshold = 0.003
 
 	oconfig.Global.Combat.MaximumAttackAngle = 90
 	oconfig.Global.Combat.EnableClientEntityTracking = true
