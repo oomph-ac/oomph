@@ -137,6 +137,7 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		mPlayer:              p,
 		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
+		airSpeed:             0.02,
 	}
 }
 
