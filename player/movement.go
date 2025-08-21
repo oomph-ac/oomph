@@ -225,6 +225,11 @@ type MovementComponent interface {
 	// SetTrustFlyStatus sets whether the movement component can trust the fly status sent by the client.
 	SetTrustFlyStatus(bool)
 
+	// Swimming returns true if the movement component is swimming.
+	Swimming() bool
+	// SetSwimming sets whether the movement component is swimming.
+	SetSwimming(swimming bool)
+
 	// Update updates the states of the movement component from the given input.
 	Update(input *packet.PlayerAuthInput)
 	// ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.

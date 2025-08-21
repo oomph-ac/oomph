@@ -26,6 +26,15 @@ func ItemName(i world.Item) string {
 	return n
 }
 
+func Enchantment(i item.Stack, e item.EnchantmentType) (item.Enchantment, bool) {
+	for _, itemE := range i.Enchantments() {
+		if t := itemE.Type(); t == e {
+			return itemE, true
+		}
+	}
+	return item.Enchantment{}, false
+}
+
 // noinspection ALL
 //
 //go:linkname ReadItem github.com/df-mc/dragonfly/server/internal/nbtconv.Item

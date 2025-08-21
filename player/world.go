@@ -96,7 +96,7 @@ func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext
 	}
 
 	// Make a list of BBoxes the block will occupy.
-	boxes := utils.BlockBoxes(b, cube.Pos(pos), p.World())
+	boxes := utils.BlockCollisions(b, cube.Pos(pos), p.World())
 	for index, blockBox := range boxes {
 		boxes[index] = blockBox.Translate(cube.Pos(pos).Vec3())
 	}

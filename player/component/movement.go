@@ -9,7 +9,7 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
-	"github.com/oomph-ac/oomph/player/simulation"
+	"github.com/oomph-ac/oomph/player/movement"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -92,6 +92,8 @@ type AuthoritativeMovementComponent struct {
 	airSpeed             float32
 	serverUpdatedSpeed   bool
 
+	swimming bool
+
 	knockback    mgl32.Vec3
 	ticksSinceKb uint64
 
@@ -136,6 +138,7 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		mPlayer:              p,
 		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
+		airSpeed:             0.02,
 	}
 }
 
@@ -649,6 +652,16 @@ func (mc *AuthoritativeMovementComponent) SetTrustFlyStatus(trust bool) {
 	mc.trustFlyStatus = trust
 }
 
+// SetSwimming sets whether the movement component is swimming.
+func (mc *AuthoritativeMovementComponent) SetSwimming(swimming bool) {
+	mc.swimming = swimming
+}
+
+// Swimming returns true if the movement component is swimming.
+func (mc *AuthoritativeMovementComponent) Swimming() bool {
+	return mc.swimming
+}
+
 // Update updates the states of the movement component from the given input.
 func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	//assert.IsTrue(mc.mPlayer != nil, "parent player is null")
@@ -690,9 +703,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.pressingSneak = pk.InputData.Load(packet.InputFlagSneaking)
 	mc.pressingSprint = pk.InputData.Load(packet.InputFlagSprintDown)
 
-	hasForwardKeyPressed := mc.impulse.Y() > 1e-4
-	startFlag, stopFlag := pk.InputData.Load(packet.InputFlagStartSprinting), pk.InputData.Load(packet.InputFlagStopSprinting) || !hasForwardKeyPressed
-
+	startFlag, stopFlag := pk.InputData.Load(packet.InputFlagStartSprinting), pk.InputData.Load(packet.InputFlagStopSprinting)
 	isNewVersionPlayer := mc.mPlayer.VersionInRange(player.GameVersion1_21_0, 65536)
 	var needsSpeedAdjusted bool
 	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
@@ -790,7 +801,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	}
 
 	mc.impulse = pk.MoveVector.Mul(0.98)
-	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
+	movement.Simulate(mc.mPlayer, mc)
 
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
 	if !isNewVersionPlayer {

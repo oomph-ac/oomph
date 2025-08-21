@@ -147,7 +147,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	}
 
 	closestDistance := float32(math.MaxFloat32 - 1)
-	blockBBoxes := utils.BlockBoxes(replacingBlock, replacePos, c.mPlayer.World())
+	blockBBoxes := utils.BlockCollisions(replacingBlock, replacePos, c.mPlayer.World())
 	if len(blockBBoxes) == 0 {
 		blockBBoxes = []cube.BBox{{}}
 	}
@@ -257,7 +257,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return true
 	}
 
-	if len(utils.BlockBoxes(interactedBlock, blockPos, c.mPlayer.World())) == 0 {
+	if len(utils.BlockCollisions(interactedBlock, blockPos, c.mPlayer.World())) == 0 {
 		c.initalInteractionAccepted = true
 		return true
 	}
@@ -311,7 +311,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			continue
 		}
 
-		iBBs := utils.BlockBoxes(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World())
+		iBBs := utils.BlockCollisions(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World())
 		if len(iBBs) == 0 {
 			continue
 		}
