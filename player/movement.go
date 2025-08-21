@@ -224,6 +224,8 @@ type MovementComponent interface {
 	TrustFlyStatus() bool
 	// SetTrustFlyStatus sets whether the movement component can trust the fly status sent by the client.
 	SetTrustFlyStatus(bool)
+	// JustDisabledFlight returns true if the movement component just disabled flight.
+	JustDisabledFlight() bool
 
 	// Update updates the states of the movement component from the given input.
 	Update(input *packet.PlayerAuthInput)
