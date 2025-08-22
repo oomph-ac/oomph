@@ -94,7 +94,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.PlayerAuthInput:
 		if !p.movement.InputAcceptable() {
 			p.Popup("<red>input rate-limited (%d)</red>", p.SimulationFrame)
-			p.tryRunningClientCombat()
+			p.tryRunningClientCombat(pk)
 			ctx.Cancel()
 			return
 		}
@@ -115,7 +115,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 		p.handleBlockActions(pk)
 		p.handleMovement(pk)
-		p.tryRunningClientCombat()
+		p.tryRunningClientCombat(pk)
 
 		if !p.blockBreakInProgress {
 			// The client should not be able to hit any entities while breaking a block.
@@ -137,6 +137,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			p.inventory.SetHeldSlot(int32(dat.HotBarSlot))
 			if dat.ActionType == protocol.UseItemOnEntityActionAttack {
 				p.combat.Attack(pk)
+				p.clicks.HandleAttack(dat)
 				if p.opts.Combat.EnableClientEntityTracking {
 					snapshot := &cloudpacket.AttackSnapshot{}
 					if prevDat := p.clientCombat.LastAttack(); prevDat == nil {
@@ -165,6 +166,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+			p.Clicks().HandleRight(tr)
 			if tr.ActionType == protocol.UseItemActionClickAir {
 				// If the client is gliding and uses a firework, it predicts a boost on it's own side, although the entity may not exist on the server.
 				// This is very stange, as the gliding boost (in bedrock) is supplied by FireworksRocketActor::normalTick() which is similar to MC:JE logic.
@@ -183,28 +185,30 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 					p.lastUseProjectileTick = p.InputCount
 					inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 					inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
-				} /* else if c, ok := held.Item().(item.Consumable); ok {
-					if p.startUseConsumableTick == 0 {
-						p.startUseConsumableTick = p.InputCount
+				} else if c, ok := held.Item().(item.Consumable); ok {
+					if p.StartUseConsumableTick == 0 {
+						p.StartUseConsumableTick = p.InputCount
 						p.consumedSlot = int(tr.HotBarSlot)
 					} else {
-						duration := p.InputCount - p.startUseConsumableTick
+						duration := p.InputCount - p.StartUseConsumableTick
 						if duration < ((c.ConsumeDuration().Milliseconds() / 50) - 1) {
-							p.startUseConsumableTick = p.InputCount
+							p.StartUseConsumableTick = p.InputCount
 							ctx.Cancel()
 							p.inventory.ForceSync()
-							p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
+							//p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
 							//_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
-							//p.Popup("<red>Item consumption cooldown</red>")
+							p.Popup("<red>Item consumption cooldown</red>")
 							return
 						}
-						p.startUseConsumableTick = 0
+						p.StartUseConsumableTick = 0
 						p.consumedSlot = 0
 					}
-				} */
+				}
 			}
 		} else if tr, ok := pk.TransactionData.(*protocol.ReleaseItemTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
+			p.StartUseConsumableTick = 0
+			//p.Message("released item")
 		} else if _, ok := pk.TransactionData.(*protocol.NormalTransactionData); ok {
 			if len(pk.Actions) != 2 {
 				p.Log().Debug("drop action should have exactly 2 actions, got different amount", "actionCount", len(pk.Actions))
@@ -252,8 +256,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
 		p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
-		if p.startUseConsumableTick != 0 && p.consumedSlot != int(pk.HotBarSlot) {
-			p.startUseConsumableTick = 0
+		if p.StartUseConsumableTick != 0 && p.consumedSlot != int(pk.HotBarSlot) {
+			p.StartUseConsumableTick = 0
 			p.consumedSlot = 0
 		}
 	case *packet.Animate:
@@ -265,6 +269,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.LevelSoundEvent:
 		if pk.SoundType == packet.SoundEventAttackNoDamage {
 			p.Combat().Attack(nil)
+			p.Clicks().HandleSwing()
 		}
 	}
 	p.RunDetections(pk)

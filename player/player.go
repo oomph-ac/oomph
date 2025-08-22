@@ -125,8 +125,8 @@ type Player struct {
 
 	// lastUseProjectileTick is the last tick the player used a projectile item.
 	lastUseProjectileTick int64
-	// startUseConsumableTick is the tick that the player started using a consumable item.
-	startUseConsumableTick int64
+	// StartUseConsumableTick is the tick that the player started using a consumable item.
+	StartUseConsumableTick int64
 	// consumedSlot is the slot of the item that the player started consuming.
 	consumedSlot int
 
@@ -182,6 +182,9 @@ type Player struct {
 	combat CombatComponent
 	// clientCombat is the component that handles validating combat with the client-state entity tracker.
 	clientCombat CombatComponent
+
+	// clicks is the component that handles click actions from the player.
+	clicks ClicksComponent
 
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler

@@ -58,17 +58,18 @@ func (p *Player) ClientCombat() CombatComponent {
 	return p.clientCombat
 }
 
-func (p *Player) tryRunningClientCombat() {
-	if !p.opts.Combat.EnableClientEntityTracking {
-		return
+func (p *Player) tryRunningClientCombat(pk *packet.PlayerAuthInput) {
+	if pk.InputData.Load(packet.InputFlagMissedSwing) {
+		p.Clicks().HandleSwing()
 	}
-
-	p.clientEntTracker.Tick(p.ClientTick)
-	_ = p.clientCombat.Calculate()
+	p.Clicks().Tick()
+	if p.opts.Combat.EnableClientEntityTracking {
+		p.clientEntTracker.Tick(p.ClientTick)
+		_ = p.clientCombat.Calculate()
+	}
 	if p.cloudClient == nil {
 		return
 	}
-
 	for rID, e := range p.clientEntTracker.All() {
 		if e.Position != e.PrevPosition {
 			p.WriteToCloud(&cloudpacket.UpdateEntityPosition{

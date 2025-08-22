@@ -6,6 +6,7 @@ import "github.com/oomph-ac/oomph/player"
 func Register(p *player.Player) {
 	p.SetCombat(NewAuthoritativeCombatComponent(p, false))
 	p.SetClientCombat(NewAuthoritativeCombatComponent(p, true))
+	p.SetClicks(NewClicksComponent(p))
 	p.SetEntityTracker(NewEntityTrackerComponent(p, false))
 	p.SetClientEntityTracker(NewEntityTrackerComponent(p, true))
 	p.SetEffects(NewEffectsComponent())

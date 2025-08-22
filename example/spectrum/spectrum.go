@@ -71,7 +71,7 @@ func main() {
 	oconfig.Global.Movement.VelocityAcceptanceThreshold = 0.077
 
 	oconfig.Global.Movement.PersuasionThreshold = 0.002
-	oconfig.Global.Movement.CorrectionThreshold = 0.3
+	oconfig.Global.Movement.CorrectionThreshold = 0.003
 
 	oconfig.Global.Combat.MaximumAttackAngle = 90
 	oconfig.Global.Combat.EnableClientEntityTracking = true
@@ -157,9 +157,9 @@ func main() {
 			proc.Player().SetCloser(func() {
 				f.Close()
 			})
-			proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
+			/* proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
 				debug.PrintStack()
-			})
+			}) */
 			proc.Player().AddPerm(player.PermissionDebug)
 			proc.Player().AddPerm(player.PermissionAlerts)
 			proc.Player().AddPerm(player.PermissionLogs)

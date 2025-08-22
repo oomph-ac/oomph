@@ -104,6 +104,7 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 			return
 		}
 		c.uniqueAttackedEntities[data.TargetEntityRuntimeID] = e
+		c.checkMisprediction = false
 	}
 
 	// Do not try to allow another hit if the member player has already notified us of an attack this tick.
@@ -395,7 +396,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	for _, hook := range c.hooks {
 		hook(c)
 	}
-	return true
+	return !c.checkMisprediction || hitValid
 }
 
 func (c *AuthoritativeCombatComponent) Swing() {
