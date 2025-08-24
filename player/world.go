@@ -317,7 +317,7 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	} */
 
 	b := p.World().Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
-	if _, blockHash := b.Hash(); blockHash == math.MaxUint64 {
+	if hash1, hash2 := b.Hash(); hash1 == 0 && hash2 == math.MaxUint64 {
 		// If the block hash is MaxUint64, then the block is unknown to dragonfly. In the future,
 		// we should implement more blocks to avoid this condition allowing clients to break those
 		// blocks at any interval they please.
