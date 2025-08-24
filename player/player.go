@@ -89,6 +89,9 @@ type Player struct {
 	// cause desync due to the client's own interpolation.
 	PendingCorrectionACK bool
 
+	// IsHungry is a boolean indicating whether the player is hungry.
+	IsHungry bool
+
 	// GameMode is the gamemode of the player. The player is exempt from movement predictions
 	// if they are not in survival or adventure mode.
 	GameMode int32
