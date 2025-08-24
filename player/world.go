@@ -31,6 +31,8 @@ type WorldUpdaterComponent interface {
 	// ValidateInteraction validates if a player is allowed to perform an action on an interactable block.
 	ValidateInteraction(pk *packet.InventoryTransaction) bool
 
+	// SetServerChunkRadius sets the server chunk radius of the world updater component.
+	SetServerChunkRadius(radius int32)
 	// SetChunkRadius sets the chunk radius of the world updater component.
 	SetChunkRadius(radius int32)
 	// ChunkRadius returns the chunk radius of the world updater component.
