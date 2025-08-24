@@ -322,7 +322,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			scale,
 		))
 	case *packet.ChunkRadiusUpdated:
-		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
+		p.worldUpdater.SetServerChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventorySlot:
 		p.inventory.HandleInventorySlot(pk)
 	case *packet.InventoryContent:
