@@ -22,9 +22,11 @@ import (
 type WorldUpdaterComponent struct {
 	mPlayer *player.Player
 
+	chunkRadius       int32
+	serverChunkRadius int32
+
 	breakingBlockPos          *protocol.BlockPos
 	prevPlaceRequest          *protocol.UseItemTransactionData
-	chunkRadius               int32
 	initalInteractionAccepted bool
 }
 
@@ -334,8 +336,17 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	return true
 }
 
+// SetServerChunkRadius sets the server chunk radius of the world updater component.
+func (c *WorldUpdaterComponent) SetServerChunkRadius(radius int32) {
+	c.serverChunkRadius = radius
+	c.chunkRadius = radius
+}
+
 // SetChunkRadius sets the chunk radius of the world updater component.
 func (c *WorldUpdaterComponent) SetChunkRadius(radius int32) {
+	if radius > c.serverChunkRadius && c.serverChunkRadius != 0 {
+		radius = c.serverChunkRadius
+	}
 	c.chunkRadius = radius
 }
 
