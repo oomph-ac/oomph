@@ -119,11 +119,14 @@ func NewUpdateAttributesACK(p *player.Player, attributes []protocol.Attribute) *
 
 func (ack *UpdateAttributes) Run() {
 	for _, attribute := range ack.attributes {
-		if attribute.Name == "minecraft:movement" {
+		switch attribute.Name {
+		case "minecraft:movement":
 			ack.mPlayer.Movement().SetMovementSpeed(attribute.Value)
 			ack.mPlayer.Movement().SetDefaultMovementSpeed(attribute.Default)
-		} else if attribute.Name == "minecraft:health" {
+		case "minecraft:health":
 			ack.mPlayer.Alive = attribute.Value > 0
+		case "minecraft:player.hunger":
+			ack.mPlayer.IsHungry = attribute.Value < 20
 		}
 	}
 }
