@@ -325,8 +325,8 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	if _, isAir := b.(block.Air); isAir {
-		// Is it possible that the server already thinks the block is broken?
-		return 1_000_000_000
+		// Let the player send a break action for air, it won't affect anything in-game.
+		return 0
 	} else if utils.BlockName(b) == "minecraft:web" {
 		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
 		// Just return 1 and accept when the client does break the cobweb.
