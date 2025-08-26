@@ -15,8 +15,9 @@ const (
 	// This can be validated in Mob::ascendLadder()
 	ClimbSpeed = float32(0.2)
 
-	DefaultPlayerHeightOffset  = float32(1.62)
+	StandingPlayerHeightOffset = float32(1.62)
 	SneakingPlayerHeightOffset = float32(1.27)
+	SwimmingPlayerHeightOffset = float32(0.4)
 
 	JumpDelayTicks  = 10
 	GlideBoostTicks = 20

@@ -7,8 +7,8 @@ import (
 	"github.com/oomph-ac/oomph/player"
 )
 
-// tryGlide returns false if the player is not gliding.
-func (ctx *movementContext) tryGlide() bool {
+// attemptGlide returns false if the player is not gliding.
+func (ctx *movementContext) attemptGlide() bool {
 	movement := ctx.mPlayer.Movement()
 	if movement.Gliding() {
 		_, hasElytra := ctx.mPlayer.Inventory().Chestplate().Item().(item.Elytra)

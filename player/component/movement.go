@@ -3,6 +3,7 @@ package component
 import (
 	"fmt"
 
+	"github.com/df-mc/dragonfly/server/block"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
@@ -14,7 +15,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-var playerHeightOffset = mgl32.Vec3{0, game.DefaultPlayerHeightOffset}
+var playerHeightOffset = mgl32.Vec3{0, game.StandingPlayerHeightOffset}
 
 // NonAuthoritativeMovementInfo represents the velocity and position that the player has sent to the server but has not validated.
 type NonAuthoritativeMovement struct {
@@ -90,9 +91,15 @@ type AuthoritativeMovementComponent struct {
 	movementSpeed        float32
 	defaultMovementSpeed float32
 	airSpeed             float32
+	waterSpeed           float32
+	lavaSpeed            float32
 	serverUpdatedSpeed   bool
 
-	swimming bool
+	swimming         bool
+	wasTouchingWater bool
+	wasEyeInWater    bool
+	fluidHeights     [2]float32
+	fluidOnEyes      [2]bool
 
 	knockback    mgl32.Vec3
 	ticksSinceKb uint64
@@ -189,6 +196,16 @@ func (mc *AuthoritativeMovementComponent) Tick(elapsedTicks int64) {
 // Client returns the non-authoritative movement data sent to us from the client.
 func (mc *AuthoritativeMovementComponent) Client() player.NonAuthoritativeMovementInfo {
 	return mc.nonAuthoritative
+}
+
+// EyeHeight returns the height of the movement component's eyes.
+func (mc *AuthoritativeMovementComponent) EyeHeight() float32 {
+	if mc.swimming {
+		return game.SwimmingPlayerHeightOffset
+	} else if mc.sneaking {
+		return game.SneakingPlayerHeightOffset
+	}
+	return game.StandingPlayerHeightOffset
 }
 
 // Pos returns the position of the movement component.
@@ -546,6 +563,26 @@ func (mc *AuthoritativeMovementComponent) SetAirSpeed(newSpeed float32) {
 	mc.airSpeed = newSpeed
 }
 
+// WaterSpeed returns the movement speed of the movement component while in water.
+func (mc *AuthoritativeMovementComponent) WaterSpeed() float32 {
+	return mc.waterSpeed
+}
+
+// SetWaterSpeed sets the movement speed of the movement component while in water.
+func (mc *AuthoritativeMovementComponent) SetWaterSpeed(newSpeed float32) {
+	mc.waterSpeed = newSpeed
+}
+
+// LavaSpeed returns the movement speed of the movement component while in lava.
+func (mc *AuthoritativeMovementComponent) LavaSpeed() float32 {
+	return mc.lavaSpeed
+}
+
+// SetLavaSpeed sets the movement speed of the movement component while in lava.
+func (mc *AuthoritativeMovementComponent) SetLavaSpeed(newSpeed float32) {
+	mc.lavaSpeed = newSpeed
+}
+
 // XCollision returns true if the movement component is collided with a block
 // on the x-axis.
 func (mc *AuthoritativeMovementComponent) XCollision() bool {
@@ -662,6 +699,66 @@ func (mc *AuthoritativeMovementComponent) Swimming() bool {
 	return mc.swimming
 }
 
+// SetWasTouchingWater sets whether the movement component was touching water last frame.
+func (mc *AuthoritativeMovementComponent) SetWasTouchingWater(wasTouchingWater bool) {
+	mc.wasTouchingWater = wasTouchingWater
+}
+
+// WasTouchingWater returns true if the movement component was touching water last frame.
+func (mc *AuthoritativeMovementComponent) WasTouchingWater() bool {
+	return mc.wasTouchingWater
+}
+
+// SetWasEyeInWater sets whether the movement component was looking into water last frame.
+func (mc *AuthoritativeMovementComponent) SetWasEyeInWater(wasEyeInWater bool) {
+	mc.wasEyeInWater = wasEyeInWater
+}
+
+// WasEyeInWater returns true if the movement component was looking into water last frame.
+func (mc *AuthoritativeMovementComponent) WasEyeInWater() bool {
+	return mc.wasEyeInWater
+}
+
+// SetWaterHeight sets the water height of the movement component.
+func (mc *AuthoritativeMovementComponent) SetWaterHeight(waterHeight float32) {
+	mc.fluidHeights[0] = waterHeight
+}
+
+// WaterHeight returns the water height of the movement component.
+func (mc *AuthoritativeMovementComponent) WaterHeight() float32 {
+	return mc.fluidHeights[0]
+}
+
+// SetLavaHeight sets the lava height of the movement component.
+func (mc *AuthoritativeMovementComponent) SetLavaHeight(lavaHeight float32) {
+	mc.fluidHeights[1] = lavaHeight
+}
+
+// LavaHeight returns the lava height of the movement component.
+func (mc *AuthoritativeMovementComponent) LavaHeight() float32 {
+	return mc.fluidHeights[1]
+}
+
+// WaterOnEyes returns true if the movement component is looking into water.
+func (mc *AuthoritativeMovementComponent) WaterOnEyes() bool {
+	return mc.fluidOnEyes[0]
+}
+
+// SetWaterOnEyes sets whether the movement component is looking into water.
+func (mc *AuthoritativeMovementComponent) SetWaterOnEyes(waterOnEyes bool) {
+	mc.fluidOnEyes[0] = waterOnEyes
+}
+
+// LavaOnEyes returns true if the movement component is looking into lava.
+func (mc *AuthoritativeMovementComponent) LavaOnEyes() bool {
+	return mc.fluidOnEyes[1]
+}
+
+// SetLavaOnEyes sets whether the movement component is looking into lava.
+func (mc *AuthoritativeMovementComponent) SetLavaOnEyes(lavaOnEyes bool) {
+	mc.fluidOnEyes[1] = lavaOnEyes
+}
+
 // Update updates the states of the movement component from the given input.
 func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	//assert.IsTrue(mc.mPlayer != nil, "parent player is null")
@@ -768,15 +865,15 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.sneaking = pk.InputData.Load(packet.InputFlagSneakDown)
 	}
 
-	if mc.mPlayer.StartUseConsumableTick != 0 {
-		baseConsumeSpeed := float32(0.3)
-		if mc.sneaking {
-			baseConsumeSpeed *= 0.3
-		}
-		pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -baseConsumeSpeed, baseConsumeSpeed)
-		pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -baseConsumeSpeed, baseConsumeSpeed)
-		//mc.mPlayer.Message("consuming (curr=%d start=%d)", mc.mPlayer.InputCount, mc.mPlayer.StartUseConsumableTick)
+	baseMaxSpeed := float32(1.0)
+	if mc.sneaking {
+		baseMaxSpeed *= 0.3
 	}
+	if mc.mPlayer.StartUseConsumableTick != 0 {
+		baseMaxSpeed *= 0.3
+	}
+	pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -baseMaxSpeed, baseMaxSpeed)
+	pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -baseMaxSpeed, baseMaxSpeed)
 
 	mc.jumping = pk.InputData.Load(packet.InputFlagStartJumping)
 	mc.pressingJump = pk.InputData.Load(packet.InputFlagJumping)
@@ -798,6 +895,16 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.glideBoostTicks = 0
 	} else if pk.InputData.Load(packet.InputFlagStartGliding) {
 		mc.gliding = true
+	}
+
+	if pk.InputData.Load(packet.InputFlagStartSwimming) {
+		// TODO: account for vehicles - you cannot swim whilst in a vehicle
+		mc.swimming = mc.sprinting && mc.wasEyeInWater && utils.IsBlockTypeAt[block.Water](cube.PosFromVec3(mc.pos), mc.mPlayer.World())
+	} else if pk.InputData.Load(packet.InputFlagStopSwimming) {
+		mc.swimming = false
+	} else {
+		// TODO: account for vehicles - you cannot swim whilst in a vehicle
+		mc.swimming = mc.sprinting && mc.wasTouchingWater
 	}
 
 	mc.impulse = pk.MoveVector.Mul(0.98)

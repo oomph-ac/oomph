@@ -2,7 +2,6 @@ package movement
 
 import (
 	"github.com/chewxy/math32"
-	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
@@ -27,6 +26,10 @@ func Simulate(p *player.Player, movement player.MovementComponent) {
 
 	ctx := newCtx(p)
 	defer putCtx(ctx)
+
+	ctx.updateInWaterStateAndDoFluidPushing()
+	ctx.updateFluidOnEyes()
+	p.Message("waterHeight=%.4f, lavaHeight=%.4f wasTouchingWater=%t (%d)", movement.WaterHeight(), movement.LavaHeight(), movement.WasTouchingWater(), p.InputCount)
 
 	// ALWAYS simulate the teleport, as the client will always have the same behavior regardless of if the scenario
 	// is "unreliable", or if the player currently is in an unloaded chunk.
@@ -53,36 +56,17 @@ func Simulate(p *player.Player, movement player.MovementComponent) {
 
 	// Reset the velocity to zero if it's significantly small.
 	initVel := movement.Vel()
-	if math32.Abs(initVel[0]) < 1e-9 {
+	if math32.Abs(initVel[0]) < 1e-6 {
 		initVel[0] = 0
 	}
-	if math32.Abs(initVel[1]) < 1e-9 {
+	if math32.Abs(initVel[1]) < 1e-6 {
 		initVel[1] = 0
 	}
-	if math32.Abs(initVel[2]) < 1e-9 {
+	if math32.Abs(initVel[2]) < 1e-6 {
 		initVel[2] = 0
 	}
 	movement.SetVel(initVel)
-
-	if ctx.tryGlide() {
-		return
-	}
-	// TODO: This works for normal air/ground scenarios - but we need to impl water/lava as well.
-	ctx.searchBlockUnder()
-	ctx.updateFrictionAndSpeed()
-	ctx.applyKnockback()
-	ctx.jump()
-	ctx.moveRelative()
-	ctx.climb()
-	ctx.applyPreBlockSlowdown()
-	ctx.avoidEdge()
-	ctx.tryCollisions()
-	ctx.walkOnBlock()
-	// Search for the block underneath again so that we can use it for post-collision motion.
-	ctx.searchBlockUnder()
-	ctx.applyPostCollisions()
-	ctx.applyPostBlockSlowdown()
-	ctx.travelNormal()
+	ctx.travel()
 }
 
 func simulationIsReliable(p *player.Player, movement player.MovementComponent) bool {
@@ -91,12 +75,12 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 	}
 
 	for _, b := range utils.GetNearbyBlocks(movement.BoundingBox().Grow(1), false, true, p.World()) {
-		if _, isLiquid := b.Block.(world.Liquid); isLiquid {
+		/* if _, isLiquid := b.Block.(world.Liquid); isLiquid {
 			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(b.Position.Vec3())
 			if movement.BoundingBox().IntersectsWith(blockBB) {
 				return false
 			}
-		}
+		} */
 		if utils.BlockName(b.Block) == "minecraft:bamboo" {
 			return false
 		}

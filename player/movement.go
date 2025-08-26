@@ -21,6 +21,9 @@ type MovementComponent interface {
 	// Client returns the non-authoritative client movement sent to the server.
 	Client() NonAuthoritativeMovementInfo
 
+	// EyeHeight returns the height of the movement component's eyes.
+	EyeHeight() float32
+
 	// Pos returns the position of the movement component.
 	Pos() mgl32.Vec3
 	// LastPos returns the previous position of the movement component.
@@ -164,6 +167,14 @@ type MovementComponent interface {
 	DefaultMovementSpeed() float32
 	// SetDefaultMovementSpeed sets the movement speed the client should default to.
 	SetDefaultMovementSpeed(speed float32)
+	// WaterSpeed returns the movement speed of the movement component while in water.
+	WaterSpeed() float32
+	// SetWaterSpeed sets the movement speed of the movement component while in water.
+	SetWaterSpeed(speed float32)
+	// LavaSpeed returns the movement speed of the movement component while in lava.
+	LavaSpeed() float32
+	// SetLavaSpeed sets the movement speed of the movement component while in lava.
+	SetLavaSpeed(speed float32)
 
 	// AirSpeed returns the movement speed of the movement component while off ground.
 	AirSpeed() float32
@@ -229,6 +240,26 @@ type MovementComponent interface {
 	Swimming() bool
 	// SetSwimming sets whether the movement component is swimming.
 	SetSwimming(swimming bool)
+	// WasTouchingWater returns true if the movement component was touching water last frame.
+	WasTouchingWater() bool
+	// SetWasTouchingWater sets whether the movement component was touching water last frame.
+	SetWasTouchingWater(wasTouchingWater bool)
+	// WaterHeight returns the water height of the movement component.
+	WaterHeight() float32
+	// SetWaterHeight sets the water height of the movement component.
+	SetWaterHeight(waterHeight float32)
+	// LavaHeight returns the lava height of the movement component.
+	LavaHeight() float32
+	// SetLavaHeight sets the lava height of the movement component.
+	SetLavaHeight(lavaHeight float32)
+	// WaterOnEyes returns true if the movement component is looking into water.
+	WaterOnEyes() bool
+	// SetWaterOnEyes sets whether the movement component is looking into water.
+	SetWaterOnEyes(waterOnEyes bool)
+	// LavaOnEyes returns true if the movement component is looking into lava.
+	LavaOnEyes() bool
+	// SetLavaOnEyes sets whether the movement component is looking into lava.
+	SetLavaOnEyes(lavaOnEyes bool)
 
 	// Update updates the states of the movement component from the given input.
 	Update(input *packet.PlayerAuthInput)
@@ -366,5 +397,5 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 	// rubberbanding that is visible on the POVs of the other players if corrections are sent. This also implies the fact that
 	// other players will be unable to see if another client is using a cheat to modify their movement (e.g - fly). Of course, that is
 	// granted that the movement scenario is supported by Oomph.
-	pk.Position = finalPos.Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset + 0.001})
+	pk.Position = finalPos.Add(mgl32.Vec3{0, game.StandingPlayerHeightOffset + 0.001})
 }

@@ -115,8 +115,8 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 				c.startAttackPos[1] += game.SneakingPlayerHeightOffset
 				c.endAttackPos[1] += game.SneakingPlayerHeightOffset
 			} else {
-				c.startAttackPos[1] += game.DefaultPlayerHeightOffset
-				c.endAttackPos[1] += game.DefaultPlayerHeightOffset
+				c.startAttackPos[1] += game.StandingPlayerHeightOffset
+				c.endAttackPos[1] += game.StandingPlayerHeightOffset
 			}
 		}
 		return
@@ -154,8 +154,8 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		c.startAttackPos[1] += game.SneakingPlayerHeightOffset
 		c.endAttackPos[1] += game.SneakingPlayerHeightOffset
 	} else {
-		c.startAttackPos[1] += game.DefaultPlayerHeightOffset
-		c.endAttackPos[1] += game.DefaultPlayerHeightOffset
+		c.startAttackPos[1] += game.StandingPlayerHeightOffset
+		c.endAttackPos[1] += game.StandingPlayerHeightOffset
 	}
 	c.attackInput = input
 }

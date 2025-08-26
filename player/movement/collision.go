@@ -253,3 +253,8 @@ func (ctx *movementContext) landOnBlock() {
 	}
 	movement.SetVel(newVel)
 }
+
+func (ctx *movementContext) isFree(vel mgl32.Vec3) bool {
+	bb := ctx.mPlayer.Movement().BoundingBox().Translate(vel)
+	return len(utils.GetNearbyBBoxes(bb, ctx.mPlayer.World())) == 0
+}

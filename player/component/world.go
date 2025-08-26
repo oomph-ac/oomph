@@ -142,8 +142,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		prevPos[1] += game.SneakingPlayerHeightOffset
 		currPos[1] += game.SneakingPlayerHeightOffset
 	} else {
-		prevPos[1] += game.DefaultPlayerHeightOffset
-		currPos[1] += game.DefaultPlayerHeightOffset
+		prevPos[1] += game.StandingPlayerHeightOffset
+		currPos[1] += game.StandingPlayerHeightOffset
 	}
 
 	closestDistance := float32(math.MaxFloat32 - 1)
@@ -267,8 +267,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		prevPos[1] += game.SneakingPlayerHeightOffset
 		currPos[1] += game.SneakingPlayerHeightOffset
 	} else {
-		prevPos[1] += game.DefaultPlayerHeightOffset
-		currPos[1] += game.DefaultPlayerHeightOffset
+		prevPos[1] += game.StandingPlayerHeightOffset
+		currPos[1] += game.StandingPlayerHeightOffset
 	}
 	closestEyePos := game.ClosestPointInLineToPoint(prevPos, currPos, interactPos)
 

@@ -9,6 +9,7 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/world/blockmodel"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -217,6 +218,106 @@ func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
 		}
 	}
 	return bboxList
+}
+
+// IsBlockTypeAt returns true if the block at the given position is of the given type.
+func IsBlockTypeAt[T world.Block](pos [3]int, src world.BlockSource) bool {
+	b := src.Block(pos)
+	_, ok := b.(T)
+	return ok
+}
+
+// LiquidHeight returns the liquid height of the given block.
+func LiquidHeight(l world.Liquid, pos cube.Pos, src world.BlockSource) float32 {
+	if l2, ok := src.Block([3]int(pos.Side(cube.FaceUp))).(world.Liquid); ok && LiquidSameType(l, l2) {
+		return 1.0
+	}
+	const mul float32 = 1.0 / 9.0
+	return float32(l.LiquidDepth()) * mul
+}
+
+// LiquidFlow returns the flow vector of the given liquid.
+func LiquidFlow(liquid1 world.Liquid, pos cube.Pos, src world.BlockSource) mgl32.Vec3 {
+	var d0, d1 float32
+
+	l1Height := LiquidHeight(liquid1, pos, src)
+	for _, face := range cube.HorizontalFaces() {
+		sidePos := pos.Side(face)
+		sideBlock := src.Block([3]int(sidePos))
+		liquid2, ok := sideBlock.(world.Liquid)
+		if !ok || !LiquidSameType(liquid1, liquid2) {
+			continue
+		}
+
+		f, f1 := LiquidHeight(liquid2, sidePos, src), float32(0.0)
+		if f == 0.0 {
+			// TODO: Account for waterlogged blocks that "block" movement like cobwebs
+			belowPos := [3]int(sidePos.Side(cube.FaceDown))
+			belowl2 := src.Block(belowPos)
+			if liquid3, ok := belowl2.(world.Liquid); ok {
+				if LiquidSameType(liquid1, liquid3) {
+					f = LiquidHeight(liquid3, belowPos, src)
+					if f > 0.0 {
+						f1 = l1Height - f
+					}
+				}
+			}
+		} else if f > 0.0 {
+			f1 = l1Height - f
+		}
+
+		if f1 != 0.0 {
+			faceStep := cube.Pos{}.Side(face).Vec3()
+			d0 += faceStep[0] * f1
+			d1 += faceStep[2] * f1
+		}
+	}
+
+	flow := mgl32.Vec3{d0, 0.0, d1}
+	if liquid1.LiquidFalling() {
+		for _, face := range cube.HorizontalFaces() {
+			sidePos := pos.Side(face)
+			if LiquidHasSolidFace(liquid1, sidePos, face, src) || LiquidHasSolidFace(liquid1, sidePos.Side(cube.FaceUp), face, src) {
+				flow = flow.Normalize()
+				flow[1] -= 6.0
+			}
+		}
+	}
+
+	if flow.LenSqr() > 0 {
+		flow = flow.Normalize()
+	}
+	return flow
+}
+
+func LiquidSameType(l1, l2 world.Liquid) bool {
+	if _, ok := l1.(block.Water); ok {
+		_, ok2 := l2.(block.Water)
+		return ok2
+	} else if _, ok := l1.(block.Lava); ok {
+		_, ok2 := l2.(block.Lava)
+		return ok2
+	}
+	return false
+}
+
+func LiquidHasSolidFace(liquid world.Liquid, pos cube.Pos, face cube.Face, src world.BlockSource) bool {
+	block := src.Block([3]int(pos))
+	// Check if there's a liquid at this position
+	if liquidAtPos, ok := block.(world.Liquid); ok {
+		// If the liquid type is the same as the current liquid, return false
+		if LiquidSameType(liquid, liquidAtPos) {
+			return false
+		}
+	}
+	if face == cube.FaceUp {
+		return true
+	}
+	blockName := BlockName(block)
+	if blockName == "minecraft:ice" || blockName == "minecraft:packed_ice" || blockName == "minecraft:blue_ice" {
+		return false
+	}
+	return block.Model().FaceSolid([3]int(pos), df_cube.Face(face), src)
 }
 
 // BlockClimbable returns whether the given block is climbable.

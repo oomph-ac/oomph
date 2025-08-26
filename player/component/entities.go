@@ -52,7 +52,7 @@ func (c *EntityTrackerComponent) All() map[uint64]*entity.Entity {
 func (c *EntityTrackerComponent) MoveEntity(rid uint64, tick int64, pos mgl32.Vec3, teleport bool) {
 	if e, ok := c.entities[rid]; ok {
 		if e.IsPlayer {
-			pos[1] -= game.DefaultPlayerHeightOffset
+			pos[1] -= game.StandingPlayerHeightOffset
 		}
 		e.ReceivePosition(entity.HistoricalPosition{
 			Position:     pos,
