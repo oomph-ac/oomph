@@ -238,7 +238,9 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
-		p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
+		if pk.WindowID == protocol.WindowIDInventory {
+			p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
+		}
 		if p.StartUseConsumableTick != 0 && p.consumedSlot != int(pk.HotBarSlot) {
 			p.StartUseConsumableTick = 0
 			p.consumedSlot = 0
