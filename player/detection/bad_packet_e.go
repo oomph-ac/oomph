@@ -49,7 +49,7 @@ func (d *BadPacketE) Detect(pk packet.Packet) {
 	}
 
 	for index := range 2 {
-		if v := i.MoveVector[index]; v < -1 || v > 1 {
+		if v := i.MoveVector[index]; v < -1.001 || v > 1.001 {
 			d.mPlayer.FailDetection(d, nil)
 		}
 	}
