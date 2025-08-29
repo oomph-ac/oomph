@@ -40,6 +40,13 @@ type Acknowledgment interface {
 	Run()
 }
 
+// TickableAcknowledgment is an interface for acknowledgments that can be ticked whenever the player sends a PlayerAuthInput packet.
+// This is primarily used for expiring movement acknowledgments.
+type TickableAcknowledgment interface {
+	// Tick ticks the acknowledgment.
+	Tick()
+}
+
 func (p *Player) SetACKs(c AcknowledgmentComponent) {
 	p.acks = c
 }

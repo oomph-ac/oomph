@@ -1,7 +1,6 @@
 package component
 
 import (
-	"fmt"
 	"math/rand/v2"
 
 	"github.com/oomph-ac/oomph/game"
@@ -12,8 +11,7 @@ import (
 )
 
 const (
-	ACK_DIVIDER              = 1_000
-	MAX_ALLOWED_PENDING_ACKS = 1200 // ~ 60 seconds worth of pending ACKs
+	AckDivider = 1000
 )
 
 // ACKComponent is the component of the player that is responsible for sending and handling
@@ -34,7 +32,7 @@ func NewACKComponent(p *player.Player) *ACKComponent {
 		mPlayer:    p,
 
 		ticksSinceLastResponse: 0,
-		pending:                make([]*ackBatch, 0, MAX_ALLOWED_PENDING_ACKS),
+		pending:                make([]*ackBatch, 0, p.Opts().Network.MaxACKTimeout*20),
 	}
 	c.Refresh()
 
@@ -55,9 +53,9 @@ func (ackC *ACKComponent) Add(ack player.Acknowledgment) {
 func (ackC *ACKComponent) Execute(ackID int64) bool {
 	ackC.mPlayer.Dbg.Notify(player.DebugModeACKs, true, "got raw ACK ID %d", ackID)
 	if !ackC.legacyMode {
-		ackID /= ACK_DIVIDER
+		ackID /= AckDivider
 		if ackC.mPlayer.ClientDat.DeviceOS != protocol.DeviceOrbis {
-			ackID /= ACK_DIVIDER
+			ackID /= AckDivider
 		}
 	}
 
@@ -113,7 +111,7 @@ func (ackC *ACKComponent) Responsive() bool {
 	if len(ackC.pending) == 0 {
 		return true
 	}
-	return ackC.ticksSinceLastResponse <= MAX_ALLOWED_PENDING_ACKS
+	return ackC.ticksSinceLastResponse <= int64(ackC.mPlayer.Opts().Network.MaxACKTimeout)*20
 }
 
 // Legacy returns true if the acknowledgment component is using legacy mode.
@@ -130,6 +128,16 @@ func (ackC *ACKComponent) SetLegacy(legacy bool) {
 func (ackC *ACKComponent) Tick(client bool) {
 	if client {
 		ackC.clientTicked = true
+
+		// Tick all expiring tickable acknowledgments.
+		for _, batch := range ackC.pending {
+			for _, ack := range batch.acks {
+				if tickable, ok := ack.(player.TickableAcknowledgment); ok {
+					tickable.Tick()
+				}
+			}
+		}
+
 		return
 	}
 
@@ -143,7 +151,7 @@ func (ackC *ACKComponent) Tick(client bool) {
 	}
 
 	// Validate that there are no duplicate timestamps.
-	knownTimestamps := make(map[int64]struct{})
+	/* knownTimestamps := make(map[int64]struct{}, len(ackC.pending))
 	for _, batch := range ackC.pending {
 		_, exists := knownTimestamps[batch.timestamp]
 		knownTimestamps[batch.timestamp] = struct{}{}
@@ -154,7 +162,7 @@ func (ackC *ACKComponent) Tick(client bool) {
 			ackC.mPlayer.Disconnect(game.ErrorInternalDuplicateACK)
 			break
 		}
-	}
+	} */
 
 	// If the client hasn't sent us a PlayerAuthInput packet, we can assume that their client may be
 	// frozen. In this case, we don't increase the ticksSinceLastResponse counter.
@@ -181,7 +189,7 @@ func (ackC *ACKComponent) Flush() {
 
 	timestamp := ackC.currentBatch.timestamp
 	if ackC.legacyMode && ackC.mPlayer.ClientDat.DeviceOS == protocol.DeviceOrbis {
-		timestamp /= ACK_DIVIDER
+		timestamp /= AckDivider
 	}
 
 	ackC.mPlayer.SendPacketToClient(&packet.NetworkStackLatency{
@@ -211,7 +219,7 @@ func (ackC *ACKComponent) Refresh() {
 		ackC.SetTimestamp(int64(rand.Uint32()))
 		if ackC.legacyMode {
 			// On older versions of the game, timestamps in NetworkStackLatency were sent to the nearest thousand.
-			ackC.currentBatch.timestamp *= ACK_DIVIDER
+			ackC.currentBatch.timestamp *= AckDivider
 		}
 
 		unique := true
