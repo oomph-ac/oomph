@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cespare/xxhash/v2"
+	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -21,7 +23,7 @@ var (
 	scMu          sync.Mutex
 )
 
-func unsubC(hash xxh3.Uint128) {
+func unsubFromChunk(hash xxh3.Uint128) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
@@ -33,7 +35,7 @@ func unsubC(hash xxh3.Uint128) {
 	}
 }
 
-func unsubSC(hash xxh3.Uint128) {
+func unsubFromSubChunk(hash xxh3.Uint128) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
@@ -72,7 +74,7 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	return cachedSC, nil
 }
 
-func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
+func CacheChunk(input *packet.LevelChunk) (*CachedChunk, error) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
@@ -80,29 +82,45 @@ func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
 	if c, ok := chunkCache[hash]; ok {
 		c.subs.Add(1)
 		//fmt.Println("returning cached chunk", hash)
-		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true}, nil
+		return c, nil
 	}
 
 	dimension, ok := world.DimensionByID(int(input.Dimension))
 	if !ok {
-		return ChunkInfo{}, fmt.Errorf("unknown dimension %v", input.Dimension)
+		return nil, fmt.Errorf("unknown dimension %v", input.Dimension)
 	}
 
-	decodedChunk, err := chunk.NetworkDecode(
+	buf := bytes.NewBuffer(input.RawPayload)
+	decodedChunk, blobs, err := chunk.NetworkDecodeBuffer(
 		AirRuntimeID,
-		input.RawPayload,
+		buf,
 		int(input.SubChunkCount),
 		dimension.Range(),
 	)
 	if err != nil {
-		return ChunkInfo{}, err
+		return nil, err
 	}
 	decodedChunk.Compact()
 
-	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk}
+	cBlobs := make([]protocol.CacheBlob, len(blobs))
+	for index, blob := range blobs {
+		cBlobs[index] = protocol.CacheBlob{
+			Payload: blob,
+			Hash:    xxhash.Sum64(blob),
+		}
+	}
+
+	cachedChunk := &CachedChunk{
+		hash:   hash,
+		chunk:  decodedChunk,
+		blobs:  cBlobs,
+		footer: buf.Bytes(),
+	}
+	_, _ = buf.ReadByte()
+	cachedChunk.nbt = ChunkBlockEntities(decodedChunk, buf)
 	cachedChunk.subs.Add(1)
 	chunkCache[hash] = cachedChunk
-	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true}, nil
+	return cachedChunk, nil
 }
 
 type CachedSubChunk struct {
@@ -128,6 +146,11 @@ type CachedChunk struct {
 	hash  xxh3.Uint128
 	subs  atomic.Int64
 	chunk *chunk.Chunk
+
+	nbt map[df_cube.Pos]world.Block
+
+	blobs  []protocol.CacheBlob
+	footer []byte
 }
 
 // Chunk returns a dereferenced copy of the chunk stored.
@@ -141,4 +164,19 @@ func (cc *CachedChunk) Hash() xxh3.Uint128 {
 
 func (cc *CachedChunk) Block(x uint8, y int16, z uint8, layer uint8) (rid uint32) {
 	return cc.chunk.Block(x, y, z, layer)
+}
+
+func (cc *CachedChunk) BlockNBT(pos df_cube.Pos) (world.Block, bool) {
+	if b, ok := cc.nbt[pos]; ok {
+		return b, true
+	}
+	return nil, false
+}
+
+func (cc *CachedChunk) Blobs() []protocol.CacheBlob {
+	return cc.blobs
+}
+
+func (cc *CachedChunk) Footer() []byte {
+	return cc.footer
 }

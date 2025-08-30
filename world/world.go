@@ -163,11 +163,11 @@ func (w *World) PurgeChunks() {
 
 func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
 	if info.Cached {
-		unsubC(info.Hash)
+		unsubFromChunk(info.Hash)
 	}
 	if subChunks, ok := w.subChunks[chunkPos]; ok {
 		for _, subChunkHash := range subChunks {
-			unsubSC(subChunkHash)
+			unsubFromSubChunk(subChunkHash)
 		}
 	}
 	delete(w.subChunks, chunkPos)
