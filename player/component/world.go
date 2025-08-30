@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"sync"
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
@@ -26,6 +27,11 @@ import (
 
 const (
 	MaxAllowedPendingBlobs = 4096
+)
+
+var (
+	legacyAirIDs = make(map[int32]uint32)
+	legacyMu     sync.RWMutex
 )
 
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
@@ -163,10 +169,22 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 	chunkBlobs := cachedChunk.Blobs()
 	chunkFooter := cachedChunk.Footer()
 
+	if !c.mPlayer.IsVersion(protocol.CurrentProtocol) {
+		legacyBlobs, legacyFooter, ok := cachedChunk.LegacyData(c.mPlayer.Version)
+		if !ok {
+			legacyBlobs, legacyFooter, ok = c.updateAndSetLegacyData(pk, cachedChunk)
+			if !ok {
+				return
+			}
+		}
+		chunkBlobs = legacyBlobs
+		chunkFooter = legacyFooter
+	}
+
 	c.mPlayer.WithPacketCtx(func(ctx *context.HandlePacketContext) {
 		ctx.Cancel()
 	})
-	newChunkPk := &packet.LevelChunk{
+	newChunkPk := &CustomLevelChunk{
 		Position:      pk.Position,
 		Dimension:     pk.Dimension,
 		SubChunkCount: uint32(len(chunkBlobs)) - 1,
@@ -547,13 +565,99 @@ func (c *WorldUpdaterComponent) addPendingBlob(hash uint64, data []byte) bool {
 	if len(c.pendingBlobs) >= MaxAllowedPendingBlobs {
 		return false
 	}
-	c.pendingBlobs[hash] = data
+	if _, ok := c.pendingBlobs[hash]; !ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "adding pending blob: %d", hash)
+		c.pendingBlobs[hash] = data
+	}
 	return true
 }
 
 func (c *WorldUpdaterComponent) removePendingBlob(hash uint64) {
 	// TODO: Implement multi-version support for blobs.
-	delete(c.pendingBlobs, hash)
+	if _, ok := c.pendingBlobs[hash]; ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "removing pending blob: %d", hash)
+		delete(c.pendingBlobs, hash)
+	}
+}
+
+func (c *WorldUpdaterComponent) updateAndSetLegacyData(chunkPk *packet.LevelChunk, cachedChunk *world.CachedChunk) ([]protocol.CacheBlob, []byte, bool) {
+	legacyMu.RLock()
+	legacyAirRID, ok := legacyAirIDs[c.mPlayer.Version]
+	legacyMu.RUnlock()
+
+	if !ok {
+		blockPk := &packet.UpdateBlock{NewBlockRuntimeID: world.AirRuntimeID}
+		downgraded := c.mPlayer.Conn().Proto().ConvertFromLatest(blockPk, c.mPlayer.Conn())
+		if len(downgraded) != 1 {
+			c.mPlayer.Log().Debug("unable to set legacy - too many packets returned from MV", "expected", 1, "got", len(downgraded))
+			return nil, nil, false
+		}
+		updateBlock, ok := downgraded[0].(*packet.UpdateBlock)
+		if !ok {
+			c.mPlayer.Log().Debug("unable to set legacy - packet is not a UpdateBlock", "packet", downgraded[0])
+			return nil, nil, false
+		}
+		legacyAirRID = updateBlock.NewBlockRuntimeID
+		legacyMu.Lock()
+		legacyAirIDs[c.mPlayer.Version] = legacyAirRID
+		legacyMu.Unlock()
+	}
+
+	downgraded := c.mPlayer.Conn().Proto().ConvertFromLatest(chunkPk, c.mPlayer.Conn())
+	if len(downgraded) != 1 {
+		c.mPlayer.Log().Debug("unable to set legacy - too many packets returned from MV", "expected", 1, "got", len(downgraded))
+		return nil, nil, false
+	}
+	legacyChunkPk, ok := downgraded[0].(*packet.LevelChunk)
+	if !ok {
+		c.mPlayer.Log().Debug("unable to set legacy - packet is not a LevelChunk", "packet", downgraded[0])
+		return nil, nil, false
+	}
+
+	dimension, ok := df_world.DimensionByID(int(legacyChunkPk.Dimension))
+	if !ok {
+		dimension = df_world.Overworld
+	}
+	blobs, footer, err := world.FetchChunkFooterAndBlobs(
+		legacyChunkPk.RawPayload,
+		legacyAirRID,
+		int(legacyChunkPk.SubChunkCount),
+		dimension,
+	)
+	if err != nil {
+		c.mPlayer.Log().Debug("unable to set legacy - error fetching chunk footer and blobs", "error", err)
+		return nil, nil, false
+	}
+	cachedChunk.SetLegacyData(c.mPlayer.Version, blobs, footer)
+	return blobs, footer, true
+}
+
+type CustomLevelChunk struct {
+	Position        protocol.ChunkPos
+	Dimension       int32
+	HighestSubChunk uint16
+	SubChunkCount   uint32
+	CacheEnabled    bool
+	BlobHashes      []uint64
+	RawPayload      []byte
+}
+
+func (pk *CustomLevelChunk) ID() uint32 {
+	return packet.IDLevelChunk
+}
+
+func (pk *CustomLevelChunk) Marshal(io protocol.IO) {
+	io.ChunkPos(&pk.Position)
+	io.Varint32(&pk.Dimension)
+	io.Varuint32(&pk.SubChunkCount)
+	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited {
+		io.Uint16(&pk.HighestSubChunk)
+	}
+	io.Bool(&pk.CacheEnabled)
+	if pk.CacheEnabled {
+		protocol.FuncSlice(io, &pk.BlobHashes, io.Uint64)
+	}
+	io.ByteSlice(&pk.RawPayload)
 }
 
 // CustomClientCacheMissResponse is a wrapper for the ClientCacheMissResponse packet with the sole intent of being able to

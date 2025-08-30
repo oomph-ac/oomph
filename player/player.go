@@ -275,7 +275,7 @@ func (p *Player) SetRemoteEventFunc(f func(e RemoteEvent, p *Player)) {
 }
 
 func (p *Player) WithPacketCtx(f func(*context.HandlePacketContext)) {
-	if p.pkCtx == nil {
+	if p.pkCtx != nil {
 		f(p.pkCtx)
 	}
 }

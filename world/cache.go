@@ -115,6 +115,9 @@ func CacheChunk(input *packet.LevelChunk) (*CachedChunk, error) {
 		chunk:  decodedChunk,
 		blobs:  cBlobs,
 		footer: buf.Bytes(),
+
+		legacyBlobs:   make(map[int32][]protocol.CacheBlob),
+		legacyFooters: make(map[int32][]byte),
 	}
 	_, _ = buf.ReadByte()
 	cachedChunk.nbt = ChunkBlockEntities(decodedChunk, buf)
@@ -151,6 +154,10 @@ type CachedChunk struct {
 
 	blobs  []protocol.CacheBlob
 	footer []byte
+
+	legacyBlobs   map[int32][]protocol.CacheBlob
+	legacyFooters map[int32][]byte
+	legacyMu      sync.RWMutex
 }
 
 // Chunk returns a dereferenced copy of the chunk stored.
@@ -179,4 +186,21 @@ func (cc *CachedChunk) Blobs() []protocol.CacheBlob {
 
 func (cc *CachedChunk) Footer() []byte {
 	return cc.footer
+}
+
+func (cc *CachedChunk) LegacyData(version int32) ([]protocol.CacheBlob, []byte, bool) {
+	cc.legacyMu.RLock()
+	defer cc.legacyMu.RUnlock()
+
+	blobs, ok1 := cc.legacyBlobs[version]
+	footer, ok2 := cc.legacyFooters[version]
+	return blobs, footer, ok1 && ok2
+}
+
+func (cc *CachedChunk) SetLegacyData(version int32, blobs []protocol.CacheBlob, footer []byte) {
+	cc.legacyMu.Lock()
+	defer cc.legacyMu.Unlock()
+
+	cc.legacyBlobs[version] = blobs
+	cc.legacyFooters[version] = footer
 }
