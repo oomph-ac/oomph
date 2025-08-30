@@ -75,7 +75,17 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 
 	// TODO: Add a block policy to allow servers to determine whether block updates should be lag-compensated or if movement should
 	// use the latest world state instantly.
-	c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+	networkOpts := c.mPlayer.Opts().Network
+	timeout := int64(networkOpts.MaxBlockUpdateDelay)
+	if timeout < 0 {
+		timeout = 1_000_000_000
+	}
+	blockAck := acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b, timeout)
+	if cutoff := networkOpts.GlobalMovementCutoffThreshold; cutoff >= 0 && c.mPlayer.ServerTick-c.mPlayer.ClientTick >= int64(cutoff) {
+		blockAck.Run()
+	} else {
+		c.mPlayer.ACKs().Add(blockAck)
+	}
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -83,6 +93,14 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 	if !c.mPlayer.Ready {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
+
+	networkOpts := c.mPlayer.Opts().Network
+	blockAckTimeout := int64(networkOpts.MaxBlockUpdateDelay)
+	if blockAckTimeout < 0 {
+		blockAckTimeout = 1_000_000_000
+	}
+	cutoff := networkOpts.GlobalMovementCutoffThreshold
+	useLagComp := cutoff >= 0 && c.mPlayer.ServerTick-c.mPlayer.ClientTick >= int64(cutoff)
 
 	// TODO: Does the sub-chunk position sent in this packet even matter?
 	for _, entry := range pk.Blocks {
@@ -92,7 +110,12 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
 			b = block.Air{}
 		}
-		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+		blockAck := acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b, blockAckTimeout)
+		if useLagComp {
+			blockAck.Run()
+		} else {
+			c.mPlayer.ACKs().Add(blockAck)
+		}
 	}
 	for _, entry := range pk.Extra {
 		pos := df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}
@@ -101,7 +124,12 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
 			b = block.Air{}
 		}
-		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+		blockAck := acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b, blockAckTimeout)
+		if useLagComp {
+			blockAck.Run()
+		} else {
+			c.mPlayer.ACKs().Add(blockAck)
+		}
 	}
 }
 
