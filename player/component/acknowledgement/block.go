@@ -15,11 +15,12 @@ type UpdateBlock struct {
 	b       world.Block
 	pos     df_cube.Pos
 
-	valid bool
+	expiresIn int64
+	valid     bool
 }
 
-func NewUpdateBlockACK(p *player.Player, pos df_cube.Pos, b world.Block) *UpdateBlock {
-	return &UpdateBlock{mPlayer: p, pos: pos, b: b, valid: true}
+func NewUpdateBlockACK(p *player.Player, pos df_cube.Pos, b world.Block, expiresIn int64) *UpdateBlock {
+	return &UpdateBlock{mPlayer: p, pos: pos, b: b, valid: true, expiresIn: expiresIn}
 }
 
 func (ack *UpdateBlock) Run() {
@@ -27,6 +28,18 @@ func (ack *UpdateBlock) Run() {
 		return
 	}
 	ack.mPlayer.World().SetBlock(ack.pos, ack.b, nil)
+	ack.valid = false
+}
+
+func (ack *UpdateBlock) Tick() {
+	if !ack.valid {
+		return
+	}
+	ack.expiresIn--
+	if ack.expiresIn <= 0 {
+		ack.mPlayer.Dbg.Notify(player.DebugModeLatency, true, "updateBlock ack for %T at %v lag-compensation expired", ack.b, ack.pos)
+		ack.Run()
+	}
 }
 
 func (ack *UpdateBlock) Invalidate() {
