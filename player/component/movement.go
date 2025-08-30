@@ -877,7 +877,17 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 	case *packet.SetActorData:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateActorData(mc.mPlayer, pk.EntityMetadata))
 	case *packet.SetActorMotion:
-		mc.mPlayer.ACKs().Add(acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity))
+		networkOpts := mc.mPlayer.Opts().Network
+		kbTimeout := int64(networkOpts.MaxKnockbackDelay)
+		if kbTimeout < 0 {
+			kbTimeout = 1_000_000_000
+		}
+		kbAck := acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity, kbTimeout)
+		if cutoff := networkOpts.GlobalMovementCutoffThreshold; cutoff >= 0 && mc.mPlayer.ServerTick-mc.mPlayer.ClientTick >= int64(cutoff) {
+			kbAck.Run()
+		} else {
+			mc.mPlayer.ACKs().Add(kbAck)
+		}
 	case *packet.UpdateAbilities:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateAbilitiesACK(mc.mPlayer, pk.AbilityData))
 	case *packet.UpdateAttributes:

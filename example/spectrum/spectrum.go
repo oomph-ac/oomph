@@ -75,7 +75,11 @@ func main() {
 
 	oconfig.Global.Combat.MaximumAttackAngle = 90
 	oconfig.Global.Combat.EnableClientEntityTracking = true
-	oconfig.Global.Combat.MaxRewind = 6
+
+	oconfig.Global.Network.GlobalMovementCutoffThreshold = 6
+	oconfig.Global.Network.MaxEntityRewind = 6
+	oconfig.Global.Network.MaxKnockbackDelay = -1
+	oconfig.Global.Network.MaxBlockUpdateDelay = -1
 
 	/* packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
 	if err != nil {
@@ -157,9 +161,9 @@ func main() {
 			proc.Player().SetCloser(func() {
 				f.Close()
 			})
-			/* proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
-				debug.PrintStack()
-			}) */
+			proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
+				panic(err)
+			})
 			proc.Player().AddPerm(player.PermissionDebug)
 			proc.Player().AddPerm(player.PermissionAlerts)
 			proc.Player().AddPerm(player.PermissionLogs)
