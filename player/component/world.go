@@ -1,22 +1,37 @@
 package component
 
 import (
+	"fmt"
 	"math"
+	"sync"
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/internal"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
+	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/utils"
+	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+)
+
+const (
+	MaxAllowedPendingBlobs = 4096
+)
+
+var (
+	legacyAirIDs = make(map[int32]uint32)
+	legacyMu     sync.RWMutex
 )
 
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
@@ -30,12 +45,15 @@ type WorldUpdaterComponent struct {
 	prevPlaceRequest *protocol.UseItemTransactionData
 
 	initalInteractionAccepted bool
+
+	pendingBlobs map[uint64][]byte
 }
 
 func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 	return &WorldUpdaterComponent{
-		mPlayer:     p,
-		chunkRadius: 1_000_000_000,
+		mPlayer:      p,
+		chunkRadius:  1_000_000_000,
+		pendingBlobs: make(map[uint64][]byte, MaxAllowedPendingBlobs),
 	}
 }
 
@@ -48,7 +66,69 @@ func (c *WorldUpdaterComponent) HandleSubChunk(pk *packet.SubChunk) {
 	if !c.mPlayer.Ready {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
-	acknowledgement.NewSubChunkUpdateACK(c.mPlayer, pk).Run()
+
+	if pk.CacheEnabled {
+		c.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
+		return
+	}
+
+	dimension, ok := df_world.DimensionByID(int(pk.Dimension))
+	if !ok {
+		dimension = df_world.Overworld
+	}
+
+	buf := internal.NewChunkBuf()
+	defer internal.PutChunkBuf(buf)
+	var bufUsed bool
+
+	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)
+	for _, entry := range pk.SubChunkEntries {
+		chunkPos := protocol.ChunkPos{
+			pk.Position[0] + int32(entry.Offset[0]),
+			pk.Position[2] + int32(entry.Offset[2]),
+		}
+		var ch *chunk.Chunk
+		if new, ok := newChunks[chunkPos]; ok {
+			ch = new
+			c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "reusing chunk in map %v", chunkPos)
+		} else if existing := c.mPlayer.World().GetChunk(chunkPos); existing != nil {
+			// We assume that the existing chunk is not cached because the cache does not support SubChunks for the time being.
+			ch = existing
+			c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "using existing chunk %v", chunkPos)
+		} else {
+			ch = chunk.New(world.AirRuntimeID, dimension.Range())
+			newChunks[chunkPos] = ch
+			c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "new chunk at %v", chunkPos)
+		}
+
+		switch entry.Result {
+		case protocol.SubChunkResultSuccess:
+			if bufUsed {
+				buf.Reset()
+			}
+			bufUsed = true
+			buf.Write(entry.RawPayload)
+
+			cachedSub, err := world.CacheSubChunk(buf, ch, chunkPos)
+			if err != nil {
+				c.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+				continue
+			}
+			ch.Sub()[cachedSub.Layer()] = cachedSub.SubChunk()
+			c.mPlayer.World().AddSubChunk(chunkPos, cachedSub.Hash())
+			c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "cached subchunk %d at %v", cachedSub.Layer(), chunkPos)
+		case protocol.SubChunkResultSuccessAllAir:
+			c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all-air chunk at %v", chunkPos)
+		default:
+			c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "no subchunk data for %v (result=%d)", chunkPos, entry.Result)
+			continue
+		}
+	}
+
+	for pos, newChunk := range newChunks {
+		c.mPlayer.World().AddChunk(pos, world.ChunkInfo{Chunk: newChunk, Cached: false})
+		c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "(sub) added chunk at %v", pos)
+	}
 }
 
 // HandleLevelChunk handles a LevelChunk packet from the server.
@@ -62,7 +142,66 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 		//c.mPlayer.Log().Debug("cannot debug chunk due to subchunk request mode unsupported", "subChunkCount", pk.SubChunkCount)
 		return
 	}
-	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
+	//acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
+
+	// Oomph should be responsible for distributing blobs to the client - not the server.
+	if pk.CacheEnabled {
+		c.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
+		return
+	}
+	cachedChunk, err := world.CacheChunk(pk)
+	if err != nil {
+		c.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
+		return
+	}
+	c.mPlayer.World().AddChunk(pk.Position, world.ChunkInfo{
+		Cached: true,
+		Hash:   cachedChunk.Hash(),
+		Chunk:  cachedChunk.Chunk(),
+	})
+	c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "added chunk at %v", pk.Position)
+
+	// Check first if the client supports the chunk cache - if not, we don't need to do anything.
+	// We also check that the chunk being sent isn't an empty air chunk (sent by spectrum? idk what it's coming from)
+	if !c.mPlayer.UseChunkCache() || (cachedChunk.Hash().Hi == 15870946467309531877 && cachedChunk.Hash().Lo == 14339477491833271119) {
+		//fmt.Printf("not caching chunk at %v\n", pk.Position)
+		return
+	}
+
+	chunkBlobs := cachedChunk.Blobs()
+	chunkFooter := cachedChunk.Footer()
+
+	if !c.mPlayer.IsVersion(protocol.CurrentProtocol) {
+		legacyBlobs, legacyFooter, ok := cachedChunk.LegacyData(c.mPlayer.Version)
+		if !ok {
+			legacyBlobs, legacyFooter, ok = c.updateAndSetLegacyData(pk, cachedChunk)
+			if !ok {
+				return
+			}
+		}
+		chunkBlobs = legacyBlobs
+		chunkFooter = legacyFooter
+	}
+
+	c.mPlayer.WithPacketCtx(func(ctx *context.HandlePacketContext) {
+		ctx.Cancel()
+	})
+	newChunkPk := &CustomLevelChunk{
+		Position:      pk.Position,
+		Dimension:     pk.Dimension,
+		SubChunkCount: uint32(len(chunkBlobs)) - 1,
+		CacheEnabled:  true,
+		RawPayload:    chunkFooter,
+		BlobHashes:    make([]uint64, 0, len(chunkBlobs)),
+	}
+	for _, blob := range chunkBlobs {
+		newChunkPk.BlobHashes = append(newChunkPk.BlobHashes, blob.Hash)
+		if !c.addPendingBlob(blob.Hash, blob.Payload) {
+			c.mPlayer.Disconnect(game.ErrorTooManyChunkBlobsPending)
+			return
+		}
+	}
+	c.mPlayer.SendPacketToClient(newChunkPk)
 }
 
 // HandleUpdateBlock handles an UpdateBlock packet from the server.
@@ -136,6 +275,31 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 		} else {
 			c.mPlayer.ACKs().Add(blockAck)
 		}
+	}
+}
+
+func (c *WorldUpdaterComponent) HandleClientBlobStatus(pk *packet.ClientCacheBlobStatus) {
+	for _, blob := range pk.HitHashes {
+		//fmt.Printf("hit blob: %d\n", blob)
+		c.removePendingBlob(blob)
+	}
+
+	resp := &CustomClientCacheMissResponse{Blobs: make([]protocol.CacheBlob, 0, len(pk.MissHashes))}
+	for _, blobHash := range pk.MissHashes {
+		//fmt.Printf("missed blob: %d\n", blobHash)
+		blob, ok := c.pendingBlobs[blobHash]
+		if !ok {
+			//c.mPlayer.Log().Debug("unable to find pending blob", "hash", blobHash)
+			continue
+		}
+		resp.Blobs = append(resp.Blobs, protocol.CacheBlob{
+			Hash:    blobHash,
+			Payload: blob,
+		})
+		//fmt.Printf("sent blob: %d\n", blobHash)
+	}
+	if len(resp.Blobs) > 0 {
+		c.mPlayer.SendPacketToClient(resp)
 	}
 }
 
@@ -431,4 +595,119 @@ func (c *WorldUpdaterComponent) SetBlockBreakPos(pos *protocol.BlockPos) {
 // BlockBreakPos returns the block breaking pos of the world updater component.
 func (c *WorldUpdaterComponent) BlockBreakPos() *protocol.BlockPos {
 	return c.breakingBlockPos
+}
+
+func (c *WorldUpdaterComponent) addPendingBlob(hash uint64, data []byte) bool {
+	if len(c.pendingBlobs) >= MaxAllowedPendingBlobs {
+		return false
+	}
+	if _, ok := c.pendingBlobs[hash]; !ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "adding pending blob: %d", hash)
+		c.pendingBlobs[hash] = data
+	}
+	return true
+}
+
+func (c *WorldUpdaterComponent) removePendingBlob(hash uint64) {
+	// TODO: Implement multi-version support for blobs.
+	if _, ok := c.pendingBlobs[hash]; ok {
+		c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "removing pending blob: %d", hash)
+		delete(c.pendingBlobs, hash)
+	}
+}
+
+func (c *WorldUpdaterComponent) updateAndSetLegacyData(chunkPk *packet.LevelChunk, cachedChunk *world.CachedChunk) ([]protocol.CacheBlob, []byte, bool) {
+	legacyMu.RLock()
+	legacyAirRID, ok := legacyAirIDs[c.mPlayer.Version]
+	legacyMu.RUnlock()
+
+	if !ok {
+		blockPk := &packet.UpdateBlock{NewBlockRuntimeID: world.AirRuntimeID}
+		downgraded := c.mPlayer.Conn().Proto().ConvertFromLatest(blockPk, c.mPlayer.Conn())
+		if len(downgraded) != 1 {
+			c.mPlayer.Log().Debug("unable to set legacy - too many packets returned from MV", "expected", 1, "got", len(downgraded))
+			return nil, nil, false
+		}
+		updateBlock, ok := downgraded[0].(*packet.UpdateBlock)
+		if !ok {
+			c.mPlayer.Log().Debug("unable to set legacy - packet is not a UpdateBlock", "packet", downgraded[0])
+			return nil, nil, false
+		}
+		legacyAirRID = updateBlock.NewBlockRuntimeID
+		legacyMu.Lock()
+		legacyAirIDs[c.mPlayer.Version] = legacyAirRID
+		legacyMu.Unlock()
+	}
+
+	downgraded := c.mPlayer.Conn().Proto().ConvertFromLatest(chunkPk, c.mPlayer.Conn())
+	if len(downgraded) != 1 {
+		c.mPlayer.Log().Debug("unable to set legacy - too many packets returned from MV", "expected", 1, "got", len(downgraded))
+		return nil, nil, false
+	}
+	legacyChunkPk, ok := downgraded[0].(*packet.LevelChunk)
+	if !ok {
+		c.mPlayer.Log().Debug("unable to set legacy - packet is not a LevelChunk", "packet", downgraded[0])
+		return nil, nil, false
+	}
+
+	dimension, ok := df_world.DimensionByID(int(legacyChunkPk.Dimension))
+	if !ok {
+		dimension = df_world.Overworld
+	}
+	blobs, footer, err := world.FetchChunkFooterAndBlobs(
+		legacyChunkPk.RawPayload,
+		legacyAirRID,
+		int(legacyChunkPk.SubChunkCount),
+		dimension,
+	)
+	if err != nil {
+		c.mPlayer.Log().Debug("unable to set legacy - error fetching chunk footer and blobs", "error", err)
+		return nil, nil, false
+	}
+	cachedChunk.SetLegacyData(c.mPlayer.Version, blobs, footer)
+	return blobs, footer, true
+}
+
+type CustomLevelChunk struct {
+	Position        protocol.ChunkPos
+	Dimension       int32
+	HighestSubChunk uint16
+	SubChunkCount   uint32
+	CacheEnabled    bool
+	BlobHashes      []uint64
+	RawPayload      []byte
+}
+
+func (pk *CustomLevelChunk) ID() uint32 {
+	return packet.IDLevelChunk
+}
+
+func (pk *CustomLevelChunk) Marshal(io protocol.IO) {
+	io.ChunkPos(&pk.Position)
+	io.Varint32(&pk.Dimension)
+	io.Varuint32(&pk.SubChunkCount)
+	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited {
+		io.Uint16(&pk.HighestSubChunk)
+	}
+	io.Bool(&pk.CacheEnabled)
+	if pk.CacheEnabled {
+		protocol.FuncSlice(io, &pk.BlobHashes, io.Uint64)
+	}
+	io.ByteSlice(&pk.RawPayload)
+}
+
+// CustomClientCacheMissResponse is a wrapper for the ClientCacheMissResponse packet with the sole intent of being able to
+// bypass downgrading from multi-version libraries.
+type CustomClientCacheMissResponse struct {
+	// Blobs is a list of all blobs that the client sent misses for in the ClientCacheBlobStatus. These blobs
+	// hold the data of the blobs with the hashes they are matched with.
+	Blobs []protocol.CacheBlob
+}
+
+func (pk *CustomClientCacheMissResponse) ID() uint32 {
+	return packet.IDClientCacheMissResponse
+}
+
+func (pk *CustomClientCacheMissResponse) Marshal(io protocol.IO) {
+	protocol.Slice(io, &pk.Blobs)
 }

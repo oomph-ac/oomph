@@ -122,3 +122,11 @@ func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) 
 	p.GameMode = data.PlayerGameMode
 	return p.conn.StartGameContext(ctx, data)
 }
+
+func (p *Player) UseChunkCache() bool {
+	clientSupportsCache := false
+	if conn := p.conn; conn != nil {
+		clientSupportsCache = conn.ClientCacheEnabled()
+	}
+	return clientSupportsCache && p.opts.Network.UpgradeChunksToBlobs
+}

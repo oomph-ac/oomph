@@ -80,6 +80,7 @@ func main() {
 	oconfig.Global.Network.MaxEntityRewind = 6
 	oconfig.Global.Network.MaxKnockbackDelay = -1
 	oconfig.Global.Network.MaxBlockUpdateDelay = -1
+	oconfig.Global.Network.UpgradeChunksToBlobs = true
 
 	/* packs, err := utils.ResourcePacks("/home/ethaniccc/temp/proxy-packs", "content_keys.json")
 	if err != nil {
@@ -162,7 +163,8 @@ func main() {
 				f.Close()
 			})
 			proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
-				panic(err)
+				debug.PrintStack()
+				os.Exit(1)
 			})
 			proc.Player().AddPerm(player.PermissionDebug)
 			proc.Player().AddPerm(player.PermissionAlerts)

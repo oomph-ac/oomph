@@ -31,6 +31,7 @@ var ClientDecode = []uint32{
 	packet.IDClientMovementPredictionSync,
 	packet.IDPlayerAction,
 	packet.IDCommandRequest,
+	packet.IDClientCacheBlobStatus,
 }
 
 var ServerDecode = []uint32{
@@ -73,6 +74,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
+	case *packet.ClientCacheBlobStatus:
+		p.worldUpdater.HandleClientBlobStatus(pk)
 	case *packet.CommandRequest:
 		args := strings.Split(pk.CommandLine, " ")
 		if len(args) >= 2 && args[0] == "/ac" {
