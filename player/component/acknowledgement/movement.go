@@ -4,6 +4,7 @@ import (
 	"github.com/df-mc/dragonfly/server/entity/effect"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/entity"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -119,11 +120,14 @@ func NewUpdateAttributesACK(p *player.Player, attributes []protocol.Attribute) *
 
 func (ack *UpdateAttributes) Run() {
 	for _, attribute := range ack.attributes {
-		if attribute.Name == "minecraft:movement" {
+		switch attribute.Name {
+		case "minecraft:movement":
 			ack.mPlayer.Movement().SetMovementSpeed(attribute.Value)
 			ack.mPlayer.Movement().SetDefaultMovementSpeed(attribute.Default)
-		} else if attribute.Name == "minecraft:health" {
+		case "minecraft:health":
 			ack.mPlayer.Alive = attribute.Value > 0
+		case "minecraft:player.hunger":
+			ack.mPlayer.IsHungry = attribute.Value < 20
 		}
 	}
 }
@@ -173,14 +177,31 @@ func (ack *PlayerUpdateActorData) Run() {
 type Knockback struct {
 	mPlayer   *player.Player
 	knockback mgl32.Vec3
+
+	expiresIn int64
+	ran       bool
 }
 
-func NewKnockbackACK(p *player.Player, knockback mgl32.Vec3) *Knockback {
-	return &Knockback{mPlayer: p, knockback: knockback}
+func NewKnockbackACK(p *player.Player, knockback mgl32.Vec3, expiresIn int64) *Knockback {
+	return &Knockback{mPlayer: p, knockback: knockback, expiresIn: expiresIn}
 }
 
 func (ack *Knockback) Run() {
-	ack.mPlayer.Movement().SetKnockback(ack.knockback)
+	if !ack.ran {
+		ack.mPlayer.Movement().SetKnockback(ack.knockback)
+		ack.ran = true
+	}
+}
+
+func (ack *Knockback) Tick() {
+	if ack.ran {
+		return
+	}
+	ack.expiresIn--
+	if ack.expiresIn <= 0 {
+		ack.mPlayer.Dbg.Notify(player.DebugModeLatency, true, "knockback ack for %T (%v) lag-compensation expired", ack.knockback, game.RoundVec32(ack.knockback, 4))
+		ack.Run()
+	}
 }
 
 // MovementCorrection is an acknowledgment that is ran whenever the player receives a movement correction from the server.

@@ -126,6 +126,7 @@ type AuthoritativeMovementComponent struct {
 	glideBoostTicks int64
 
 	flying, mayFly, trustFlyStatus bool
+	justDisabledFlight             bool
 
 	allowedInputs int64
 	hasFirstInput bool
@@ -139,6 +140,7 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		mPlayer:              p,
 		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
+		airSpeed:             0.02,
 	}
 }
 
@@ -657,6 +659,11 @@ func (mc *AuthoritativeMovementComponent) SetTrustFlyStatus(trust bool) {
 	mc.trustFlyStatus = trust
 }
 
+// JustDisabledFlight returns true if the movement component just disabled flight.
+func (mc *AuthoritativeMovementComponent) JustDisabledFlight() bool {
+	return mc.justDisabledFlight
+}
+
 // Update updates the states of the movement component from the given input.
 func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	//assert.IsTrue(mc.mPlayer != nil, "parent player is null")
@@ -678,6 +685,9 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 			mc.flying = true
 		}
 	} else if pk.InputData.Load(packet.InputFlagStopFlying) {
+		if mc.flying {
+			mc.justDisabledFlight = true
+		}
 		mc.flying = false
 		mc.nonAuthoritative.toggledFly = false
 	}
@@ -698,9 +708,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.pressingSneak = pk.InputData.Load(packet.InputFlagSneaking)
 	mc.pressingSprint = pk.InputData.Load(packet.InputFlagSprintDown)
 
-	hasForwardKeyPressed := mc.impulse.Y() > 1e-4
-	startFlag, stopFlag := pk.InputData.Load(packet.InputFlagStartSprinting), pk.InputData.Load(packet.InputFlagStopSprinting) || !hasForwardKeyPressed
-
+	startFlag, stopFlag := pk.InputData.Load(packet.InputFlagStartSprinting), pk.InputData.Load(packet.InputFlagStopSprinting)
 	isNewVersionPlayer := mc.mPlayer.VersionInRange(player.GameVersion1_21_0, 65536)
 	var needsSpeedAdjusted bool
 	if startFlag && stopFlag /*&& hasForwardKeyPressed*/ {
@@ -878,7 +886,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	if mc.jumpDelay > 0 {
 		mc.jumpDelay--
 	}
-
+	mc.justDisabledFlight = false
 }
 
 // ServerUpdate updates certain states of the movement component based on a packet sent by the remote server.
@@ -914,7 +922,17 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 	case *packet.SetActorData:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateActorData(mc.mPlayer, pk.EntityMetadata))
 	case *packet.SetActorMotion:
-		mc.mPlayer.ACKs().Add(acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity))
+		networkOpts := mc.mPlayer.Opts().Network
+		kbTimeout := int64(networkOpts.MaxKnockbackDelay)
+		if kbTimeout < 0 {
+			kbTimeout = 1_000_000_000
+		}
+		kbAck := acknowledgement.NewKnockbackACK(mc.mPlayer, pk.Velocity, kbTimeout)
+		if cutoff := networkOpts.GlobalMovementCutoffThreshold; cutoff >= 0 && mc.mPlayer.ServerTick-mc.mPlayer.ClientTick >= int64(cutoff) {
+			kbAck.Run()
+		} else {
+			mc.mPlayer.ACKs().Add(kbAck)
+		}
 	case *packet.UpdateAbilities:
 		mc.mPlayer.ACKs().Add(acknowledgement.NewUpdateAbilitiesACK(mc.mPlayer, pk.AbilityData))
 	case *packet.UpdateAttributes:
@@ -933,6 +951,9 @@ func (mc *AuthoritativeMovementComponent) Reset() {
 	mc.vel = mc.nonAuthoritative.vel
 	mc.lastMov = mc.nonAuthoritative.lastMov
 	mc.mov = mc.nonAuthoritative.mov
+	if mc.flying {
+		mc.onGround = false
+	}
 }
 
 // PendingCorrections returns the number of pending corrections the movement component has.

@@ -32,7 +32,7 @@ func (*BadPacketF) SubType() string {
 }
 
 func (*BadPacketF) Description() string {
-	return "Checks if the player's TriggerType is valid"
+	return "Checks if the player's inventory actions are valid"
 }
 
 func (*BadPacketF) Punishable() bool {
@@ -44,26 +44,28 @@ func (d *BadPacketF) Metadata() *player.DetectionMetadata {
 }
 
 func (d *BadPacketF) Detect(pk packet.Packet) {
-	tr, ok := pk.(*packet.InventoryTransaction)
-	if !ok || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) {
-		return
-	}
-
-	switch dat := tr.TransactionData.(type) {
-	case *protocol.ReleaseItemTransactionData:
-		d.checkHotbarSlot(dat.HotBarSlot)
-	case *protocol.UseItemOnEntityTransactionData:
-		d.checkHotbarSlot(dat.HotBarSlot)
-	case *protocol.UseItemTransactionData:
-		d.checkHotbarSlot(dat.HotBarSlot)
-		if dat.ActionType != protocol.UseItemActionClickBlock {
-			return
+	switch pk := pk.(type) {
+	case *packet.InventoryTransaction:
+		switch dat := pk.TransactionData.(type) {
+		case *protocol.ReleaseItemTransactionData:
+			d.checkHotbarSlot(dat.HotBarSlot)
+		case *protocol.UseItemOnEntityTransactionData:
+			d.checkHotbarSlot(dat.HotBarSlot)
+		case *protocol.UseItemTransactionData:
+			d.checkHotbarSlot(dat.HotBarSlot)
+			if dat.ActionType != protocol.UseItemActionClickBlock || !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) {
+				return
+			}
+			if dat.TriggerType != protocol.TriggerTypePlayerInput && dat.TriggerType != protocol.TriggerTypeSimulationTick {
+				d.mPlayer.FailDetection(d, nil)
+			}
+			if dat.ClientPrediction != protocol.ClientPredictionFailure && dat.ClientPrediction != protocol.ClientPredictionSuccess {
+				d.mPlayer.FailDetection(d, nil)
+			}
 		}
-		if dat.TriggerType != protocol.TriggerTypePlayerInput && dat.TriggerType != protocol.TriggerTypeSimulationTick {
-			d.mPlayer.FailDetection(d, nil)
-		}
-		if dat.ClientPrediction != protocol.ClientPredictionFailure && dat.ClientPrediction != protocol.ClientPredictionSuccess {
-			d.mPlayer.FailDetection(d, nil)
+	case *packet.MobEquipment:
+		if pk.WindowID == protocol.WindowIDInventory {
+			d.checkHotbarSlot(int32(pk.HotBarSlot))
 		}
 	}
 }

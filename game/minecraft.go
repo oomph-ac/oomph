@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	MaxBlockInteractionDistance float32 = 6.01
+	MaxBlockInteractionDistance float32 = 6.6
 )
 
 // sinTable ...

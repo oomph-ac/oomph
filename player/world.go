@@ -34,6 +34,8 @@ type WorldUpdaterComponent interface {
 	// ValidateInteraction validates if a player is allowed to perform an action on an interactable block.
 	ValidateInteraction(pk *packet.InventoryTransaction) bool
 
+	// SetServerChunkRadius sets the server chunk radius of the world updater component.
+	SetServerChunkRadius(radius int32)
 	// SetChunkRadius sets the chunk radius of the world updater component.
 	SetChunkRadius(radius int32)
 	// ChunkRadius returns the chunk radius of the world updater component.
@@ -320,7 +322,7 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	} */
 
 	b := p.World().Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
-	if blockHash, _ := b.Hash(); blockHash == math.MaxUint64 {
+	if hash1, hash2 := b.Hash(); hash1 == 0 && hash2 == math.MaxUint64 {
 		// If the block hash is MaxUint64, then the block is unknown to dragonfly. In the future,
 		// we should implement more blocks to avoid this condition allowing clients to break those
 		// blocks at any interval they please.
@@ -328,8 +330,8 @@ func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	if _, isAir := b.(block.Air); isAir {
-		// Is it possible that the server already thinks the block is broken?
-		return 1_000_000_000
+		// Let the player send a break action for air, it won't affect anything in-game.
+		return 0
 	} else if utils.BlockName(b) == "minecraft:web" {
 		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
 		// Just return 1 and accept when the client does break the cobweb.

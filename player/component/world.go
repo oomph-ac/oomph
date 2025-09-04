@@ -23,9 +23,12 @@ import (
 type WorldUpdaterComponent struct {
 	mPlayer *player.Player
 
-	breakingBlockPos          *protocol.BlockPos
-	prevUseItemData           *protocol.UseItemTransactionData
-	chunkRadius               int32
+	chunkRadius       int32
+	serverChunkRadius int32
+
+	breakingBlockPos *protocol.BlockPos
+	prevPlaceRequest *protocol.UseItemTransactionData
+
 	initalInteractionAccepted bool
 }
 
@@ -37,7 +40,7 @@ func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 }
 
 func (c *WorldUpdaterComponent) UseItemData() *protocol.UseItemTransactionData {
-	return c.prevUseItemData
+	return c.prevPlaceRequest
 }
 
 // HandleSubChunk handles a SubChunk packet from the server.
@@ -78,7 +81,17 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 
 	// TODO: Add a block policy to allow servers to determine whether block updates should be lag-compensated or if movement should
 	// use the latest world state instantly.
-	c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+	networkOpts := c.mPlayer.Opts().Network
+	timeout := int64(networkOpts.MaxBlockUpdateDelay)
+	if timeout < 0 {
+		timeout = 1_000_000_000
+	}
+	blockAck := acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b, timeout)
+	if cutoff := networkOpts.GlobalMovementCutoffThreshold; cutoff >= 0 && c.mPlayer.ServerTick-c.mPlayer.ClientTick >= int64(cutoff) {
+		blockAck.Run()
+	} else {
+		c.mPlayer.ACKs().Add(blockAck)
+	}
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -86,6 +99,14 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 	if !c.mPlayer.Ready {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
+
+	networkOpts := c.mPlayer.Opts().Network
+	blockAckTimeout := int64(networkOpts.MaxBlockUpdateDelay)
+	if blockAckTimeout < 0 {
+		blockAckTimeout = 1_000_000_000
+	}
+	cutoff := networkOpts.GlobalMovementCutoffThreshold
+	useLagComp := cutoff >= 0 && c.mPlayer.ServerTick-c.mPlayer.ClientTick >= int64(cutoff)
 
 	// TODO: Does the sub-chunk position sent in this packet even matter?
 	for _, entry := range pk.Blocks {
@@ -95,7 +116,12 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
 			b = block.Air{}
 		}
-		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+		blockAck := acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b, blockAckTimeout)
+		if useLagComp {
+			blockAck.Run()
+		} else {
+			c.mPlayer.ACKs().Add(blockAck)
+		}
 	}
 	for _, entry := range pk.Extra {
 		pos := df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}
@@ -104,7 +130,12 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 			c.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", entry.BlockRuntimeID)
 			b = block.Air{}
 		}
-		c.mPlayer.ACKs().Add(acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b))
+		blockAck := acknowledgement.NewUpdateBlockACK(c.mPlayer, pos, b, blockAckTimeout)
+		if useLagComp {
+			blockAck.Run()
+		} else {
+			c.mPlayer.ACKs().Add(blockAck)
+		}
 	}
 }
 
@@ -117,7 +148,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	}
 
 	snapshot := &cloudpacket.BlockInteractionSnapshot{}
-	if c.prevUseItemData == nil {
+	if c.prevPlaceRequest == nil {
 		snapshot.SetActionType(dat.ActionType)
 		snapshot.SetTriggerType(dat.TriggerType)
 		snapshot.SetClientPrediction(dat.ClientPrediction)
@@ -126,30 +157,30 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		snapshot.SetReportedPos(dat.Position)
 		snapshot.SetClickedPos(dat.ClickedPosition)
 	} else {
-		if dat.ActionType != c.prevUseItemData.ActionType {
+		if dat.ActionType != c.prevPlaceRequest.ActionType {
 			snapshot.SetActionType(dat.ActionType)
 		}
-		if dat.TriggerType != c.prevUseItemData.TriggerType {
+		if dat.TriggerType != c.prevPlaceRequest.TriggerType {
 			snapshot.SetTriggerType(dat.TriggerType)
 		}
-		if dat.ClientPrediction != c.prevUseItemData.ClientPrediction {
+		if dat.ClientPrediction != c.prevPlaceRequest.ClientPrediction {
 			snapshot.SetClientPrediction(dat.ClientPrediction)
 		}
-		if dat.BlockFace != c.prevUseItemData.BlockFace {
+		if dat.BlockFace != c.prevPlaceRequest.BlockFace {
 			snapshot.SetBlockFace(dat.BlockFace)
 		}
-		if dat.BlockPosition != c.prevUseItemData.BlockPosition {
+		if dat.BlockPosition != c.prevPlaceRequest.BlockPosition {
 			snapshot.SetBlockPos(dat.BlockPosition)
 		}
-		if dat.Position != c.prevUseItemData.Position {
+		if dat.Position != c.prevPlaceRequest.Position {
 			snapshot.SetReportedPos(dat.Position)
 		}
-		if dat.ClickedPosition != c.prevUseItemData.ClickedPosition {
+		if dat.ClickedPosition != c.prevPlaceRequest.ClickedPosition {
 			snapshot.SetClickedPos(dat.ClickedPosition)
 		}
 	}
 	c.mPlayer.WriteToCloud(snapshot)
-	c.prevUseItemData = dat
+	c.prevPlaceRequest = dat
 
 	if dat.ActionType != protocol.UseItemActionClickBlock {
 		return true
@@ -278,9 +309,9 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return true
 	}
 
-	if c.prevUseItemData != nil && dat.BlockRuntimeID == c.prevUseItemData.BlockRuntimeID && dat.BlockFace == c.prevUseItemData.BlockFace &&
-		dat.BlockPosition == c.prevUseItemData.BlockPosition && dat.HotBarSlot == c.prevUseItemData.HotBarSlot &&
-		dat.Position == c.prevUseItemData.Position && dat.ClickedPosition == c.prevUseItemData.ClickedPosition {
+	if c.prevPlaceRequest != nil && dat.BlockRuntimeID == c.prevPlaceRequest.BlockRuntimeID && dat.BlockFace == c.prevPlaceRequest.BlockFace &&
+		dat.BlockPosition == c.prevPlaceRequest.BlockPosition && dat.HotBarSlot == c.prevPlaceRequest.HotBarSlot &&
+		dat.Position == c.prevPlaceRequest.Position && dat.ClickedPosition == c.prevPlaceRequest.ClickedPosition {
 		return false
 	}
 
@@ -373,8 +404,17 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	return true
 }
 
+// SetServerChunkRadius sets the server chunk radius of the world updater component.
+func (c *WorldUpdaterComponent) SetServerChunkRadius(radius int32) {
+	c.serverChunkRadius = radius
+	c.chunkRadius = radius
+}
+
 // SetChunkRadius sets the chunk radius of the world updater component.
 func (c *WorldUpdaterComponent) SetChunkRadius(radius int32) {
+	if radius > c.serverChunkRadius && c.serverChunkRadius != 0 {
+		radius = c.serverChunkRadius
+	}
 	c.chunkRadius = radius
 }
 

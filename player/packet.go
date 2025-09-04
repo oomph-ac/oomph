@@ -186,7 +186,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 					inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 					inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
 				} else if c, ok := held.Item().(item.Consumable); ok {
-					if p.StartUseConsumableTick == 0 {
+					if p.StartUseConsumableTick == 0 && c.ConsumeDuration() > 0 && (c.AlwaysConsumable() || p.IsHungry) {
 						p.StartUseConsumableTick = p.InputCount
 						p.consumedSlot = int(tr.HotBarSlot)
 					} else {
@@ -255,7 +255,9 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.MobEquipment:
 		p.LastEquipmentData = pk
-		p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
+		if pk.WindowID == protocol.WindowIDInventory {
+			p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
+		}
 		if p.StartUseConsumableTick != 0 && p.consumedSlot != int(pk.HotBarSlot) {
 			p.StartUseConsumableTick = 0
 			p.consumedSlot = 0
@@ -298,7 +300,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			p.Opts().Combat.MaxRewind,
+			p.Opts().Network.MaxEntityRewind,
 			false,
 			width,
 			height,
@@ -310,7 +312,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			p.Opts().Combat.MaxRewind,
+			p.Opts().Network.MaxEntityRewind,
 			false,
 			width,
 			height,
@@ -330,7 +332,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			p.Opts().Combat.MaxRewind,
+			p.Opts().Network.MaxEntityRewind,
 			true,
 			width,
 			height,
@@ -342,7 +344,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			pk.EntityMetadata,
 			pk.Position,
 			pk.Velocity,
-			p.Opts().Combat.MaxRewind,
+			p.Opts().Network.MaxEntityRewind,
 			true,
 			width,
 			height,
@@ -356,7 +358,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			Flags:      cloudpacket.UpdateEntityStatusFlagIsPlayer,
 		})
 	case *packet.ChunkRadiusUpdated:
-		p.worldUpdater.SetChunkRadius(pk.ChunkRadius + 4)
+		p.worldUpdater.SetServerChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventorySlot:
 		p.inventory.HandleInventorySlot(pk)
 	case *packet.InventoryContent:
