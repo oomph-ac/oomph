@@ -59,9 +59,6 @@ func (c *Client) readLoop() {
 				c.Close()
 				return
 			}
-			headerGb := float64(len(header)) * ByteToGBMultiplier
-			_ = gbIn.Add(headerGb)
-			_ = gbProcIn.Add(headerGb)
 
 			if header[4] != 0 && header[4] != 1 {
 				c.log.Error("invalid packet header: compression flag must be 0 or 1", "flag", header[4])
@@ -85,10 +82,13 @@ func (c *Client) readLoop() {
 				c.Close()
 				return
 			}
-			_ = gbIn.Add(float64(len(payload)) * ByteToGBMultiplier)
+
+			// Track network bytes read
+			networkBytes := uint64(len(header) + len(payload))
 
 			// Decompress if needed
 			var data []byte
+			var originalBytes uint64
 			if compressed {
 				var err error
 				data, err = snappy.Decode(nil, payload)
@@ -96,10 +96,14 @@ func (c *Client) readLoop() {
 					c.log.Error("failed to decompress packet", "err", err)
 					return
 				}
+				originalBytes = uint64(len(header) + len(data))
 			} else {
 				data = payload
+				originalBytes = networkBytes
 			}
-			_ = gbProcIn.Add(float64(len(data)) * ByteToGBMultiplier)
+
+			// Record read statistics (packet count will be tracked in parseBatch)
+			GlobalStats.RecordRead(networkBytes, originalBytes, 0) // packets counted separately
 
 			// Parse the batch data
 			if err := c.parseBatch(data); err != nil {
@@ -114,6 +118,8 @@ func (c *Client) readLoop() {
 func (c *Client) parseBatch(data []byte) error {
 	batchBuf := bytes.NewBuffer(data)
 	reader := protocol.NewReader(batchBuf, 0, false)
+	packetCount := uint64(0)
+
 	for batchBuf.Len() > 0 {
 		var pkId, pkLen uint32
 		reader.Varuint32(&pkId)
@@ -133,6 +139,7 @@ func (c *Client) parseBatch(data []byte) error {
 		}
 		pk.Marshal(pkReader, packet.CurrentProtocol)
 		internal.PutPacketBuf(pkBuf)
+		packetCount++
 
 		select {
 		case <-c.done:
@@ -140,6 +147,11 @@ func (c *Client) parseBatch(data []byte) error {
 		case c.rPackets <- pk:
 			// OK.
 		}
+	}
+
+	// Update packet count in global stats (we add to existing batch count)
+	if packetCount > 0 {
+		GlobalStats.packetsRead.Add(packetCount)
 	}
 
 	return nil

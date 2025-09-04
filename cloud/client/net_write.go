@@ -46,21 +46,26 @@ func (c *Client) flush() error {
 	batchLen := uint32(buf.Len())
 	useCompression := batchLen > c.connInfo.CmpThreshold
 	header := make([]byte, packet.NetworkHeaderSize)
-	headerGb := float64(len(header)) * ByteToGBMultiplier
-	_ = gbOut.Add(headerGb)
-	_ = gbProcOut.Add(headerGb)
+
+	// Track original uncompressed data size
+	originalBytes := uint64(len(header) + len(buf.Bytes()))
+
 	if !useCompression {
 		header[0] = byte(batchLen)
 		header[1] = byte(batchLen >> 8)
 		header[2] = byte(batchLen >> 16)
 		header[3] = byte(batchLen >> 24)
 		header[4] = 0 // No compression
+
 		if err := c.networkWrite(header); err != nil {
 			return fmt.Errorf("failed to write packet header: %v", err)
-		} else if err := c.networkWrite(buf.Bytes()); err != nil {
+		}
+		if err := c.networkWrite(buf.Bytes()); err != nil {
 			return fmt.Errorf("failed to write packet data: %v", err)
 		}
-		_ = gbProcOut.Add(float64(len(buf.Bytes())) * ByteToGBMultiplier)
+
+		// Record uncompressed write statistics
+		GlobalStats.RecordWrite(uint64(len(header)+len(buf.Bytes())), originalBytes, uint64(len(c.batched)))
 		return nil
 	}
 
@@ -77,7 +82,10 @@ func (c *Client) flush() error {
 	if err := c.networkWrite(compressed); err != nil {
 		return fmt.Errorf("failed to write compressed packet data: %v", err)
 	}
-	_ = gbProcOut.Add(float64(len(compressed)) * ByteToGBMultiplier)
+
+	// Record compressed write statistics
+	networkBytes := uint64(len(header) + len(compressed))
+	GlobalStats.RecordWrite(networkBytes, originalBytes, uint64(len(c.batched)))
 	return nil
 }
 
