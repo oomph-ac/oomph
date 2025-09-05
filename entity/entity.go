@@ -39,14 +39,14 @@ type Entity struct {
 }
 
 // New creates and returns a new Entity instance.
-func New(entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySize int, isPlayer bool, width, height, scale float32) *Entity {
+func New(entType string, metadata map[uint32]any, pos mgl32.Vec3, historySize int, isPlayer bool, width, height, scale float32) *Entity {
 	e := &Entity{
 		Type:     entType,
 		Metadata: metadata,
 
 		Position:     pos,
 		PrevPosition: pos,
-		RecvPosition: pos.Add(vel),
+		RecvPosition: pos,
 
 		Width:  width,
 		Height: height,
@@ -56,10 +56,10 @@ func New(entType string, metadata map[uint32]any, pos, vel mgl32.Vec3, historySi
 
 		IsPlayer: isPlayer,
 	}
-	e.InterpolationTicks = EntityMobInterpolationTicks
+	/* e.InterpolationTicks = EntityMobInterpolationTicks
 	if isPlayer {
 		e.InterpolationTicks = EntityPlayerInterpolationTicks
-	}
+	} */
 
 	return e
 }
