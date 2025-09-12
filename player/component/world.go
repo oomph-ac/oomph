@@ -125,6 +125,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		return false
 	} else if placement, hasPlacement := c.clientPlacedBlocks[dfClickedBlockPos]; hasPlacement && c.mPlayer.Opts().Network.MaxGhostBlockChain >= 0 {
 		chainSize, anyConfirmed := placement.ghostBlockChain()
+		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "gbChainSize=%d anyConfirmed=%t", chainSize, anyConfirmed)
 		if anyConfirmed && !placement.placementAllowed && chainSize+1 > c.mPlayer.Opts().Network.MaxGhostBlockChain {
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction denied: clicked block is in ghost block chain that exceeds limit")
 			c.mPlayer.Popup("<red>Ghost block(s) cancelled</red>")
@@ -432,7 +433,7 @@ func (c *WorldUpdaterComponent) Flush() {
 
 			// If the value is at least 1, the user wants to allow a certain amount of ghost blocks.
 			if maxChain >= 1 {
-				pl.setPlacementAllowed(placementAllowed, 0)
+				pl.setPlacementAllowed(placementAllowed)
 			} else if maxChain == 0 && !placementAllowed {
 				// The user wants to refuse compensation for ghost blocks, so we will set the block in the world immediately.
 				c.mPlayer.Popup("<red>Ghost blocks not allowed.</red>")
@@ -463,7 +464,12 @@ func (c *WorldUpdaterComponent) Tick() {
 }
 
 const (
-	maxChainedBlockPlacementLifetime = 10 * player.TicksPerSecond // just in case the server decides to not sync the block placement at all??
+	// maxChainedBlockPlacementLifetime is how long in ticks a block placement will be stored in the world updater component.
+	// We need this because we don't want to remove the block placement immediately when the server notifies us (or also lack of)
+	// of whether the block placement was allowed or not. Some server softwares send multiple UpdateBlock packets for the same positions (PMMP)
+	// and the proxy may not recieve all of them at the same time. Ping me on Discord for more specific information if it doesn't make sense,
+	// because I am rushing this note.
+	maxChainedBlockPlacementLifetime = 10 * player.TicksPerSecond
 	maxGhostBlockChainSize           = 100
 )
 
@@ -524,21 +530,50 @@ func (pl *chainedBlockPlacement) ghostBlockChain() (int, bool) {
 	return size, anyConfirmed
 }
 
-func (pl *chainedBlockPlacement) setPlacementAllowed(allowed bool, currentStep byte) {
+func (pl *chainedBlockPlacement) setPlacementAllowed(allowed bool) {
 	// Usually happens when servers try to send block updates too quickly, resulting in block flickering.
-	if (pl.placementConfirmed && pl.placementAllowed) || currentStep >= maxGhostBlockChainSize {
+	if pl.placementConfirmed && pl.placementAllowed {
 		return
 	}
 
-	pl.placementAllowed = allowed
-	pl.placementConfirmed = true
-	for _, face := range df_cube.Faces() {
-		if face == pl.parentFace {
+	// Iterative DFS to avoid deep recursion on long chains
+	type nodeStep struct {
+		node *chainedBlockPlacement
+		step byte
+	}
+
+	visited := make(map[*chainedBlockPlacement]struct{})
+	stack := make([]nodeStep, 0, 8)
+	stack = append(stack, nodeStep{node: pl, step: 0})
+
+	for len(stack) > 0 {
+		ns := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		n := ns.node
+		step := ns.step
+
+		if _, ok := visited[n]; ok {
 			continue
 		}
-		child := pl.connections[face]
-		if child != nil {
-			child.setPlacementAllowed(allowed, currentStep+1)
+		visited[n] = struct{}{}
+
+		// Preserve original early-exit semantics per node
+		if (n.placementConfirmed && n.placementAllowed) || step >= maxGhostBlockChainSize {
+			continue
+		}
+
+		n.placementAllowed = allowed
+		n.placementConfirmed = true
+
+		for _, face := range df_cube.Faces() {
+			if face == n.parentFace {
+				continue
+			}
+			child := n.connections[face]
+			if child != nil {
+				stack = append(stack, nodeStep{node: child, step: step + 1})
+			}
 		}
 	}
 }
