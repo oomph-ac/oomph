@@ -543,6 +543,7 @@ func (p *Player) Tick() bool {
 
 	p.movement.Tick(p.ServerTick - prevTick)
 	p.entTracker.Tick(p.ServerTick)
+	p.worldUpdater.Tick()
 	p.acks.Tick(false)
 	if !p.acks.Responsive() {
 		p.Disconnect(game.ErrorNetworkTimeout)
