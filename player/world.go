@@ -6,7 +6,6 @@ import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/oomph/utils"
@@ -42,6 +41,20 @@ type WorldUpdaterComponent interface {
 	SetBlockBreakPos(pos *protocol.BlockPos)
 	// BlockBreakPos returns the block breaking pos of the world updater component.
 	BlockBreakPos() *protocol.BlockPos
+
+	// QueueBlockPlacement queues a block placement.
+	QueueBlockPlacement(clickedBlockPos, placedBlockPos df_cube.Pos, face df_cube.Face)
+	// AddPendingUpdate adds a pending block update.
+	AddPendingUpdate(pos df_cube.Pos, blockRuntimeID uint32)
+	// HasPendingUpdate checks if a block update is pending at the given block position.
+	HasPendingUpdate(pos df_cube.Pos) bool
+	// RemovePendingUpdate removes a pending block update.
+	RemovePendingUpdate(pos df_cube.Pos, blockRuntimeID uint32)
+
+	// Tick ticks the world updater component.
+	Tick()
+	// Flush flushes the world updater component.
+	Flush()
 }
 
 func (p *Player) SetWorldUpdater(c WorldUpdaterComponent) {
@@ -63,85 +76,83 @@ func (p *Player) RegenerateWorld() {
 
 func (p *Player) SyncWorld() {
 	// Update the blocks in the world so the client can sync itself properly.
-	for _, blockResult := range utils.GetNearbyBlocks(p.Movement().BoundingBox().Grow(3.0), true, true, p.World()) {
-		p.SendPacketToClient(&packet.UpdateBlock{
-			Position: protocol.BlockPos{
-				int32(blockResult.Position[0]),
-				int32(blockResult.Position[1]),
-				int32(blockResult.Position[2]),
-			},
-			NewBlockRuntimeID: world.BlockRuntimeID(blockResult.Block),
-			Flags:             packet.BlockUpdatePriority,
-			Layer:             0, // TODO: Implement and account for multi-layer blocks.
-		})
+	pos := p.Movement().Pos()
+	for x := int(math32.Floor(pos[0] - 0.05)); x <= int(pos[0]+0.05); x++ {
+		for y := int(math32.Floor(pos[1] - 0.05)); y <= int(pos[1]+0.05); y++ {
+			for z := int(math32.Floor(pos[2] - 0.05)); z <= int(pos[2]+0.05); z++ {
+				p.SyncBlock(df_cube.Pos{x, y, z})
+			}
+		}
 	}
 }
 
 func (p *Player) SyncBlock(pos df_cube.Pos) {
-	p.SendPacketToClient(&packet.UpdateBlock{
+	// Avoid syncing blocks when there is a pending update already for that block - it can cause a desync.
+	if p.WorldUpdater().HasPendingUpdate(pos) {
+		return
+	}
+	pk := &packet.UpdateBlock{
 		Position: protocol.BlockPos{
 			int32(pos[0]),
 			int32(pos[1]),
 			int32(pos[2]),
 		},
 		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
-		Flags:             packet.BlockUpdateNeighbours | packet.BlockUpdateNetwork,
+		Flags:             packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
-	})
+	}
+	p.WorldUpdater().HandleUpdateBlock(pk)
+	_ = p.SendPacketToClient(pk)
 }
 
-func (p *Player) PlaceBlock(pos df_cube.Pos, b world.Block, ctx *item.UseContext) {
-	replacingBlock := p.World().Block(pos)
+func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face df_cube.Face, b world.Block) {
+	replacingBlock := p.World().Block(replaceBlockPos)
 	if _, isReplaceable := replacingBlock.(block.Replaceable); !isReplaceable {
-		p.Dbg.Notify(DebugModeBlockPlacement, true, "block at %v is not replaceable", pos)
+		p.Dbg.Notify(DebugModeBlockPlacement, true, "block at %v (%T) is not replaceable", replaceBlockPos, replacingBlock)
 		return
 	}
 
 	// Make a list of BBoxes the block will occupy.
-	boxes := utils.BlockBoxes(b, cube.Pos(pos), p.World())
+	boxes := utils.BlockBoxes(b, cube.Pos(replaceBlockPos), p.World())
 	for index, blockBox := range boxes {
-		boxes[index] = blockBox.Translate(cube.Pos(pos).Vec3())
+		boxes[index] = blockBox.Translate(cube.Pos(replaceBlockPos).Vec3())
 	}
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
 	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
-		p.SyncBlock(pos)
+		p.SyncBlock(replaceBlockPos)
 		p.Inventory().ForceSync()
-		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", pos)
+		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", replaceBlockPos)
 		return
 	}
 
 	// Check if any entity is in the way of the block being placed.
 	entityIntersecting := false
+	var entTracker EntityTrackerComponent = p.EntityTracker()
 	if p.Opts().Combat.EnableClientEntityTracking {
-		for _, e := range p.ClientEntityTracker().All() {
-			if cube.AnyIntersections(boxes, e.Box(e.Position)) {
-				entityIntersecting = true
-				break
-			}
-		}
-	} else {
-		for _, e := range p.EntityTracker().All() {
-			if rew, ok := e.Rewind(p.ClientTick); ok && cube.AnyIntersections(boxes, e.Box(rew.Position)) {
-				entityIntersecting = true
-				break
-			}
+		entTracker = p.ClientEntityTracker()
+	}
+	for _, e := range entTracker.All() {
+		if cube.AnyIntersections(boxes, e.Box(e.Position)) {
+			entityIntersecting = true
+			break
 		}
 	}
 
 	if entityIntersecting {
 		// We sync the world in this instance to avoid any possibility of a long-persisting ghost block.
-		p.SyncBlock(pos)
+		p.SyncBlock(replaceBlockPos)
 		p.Inventory().ForceSync()
-		p.Dbg.Notify(DebugModeBlockPlacement, true, "entity prevents block placement at %v", pos)
+		p.Dbg.Notify(DebugModeBlockPlacement, true, "entity prevents block placement at %v", replaceBlockPos)
 		return
 	}
 
 	inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 	inv.SetSlot(int(p.inventory.HeldSlot()), p.inventory.Holding().Grow(-1))
-	p.World().SetBlock(pos, b, nil)
-	p.Dbg.Notify(DebugModeBlockPlacement, true, "placed block at %v", pos)
+	p.WorldUpdater().QueueBlockPlacement(clickedBlockPos, replaceBlockPos, face)
+	p.World().SetBlock(replaceBlockPos, b, nil)
+	p.Dbg.Notify(DebugModeBlockPlacement, true, "placed block at %v", replaceBlockPos)
 }
 
 func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
