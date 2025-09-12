@@ -129,14 +129,19 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 
 	// Check if any entity is in the way of the block being placed.
 	entityIntersecting := false
-	var entTracker EntityTrackerComponent = p.EntityTracker()
 	if p.Opts().Combat.EnableClientEntityTracking {
-		entTracker = p.ClientEntityTracker()
-	}
-	for _, e := range entTracker.All() {
-		if cube.AnyIntersections(boxes, e.Box(e.Position)) {
-			entityIntersecting = true
-			break
+		for _, e := range p.ClientEntityTracker().All() {
+			if cube.AnyIntersections(boxes, e.Box(e.Position)) {
+				entityIntersecting = true
+				break
+			}
+		}
+	} else {
+		for _, e := range p.EntityTracker().All() {
+			if rew, ok := e.Rewind(p.ClientTick); ok && cube.AnyIntersections(boxes, e.Box(rew.Position)) {
+				entityIntersecting = true
+				break
+			}
 		}
 	}
 
