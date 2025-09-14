@@ -3,17 +3,19 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/akmalfairuz/legacy-version/legacyver"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/akmalfairuz/legacy-version/legacyver"
 
 	_ "github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/player/detection"
+
 	"github.com/sandertv/gophertunnel/minecraft"
 
 	"github.com/go-echarts/statsview"

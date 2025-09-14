@@ -10,20 +10,24 @@ import (
 	"runtime/debug"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/akmalfairuz/legacy-version/legacyver"
+
 	"github.com/cooldogedev/spectrum"
 	"github.com/cooldogedev/spectrum/server"
 	"github.com/cooldogedev/spectrum/session"
 	"github.com/cooldogedev/spectrum/util"
+
 	"github.com/go-echarts/statsview"
 	"github.com/go-echarts/statsview/viewer"
+
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
+
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-
-	_ "net/http/pprof"
 )
 
 var evHandler = player.NewExampleEventHandler()
@@ -141,7 +145,7 @@ func main() {
 	}()
 
 	for {
-		initalSession, err := proxy.Accept()
+		initialSession, err := proxy.Accept()
 		if err != nil {
 			continue
 		}
@@ -180,6 +184,6 @@ func main() {
 			}
 
 			proc.Player().SetServerConn(s.Server())
-		}(initalSession)
+		}(initialSession)
 	}
 }
