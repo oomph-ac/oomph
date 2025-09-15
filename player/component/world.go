@@ -111,6 +111,11 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		return false
 	}
 
+	// Ignore if the block face the client sends is not valid.
+	if dat.BlockFace < 0 || dat.BlockFace > 5 {
+		return false
+	}
+
 	clickedBlockPos := utils.BlockToCubePos(dat.BlockPosition)
 	dfClickedBlockPos := df_cube.Pos(clickedBlockPos)
 	replacingBlock := c.mPlayer.World().Block(dfClickedBlockPos)
