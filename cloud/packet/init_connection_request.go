@@ -3,7 +3,7 @@ package packet
 import "github.com/sandertv/gophertunnel/minecraft/protocol"
 
 const (
-	ClientTypePlayer uint8 = iota
+	ClientTypeProxy uint8 = iota
 	ClientTypeHealthCheck
 )
 
