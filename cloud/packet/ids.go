@@ -3,11 +3,13 @@ package packet
 const (
 	IDInitConnectionRequest uint32 = iota
 	IDInitConnectionResponse
+	IDAddPlayerRequest
+	IDAddPlayerResponse
+	IDPlayerDisconnect
 	IDHeartbeat
 	IDPlayerSnapshot
 	IDBlockInteractionSnapshot
 	IDAttackSnapshot
-	IDPlayerDisconnect
 	IDUpdateEntityPosition
 	IDUpdateEntityDimensions
 	IDUpdateEntityStatus

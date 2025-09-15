@@ -10,7 +10,7 @@ func init() {
 
 // Heartbeat is a packet that is sent periodically to indicate that the remote connection is still active.
 type Heartbeat struct {
-	Timestamp int64 // 8 bytes
+	Timestamp int64 // 1-9 bytes
 }
 
 func (*Heartbeat) ID() uint32 {
@@ -18,5 +18,5 @@ func (*Heartbeat) ID() uint32 {
 }
 
 func (pk *Heartbeat) Marshal(io protocol.IO, cloudProto uint32) {
-	io.Int64(&pk.Timestamp)
+	io.Varint64(&pk.Timestamp)
 }

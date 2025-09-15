@@ -17,16 +17,8 @@ func init() {
 // the client is using, which is important for future compatibility (since the server may update its protocol whilst the client has not). Ideally
 // this connection initalization is never changed.
 type InitConnectionRequest struct {
-	ClientType     uint8  // 1 byte
-	CloudProtocol  uint32 // 1-5 bytes
-	PlayerProtocol int32  // 1-5 bytes
-
-	// ClientData is a JSON byte slice that contains information
-	ClientData   []byte // 1-5 bytes + len(ClientData) bytes
-	IdentityData []byte // 1-5 bytes + len(IdentityData) bytes
-
-	// PlayerAddr is the IP address of the player.
-	PlayerAddr string
+	ClientType    uint8  // 1 byte
+	CloudProtocol uint32 // 1-5 bytes
 }
 
 func (*InitConnectionRequest) ID() uint32 {
@@ -36,10 +28,4 @@ func (*InitConnectionRequest) ID() uint32 {
 func (pk *InitConnectionRequest) Marshal(io protocol.IO, _ uint32) {
 	io.Uint8(&pk.ClientType)
 	io.Varuint32(&pk.CloudProtocol)
-	if pk.ClientType == ClientTypePlayer {
-		io.Varint32(&pk.PlayerProtocol)
-		io.ByteSlice(&pk.ClientData)
-		io.ByteSlice(&pk.IdentityData)
-		io.String(&pk.PlayerAddr)
-	}
 }

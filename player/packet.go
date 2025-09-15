@@ -142,7 +142,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 				p.combat.Attack(pk)
 				p.clicks.HandleAttack(dat)
 				if p.opts.Combat.EnableClientEntityTracking {
-					snapshot := &cloudpacket.AttackSnapshot{}
+					snapshot := &cloudpacket.AttackSnapshot{XUID: p.IdentityDat.XUID}
 					if prevDat := p.clientCombat.LastAttack(); prevDat == nil {
 						snapshot.SetHotBarSlot(int32(dat.HotBarSlot))
 						snapshot.SetEntityRID(dat.TargetEntityRuntimeID)
@@ -322,6 +322,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			scale,
 		))
 		p.WriteToCloud(&cloudpacket.UpdateEntityStatus{
+			XUID:       p.IdentityDat.XUID,
 			RuntimeId:  pk.EntityRuntimeID,
 			Position:   pk.Position,
 			Dimensions: mgl32.Vec3{width, height, scale},
@@ -354,6 +355,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			scale,
 		))
 		p.WriteToCloud(&cloudpacket.UpdateEntityStatus{
+			XUID:       p.IdentityDat.XUID,
 			RuntimeId:  pk.EntityRuntimeID,
 			Position:   pk.Position,
 			Dimensions: mgl32.Vec3{width, height, scale},
@@ -400,6 +402,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 		p.WriteToCloud(&cloudpacket.UpdateEntityStatus{
+			XUID:      p.IdentityDat.XUID,
 			RuntimeId: uint64(pk.EntityUniqueID),
 			Flags:     cloudpacket.UpdateEntityStatusFlagIsRemoval,
 		})

@@ -311,7 +311,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		return true
 	}
 
-	snapshot := &cloudpacket.BlockInteractionSnapshot{}
+	snapshot := &cloudpacket.BlockInteractionSnapshot{XUID: c.mPlayer.IdentityDat.XUID}
 	if c.prevPlaceRequest == nil {
 		snapshot.SetActionType(dat.ActionType)
 		snapshot.SetTriggerType(dat.TriggerType)

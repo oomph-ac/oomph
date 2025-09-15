@@ -23,17 +23,15 @@ const (
 )
 
 type BlockInteractionSnapshot struct {
-	Flags uint8 // 1 byte
-
-	ActionType  uint32 // 0-5 bytes
-	TriggerType uint32 // 0-5 bytes
-	CPrediction uint32 // 0-5 bytes
-
-	BlockFace int32             // 0-5 bytes
-	BlockPos  protocol.BlockPos // 0-16 bytes
-
-	ReportedPos mgl32.Vec3 // 0-12 bytes
-	ClickedPos  mgl32.Vec3 // 0-12 bytes
+	XUID        string            // 1-5 bytes + len(XUID)
+	Flags       uint8             // 1 byte
+	ActionType  uint32            // 0-5 bytes
+	TriggerType uint32            // 0-5 bytes
+	CPrediction uint32            // 0-5 bytes
+	BlockFace   int32             // 0-5 bytes
+	BlockPos    protocol.BlockPos // 0-16 bytes
+	ReportedPos mgl32.Vec3        // 0-12 bytes
+	ClickedPos  mgl32.Vec3        // 0-12 bytes
 }
 
 func (*BlockInteractionSnapshot) ID() uint32 {
@@ -41,6 +39,7 @@ func (*BlockInteractionSnapshot) ID() uint32 {
 }
 
 func (pk *BlockInteractionSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
+	io.String(&pk.XUID)
 	io.Uint8(&pk.Flags)
 	if pk.CheckFlag(BlockInteractionSnapshotFlagIsInital) {
 		io.Varuint32(&pk.ActionType)

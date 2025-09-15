@@ -8,9 +8,12 @@ func init() {
 	})
 }
 
-// PlayerDisconnect represents a packet sent by Oomph's cloud when it wants to disconnect a player from the connected proxy.
+// PlayerDisconnect can be sent by both the connected proxy and the cloud server. If sent by the cloud server, the proxy
+// should disconnect the player with the given message. If sent by the connected proxy, the cloud server should save relevant
+// data before removing the session.
 type PlayerDisconnect struct {
-	Message string
+	XUID    string // 1-5 bytes + len(XUID)
+	Message string // 1-5 bytes + len(Message) bytes
 }
 
 func (*PlayerDisconnect) ID() uint32 {
@@ -18,5 +21,6 @@ func (*PlayerDisconnect) ID() uint32 {
 }
 
 func (pk *PlayerDisconnect) Marshal(io protocol.IO, cloudProto uint32) {
+	io.String(&pk.XUID)
 	io.String(&pk.Message)
 }

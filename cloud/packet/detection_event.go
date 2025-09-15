@@ -12,14 +12,13 @@ func init() {
 }
 
 type DetectionEvent struct {
-	EventType byte
-
-	Violations       float32
-	DetectionType    string
-	DetectionSubType string
-
-	PunishmentID          string
-	PunishmentEffectiveAt int64
+	XUID                  string  // 1-5 bytes + len(XUID)
+	EventType             byte    // 1 byte
+	Violations            float32 // 4 bytes
+	DetectionType         string  // 1-5 bytes + len(DetectionType) bytes
+	DetectionSubType      string  // 1-5 bytes + len(DetectionSubType) bytes
+	PunishmentID          string  // 1-5 bytes + len(PunishmentID) bytes
+	PunishmentEffectiveAt int64   // 8 bytes
 }
 
 func (pk *DetectionEvent) ID() uint32 {
@@ -27,6 +26,7 @@ func (pk *DetectionEvent) ID() uint32 {
 }
 
 func (pk *DetectionEvent) Marshal(io protocol.IO, cloudProto uint32) {
+	io.String(&pk.XUID)
 	io.Uint8(&pk.EventType)
 	if pk.EventType == DetectionEventFlagged {
 		io.String(&pk.DetectionType)

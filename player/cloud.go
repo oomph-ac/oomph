@@ -6,22 +6,22 @@ import (
 	"github.com/oomph-ac/oomph/oerror"
 )
 
-func (p *Player) SetCloudClient(cl *client.Client) {
-	if p.cloudClient != nil && cl != nil {
+func (p *Player) SetCloud(cl *client.Client) {
+	if p.cloud != nil && cl != nil {
 		panic(oerror.New("cloud client already set for player"))
 	}
 	if !p.opts.Combat.EnableClientEntityTracking {
-		panic(oerror.New("cloud requires client-view entity tracking to be enabled"))
+		panic(oerror.New("cloud functionality requires client-view entity tracking to be enabled"))
 	}
-	p.cloudClient = cl
+	p.cloud = cl
 }
 
-func (p *Player) CloudClient() *client.Client {
-	return p.cloudClient
+func (p *Player) Cloud() *client.Client {
+	return p.cloud
 }
 
 func (p *Player) WriteToCloud(pk packet.Packet) {
-	cloudClient := p.cloudClient
+	cloudClient := p.cloud
 	if cloudClient == nil {
 		return
 	}

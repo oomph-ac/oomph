@@ -26,18 +26,16 @@ func init() {
 }
 
 type PlayerSnapshot struct {
+	XUID          string          // 1-5 bytes + len(XUID)
 	SnapshotFlags uint16          // 2 bytes
 	CInputFlags   protocol.Bitset // 9 bytes (?)
-
-	Pos, CPos mgl32.Vec3 // 0-24 bytes
-	Vel, CVel mgl32.Vec3 // 0-24 bytes
-	Mov, CMov mgl32.Vec3 // 0-24 bytes
-	CRot      mgl32.Vec3 // 0-12 bytes
-
-	Timestamp  int64  // 8 bytes
-	CInputTick int64  // 8 bytes
-	CSimTick   uint64 // 8 bytes
-
+	Pos, CPos     mgl32.Vec3      // 0-24 bytes
+	Vel, CVel     mgl32.Vec3      // 0-24 bytes
+	Mov, CMov     mgl32.Vec3      // 0-24 bytes
+	CRot          mgl32.Vec3      // 0-12 bytes
+	Timestamp     int64           // 8 bytes
+	CInputTick    int64           // 8 bytes
+	CSimTick      uint64          // 8 bytes
 }
 
 func (*PlayerSnapshot) ID() uint32 {
@@ -45,6 +43,7 @@ func (*PlayerSnapshot) ID() uint32 {
 }
 
 func (pk *PlayerSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
+	io.String(&pk.XUID)
 	io.Uint16(&pk.SnapshotFlags)
 	io.Bitset(&pk.CInputFlags, gtpacket.PlayerAuthInputBitsetSize)
 

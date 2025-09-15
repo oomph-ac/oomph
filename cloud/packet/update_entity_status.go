@@ -15,13 +15,12 @@ func init() {
 }
 
 type UpdateEntityStatus struct {
-	Flags     uint8  // 1 byte
-	RuntimeId uint64 // 1-9 bytes
-
+	XUID       string     // 1-5 bytes + len(XUID)
+	Flags      uint8      // 1 byte
+	RuntimeId  uint64     // 1-9 bytes
 	Position   mgl32.Vec3 // 0-12 bytes
 	Dimensions mgl32.Vec3 // 0-12 bytes ([w, h, s])
 	EntityType string     // 0-12 bytes
-
 }
 
 func (*UpdateEntityStatus) ID() uint32 {
@@ -29,6 +28,7 @@ func (*UpdateEntityStatus) ID() uint32 {
 }
 
 func (pk *UpdateEntityStatus) Marshal(io protocol.IO, cloudProto uint32) {
+	io.String(&pk.XUID)
 	io.Uint8(&pk.Flags)
 	io.Varuint64(&pk.RuntimeId)
 

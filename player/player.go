@@ -195,8 +195,8 @@ type Player struct {
 	// detections contains the detections for the player.
 	detections []Detection
 
-	// cloudClient is the oomph cloud client that handles remote detections. By default, this is not set.
-	cloudClient *client.Client
+	// cloud is the connection to the cloud server.
+	cloud *client.Client
 
 	// log is the logger of the player.
 	log *slog.Logger
@@ -475,13 +475,19 @@ func (p *Player) Close() error {
 			p.procMu.Lock()
 			defer p.procMu.Unlock()
 
-			if cc := p.cloudClient; cc != nil {
+			if cc := p.cloud; cc != nil {
 				cc.Close()
 			}
 
 			if evHandler := p.eventHandler; evHandler != nil {
 				evHandler.HandleQuit(event.C(p))
 			}
+
+			if cloud := p.cloud; cloud != nil {
+				p.WriteToCloud(&cloudpacket.PlayerDisconnect{XUID: p.IdentityDat.XUID})
+				p.cloud = nil
+			}
+
 			if !p.MState.IsReplay {
 				if c := p.conn; c != nil {
 					c.Close()

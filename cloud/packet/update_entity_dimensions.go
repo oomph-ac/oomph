@@ -13,12 +13,12 @@ const (
 )
 
 type UpdateEntityDimensions struct {
-	Flags     uint8  // 1 byte
-	RuntimeId uint64 // 1-9 bytes
-
-	Width  float32 // 0-4 bytes
-	Height float32 // 0-4 bytes
-	Scale  float32 // 0-4 bytes
+	XUID      string  // 1-5 bytes + len(XUID)
+	Flags     uint8   // 1 byte
+	RuntimeId uint64  // 1-9 bytes
+	Width     float32 // 0-4 bytes
+	Height    float32 // 0-4 bytes
+	Scale     float32 // 0-4 bytes
 }
 
 func (*UpdateEntityDimensions) ID() uint32 {
@@ -26,6 +26,7 @@ func (*UpdateEntityDimensions) ID() uint32 {
 }
 
 func (pk *UpdateEntityDimensions) Marshal(io protocol.IO, cloudProto uint32) {
+	io.String(&pk.XUID)
 	io.Uint8(&pk.Flags)
 	io.Varuint64(&pk.RuntimeId)
 	if pk.CheckFlag(UpdateEntityDimensionsFlagUpdatedWidth) {

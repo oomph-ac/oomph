@@ -35,7 +35,7 @@ func (ack *EntitySize) Run() {
 	ack.mEntity.Scale = ack.scale
 
 	if widthModified || heightModified || scaleModified {
-		pk := &cloudpacket.UpdateEntityDimensions{}
+		pk := &cloudpacket.UpdateEntityDimensions{XUID: ack.mPlayer.IdentityDat.XUID}
 		pk.RuntimeId = ack.mEntity.RuntimeId
 		if widthModified {
 			pk.SetWidth(ack.width)
@@ -79,6 +79,7 @@ func (ack *EntityPosition) Run() {
 		return
 	}
 	ack.mPlayer.WriteToCloud(&packet.UpdateEntityPosition{
+		XUID:         ack.mPlayer.IdentityDat.XUID,
 		RuntimeId:    ack.runtimeID,
 		Position:     e.RecvPosition,
 		IsClientView: false,

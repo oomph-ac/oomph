@@ -67,12 +67,13 @@ func (p *Player) tryRunningClientCombat(pk *packet.PlayerAuthInput) {
 		p.clientEntTracker.Tick(p.ClientTick)
 		_ = p.clientCombat.Calculate()
 	}
-	if p.cloudClient == nil {
+	if p.cloud == nil {
 		return
 	}
 	for rID, e := range p.clientEntTracker.All() {
 		if e.Position != e.PrevPosition {
 			p.WriteToCloud(&cloudpacket.UpdateEntityPosition{
+				XUID:         p.IdentityDat.XUID,
 				RuntimeId:    rID,
 				Position:     e.Position,
 				IsClientView: true,
