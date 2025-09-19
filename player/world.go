@@ -303,6 +303,10 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 }
 
 func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bool {
+	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
+		return true
+	}
+
 	// If the player is a non-touch player, we should just do a raycast and make sure no blocks are in the way. However, the check
 	// below is faster and really the only way we can account for touch players anyway.
 	if p.InputMode != packet.InputModeTouch {
@@ -365,9 +369,6 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 // 2. There are no blocks in the way of the raycast.
 // OR: if the player is not in survival or adventure mode.
 func (p *Player) tryRaycastToBlock(blockPos cube.Pos) bool {
-	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
-		return true
-	}
 	rotation := p.Movement().LastRotation()
 	eyeHeight := game.DefaultPlayerHeightOffset
 	if p.Movement().Sneaking() {
