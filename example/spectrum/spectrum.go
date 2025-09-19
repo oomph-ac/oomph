@@ -46,6 +46,7 @@ func main() {
 
 	debug.SetGCPercent(-1)
 	debug.SetMemoryLimit(4 * 1024 * 1024 * 1024) // 4GB
+	fmt.Println("process ID:", os.Getpid())
 
 	opts := util.DefaultOpts()
 	opts.ClientDecode = player.ClientDecode
@@ -76,8 +77,9 @@ func main() {
 	oconfig.Global.Combat.MaximumAttackAngle = 90
 	oconfig.Global.Combat.EnableClientEntityTracking = true
 
-	oconfig.Global.Network.GlobalMovementCutoffThreshold = 6
+	oconfig.Global.Network.GlobalMovementCutoffThreshold = -1
 	oconfig.Global.Network.MaxEntityRewind = 6
+	oconfig.Global.Network.MaxGhostBlockChain = 7
 	oconfig.Global.Network.MaxKnockbackDelay = -1
 	oconfig.Global.Network.MaxBlockUpdateDelay = -1
 
@@ -162,7 +164,10 @@ func main() {
 				f.Close()
 			})
 			proc.Player().SetRecoverFunc(func(p *player.Player, err any) {
-				panic(err)
+				fmt.Println("ERROR:", err)
+				debug.PrintStack()
+				fmt.Println("Please remember this is an example, and you should set this recovery function to something that can log errors, like Sentry.")
+				os.Exit(1)
 			})
 			proc.Player().AddPerm(player.PermissionDebug)
 			proc.Player().AddPerm(player.PermissionAlerts)

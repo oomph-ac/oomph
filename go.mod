@@ -56,6 +56,8 @@ require (
 
 //replace github.com/sandertv/gophertunnel => ../tedac-gophertunnel
 
+replace github.com/sandertv/go-raknet => ../go-raknet
+
 replace github.com/sandertv/gophertunnel => ../gophertunnel
 
 replace github.com/df-mc/dragonfly => ../dragonfly
