@@ -50,7 +50,7 @@ func (d *BadPacketG) Detect(pk packet.Packet) {
 		if !ok {
 			return
 		}
-		if !utils.IsBlockFaceValid(trDat.BlockFace) {
+		if trDat.ActionType != protocol.UseItemActionClickAir && !utils.IsBlockFaceValid(trDat.BlockFace) {
 			d.mPlayer.FailDetection(d, nil)
 		}
 	case *packet.PlayerAuthInput:
@@ -61,7 +61,7 @@ func (d *BadPacketG) Detect(pk packet.Packet) {
 		}
 		if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
 			for _, action := range pk.BlockActions {
-				if !utils.IsBlockFaceValid(action.Face) {
+				if action.Action != protocol.PlayerActionAbortBreak && !utils.IsBlockFaceValid(action.Face) {
 					d.mPlayer.FailDetection(d, nil)
 				}
 			}
