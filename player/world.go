@@ -8,6 +8,9 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/ethaniccc/float32-cube/cube/trace"
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	oworld "github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -186,13 +189,17 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 		isFullServerAuthBlockBreaking = p.ServerConn() == nil || p.GameDat.PlayerMovementSettings.ServerAuthoritativeBlockBreaking
 	)
 	if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress && isFullServerAuthBlockBreaking {
-		p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
+		p.blockBreakProgress += 1.0 / math32.Max(p.expectedBlockBreakTime(*blockBreakPos), 0.001)
 		p.Dbg.Notify(DebugModeBlockBreaking, true, "(handleBlockActions) assuming block break in progress (blockBreakProgress=%.4f)", p.blockBreakProgress)
 		handledBlockBreak = true
 	}
 
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
-		var newActions = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
+		var (
+			newActions          = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
+			hasPreDestroyAction = p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure
+		)
+
 		for _, action := range pk.BlockActions {
 			p.Dbg.Notify(DebugModeBlockBreaking, true, "blockAction=%v", action)
 			switch action.Action {
@@ -208,16 +215,16 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				finalProgress := p.blockBreakProgress + (1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001))
-				p.Dbg.Notify(DebugModeBlockBreaking, true, "finalProgress=%.4f", finalProgress)
-				if finalProgress <= 0.999 {
-					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
-					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
-					p.Popup("<red>Broke block too early!</red>")
-					p.Dbg.Notify(DebugModeBlockBreaking, true, "cancelled PlayerActionPredictDestroyBlock (finalProgress=%.4f)", finalProgress)
+				if !hasPreDestroyAction {
+					p.Popup("<red>Broke block too early! [2]</red>")
+					p.Dbg.Notify(DebugModeBlockBreaking, true, "cancelled PlayerActionPredictDestroyBlock: no pre-destroy action")
 					continue
 				}
+				hasPreDestroyAction = false
 
+				if !p.tryBreakBlock(cube.Face(action.Face)) {
+					continue
+				}
 				p.blockBreakProgress = 0.0
 				p.blockBreakInProgress = false
 				p.World().SetBlock(df_cube.Pos{
@@ -248,7 +255,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					p.blockBreakProgress = 0.0
 					p.blockBreakStartTick = p.ClientTick
 				}
-				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
+				p.blockBreakProgress += 1.0 / math32.Max(p.expectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
 			case protocol.PlayerActionContinueDestroyBlock:
 				if currentBreakPos := p.worldUpdater.BlockBreakPos(); !p.blockBreakInProgress || (currentBreakPos != nil && *currentBreakPos != action.BlockPos) {
@@ -256,9 +263,10 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					p.blockBreakStartTick = p.ClientTick
 					p.Dbg.Notify(DebugModeBlockBreaking, true, "different block being broken - reset block break progress (currentBreakPos=%v, action.BlockPos=%v)", currentBreakPos, action.BlockPos)
 				}
-				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(action.BlockPos), 0.001)
+				p.blockBreakProgress += 1.0 / math32.Max(p.expectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
 				p.blockBreakInProgress = true
+				hasPreDestroyAction = true
 
 				// We assume a potential mispredction here because the client while clicking, think it may need to break
 				// a block, but the server may instead think an entity is in the way of that block, constituting
@@ -278,16 +286,9 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*p.worldUpdater.BlockBreakPos()), 0.001)
-				p.Dbg.Notify(DebugModeBlockBreaking, true, "(PlayerActionStopBreak) block break progress=%.4f", p.blockBreakProgress)
-				if p.blockBreakProgress <= 0.999 {
-					p.SendBlockUpdates([]protocol.BlockPos{*p.worldUpdater.BlockBreakPos()})
-					pk.InputData.Unset(packet.InputFlagPerformItemInteraction)
-					p.Popup("<red>Broke block too early!</red>")
-					p.Dbg.Notify(DebugModeBlockBreaking, true, "cancelled PlayerActionStopBreak (blockBreakProgress=%.4f)", p.blockBreakProgress)
+				if !p.tryBreakBlock(cube.Face(action.Face)) {
 					continue
 				}
-
 				p.blockBreakProgress = 0.0
 				p.blockBreakInProgress = false
 				p.World().SetBlock(df_cube.Pos{
@@ -300,11 +301,14 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 			newActions = append(newActions, action)
 		}
 		pk.BlockActions = newActions
+		if len(newActions) == 0 {
+			pk.InputData.Unset(packet.InputFlagPerformBlockActions)
+		}
 	}
 
 	if !handledBlockBreak && isFullServerAuthBlockBreaking {
 		if blockBreakPos := p.worldUpdater.BlockBreakPos(); blockBreakPos != nil && p.blockBreakInProgress {
-			p.blockBreakProgress += 1.0 / math32.Max(p.getExpectedBlockBreakTime(*blockBreakPos), 0.001)
+			p.blockBreakProgress += 1.0 / math32.Max(p.expectedBlockBreakTime(*blockBreakPos), 0.001)
 			p.Dbg.Notify(DebugModeBlockBreaking, true, "(afterTheFactHack) block break in progress (blockBreakProgress=%.4f)", p.blockBreakProgress)
 		}
 	}
@@ -314,7 +318,134 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	} */
 }
 
-func (p *Player) getExpectedBlockBreakTime(pos protocol.BlockPos) float32 {
+func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bool {
+	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
+		return true
+	}
+
+	// If the player is a non-touch player, we should just do a raycast and make sure no blocks are in the way. However, the check
+	// below is faster and really the only way we can account for touch players anyway.
+	if p.InputMode != packet.InputModeTouch {
+		return p.tryRaycastToBlock(blockPos)
+	}
+
+	interactableFaces := make(map[cube.Face]struct{}, 6)
+	prevPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
+	currPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
+	blockX, blockY, blockZ := blockPos[0], blockPos[1], blockPos[2]
+
+	belowBlock := currPos[1] < blockY || prevPos[1] < blockY
+	aboveBlock := currPos[1] > blockY || prevPos[1] > blockY
+	if belowBlock {
+		interactableFaces[cube.FaceDown] = struct{}{}
+	}
+	if aboveBlock {
+		interactableFaces[cube.FaceUp] = struct{}{}
+	}
+	if currPos[0] < blockX || prevPos[0] < blockX {
+		interactableFaces[cube.FaceWest] = struct{}{}
+	}
+	if currPos[0] > blockX || prevPos[0] > blockX {
+		interactableFaces[cube.FaceEast] = struct{}{}
+	}
+	if currPos[2] < blockZ || prevPos[2] < blockZ {
+		interactableFaces[cube.FaceNorth] = struct{}{}
+	}
+	if currPos[2] > blockZ || prevPos[2] > blockZ {
+		interactableFaces[cube.FaceSouth] = struct{}{}
+	}
+	if _, ok := interactableFaces[interactFace]; !ok {
+		p.Dbg.Notify(DebugModeBlockBreaking, true, "interactFace=%v is not interactable (currPos=%v, prevPos=%v, blockPos=%v)", interactFace, currPos, prevPos, blockPos)
+		return false
+	}
+
+	// Check if there is a full obstructing block in the way of the face. If so, the player should not be able to break the block.
+	sidePos := blockPos.Side(interactFace)
+	sideBlock := p.World().Block([3]int(sidePos))
+	sideBBs := utils.BlockBoxes(sideBlock, sidePos, p.World())
+	// There are no bounding boxes in the way of this face.
+	if len(sideBBs) == 0 {
+		return true
+	}
+
+	for _, indexBB := range sideBBs {
+		if (indexBB.Width() == 1 || indexBB.Length() == 1) && indexBB.Height() == 1 {
+			return false
+		}
+	}
+	return true
+}
+
+// tryRaycastToBlock runs a raycast to the block at the given position. This function assumes that to break the target block, the
+// player must be aiming at it at all times, so we just use the previous position & current rotation (movement component
+// isn't updated yet when block actions are handled) instead of trying to account for frame action shitfuckery.
+//
+// It returns true if:
+// 1. The raycast hits, and is within the max interaction distance.
+// 2. There are no blocks in the way of the raycast.
+// OR: if the player is not in survival or adventure mode.
+func (p *Player) tryRaycastToBlock(blockPos cube.Pos) bool {
+	rotation := p.Movement().LastRotation()
+	eyeHeight := game.DefaultPlayerHeightOffset
+	if p.Movement().Sneaking() {
+		eyeHeight = game.SneakingPlayerHeightOffset
+	}
+
+	raycastDir := game.DirectionVector(rotation.Z(), rotation.X())
+	raycastStart := p.Movement().LastPos().Add(mgl32.Vec3{0, eyeHeight, 0})
+	raycastEnd := raycastStart.Add(raycastDir.Mul(game.MaxBlockInteractionDistance))
+
+	brokenBlockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(blockPos.Vec3())
+	raycast, ok := trace.BBoxIntercept(brokenBlockBB, raycastStart, raycastEnd)
+	if !ok {
+		return false
+	}
+	hitPos := raycast.Position()
+	for intersectingBlockPos := range game.BlocksBetween(raycastStart, hitPos, 128) {
+		flooredPos := cube.PosFromVec3(intersectingBlockPos)
+		if flooredPos == blockPos {
+			continue
+		}
+		intersectingBlock := p.World().Block([3]int(flooredPos))
+		for _, intersectingBlockBB := range utils.BlockBoxes(intersectingBlock, flooredPos, p.World()) {
+			intersectingBlockBB = intersectingBlockBB.Translate(intersectingBlockPos)
+			if _, ok := trace.BBoxIntercept(intersectingBlockBB, raycastStart, raycastEnd); ok {
+				return false
+			}
+		}
+	}
+
+	p.Message("raycast to block hit!")
+	return true
+}
+
+func (p *Player) tryBreakBlock(interactFace cube.Face) bool {
+	breakPosPtr := p.worldUpdater.BlockBreakPos()
+	if breakPosPtr == nil {
+		p.Dbg.Notify(DebugModeBlockBreaking, true, "ignored PlayerActionStopBreak (blockBreakPos is nil)")
+		return false
+	}
+
+	breakPos := *breakPosPtr
+	p.blockBreakProgress += 1.0 / math32.Max(p.expectedBlockBreakTime(breakPos), 0.001)
+	p.Dbg.Notify(DebugModeBlockBreaking, true, "block break progress=%.4f", p.blockBreakProgress)
+	if p.blockBreakProgress <= 0.999 {
+		p.SendBlockUpdates([]protocol.BlockPos{breakPos})
+		p.Popup("<red>Broke block too early!</red>")
+		p.Dbg.Notify(DebugModeBlockBreaking, true, "cancelled break action (blockBreakProgress=%.4f)", p.blockBreakProgress)
+		p.blockBreakProgress = 0.0
+		return false
+	}
+	if !p.blockInteractable(cube.Pos{int(breakPos[0]), int(breakPos[1]), int(breakPos[2])}, interactFace) {
+		p.SendBlockUpdates([]protocol.BlockPos{breakPos})
+		p.Popup("<red>Cannot break this block!</red>")
+		p.blockBreakProgress = 0.0
+		return false
+	}
+	return true
+}
+
+func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
 		return 0
 	}

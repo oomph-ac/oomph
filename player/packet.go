@@ -1,14 +1,18 @@
 package player
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/utils"
+	oworld "github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -328,6 +332,29 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.ItemStackResponse:
 		p.inventory.HandleItemStackResponse(pk)
 	case *packet.LevelChunk:
+		// HACK: For some reason, some chunks forwarded through gophertunnel will spawn invisible blocks? Lunar had this issue as well
+		// and seemed to have fixed it by fully re-encoding the chunk.
+		if p.opts.Network.AttemptFixChunks && !pk.CacheEnabled && !(pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless) {
+			dim, ok := world.DimensionByID(int(pk.Dimension))
+			if !ok {
+				dim = world.Overworld
+			}
+			if c, err := chunk.NetworkDecode(oworld.AirRuntimeID, pk.RawPayload, int(pk.SubChunkCount), dim.Range()); err != nil {
+				p.Log().Warn("unable to decode chunk", "error", err)
+			} else {
+				data := chunk.Encode(c, chunk.NetworkEncoding)
+				chunkBuf := bytes.NewBuffer(nil)
+				for _, sub := range data.SubChunks {
+					chunkBuf.Write(sub)
+				}
+				chunkBuf.Write(data.Biomes)
+				chunkBuf.WriteByte(0)
+				pk.RawPayload = append([]byte(nil), chunkBuf.Bytes()...)
+				pk.SubChunkCount = uint32(len(data.SubChunks))
+				ctx.SetModified()
+			}
+		}
+
 		p.worldUpdater.HandleLevelChunk(pk)
 	case *packet.MobEffect:
 		pk.Tick = 0
