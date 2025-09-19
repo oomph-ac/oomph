@@ -414,8 +414,6 @@ func (p *Player) tryRaycastToBlock(blockPos cube.Pos) bool {
 			}
 		}
 	}
-
-	p.Message("raycast to block hit!")
 	return true
 }
 
