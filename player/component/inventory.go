@@ -44,6 +44,8 @@ type InventoryComponent struct {
 	currentRequest *invReq
 
 	heldSlot int32
+
+	pendingInventorySync bool
 }
 
 func NewInventoryComponent(p *player.Player) *InventoryComponent {
@@ -123,7 +125,7 @@ func (c *InventoryComponent) Sync(windowID int32) bool {
 		WindowID: uint32(windowID),
 		Content:  contents,
 	})
-
+	c.pendingInventorySync = false
 	return true
 }
 
@@ -171,6 +173,10 @@ func (c *InventoryComponent) SyncSlot(windowID int32, slot int) bool {
 }
 
 func (c *InventoryComponent) ForceSync() {
+	if c.pendingInventorySync {
+		return
+	}
+	c.pendingInventorySync = true
 	// Sending a mismatch transaction to the server forces the server to re-send all inventories.
 	if conn := c.mPlayer.ServerConn(); conn != nil {
 		_ = conn.WritePacket(&packet.InventoryTransaction{
