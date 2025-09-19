@@ -181,7 +181,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
 		var (
 			newActions          = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
-			hasPreDestroyAction = false
+			hasPreDestroyAction = p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure
 		)
 
 		for _, action := range pk.BlockActions {
