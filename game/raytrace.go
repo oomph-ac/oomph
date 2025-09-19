@@ -9,14 +9,15 @@ import (
 )
 
 // https://github.com/pmmp/Math/blob/stable/src/VoxelRayTrace.php#L67
-func BlocksBetween(start, end mgl32.Vec3) iter.Seq[mgl32.Vec3] {
+func BlocksBetween(start, end mgl32.Vec3, maxSafeIters int) iter.Seq[mgl32.Vec3] {
+	currIters := 0
 	return func(yield func(mgl32.Vec3) bool) {
-		dirVec := end.Sub(start).Normalize()
-		if dirVec.LenSqr() <= 0 {
+		delta := end.Sub(start)
+		if delta.LenSqr() <= 1e-10 {
 			return
 		}
-
-		radius := start.Sub(end).Len()
+		dirVec := delta.Normalize()
+		radius := delta.Len()
 		stepX := PHPSpaceshipOp(dirVec.X(), 0)
 		stepY := PHPSpaceshipOp(dirVec.Y(), 0)
 		stepZ := PHPSpaceshipOp(dirVec.Z(), 0)
@@ -42,6 +43,11 @@ func BlocksBetween(start, end mgl32.Vec3) iter.Seq[mgl32.Vec3] {
 
 		currentBlock := cube.PosFromVec3(start).Vec3()
 		for {
+			currIters++
+			if currIters > maxSafeIters {
+				return
+			}
+
 			if !yield(currentBlock) {
 				return
 			}
