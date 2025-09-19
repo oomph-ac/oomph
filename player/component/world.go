@@ -311,18 +311,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 
 	// Check for all the blocks in between the interaction position and the player's eye position. If any blocks intersect
 	// with the line between the player's eye position and the interaction position, the interaction is cancelled.
-	var (
-		checkedPositions = make(map[df_cube.Pos]struct{})
-		iterCount        int
-	)
-
-	for intersectingBlockPos := range game.BlocksBetween(closestEyePos, interactPos) {
-		iterCount++
-		if iterCount > 49 {
-			c.mPlayer.Log().Debug("too many iterations for interaction validation", "eyePos", closestEyePos, "interactPos", interactPos, "checkedPositions", len(checkedPositions))
-			break
-		}
-
+	checkedPositions := make(map[df_cube.Pos]struct{})
+	for intersectingBlockPos := range game.BlocksBetween(closestEyePos, interactPos, 49) {
 		flooredPos := df_cube.Pos{int(intersectingBlockPos[0]), int(intersectingBlockPos[1]), int(intersectingBlockPos[2])}
 		if flooredPos == df_cube.Pos(blockPos) {
 			continue

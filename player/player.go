@@ -116,10 +116,10 @@ type Player struct {
 	// LastAlert is the last time the player received an alert.
 	LastAlert time.Time
 
-	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
-	blockBreakProgress float32
 	// blockBreakStartTick is the tick that the player started breaking a block.
 	blockBreakStartTick int64
+	// blockBreakProgress (usually between 0 and 1) is how far along the player is from breaking a targeted block.
+	blockBreakProgress float32
 	// blockBreakInProgress is a boolean indicating whether the player is currently breaking a block. This is used for
 	// when server-authoritative block breaking is enabled on the server.
 	blockBreakInProgress bool
