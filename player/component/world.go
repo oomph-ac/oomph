@@ -43,6 +43,8 @@ func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 		clientPlacedBlocks:  make(map[df_cube.Pos]*chainedBlockPlacement),
 		pendingBlockUpdates: make(map[df_cube.Pos]uint32),
 		batchedBlockUpdates: acknowledgement.NewUpdateBlockBatchACK(p),
+
+		initalInteractionAccepted: true,
 	}
 }
 
@@ -203,8 +205,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		// The player has nothing in this slot, ignore the block placement.
 		// FIXME: It seems some blocks aren't implemented by Dragonfly and will therefore seem to be air when
 		// it is actually a valid block.
-		c.mPlayer.Popup("<red>No item in hand.</red>")
-		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Block placement denied: no item in hand.")
+		//c.mPlayer.Popup("<red>No item in hand.</red>")
+		//c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "Block placement denied: no item in hand.")
 		return true
 	case item.UsableOnBlock:
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "running interaction w/ item.UsableOnBlock")
@@ -252,15 +254,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		c.initalInteractionAccepted = true
 		return true
 	}
-
-	if c.prevPlaceRequest != nil && dat.BlockRuntimeID == c.prevPlaceRequest.BlockRuntimeID && dat.BlockFace == c.prevPlaceRequest.BlockFace &&
-		dat.BlockPosition == c.prevPlaceRequest.BlockPosition && dat.HotBarSlot == c.prevPlaceRequest.HotBarSlot &&
-		dat.Position == c.prevPlaceRequest.Position && dat.ClickedPosition == c.prevPlaceRequest.ClickedPosition {
-		return false
-	}
-
 	if c.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) && dat.ClientPrediction != protocol.ClientPredictionSuccess {
-		return false
+		return true
 	}
 
 	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
@@ -270,7 +265,6 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	if _, isActivatable := interactedBlock.(block.Activatable); !isActivatable {
 		return true
 	}
-
 	if len(utils.BlockBoxes(interactedBlock, blockPos, c.mPlayer.World())) == 0 {
 		c.initalInteractionAccepted = true
 		return true
