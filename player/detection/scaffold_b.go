@@ -18,7 +18,9 @@ type ScaffoldB struct {
 	mPlayer  *player.Player
 	metadata *player.DetectionMetadata
 
-	initialFace cube.Face
+	initialFace        cube.Face
+	prevSimBlockPos    cube.Pos
+	hasPrevSimBlockPos bool
 }
 
 func New_ScaffoldB(p *player.Player) *ScaffoldB {
@@ -74,6 +76,7 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	blockFace := cube.Face(dat.BlockFace)
 	if dat.TriggerType == protocol.TriggerTypePlayerInput {
 		d.initialFace = faceNotSet
+		d.hasPrevSimBlockPos = false
 	} else if d.initialFace == faceNotSet && blockFace != cube.FaceUp && blockFace != cube.FaceDown {
 		d.initialFace = blockFace
 	}
@@ -93,6 +96,9 @@ func (d *ScaffoldB) Detect(pk packet.Packet) {
 	} else {
 		d.mPlayer.PassDetection(d, 0.5)
 	}
+	if d.initialFace != faceNotSet && (blockFace == cube.FaceUp || blockFace == cube.FaceDown) {
+		d.initialFace = blockFace
+	}
 }
 
 func (d *ScaffoldB) isFaceInteractable(
@@ -107,6 +113,13 @@ func (d *ScaffoldB) isFaceInteractable(
 	floorPosStart := cube.PosFromVec3(startPos)
 	floorPosEnd := cube.PosFromVec3(endPos)
 
+	eyeOffset := game.DefaultPlayerHeightOffset
+	if d.mPlayer.Movement().Sneaking() {
+		eyeOffset = game.SneakingPlayerHeightOffset
+	}
+	floorEyeStart := int(startPos[1] + eyeOffset)
+	floorEyeEnd := int(endPos[1] + eyeOffset)
+
 	if !isClientInput {
 		interactableFaces[cube.FaceDown] = struct{}{}
 		interactableFaces[cube.FaceUp] = struct{}{}
@@ -114,12 +127,31 @@ func (d *ScaffoldB) isFaceInteractable(
 			interactableFaces[d.initialFace] = struct{}{}
 			interactableFaces[d.initialFace.Opposite()] = struct{}{}
 		}
+
+		prevPos := d.prevSimBlockPos
+		d.prevSimBlockPos = blockPos
+		d.hasPrevSimBlockPos = true
+
+		if d.hasPrevSimBlockPos {
+			found := false
+			for iFace := range interactableFaces {
+				if prevPos.Side(iFace) == blockPos {
+					found = true
+					break
+				}
+			}
+			// Simulation placements must be in a chain and not seperated from each other.
+			if !found {
+				d.mPlayer.Log().Debug("scaffold_b (invalid sim placement)", "blockPos", blockPos, "prevSimBlockPos", prevPos, "interactableFaces", interactableFaces)
+				return false
+			}
+		}
 	} else {
 		// Check for the Y-axis faces first.
 		// If floor(eyePos.Y) < blockPos.Y -> the bottom face is interactable.
 		// If floor(eyePos.Y) > blockPos.Y -> the top face is interactable.
-		isBelowBlock := floorPosStart[1] < blockY || floorPosEnd[1] < blockY
-		isAboveBlock := floorPosStart[1] > blockY || floorPosEnd[1] > blockY
+		isBelowBlock := floorEyeStart < blockY || floorEyeEnd < blockY
+		isAboveBlock := floorEyeStart > blockY || floorEyeEnd > blockY
 		isOnBlock := floorPosStart[1] == blockY+1 || floorPosEnd[1] == blockY+1
 		if isBelowBlock {
 			interactableFaces[cube.FaceDown] = struct{}{}
