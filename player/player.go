@@ -477,18 +477,14 @@ func (p *Player) Close() error {
 			p.procMu.Lock()
 			defer p.procMu.Unlock()
 
-			if cc := p.cloud; cc != nil {
-				cc.Close()
-			}
-
 			if evHandler := p.eventHandler; evHandler != nil {
 				evHandler.HandleQuit(event.C(p))
 			}
 
-			if cloud := p.cloud; cloud != nil {
+			/* if cloud := p.cloud; cloud != nil {
 				p.WriteToCloud(&cloudpacket.PlayerDisconnect{Identifier: p.IdentityDat.XUID})
 				p.cloud = nil
-			}
+			} */
 
 			if !p.MState.IsReplay {
 				if c := p.conn; c != nil {

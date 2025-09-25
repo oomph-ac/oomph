@@ -28,6 +28,7 @@ func (*AddPlayerRequest) ID() uint32 {
 }
 
 func (pk *AddPlayerRequest) Marshal(io protocol.IO, _ uint32) {
+	io.String(&pk.PlayerIdentifier)
 	io.Varint32(&pk.Protocol)
 	io.String(&pk.Address)
 	io.ByteSlice(&pk.ClientData)

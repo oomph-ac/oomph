@@ -2,6 +2,12 @@ package packet
 
 import "github.com/sandertv/gophertunnel/minecraft/protocol"
 
+func init() {
+	Register(IDPunishmentEvent, func() Packet {
+		return &PunishmentEvent{}
+	})
+}
+
 type PunishmentEvent struct {
 	Identifier   string // 1-5 bytes + len(Identifier) bytes
 	PunishmentID string // 1-5 bytes + len(PunishmentID) bytes
