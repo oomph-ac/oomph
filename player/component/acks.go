@@ -182,6 +182,7 @@ func (ackC *ACKComponent) Tick(client bool) {
 // to be handled later.
 func (ackC *ACKComponent) Flush() {
 	//assert.IsTrue(ackC.currentBatch.acks != nil, "no buffer for current timestamp to flush %d", ackC.currentBatch.timestamp)
+	ackC.mPlayer.WorldUpdater().Flush()
 	if ackC.currentBatch == nil {
 		ackC.mPlayer.Disconnect(game.ErrorInternalACKIsNull)
 		return
@@ -204,7 +205,7 @@ func (ackC *ACKComponent) Flush() {
 func (ackC *ACKComponent) Invalidate() {
 	for _, batch := range ackC.pending {
 		for _, ack := range batch.acks {
-			if blockACK, ok := ack.(*acknowledgement.UpdateBlock); ok {
+			if blockACK, ok := ack.(*acknowledgement.UpdateBlockBatch); ok {
 				blockACK.Invalidate()
 			}
 		}

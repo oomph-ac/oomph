@@ -16,3 +16,7 @@ func GetFaceFromRotation(yaw float32) cube.Face {
 		return cube.FaceWest
 	}
 }
+
+func IsBlockFaceValid(face int32) bool {
+	return face >= 0 && face <= 5
+}

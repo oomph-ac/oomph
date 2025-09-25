@@ -6,7 +6,9 @@ const (
 	ErrorChunkCacheUnsupported    = "Error: Chunk cache is not supported from server -> proxy"
 	ErrorTooManyChunkBlobsPending = "Error: Client requested too many chunk blobs."
 	ErrorChunkCacheMVError        = "Error: Multi-version failed to properly downgrade chunk packet."
-	ErrorInvalidInventorySlot     = "Error: Invalid inventory slot selected."
+
+	ErrorInvalidInventorySlot = "Error: Invalid inventory slot selected."
+	ErrorInvalidBlockFace     = "Error: Invalid block face selected."
 
 	ErrorInternalDecodeChunk                       = "Unable to decode chunk: %v"
 	ErrorInternalDuplicateACK                      = "Error: Duplicated ACKs."

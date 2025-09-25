@@ -87,7 +87,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox 
 
 		blockBBY := float32(height.(int32)) / 8.0
 		return []cube.BBox{cube.Box(0, 0, 0, 1, blockBBY, 1)}
-	case "minecraft:redstone_ore", "minecraft:redstone_wire":
+	case "minecraft:redstone_wire":
 		return []cube.BBox{}
 	case "minecraft:golden_rail", "minecraft:detector_rail", "minecraft:activator_rail", "minecraft:rail":
 		return []cube.BBox{}
