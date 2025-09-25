@@ -6,13 +6,10 @@ import (
 
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/item"
-<<<<<<< HEAD
-	"github.com/go-gl/mathgl/mgl32"
-	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
-=======
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
->>>>>>> master
+	"github.com/go-gl/mathgl/mgl32"
+	cloudpacket "github.com/oomph-ac/oomph/cloud/packet"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player/context"
