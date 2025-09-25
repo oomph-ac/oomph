@@ -33,7 +33,7 @@ type EventHandler interface {
 	// HandleCloudFlag is called when a cloud detection flag event is received.
 	HandleCloudFlag(ctx *event.Context[*Player], dtcType, dtcSubType string, violations float32)
 	// HandleCloudQueuedPunishment is called when a cloud detection queued punishment event is received.
-	HandleCloudPunishment(ctx *event.Context[*Player], dtcType, dtcSubType string, effectiveAt time.Time)
+	HandleCloudPunishment(ctx *event.Context[*Player], effectiveAt time.Time, punishmentID string)
 }
 
 // NopEventHandler is an event handler that does nothing.
@@ -45,8 +45,8 @@ func (NopEventHandler) HandleCommand(*event.Context[*Player], string, []string) 
 func (NopEventHandler) HandlePunishment(*event.Context[*Player], Detection, *string) {}
 func (NopEventHandler) HandleFlag(*event.Context[*Player], Detection, *orderedmap.OrderedMap[string, any]) {
 }
-func (NopEventHandler) HandleCloudFlag(*event.Context[*Player], string, string, float32)         {}
-func (NopEventHandler) HandleCloudPunishment(*event.Context[*Player], string, string, time.Time) {}
+func (NopEventHandler) HandleCloudFlag(*event.Context[*Player], string, string, float32) {}
+func (NopEventHandler) HandleCloudPunishment(*event.Context[*Player], time.Time, string) {}
 
 type ExampleEventHandler struct {
 	connected     map[string]*Player
@@ -268,11 +268,10 @@ func (h *ExampleEventHandler) HandleCloudFlag(ctx *event.Context[*Player], dtcTy
 	h.broadcastAlert(alertMsg)
 }
 
-func (h *ExampleEventHandler) HandleCloudPunishment(ctx *event.Context[*Player], dtcType, dtcSubType string, effectiveAt time.Time) {
+func (h *ExampleEventHandler) HandleCloudPunishment(ctx *event.Context[*Player], effectiveAt time.Time, punishmentID string) {
 	// Ideally - this implementation allows for the ban to be delayed and not acted upon the effectiveAt time for best results.
 	// However, for this example handler we can just issue the punishment immediately.
 	p := ctx.Val()
-	p.Log().Info("cloud punishment issued to player", "detection_type", dtcType, "detection_subtype", dtcSubType, "effective_at", effectiveAt)
 	p.Disconnect(DefaultDetectionDisconnectMessage)
 }
 

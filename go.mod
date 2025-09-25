@@ -4,6 +4,7 @@ go 1.24.1
 
 require (
 	github.com/akmalfairuz/legacy-version v1.5.4
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/chewxy/math32 v1.10.1
 	github.com/cooldogedev/spectrum v0.0.40-0.20250527034552-55ddfe1bba67
 	github.com/df-mc/dragonfly v0.10.6-0.20250708145727-07da2e859609
@@ -24,7 +25,6 @@ require (
 
 require (
 	github.com/brentp/intintmap v0.0.0-20190211203843-30dc0ade9af9 // indirect
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cooldogedev/spectral v0.0.5 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/worldupgrader v1.0.19 // indirect

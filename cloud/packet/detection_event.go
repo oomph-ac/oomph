@@ -11,7 +11,6 @@ type DetectionEvent struct {
 	// generated UUID of the player if the proxy wants to accept offline-mode players.
 	PlayerIdentifier string // 1-5 bytes + len(PlayerIdentifier)
 
-	EventType  byte    // 1 byte
 	Violations float32 // 4 bytes
 	Type       string  // 1-5 bytes + len(Type) bytes
 	SubType    string  // 1-5 bytes + len(SubType) bytes
@@ -23,7 +22,6 @@ func (pk *DetectionEvent) ID() uint32 {
 
 func (pk *DetectionEvent) Marshal(io protocol.IO, cloudProto uint32) {
 	io.String(&pk.PlayerIdentifier)
-	io.Uint8(&pk.EventType)
 	io.String(&pk.Type)
 	io.String(&pk.SubType)
 	io.Float32(&pk.Violations)
