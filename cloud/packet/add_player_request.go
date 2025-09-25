@@ -17,7 +17,7 @@ type AddPlayerRequest struct {
 	// to be parsed, a response can still be sent back to the proxy.
 	PlayerIdentifier string // 1-5 bytes + len(PlayerIdentifier) bytes
 
-	Protocol     uint32                    // 1-5 bytes
+	Protocol     int32                     // 1-5 bytes
 	Address      string                    // 1-5 bytes + len(Address) bytes
 	ClientData   []byte                    // 1-5 bytes + len(ClientData) bytes
 	IdentityData protocol.Optional[[]byte] // 1 byte + 1-5 bytes + len(IdentityData) bytes
@@ -28,7 +28,7 @@ func (*AddPlayerRequest) ID() uint32 {
 }
 
 func (pk *AddPlayerRequest) Marshal(io protocol.IO, _ uint32) {
-	io.Varuint32(&pk.Protocol)
+	io.Varint32(&pk.Protocol)
 	io.String(&pk.Address)
 	io.ByteSlice(&pk.ClientData)
 	protocol.OptionalFunc(io, &pk.IdentityData, io.ByteSlice)
