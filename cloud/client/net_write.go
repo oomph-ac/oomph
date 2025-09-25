@@ -44,7 +44,7 @@ func (c *Client) flush() error {
 	}
 
 	batchLen := uint32(buf.Len())
-	useCompression := batchLen > c.connInfo.CmpThreshold
+	useCompression := batchLen > c.netOpts.CmpThreshold
 	header := make([]byte, packet.NetworkHeaderSize)
 
 	// Track original uncompressed data size
@@ -112,7 +112,7 @@ func (c *Client) networkWrite(b []byte) error {
 }
 
 func (c *Client) writeLoop() {
-	t := time.NewTicker(c.connInfo.FlushRate)
+	t := time.NewTicker(c.netOpts.FlushRate)
 	defer t.Stop()
 
 	for {

@@ -5,6 +5,7 @@ import "github.com/sandertv/gophertunnel/minecraft/protocol"
 const (
 	InitConnectionStatusOK uint8 = iota
 	InitConnectionStatusOKWithWarning
+	InitConnectionStatusProtocolIncompatible
 	InitConnectionStatusError
 	InitConnectionStatusUnauthorized
 )

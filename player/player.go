@@ -197,6 +197,8 @@ type Player struct {
 
 	// cloud is the connection to the cloud server.
 	cloud *client.Client
+	// cloudId is the oomph cloud identifier for this player.
+	cloudId uint64
 
 	// log is the logger of the player.
 	log *slog.Logger
@@ -484,7 +486,7 @@ func (p *Player) Close() error {
 			}
 
 			if cloud := p.cloud; cloud != nil {
-				p.WriteToCloud(&cloudpacket.PlayerDisconnect{XUID: p.IdentityDat.XUID})
+				p.WriteToCloud(&cloudpacket.PlayerDisconnect{Identifier: p.IdentityDat.XUID})
 				p.cloud = nil
 			}
 

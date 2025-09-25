@@ -2,23 +2,19 @@ package packet
 
 import "github.com/sandertv/gophertunnel/minecraft/protocol"
 
-const (
-	DetectionEventFlagged byte = iota
-	DetectionEventPunishmentIssued
-)
-
 func init() {
 	Register(IDDetectionEvent, func() Packet { return &DetectionEvent{} })
 }
 
 type DetectionEvent struct {
-	XUID                  string  // 1-5 bytes + len(XUID)
-	EventType             byte    // 1 byte
-	Violations            float32 // 4 bytes
-	DetectionType         string  // 1-5 bytes + len(DetectionType) bytes
-	DetectionSubType      string  // 1-5 bytes + len(DetectionSubType) bytes
-	PunishmentID          string  // 1-5 bytes + len(PunishmentID) bytes
-	PunishmentEffectiveAt int64   // 8 bytes
+	// PlayerIdentifier is either the XUID of the player if the proxy has online mode enabled, or the client-side
+	// generated UUID of the player if the proxy wants to accept offline-mode players.
+	PlayerIdentifier string // 1-5 bytes + len(PlayerIdentifier)
+
+	EventType  byte    // 1 byte
+	Violations float32 // 4 bytes
+	Type       string  // 1-5 bytes + len(Type) bytes
+	SubType    string  // 1-5 bytes + len(SubType) bytes
 }
 
 func (pk *DetectionEvent) ID() uint32 {
@@ -26,14 +22,9 @@ func (pk *DetectionEvent) ID() uint32 {
 }
 
 func (pk *DetectionEvent) Marshal(io protocol.IO, cloudProto uint32) {
-	io.String(&pk.XUID)
+	io.String(&pk.PlayerIdentifier)
 	io.Uint8(&pk.EventType)
-	if pk.EventType == DetectionEventFlagged {
-		io.String(&pk.DetectionType)
-		io.String(&pk.DetectionSubType)
-		io.Float32(&pk.Violations)
-	} else if pk.EventType == DetectionEventPunishmentIssued {
-		io.String(&pk.PunishmentID)
-		io.Int64(&pk.PunishmentEffectiveAt)
-	}
+	io.String(&pk.Type)
+	io.String(&pk.SubType)
+	io.Float32(&pk.Violations)
 }

@@ -14,4 +14,6 @@ const (
 	IDUpdateEntityDimensions
 	IDUpdateEntityStatus
 	IDDetectionEvent
+	IDPunishmentEvent
+	IDCustomMessage
 )

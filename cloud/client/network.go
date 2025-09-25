@@ -183,7 +183,7 @@ func GetNetworkReport() networkReport {
 	}
 }
 
-type ConnectionInfo struct {
+type NetworkOpts struct {
 	FlushRate    time.Duration
 	CmpThreshold uint32
 }

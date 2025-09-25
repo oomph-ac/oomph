@@ -11,9 +11,9 @@ import (
 )
 
 type Client struct {
-	log      *slog.Logger
-	conn     net.Conn
-	connInfo ConnectionInfo
+	log     *slog.Logger
+	conn    net.Conn
+	netOpts NetworkOpts
 
 	batched  []packet.Packet
 	wPackets chan packet.Packet
@@ -25,14 +25,14 @@ type Client struct {
 	once sync.Once
 }
 
-func New(log *slog.Logger, conn net.Conn, cd ConnectionInfo) *Client {
+func New(log *slog.Logger, conn net.Conn, cd NetworkOpts) *Client {
 	if cd.FlushRate < 50*time.Millisecond {
 		cd.FlushRate = 50 * time.Millisecond
 	}
 	c := &Client{
-		log:      log,
-		conn:     conn,
-		connInfo: cd,
+		log:     log,
+		conn:    conn,
+		netOpts: cd,
 
 		batched:  make([]packet.Packet, 0, 64),
 		wPackets: make(chan packet.Packet, 128),

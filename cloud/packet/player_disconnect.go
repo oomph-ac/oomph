@@ -12,8 +12,8 @@ func init() {
 // should disconnect the player with the given message. If sent by the connected proxy, the cloud server should save relevant
 // data before removing the session.
 type PlayerDisconnect struct {
-	XUID    string // 1-5 bytes + len(XUID)
-	Message string // 1-5 bytes + len(Message) bytes
+	Identifier string // 1-5 bytes + len(Identifier)
+	Message    string // 1-5 bytes + len(Message) bytes
 }
 
 func (*PlayerDisconnect) ID() uint32 {
@@ -21,6 +21,6 @@ func (*PlayerDisconnect) ID() uint32 {
 }
 
 func (pk *PlayerDisconnect) Marshal(io protocol.IO, cloudProto uint32) {
-	io.String(&pk.XUID)
+	io.String(&pk.Identifier)
 	io.String(&pk.Message)
 }

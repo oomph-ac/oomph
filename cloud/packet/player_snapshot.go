@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	PlayerSnapshotFlagInCorrectiveState = 1 << iota
+	PlayerSnapshotFlagIsInital = 1 << iota
+	PlayerSnapshotFlagInCorrectiveState
 	PlayerSnapshotFlagHasTeleport
 	PlayerSnapshotFlagHasKnockback
 	PlayerSnapshotFlagUpdatedPosition
@@ -26,7 +27,8 @@ func init() {
 }
 
 type PlayerSnapshot struct {
-	XUID          string          // 1-5 bytes + len(XUID)
+	CloudID uint64 // 1-9 bytes
+
 	SnapshotFlags uint16          // 2 bytes
 	CInputFlags   protocol.Bitset // 9 bytes (?)
 	Pos, CPos     mgl32.Vec3      // 0-24 bytes
@@ -43,7 +45,7 @@ func (*PlayerSnapshot) ID() uint32 {
 }
 
 func (pk *PlayerSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
-	io.String(&pk.XUID)
+	io.Varuint64(&pk.CloudID)
 	io.Uint16(&pk.SnapshotFlags)
 	io.Bitset(&pk.CInputFlags, gtpacket.PlayerAuthInputBitsetSize)
 

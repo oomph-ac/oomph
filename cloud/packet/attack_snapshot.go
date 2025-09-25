@@ -20,7 +20,8 @@ const (
 )
 
 type AttackSnapshot struct {
-	XUID        string     // 1-5 bytes + len(XUID)
+	CloudID uint64 // 1-9 bytes
+
 	Flags       uint8      // 1 byte
 	HotBarSlot  int32      // 0-5 bytes
 	EntityRID   uint64     // 0-9 bytes
@@ -33,7 +34,7 @@ func (*AttackSnapshot) ID() uint32 {
 }
 
 func (pk *AttackSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
-	io.String(&pk.XUID)
+	io.Varuint64(&pk.CloudID)
 	io.Uint8(&pk.Flags)
 	if pk.CheckFlag(AttackSnapshotFlagIsInital) {
 		io.Varint32(&pk.HotBarSlot)

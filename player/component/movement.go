@@ -842,7 +842,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	}
 
 	playerSnapshot := &cloudpacket.PlayerSnapshot{
-		XUID:        mc.mPlayer.IdentityDat.XUID,
+		CloudID:     mc.mPlayer.CloudID(),
 		CInputFlags: clonedInputData,
 		Timestamp:   time.Now().UnixMicro(),
 		CInputTick:  mc.mPlayer.ClientTick,

@@ -23,7 +23,8 @@ const (
 )
 
 type BlockInteractionSnapshot struct {
-	XUID        string            // 1-5 bytes + len(XUID)
+	CloudID uint64 // 1-9 bytes
+
 	Flags       uint8             // 1 byte
 	ActionType  uint32            // 0-5 bytes
 	TriggerType uint32            // 0-5 bytes
@@ -39,7 +40,7 @@ func (*BlockInteractionSnapshot) ID() uint32 {
 }
 
 func (pk *BlockInteractionSnapshot) Marshal(io protocol.IO, cloudProto uint32) {
-	io.String(&pk.XUID)
+	io.Varuint64(&pk.CloudID)
 	io.Uint8(&pk.Flags)
 	if pk.CheckFlag(BlockInteractionSnapshotFlagIsInital) {
 		io.Varuint32(&pk.ActionType)

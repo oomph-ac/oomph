@@ -6,7 +6,7 @@ import (
 	"github.com/oomph-ac/oomph/oerror"
 )
 
-func (p *Player) SetCloud(cl *client.Client) {
+func (p *Player) SetCloud(cl *client.Client, cloudId uint64) {
 	if p.cloud != nil && cl != nil {
 		panic(oerror.New("cloud client already set for player"))
 	}
@@ -14,10 +14,19 @@ func (p *Player) SetCloud(cl *client.Client) {
 		panic(oerror.New("cloud functionality requires client-view entity tracking to be enabled"))
 	}
 	p.cloud = cl
+	if cl != nil {
+		p.cloudId = cloudId
+	} else {
+		p.cloudId = 0
+	}
 }
 
 func (p *Player) Cloud() *client.Client {
 	return p.cloud
+}
+
+func (p *Player) CloudID() uint64 {
+	return p.cloudId
 }
 
 func (p *Player) WriteToCloud(pk packet.Packet) {
