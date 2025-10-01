@@ -14,7 +14,6 @@ require (
 	github.com/go-echarts/statsview v0.4.2
 	github.com/go-gl/mathgl v1.2.0
 	github.com/golang/snappy v1.0.0
-	github.com/oomph-ac/multiversion v0.0.0-20250311011509-e9c78bda67c1
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
 	github.com/sandertv/gophertunnel v1.49.0
@@ -66,7 +65,5 @@ replace github.com/df-mc/dragonfly => ../dragonfly
 replace github.com/cooldogedev/spectrum => ../spectrum
 
 replace github.com/oomph-ac/oconfig => ../oconfig
-
-replace github.com/oomph-ac/multiversion => ../multiversion
 
 replace github.com/akmalfairuz/legacy-version => ../legacy-version
