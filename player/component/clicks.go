@@ -88,7 +88,13 @@ func (c *ClicksComponent) Tick() {
 }
 
 func (c *ClicksComponent) clickLeft() {
-	index := c.clicksLeft.Cap() - 1
+	leftCap := c.clicksLeft.Cap()
+	if leftCap == 0 {
+		c.clicksLeft.Append(1)
+		return
+	}
+
+	index := leftCap - 1
 	c.clicksLeft.Set(index, c.clicksLeft.Get(index)+1)
 	c.cpsLeft++
 	c.delayLeft = c.mPlayer.InputCount - c.lastLeftClick
@@ -100,7 +106,13 @@ func (c *ClicksComponent) clickLeft() {
 }
 
 func (c *ClicksComponent) clickRight() {
-	index := c.clicksRight.Cap() - 1
+	rightCap := c.clicksRight.Cap()
+	if rightCap == 0 {
+		c.clicksRight.Append(1)
+		return
+	}
+
+	index := rightCap - 1
 	c.clicksRight.Set(index, c.clicksRight.Get(index)+1)
 	c.cpsRight++
 	c.delayRight = c.mPlayer.InputCount - c.lastRightClick
