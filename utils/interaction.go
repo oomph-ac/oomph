@@ -208,7 +208,7 @@ func UseOnBlock(opts UseOnBlockOpts) {
 			return
 		}
 		place(placer, clickedBlockPos, pos, face, b)
-	case block.Chain:
+	case block.IronChain:
 		pos, face, used := firstReplaceable(src, replaceBlockPos, face, b)
 		if !used {
 			return
@@ -480,7 +480,7 @@ func UseOnBlock(opts UseOnBlockOpts) {
 		}
 		if face == cube.FaceDown {
 			upPos := pos.Side(cube.FaceUp)
-			if _, ok := src.Block(upPos).(block.Chain); !ok && !src.Block(upPos).Model().FaceSolid(upPos, cube.FaceDown, src) {
+			if _, ok := src.Block(upPos).(block.IronChain); !ok && !src.Block(upPos).Model().FaceSolid(upPos, cube.FaceDown, src) {
 				face = cube.FaceUp
 			}
 		}
