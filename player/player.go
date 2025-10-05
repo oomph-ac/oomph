@@ -435,7 +435,7 @@ func (p *Player) Disconnect(reason string) {
 	p.SendPacketToClient(&packet.Disconnect{
 		Message:         reason,
 		FilteredMessage: reason,
-		Reason:          packet.DisconnectReasonKicked,
+		//Reason:          packet.DisconnectReasonKicked,
 	})
 	p.Close()
 }
