@@ -24,6 +24,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cooldogedev/spectral v0.0.5 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
+	github.com/df-mc/jsonc v1.0.5 // indirect
 	github.com/df-mc/worldupgrader v1.0.20 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.5.1 // indirect
@@ -33,7 +34,6 @@ require (
 	github.com/hjson/hjson-go/v4 v4.4.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/muhammadmuzzammil1998/jsonc v1.0.0 // indirect
 	github.com/onsi/gomega v1.36.3 // indirect
 	github.com/quic-go/quic-go v0.53.0 // indirect
 	github.com/rs/cors v1.11.0 // indirect
