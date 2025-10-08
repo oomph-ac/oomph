@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-echarts/statsview"
 	"github.com/go-echarts/statsview/viewer"
+	"github.com/oomph-ac/oomph/utils"
 )
 
 var (
@@ -55,6 +56,8 @@ func main() {
 		go mgr.Start()
 		//go http.ListenAndServe("localhost:8080", nil)
 	}
+
+	utils.InitializeBlockNameMapping()
 
 	for {
 		c, err := listener.Accept()
