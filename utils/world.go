@@ -19,8 +19,26 @@ type BlockSearchResult struct {
 	Position cube.Pos
 }
 
+var (
+	blockNameMapping = map[uint64]string{}
+)
+
+func InitializeBlockNameMapping() {
+	blockNameMapping = make(map[uint64]string, len(world.Blocks()))
+	for _, b := range world.Blocks() {
+		if x, y := b.Hash(); x == 0 && y == math.MaxUint64 {
+			continue
+		}
+		name, _ := b.EncodeBlock()
+		blockNameMapping[world.BlockHash(b)] = name
+	}
+}
+
 // BlockName returns the name of the block.
 func BlockName(b world.Block) string {
+	if n, ok := blockNameMapping[world.BlockHash(b)]; ok {
+		return n
+	}
 	n, _ := b.EncodeBlock()
 	return n
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 
+	"github.com/oomph-ac/oomph/utils"
 	_ "net/http/pprof"
 )
 
@@ -141,6 +142,8 @@ func main() {
 		time.Sleep(time.Second)
 		os.Exit(0)
 	}()
+
+	utils.InitializeBlockNameMapping()
 
 	for {
 		initalSession, err := proxy.Accept()
