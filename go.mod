@@ -6,7 +6,7 @@ require (
 	github.com/akmalfairuz/legacy-version v1.5.4
 	github.com/chewxy/math32 v1.10.1
 	github.com/cooldogedev/spectrum v0.0.40-0.20250527034552-55ddfe1bba67
-	github.com/df-mc/dragonfly v0.10.6-0.20250708145727-07da2e859609
+	github.com/df-mc/dragonfly v0.10.6-0.20250817203556-60bcf6b7432b
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/getsentry/sentry-go v0.27.0
@@ -16,7 +16,7 @@ require (
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
 	github.com/sandertv/gophertunnel v1.50.0
 	github.com/zeebo/xxh3 v1.0.2
-	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
+	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b
 )
 
 require (
@@ -28,7 +28,7 @@ require (
 	github.com/df-mc/worldupgrader v1.0.20 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.5.1 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hjson/hjson-go/v4 v4.4.0 // indirect
@@ -41,14 +41,14 @@ require (
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	go.uber.org/mock v0.5.2 // indirect
-	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/mod v0.26.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/tools v0.35.0 // indirect
+	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/mod v0.27.0 // indirect
+	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/oauth2 v0.31.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
+	golang.org/x/tools v0.36.0 // indirect
 )
 
 //replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
