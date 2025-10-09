@@ -76,7 +76,11 @@ func (ack *SubChunkUpdate) Run() {
 			ch = existing
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "using existing chunk %v", chunkPos)
 		} else {
-			ch = chunk.New(oworld.AirRuntimeID, world.Overworld.Range())
+			dimension, ok := world.DimensionByID(int(ack.pk.Dimension))
+			if !ok {
+				dimension = world.Overworld
+			}
+			ch = chunk.New(oworld.AirRuntimeID, dimension.Range())
 			newChunks[chunkPos] = ch
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "new chunk at %v", chunkPos)
 		}
