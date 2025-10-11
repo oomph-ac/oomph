@@ -506,8 +506,7 @@ func (pl *chainedBlockPlacement) ghostBlockChain() (int, bool) {
 	for parent != nil {
 		// If the placement was allowed, it is not part of the ghost block chain.
 		if parent.placementAllowed {
-			anyConfirmed = true
-			break
+			return size, anyConfirmed
 		}
 		size++
 		anyConfirmed = anyConfirmed || parent.placementConfirmed
