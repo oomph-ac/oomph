@@ -325,9 +325,9 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 
 	// If the player is a non-touch player, we should just do a raycast and make sure no blocks are in the way. However, the check
 	// below is faster and really the only way we can account for touch players anyway.
-	if p.InputMode != packet.InputModeTouch {
+	/* if p.InputMode != packet.InputModeTouch {
 		return p.tryRaycastToBlock(blockPos)
-	}
+	} */
 
 	interactableFaces := make(map[cube.Face]struct{}, 6)
 	prevPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
