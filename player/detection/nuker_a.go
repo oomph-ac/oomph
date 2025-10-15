@@ -52,6 +52,6 @@ func (d *NukerA) Detect(pk packet.Packet) {
 		return
 	}
 	if trDat.ActionType == protocol.UseItemActionBreakBlock && (d.mPlayer.GameMode == packet.GameTypeSurvival || d.mPlayer.GameMode == packet.GameTypeAdventure) {
-		d.mPlayer.FailDetection(d, nil)
+		d.mPlayer.FailDetection(d)
 	}
 }

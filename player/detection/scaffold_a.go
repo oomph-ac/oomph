@@ -55,6 +55,6 @@ func (d *ScaffoldA) Detect(pk packet.Packet) {
 		return
 	}
 	if trData.ClickedPosition.LenSqr() == 0 && trData.TriggerType == protocol.TriggerTypePlayerInput {
-		d.mPlayer.FailDetection(d, nil)
+		d.mPlayer.FailDetection(d)
 	}
 }

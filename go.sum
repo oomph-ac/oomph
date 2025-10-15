@@ -32,8 +32,6 @@ github.com/df-mc/jsonc v1.0.5/go.mod h1:+Q++JuCE9IKiP8v7sWImdf/RjQX0nfXyfX6PdfTT
 github.com/df-mc/worldupgrader v1.0.20 h1:wfJyG3bFeaM/HXy7TCiO4HKVw3Mf3N4gPFmgxMHsKnc=
 github.com/df-mc/worldupgrader v1.0.20/go.mod h1:tsSOLTRm9mpG7VHvYpAjjZrkRHWmSbKZAm9bOLNnlDk=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
-github.com/elliotchance/orderedmap/v2 v2.2.0 h1:7/2iwO98kYT4XkOjA9mBEIwvi4KpGB4cyHeOFOnj4Vk=
-github.com/elliotchance/orderedmap/v2 v2.2.0/go.mod h1:85lZyVbpGaGvHvnKa7Qhx7zncAdBIBq6u56Hb1PRU5Q=
 github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12 h1:o8NDdPPBeF7y//XYIRvzrXPB08/Lblt/ceu1+3vS1hM=
 github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12/go.mod h1:xBh0GYHZ5yHg3YvvUGriGLSAlm7YW2S9SRULstdLZLk=
 github.com/fatih/set v0.2.1 h1:nn2CaJyknWE/6txyUDGwysr3G5QC6xWB/PtVjPBbeaA=

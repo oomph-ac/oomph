@@ -1,7 +1,6 @@
 package detection
 
 import (
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -54,9 +53,7 @@ func (d *AutoclickerA) hookLeft() {
 		limit = d.mPlayer.Opts().Combat.LeftCPSLimitMobile
 	}
 	if cps := d.mPlayer.Clicks().CPSLeft(); cps > limit {
-		dat := orderedmap.NewOrderedMap[string, any]()
-		dat.Set("left_cps", cps)
-		d.mPlayer.FailDetection(d, dat)
+		d.mPlayer.FailDetection(d, "left_cps", cps)
 	}
 }
 
@@ -66,8 +63,6 @@ func (d *AutoclickerA) hookRight() {
 		limit = d.mPlayer.Opts().Combat.RightCPSLimitMobile
 	}
 	if cps := d.mPlayer.Clicks().CPSRight(); cps > limit {
-		dat := orderedmap.NewOrderedMap[string, any]()
-		dat.Set("right_cps", cps)
-		d.mPlayer.FailDetection(d, dat)
+		d.mPlayer.FailDetection(d, "right_cps", cps)
 	}
 }

@@ -2,7 +2,6 @@ package detection
 
 import (
 	"github.com/chewxy/math32"
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
@@ -67,9 +66,7 @@ func (d *HitboxA) Detect(pk packet.Packet) {
 			pk.Position.Sub(game.ClosestPointToBBox(pk.Position, h2)).Len(),
 		)
 		if dist > 0.004 {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("amt", game.Round32(0.6+(dist*2), 3))
-			d.mPlayer.FailDetection(d, data)
+			d.mPlayer.FailDetection(d, "amt", game.Round32(0.6+(dist*2), 3))
 		} else {
 			d.mPlayer.PassDetection(d, d.metadata.Buffer)
 		}

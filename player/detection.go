@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/event"
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oconfig"
-	"github.com/oomph-ac/oomph/game"
 	oevent "github.com/oomph-ac/oomph/player/event"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -51,11 +49,13 @@ func (p *Player) PassDetection(d Detection, sub float64) {
 	m.Buffer = math.Max(0, m.Buffer-sub)
 }
 
-func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[string, any]) {
-	if extraData == nil {
-		extraData = orderedmap.NewOrderedMap[string, any]()
+func (p *Player) FailDetection(d Detection, keyvals ...any) {
+	// Ensure kvs are in pairs to avoid misaligned formatting.
+	if len(keyvals)%2 != 0 {
+		keyvals = keyvals[:len(keyvals)-1]
 	}
-	extraData.Set("latency", fmt.Sprintf("%dms", p.StackLatency.Milliseconds()))
+	// Append latency consistently to all failure logs/events.
+	keyvals = append(keyvals, "latency", fmt.Sprintf("%dms", p.StackLatency.Milliseconds()))
 
 	m := d.Metadata()
 	m.Buffer = math.Min(m.Buffer+1.0, m.MaxBuffer)
@@ -71,7 +71,7 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 	}
 
 	ctx := event.C(p)
-	p.EventHandler().HandleFlag(ctx, d, extraData)
+	p.EventHandler().HandleFlag(ctx, d)
 	if ctx.Cancelled() {
 		m.Violations = oldVl
 		return
@@ -79,7 +79,7 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 
 	m.LastFlagged = p.ServerTick
 	if m.Violations >= 0.01 {
-		extraDatString := utils.OrderedMapToString(*extraData)
+		extraDatString := utils.KeyValsToString(keyvals...)
 		if oconfig.Global.UseLegacyEvents {
 			p.SendRemoteEvent(oevent.NewFlaggedEvent(
 				p.IdentityDat.DisplayName,
@@ -89,7 +89,14 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 				extraDatString,
 			))
 		}
-		p.Log().Warn(fmt.Sprintf("%s flagged %s (%s) <x%.2f> %s", p.IdentityDat.DisplayName, d.Type(), d.SubType(), game.Round64(m.Violations, 2), extraDatString))
+		p.Log().Warn(
+			"failed detection",
+			"ign", p.IdentityDat.DisplayName,
+			"dtc", d.Type(),
+			"subDtc", d.SubType(),
+			"vl", m.Violations,
+			"data", extraDatString,
+		)
 	}
 
 	if d.Punishable() && m.Violations >= m.MaxViolations {
@@ -100,7 +107,13 @@ func (p *Player) FailDetection(d Detection, extraData *orderedmap.OrderedMap[str
 			return
 		}
 
-		p.Log().Warn("Player was removed from the server for usage of third-party modifications.", "playerIGN", p.IdentityDat.DisplayName, "detectionType", d.Type(), "detectionSubType", d.SubType())
+		p.Log().Warn(
+			"punishment issued",
+			"ign", p.IdentityDat.DisplayName,
+			"dtc", d.Type(),
+			"subDtc", d.SubType(),
+			"message", message,
+		)
 		p.Disconnect(message)
 		p.Close()
 	}

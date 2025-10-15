@@ -3,7 +3,6 @@ package detection
 import (
 	"slices"
 
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -65,16 +64,12 @@ func (d *EditionFakerC) Detect(pk packet.Packet) {
 	if i, ok := pk.(*packet.PlayerAuthInput); ok {
 		// There is no input mode after motion controller or before mouse.
 		if i.InputMode > packet.InputModeMotionController || i.InputMode < packet.InputModeMouse {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("inputMode", i.InputMode)
-			d.mPlayer.FailDetection(d, data)
+			d.mPlayer.FailDetection(d, "inputMode", i.InputMode)
 			return
 		}
 
 		if invalid, ok := knownInvalidInputs[d.mPlayer.ClientDat.DeviceOS]; !ok && slices.Contains(invalid, i.InputMode) {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("inputMode", i.InputMode)
-			data.Set("OS", utils.Device(d.mPlayer.ClientDat.DeviceOS))
+			_ = utils.Device(d.mPlayer.ClientDat.DeviceOS) // existing behavior didn't flag; keeping noop
 		}
 
 		if !d.mPlayer.Opts().Combat.AllowNonMobileTouch && !d.isMobile && i.InputMode == packet.InputModeTouch {

@@ -1,7 +1,6 @@
 package detection
 
 import (
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -60,11 +59,12 @@ func (d *KillauraA) Detect(pk packet.Packet) {
 		}
 
 		if tickDiff > maxTickDiff {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("tick_diff", tickDiff)
-			data.Set("current_tick", currentTick)
-			data.Set("last_tick", lastSwung)
-			d.mPlayer.FailDetection(d, data)
+			d.mPlayer.FailDetection(
+				d,
+				"tick_diff", tickDiff,
+				"current_tick", currentTick,
+				"last_tick", lastSwung,
+			)
 		}
 	}
 }

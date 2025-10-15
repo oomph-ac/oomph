@@ -1,7 +1,6 @@
 package detection
 
 import (
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -70,10 +69,11 @@ func (d *EditionFakerB) Detect(pk packet.Packet) {
 		// Check that the default input mode of the client matches the expected input mode.
 		currentDefaultInputMode := d.mPlayer.ClientDat.DefaultInputMode
 		if defaultInputMode, ok := defaultInputModes[d.mPlayer.ClientDat.DeviceOS]; ok && defaultInputMode != currentDefaultInputMode {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("defaultMode", utils.InputMode(currentDefaultInputMode))
-			data.Set("expectedMode", utils.InputMode(defaultInputMode))
-			d.mPlayer.FailDetection(d, data)
+			d.mPlayer.FailDetection(
+				d,
+				"defaultMode", utils.InputMode(currentDefaultInputMode),
+				"expectedMode", utils.InputMode(defaultInputMode),
+			)
 		}
 	}
 }
