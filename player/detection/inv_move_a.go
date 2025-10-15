@@ -48,7 +48,7 @@ func (d *InvMoveA) Detect(pk packet.Packet) {
 		d.preFlag = d.mPlayer.Movement().Impulse().LenSqr() > 0.0
 	} else if _, ok := pk.(*packet.PlayerAuthInput); ok {
 		if d.preFlag && d.mPlayer.Movement().Impulse().LenSqr() > 0.0 {
-			d.mPlayer.FailDetection(d, nil)
+			d.mPlayer.FailDetection(d)
 		}
 		d.preFlag = false
 	}

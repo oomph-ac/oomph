@@ -57,10 +57,10 @@ func (d *BadPacketF) Detect(pk packet.Packet) {
 				return
 			}
 			if dat.TriggerType != protocol.TriggerTypePlayerInput && dat.TriggerType != protocol.TriggerTypeSimulationTick {
-				d.mPlayer.FailDetection(d, nil)
+				d.mPlayer.FailDetection(d)
 			}
 			if dat.ClientPrediction != protocol.ClientPredictionFailure && dat.ClientPrediction != protocol.ClientPredictionSuccess {
-				d.mPlayer.FailDetection(d, nil)
+				d.mPlayer.FailDetection(d)
 			}
 		}
 	case *packet.MobEquipment:
@@ -72,6 +72,6 @@ func (d *BadPacketF) Detect(pk packet.Packet) {
 
 func (d *BadPacketF) checkHotbarSlot(slot int32) {
 	if slot < 0 || slot >= 9 {
-		d.mPlayer.FailDetection(d, nil)
+		d.mPlayer.FailDetection(d)
 	}
 }

@@ -2,7 +2,6 @@ package detection
 
 import (
 	"github.com/chewxy/math32"
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -78,9 +77,7 @@ func (d *AimA) Detect(pk packet.Packet) {
 	)
 
 	if diff <= 3e-5 {
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("yD", game.Round32(yawDelta, 3))
-		d.mPlayer.FailDetection(d, data)
+		d.mPlayer.FailDetection(d, "yD", game.Round32(yawDelta, 3))
 		return
 	} else {
 		d.mPlayer.PassDetection(d, 0.1)

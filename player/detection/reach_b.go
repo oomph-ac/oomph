@@ -58,7 +58,7 @@ func (d *ReachB) run(c player.CombatComponent) {
 		}
 	}
 	if minReach > 2.9 {
-		d.mPlayer.FailDetection(d, nil)
+		d.mPlayer.FailDetection(d)
 		d.mPlayer.Log().Debug("reach(B)", "min", minReach, "vl", d.metadata.Violations)
 	} else {
 		d.mPlayer.PassDetection(d, 0.001)

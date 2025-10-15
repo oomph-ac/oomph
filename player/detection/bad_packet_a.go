@@ -47,7 +47,7 @@ func (d *BadPacketA) Metadata() *player.DetectionMetadata {
 func (d *BadPacketA) Detect(pk packet.Packet) {
 	if i, ok := pk.(*packet.PlayerAuthInput); ok {
 		if d.prevFrame != 0 && i.Tick == 0 {
-			d.mPlayer.FailDetection(d, nil)
+			d.mPlayer.FailDetection(d)
 		}
 		d.prevFrame = i.Tick
 	}

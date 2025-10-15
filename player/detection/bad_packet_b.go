@@ -46,7 +46,7 @@ func (d *BadPacketB) Metadata() *player.DetectionMetadata {
 func (d *BadPacketB) Detect(pk packet.Packet) {
 	if t, ok := pk.(*packet.InventoryTransaction); ok {
 		if dat, ok := t.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && dat.ActionType == protocol.UseItemOnEntityActionAttack && d.mPlayer.RuntimeId == dat.TargetEntityRuntimeID {
-			d.mPlayer.FailDetection(d, nil)
+			d.mPlayer.FailDetection(d)
 		}
 	}
 }

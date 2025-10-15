@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -88,11 +87,12 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 
 	// Check if there's a titleID we know that is invalid/incompatible with Minecraft: Bedrock Edition.
 	if clientType, ok := invalidTitleIDs[titleID]; ok {
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("titleID", titleID)
-		data.Set("givenOS", utils.Device(deviceOS))
-		data.Set("expectedOS", fmt.Sprintf("None (client %s should not support MC:BE)", clientType))
-		d.mPlayer.FailDetection(d, data)
+		d.mPlayer.FailDetection(
+			d,
+			"titleID", titleID,
+			"givenOS", utils.Device(deviceOS),
+			"expectedOS", fmt.Sprintf("None (client %s should not support MC:BE)", clientType),
+		)
 		return
 	}
 
@@ -100,11 +100,12 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 	// can be found on Windows, iOS, and Xbox.
 	if titleID == "1904044383" {
 		if !slices.Contains(previewEditionClients, deviceOS) {
-			data := orderedmap.NewOrderedMap[string, any]()
-			data.Set("titleID", titleID)
-			data.Set("givenOS", utils.Device(deviceOS))
-			data.Set("expectedOS", "Windows/iOS/Xbox")
-			d.mPlayer.FailDetection(d, data)
+			d.mPlayer.FailDetection(
+				d,
+				"titleID", titleID,
+				"givenOS", utils.Device(deviceOS),
+				"expectedOS", "Windows/iOS/Xbox",
+			)
 		}
 		return
 	}
@@ -121,11 +122,12 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 			return
 		}
 
-		data := orderedmap.NewOrderedMap[string, any]()
-		data.Set("titleID", titleID)
-		data.Set("givenOS", utils.Device(deviceOS))
-		data.Set("expectedOS", utils.Device(expected))
-		d.mPlayer.FailDetection(d, data)
+		d.mPlayer.FailDetection(
+			d,
+			"titleID", titleID,
+			"givenOS", utils.Device(deviceOS),
+			"expectedOS", utils.Device(expected),
+		)
 	} else if !ok {
 		switch titleID {
 		case "":

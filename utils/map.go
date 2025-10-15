@@ -2,24 +2,33 @@ package utils
 
 import (
 	"fmt"
-
-	"github.com/elliotchance/orderedmap/v2"
 )
 
-// OrderedMapToString converts an orderedmap to a string.
-func OrderedMapToString(data orderedmap.OrderedMap[string, any]) string {
+// KeyValsToString formats slog-style keyvals into a single bracketed string.
+// Example: KeyValsToString("foo", 1, "bar", true) => "[foo=1 bar=true]".
+// If an odd number of values is provided, the last value is ignored.
+func KeyValsToString(kv ...any) string {
+	if len(kv) < 2 {
+		return "[]"
+	}
 	dataString := "["
-	count := data.Len()
-	for _, key := range data.Keys() {
-		v, _ := data.Get(key)
-		dataString += fmt.Sprintf("%s=%v", key, v)
-
-		count--
-		if count > 0 {
+	// Only iterate pairs.
+	pairCount := len(kv) / 2
+	for i := 0; i < pairCount; i++ {
+		if i > 0 {
 			dataString += " "
 		}
+		key := kv[i*2]
+		val := kv[i*2+1]
+		// Coerce non-string keys to fmt string.
+		var keyStr string
+		if s, ok := key.(string); ok {
+			keyStr = s
+		} else {
+			keyStr = fmt.Sprintf("%v", key)
+		}
+		dataString += fmt.Sprintf("%s=%v", keyStr, val)
 	}
 	dataString += "]"
-
 	return dataString
 }

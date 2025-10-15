@@ -46,25 +46,25 @@ func (d *BadPacketC) Detect(pk packet.Packet) {
 	switch pk := pk.(type) {
 	case *packet.InventoryTransaction:
 		if dat, ok := pk.TransactionData.(*protocol.UseItemTransactionData); ok && dat.ActionType == protocol.UseItemActionBreakBlock && d.mPlayer.GameMode != packet.GameTypeCreative {
-			d.mPlayer.FailDetection(d, nil)
+			d.mPlayer.FailDetection(d)
 		}
 	case *packet.PlayerAction:
 		switch pk.ActionType {
 		case protocol.PlayerActionPredictDestroyBlock, protocol.PlayerActionStartBreak, protocol.PlayerActionCrackBreak,
 			protocol.PlayerActionContinueDestroyBlock, protocol.PlayerActionAbortBreak, protocol.PlayerActionStopBreak:
-			d.mPlayer.FailDetection(d, nil)
+			d.mPlayer.FailDetection(d)
 		case protocol.PlayerActionCreativePlayerDestroyBlock:
 			if d.mPlayer.GameMode != packet.GameTypeCreative {
-				d.mPlayer.FailDetection(d, nil)
+				d.mPlayer.FailDetection(d)
 			}
 		}
 	case *packet.PlayerAuthInput:
 		if pk.InputData.Load(packet.InputFlagPerformItemInteraction) && d.mPlayer.GameMode != packet.GameTypeCreative {
-			d.mPlayer.FailDetection(d, nil)
+			d.mPlayer.FailDetection(d)
 		}
 		for _, action := range pk.BlockActions {
 			if action.Action == protocol.PlayerActionCreativePlayerDestroyBlock {
-				d.mPlayer.FailDetection(d, nil)
+				d.mPlayer.FailDetection(d)
 				break
 			}
 		}

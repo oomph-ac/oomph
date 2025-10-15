@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/event"
-	"github.com/elliotchance/orderedmap/v2"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/player/command"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -28,7 +27,8 @@ type EventHandler interface {
 	// HandlePunishment is called when a detection triggers a punishment for a player.
 	HandlePunishment(ctx *event.Context[*Player], detection Detection, message *string)
 	// HandleFlag is called when a detection flags a player.
-	HandleFlag(ctx *event.Context[*Player], detection Detection, data *orderedmap.OrderedMap[string, any])
+	// data is a list of key-value pairs in slog style: key1, val1, key2, val2, ...
+	HandleFlag(ctx *event.Context[*Player], detection Detection)
 }
 
 // NopEventHandler is an event handler that does nothing.
@@ -38,8 +38,7 @@ func (NopEventHandler) HandleJoin(*event.Context[*Player])                      
 func (NopEventHandler) HandleQuit(*event.Context[*Player])                           {}
 func (NopEventHandler) HandleCommand(*event.Context[*Player], string, []string)      {}
 func (NopEventHandler) HandlePunishment(*event.Context[*Player], Detection, *string) {}
-func (NopEventHandler) HandleFlag(*event.Context[*Player], Detection, *orderedmap.OrderedMap[string, any]) {
-}
+func (NopEventHandler) HandleFlag(*event.Context[*Player], Detection)                {}
 
 type ExampleEventHandler struct {
 	connected     map[string]*Player
@@ -223,7 +222,7 @@ func (h *ExampleEventHandler) HandlePunishment(ctx *event.Context[*Player], dete
 
 }
 
-func (h *ExampleEventHandler) HandleFlag(ctx *event.Context[*Player], dtc Detection, data *orderedmap.OrderedMap[string, any]) {
+func (h *ExampleEventHandler) HandleFlag(ctx *event.Context[*Player], dtc Detection) {
 	p := ctx.Val()
 	m := dtc.Metadata()
 
