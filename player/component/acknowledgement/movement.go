@@ -165,11 +165,9 @@ func (ack *PlayerUpdateActorData) Run() {
 		ack.mPlayer.Movement().SetImmobile(utils.HasDataFlag(entity.DataFlagImmobile, flags))
 		ack.mPlayer.Movement().SetServerSprint(utils.HasDataFlag(entity.DataFlagSprinting, flags))
 
-		// Forcefully remove this flag so that the client doesn't end up with any weird desync.
-		ack.metadata[entity.DataKeyFlags] = utils.RemoveDataFlag(flags, entity.DataFlagAction)
-		/*if utils.HasDataFlag(entity.DataFlagAction, flags) {
-			//ack.mPlayer.Message("hasAction? (%d)", ack.mPlayer.InputCount)
-		}*/
+		if !utils.HasDataFlag(entity.DataFlagAction, flags) && ack.mPlayer.StartUseConsumableTick != 0 {
+			ack.mPlayer.StartUseConsumableTick = 0
+		}
 	}
 }
 
