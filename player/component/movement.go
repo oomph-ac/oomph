@@ -764,15 +764,25 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.sneaking = pk.InputData.Load(packet.InputFlagSneakDown)
 	}
 
-	if mc.mPlayer.StartUseConsumableTick != 0 {
-		baseConsumeSpeed := float32(0.3)
-		if mc.sneaking {
-			baseConsumeSpeed *= 0.3
-		}
-		pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -baseConsumeSpeed, baseConsumeSpeed)
-		pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -baseConsumeSpeed, baseConsumeSpeed)
-		//mc.mPlayer.Message("consuming (curr=%d start=%d)", mc.mPlayer.InputCount, mc.mPlayer.StartUseConsumableTick)
+	mc.mPlayer.Dbg.Notify(
+		player.DebugModeMovementSim,
+		true,
+		"rawMoveVector=%v",
+		pk.MoveVector,
+	)
+
+	maxImpulse := float32(1.0)
+	if pk.MoveVector[0] != 0 && pk.MoveVector[1] != 0 {
+		maxImpulse = game.MaxNormalizedImpulse
 	}
+	if mc.mPlayer.StartUseConsumableTick != 0 {
+		maxImpulse *= game.MaxConsumingImpulse
+	}
+	if mc.sneaking {
+		maxImpulse *= game.MaxSneakImpulse
+	}
+	pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -maxImpulse, maxImpulse)
+	pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -maxImpulse, maxImpulse)
 
 	mc.jumping = pk.InputData.Load(packet.InputFlagStartJumping)
 	mc.pressingJump = pk.InputData.Load(packet.InputFlagJumping)

@@ -177,8 +177,8 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 						p.StartUseConsumableTick = p.InputCount
 						p.consumedSlot = int(tr.HotBarSlot)
 					} else {
-						duration := p.InputCount - p.StartUseConsumableTick
-						if duration < ((c.ConsumeDuration().Milliseconds() / 50) - 1) {
+						duration := (p.InputCount - p.StartUseConsumableTick) * 50
+						if duration < (c.ConsumeDuration().Milliseconds() - 50) {
 							p.StartUseConsumableTick = p.InputCount
 							ctx.Cancel()
 							p.inventory.ForceSync()
