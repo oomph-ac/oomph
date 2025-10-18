@@ -60,6 +60,11 @@ type MovementComponent interface {
 	// the movement component.
 	RotationDelta() mgl32.Vec3
 
+	// SupportingBlockPos is the position of the block that the player is standing on/supported by.
+	SupportingBlockPos() *cube.Pos
+	// SetSupportingBlockPos sets the position of the block that the player is standing on/supported by.
+	SetSupportingBlockPos(pos *cube.Pos)
+
 	// Impulse returns the movement impulse of the movement component. The X-axis contains
 	// the forward impulse, and the Y-axis contains the left impulse.
 	Impulse() mgl32.Vec2

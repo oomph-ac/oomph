@@ -82,6 +82,8 @@ type AuthoritativeMovementComponent struct {
 	impulse     mgl32.Vec2
 	size        mgl32.Vec2
 
+	supportingBlockPos *cube.Pos
+
 	gravity      float32
 	jumpHeight   float32
 	fallDistance float32
@@ -269,6 +271,16 @@ func (mc *AuthoritativeMovementComponent) SetRotation(newRotation mgl32.Vec3) {
 // RotationDelta returns the difference from the current and previous rotations of the movement component.
 func (mc *AuthoritativeMovementComponent) RotationDelta() mgl32.Vec3 {
 	return mc.rotation.Sub(mc.lastRotation)
+}
+
+// SupportingBlockPos returns the position of the block that the player is standing on/supported by.
+func (mc *AuthoritativeMovementComponent) SupportingBlockPos() *cube.Pos {
+	return mc.supportingBlockPos
+}
+
+// SetSupportingBlockPos sets the position of the block that the player is standing on/supported by.
+func (mc *AuthoritativeMovementComponent) SetSupportingBlockPos(pos *cube.Pos) {
+	mc.supportingBlockPos = pos
 }
 
 // Impulse returns the movement impulse of the movement component. The X-axis contains the forward impulse, and the Y-axis contains the left impulse.

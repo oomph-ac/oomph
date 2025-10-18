@@ -1,6 +1,8 @@
 package simulation
 
 import (
+	"math"
+
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
@@ -143,11 +145,15 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		walkOnBlock(movement, blockUnder)
 		movement.SetMov(movement.Vel())
 
-		blockUnder = p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.2}))))
-		if _, isAir := blockUnder.(block.Air); isAir {
-			b := p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()).Side(cube.FaceDown)))
-			if oomph_block.IsWall(b) || oomph_block.IsFence(b) {
-				blockUnder = b
+		if supportPos := movement.SupportingBlockPos(); supportPos != nil {
+			blockUnder = p.World().Block([3]int(*supportPos))
+		} else {
+			blockUnder = p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.2}))))
+			if _, isAir := blockUnder.(block.Air); isAir {
+				b := p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()).Side(cube.FaceDown)))
+				if oomph_block.IsWall(b) || oomph_block.IsFence(b) {
+					blockUnder = b
+				}
 			}
 		}
 		setPostCollisionMotion(p, oldVel, oldOnGround, blockUnder)
@@ -288,6 +294,9 @@ func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder w
 	switch utils.BlockName(blockUnder) {
 	case "minecraft:slime":
 		newVel[1] = game.SlimeBounceMultiplier * old.Y()
+		if math32.Abs(newVel[1]) < 1e-4 {
+			newVel[1] = 0.0
+		}
 	case "minecraft:bed":
 		newVel[1] = math32.Min(1.0, game.BedBounceMultiplier*old.Y())
 	default:
@@ -480,6 +489,7 @@ func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger
 	// Unlike Java, bedrock seems to have a strange condition for the client to be considered on the ground. This is probably useful
 	// in cases where the client is teleporting, and the velocity (0) would still be equal to the previous velocity.
 	movement.SetOnGround((yCollision && currVel.Y() < 0) || (movement.OnGround() && !yCollision && math32.Abs(currVel.Y()) <= 1e-5))
+	checkSupportingBlockPos(movement, src, currVel)
 	movement.SetVel(collisionVel)
 
 	dbg.Notify(player.DebugModeMovementSim, true, "clientVel=%v clientPos=%v", movement.Client().Mov(), movement.Client().Pos())
@@ -663,4 +673,32 @@ func attemptTeleport(p *player.Player, dbg *player.Debugger) bool {
 		return remaining > 1
 	}
 	return false
+}
+
+func findSupportingBlock(movement player.MovementComponent, bb cube.BBox, w world.BlockSource) {
+	var (
+		blockPos  *cube.Pos
+		minDist   = float32(math.MaxFloat32 - 1)
+		centerPos = cube.PosFromVec3(movement.Pos()).Vec3().Add(mgl32.Vec3{0.5, 0.5, 0.5})
+	)
+	for result := range utils.GetNearbyBlockCollisions(bb, w) {
+		if dist := result.Position.Vec3().Sub(centerPos).LenSqr(); dist < minDist {
+			minDist = dist
+			blockPos = &result.Position
+		}
+	}
+	movement.SetSupportingBlockPos(blockPos)
+}
+
+func checkSupportingBlockPos(movement player.MovementComponent, src world.BlockSource, vel mgl32.Vec3) {
+	if !movement.OnGround() {
+		movement.SetSupportingBlockPos(nil)
+		return
+	}
+	decBB := movement.BoundingBox().ExtendTowards(cube.FaceDown, 1e-3) //.GrowVec3(mgl32.Vec3{0.025, 0, 0.025})
+	findSupportingBlock(movement, decBB, src)
+	if movement.SupportingBlockPos() == nil {
+		decBB = decBB.Translate(mgl32.Vec3{-vel[0], 0, -vel[2]})
+		findSupportingBlock(movement, decBB, src)
+	}
 }
