@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"iter"
 	"math"
 	_ "unsafe"
 
@@ -163,6 +164,38 @@ func GetBlocksInRadius(pos protocol.BlockPos, radius int32) []protocol.BlockPos 
 	return blocks
 }
 
+// GetNearbyBlockCollisions ...
+func GetNearbyBlockCollisions(aabb cube.BBox, src world.BlockSource) iter.Seq[BlockSearchResult] {
+	return func(yield func(BlockSearchResult) bool) {
+		min, max := aabb.Min(), aabb.Max()
+		minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
+		maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
+		for y := minY; y <= maxY; y++ {
+			for x := minX; x <= maxX; x++ {
+				for z := minZ; z <= maxZ; z++ {
+					pos := cube.Pos{x, y, z}
+					b := src.Block(df_cube.Pos(pos))
+					if _, isAir := b.(block.Air); isAir {
+						continue
+					}
+
+					// Add the block to the list of block search results.
+					vecPos := pos.Vec3()
+				block_loop:
+					for _, bb := range BlockBoxes(b, pos, src) {
+						if bb.Translate(vecPos).IntersectsWith(aabb) {
+							if !yield(BlockSearchResult{Block: b, Position: pos}) {
+								return
+							}
+							break block_loop
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 // GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
 func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src world.BlockSource) []BlockSearchResult {
 	min, max := aabb.Min(), aabb.Max()
@@ -242,6 +275,28 @@ func BlockClimbable(b world.Block) bool {
 	default:
 		return false
 	}
+}
+
+// IsFence returns true if the block is a fence.
+func IsFence(b world.Block) bool {
+	switch b.(type) {
+	case block.WoodFence, block.NetherBrickFence:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsFenceGate returns true if the block is a fence gate
+func IsFenceGate(b world.Block) bool {
+	_, ok := b.(block.WoodFenceGate)
+	return ok
+}
+
+// IsWall returns true if the block is a wall.
+func IsWall(b world.Block) bool {
+	_, ok := b.(block.Wall)
+	return ok
 }
 
 // IsBlockPassInteraction returns true if the block allows interactions although it has a solid
