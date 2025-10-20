@@ -784,9 +784,9 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	)
 
 	maxImpulse := float32(1.0)
-	if pk.MoveVector[0] != 0 && pk.MoveVector[1] != 0 {
+	/* if pk.MoveVector[0] != 0 && pk.MoveVector[1] != 0 {
 		maxImpulse = game.MaxNormalizedImpulse
-	}
+	} */
 	if mc.mPlayer.StartUseConsumableTick != 0 {
 		maxImpulse *= game.MaxConsumingImpulse
 	}
