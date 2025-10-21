@@ -99,7 +99,7 @@ func (p *Player) FailDetection(d Detection, keyvals ...any) {
 		)
 	}
 
-	if oconfig.Global.UseLegacyEvents && d.Punishable() && m.Violations >= m.MaxViolations {
+	if !oconfig.Global.UseLegacyEvents && d.Punishable() && m.Violations >= m.MaxViolations {
 		ctx = event.C(p)
 		message := DefaultDetectionDisconnectMessage
 		p.EventHandler().HandlePunishment(ctx, d, &message)
