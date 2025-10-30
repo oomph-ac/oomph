@@ -45,7 +45,9 @@ const (
 	GameVersion1_21_80  = 800
 	GameVersion1_21_90  = 818
 	GameVersion1_21_93  = 819
-	GameVersion1_21_100 = protocol.CurrentProtocol
+	GameVersion1_21_100 = 827
+	GameVersion1_21_111 = 844
+	GameVersion1_21_120 = 859
 
 	TicksPerSecond = 20
 )
