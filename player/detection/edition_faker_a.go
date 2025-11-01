@@ -10,19 +10,30 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-var knownTitleIDs = map[string]protocol.DeviceOS{
-	"1739947436": protocol.DeviceAndroid,
-	"1810924247": protocol.DeviceIOS,
-	"1944307183": protocol.DeviceFireOS,
-	"896928775":  protocol.DeviceWin10,
-	"2044456598": protocol.DeviceOrbis,
-	"2047319603": protocol.DeviceNX,
-	"1828326430": protocol.DeviceXBOX,
-	"1916611344": protocol.DeviceWP,
-}
+const (
+	titleIDAndroid = "1739947436"
+	titleIDIOS     = "1810924247"
+	titleIDFireOS  = "1944307183"
+	titleIDWindows = "896928775"
+	titleIDOrbis   = "2044456598"
+	titleIDNX      = "2047319603"
+	titleIDXBOX    = "1828326430"
+	titleIDWP      = "1916611344"
+	titleIDPreview = "1904044383"
+)
 
-var invalidTitleIDs = map[string]string{
-	"328178078": "XBOX Mobile App",
+var knownTitleIDs = map[protocol.DeviceOS]string{
+	protocol.DeviceAndroid: titleIDAndroid,
+	protocol.DeviceIOS:     titleIDIOS,
+	protocol.DeviceFireOS:  titleIDFireOS,
+
+	protocol.DeviceWin10: titleIDWindows, // Windows (UWP) on MC:BE Versions 1.21.111 and below
+	protocol.DeviceWin32: titleIDWindows, // Windows (GDK) on MC:BE Versions 1.21.120 and above
+
+	protocol.DeviceOrbis: titleIDOrbis,
+	protocol.DeviceNX:    titleIDNX,
+	protocol.DeviceXBOX:  titleIDXBOX,
+	14:                   titleIDWP, // protocol.DeviceWP
 }
 
 var previewEditionClients = []protocol.DeviceOS{
@@ -85,20 +96,9 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 	deviceOS := d.mPlayer.ClientDat.DeviceOS
 	titleID := d.mPlayer.IdentityDat.TitleID
 
-	// Check if there's a titleID we know that is invalid/incompatible with Minecraft: Bedrock Edition.
-	if clientType, ok := invalidTitleIDs[titleID]; ok {
-		d.mPlayer.FailDetection(
-			d,
-			"titleID", titleID,
-			"givenOS", utils.Device(deviceOS),
-			"expectedOS", fmt.Sprintf("None (client %s should not support MC:BE)", clientType),
-		)
-		return
-	}
-
 	// 1904044383 is the title ID of the preview client in MC:BE. According to @GameParrot, the preview client
 	// can be found on Windows, iOS, and Xbox.
-	if titleID == "1904044383" {
+	if titleID == titleIDPreview {
 		if !slices.Contains(previewEditionClients, deviceOS) {
 			d.mPlayer.FailDetection(
 				d,
@@ -110,15 +110,32 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 		return
 	}
 
+	// Check if the client is trying to log in with a GDK client where GDK is not available.
+	if deviceOS == protocol.DeviceWin32 && d.mPlayer.Version < player.GameVersion1_21_120 {
+		d.mPlayer.FailDetection(
+			d,
+			"titleID", titleID,
+			"givenOS", utils.Device(deviceOS),
+			"expectedOS", "Windows (UWP)",
+			"protocol", d.mPlayer.Version,
+		)
+		return
+	}
+
 	// Check that the title ID matches the expected device OS.
-	if expected, ok := knownTitleIDs[titleID]; ok && expected != deviceOS {
-		// Exempt Playstation and XBOX devices from this check, since they need proxy workarounds to connect to external servers.
-		if titleID == "2044456598" || titleID == "1828326430" {
+	if expected, ok := knownTitleIDs[deviceOS]; ok && expected != titleID {
+		// TODO: Is this still required? Most of these utilities rely on just sending transfer packets to those devices.
+		if titleID == titleIDOrbis || titleID == titleIDXBOX {
 			return
 		}
 
 		// Ugly & much [sugar honey iced tea] hack for BedrockTogether - why do console versions need external solutions to join servers anyway?
-		if titleID == "1739947436" && (deviceOS == protocol.DeviceOrbis || deviceOS == protocol.DeviceXBOX) {
+		if titleID == titleIDAndroid && (deviceOS == protocol.DeviceOrbis || deviceOS == protocol.DeviceXBOX) {
+			return
+		}
+
+		// Bug with old game version
+		if len(titleID) == 0 && d.mPlayer.Version == player.GameVersion1_21_80 {
 			return
 		}
 
@@ -126,18 +143,10 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 			d,
 			"titleID", titleID,
 			"givenOS", utils.Device(deviceOS),
-			"expectedOS", utils.Device(expected),
+			"expectedTitleID", expected,
 		)
 	} else if !ok {
-		switch titleID {
-		case "":
-			if d.mPlayer.Version != player.GameVersion1_21_80 {
-				d.mPlayer.Disconnect("TitleID not present")
-				d.mPlayer.Log().Warn("no titleID present in identity data", "version", d.mPlayer.Version)
-			}
-		default:
-			d.mPlayer.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
-			d.mPlayer.Log().Warn("unknown title ID for given OS", "titleID", titleID, "deviceOS", deviceOS)
-		}
+		d.mPlayer.Disconnect(fmt.Sprintf("report to admin: unknown title ID %s with OS %v", titleID, deviceOS))
+		d.mPlayer.Log().Warn("unknown title ID for given OS", "titleID", titleID, "deviceOS", deviceOS)
 	}
 }
