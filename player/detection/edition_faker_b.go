@@ -9,6 +9,7 @@ import (
 
 var defaultInputModes = map[protocol.DeviceOS]int{
 	protocol.DeviceWin10:   packet.InputModeMouse,
+	protocol.DeviceWin32:   packet.InputModeMouse,
 	protocol.DeviceAndroid: packet.InputModeTouch,
 	protocol.DeviceIOS:     packet.InputModeTouch,
 	protocol.DeviceFireOS:  packet.InputModeTouch,
