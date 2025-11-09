@@ -20,11 +20,13 @@ import (
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 
-	"github.com/oomph-ac/oomph/utils"
 	_ "net/http/pprof"
+
+	"github.com/oomph-ac/oomph/utils"
 )
 
 var evHandler = player.NewExampleEventHandler()
@@ -99,6 +101,9 @@ func main() {
 		}
 		netTransport = transport.NewSpectral(logger)
 	} */
+
+	// Register custom blocks here
+	world.FinalizeBlockRegistry()
 
 	proxy := spectrum.NewSpectrum(
 		server.NewStaticDiscovery(os.Args[2], os.Args[2]),
