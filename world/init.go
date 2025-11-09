@@ -15,7 +15,8 @@ var AirRuntimeID uint32
 //go:linkname world_finaliseBlockRegistry github.com/df-mc/dragonfly/server/world.finaliseBlockRegistry
 func world_finaliseBlockRegistry()
 
-func init() {
+// FinalizeBlockRegistry finalizes the block registry and then caches the expected runtime ID for air.
+func FinalizeBlockRegistry() {
 	world_finaliseBlockRegistry()
 	airRID, ok := chunk.StateToRuntimeID("minecraft:air", nil)
 	if !ok {
