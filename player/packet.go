@@ -76,7 +76,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
 	case *packet.CommandRequest:
-		args := strings.Split(pk.CommandLine, " ")
+		args := splitCommandLine(pk.CommandLine)
 		if len(args) >= 2 && args[0] == "/ac" {
 			subcommand := args[1]
 			args = args[2:]
@@ -262,6 +262,54 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	}
 	p.RunDetections(pk)
+}
+
+// splitCommandLine splits a command line into arguments, preserving quoted substrings
+// as single arguments. Supports both single (”) and double ("") quotes, and escaping
+// characters using backslashes within or outside quotes.
+func splitCommandLine(s string) []string {
+	var (
+		args      []string
+		cur       strings.Builder
+		inQuotes  bool
+		quoteChar rune
+		escaped   bool
+	)
+	for _, r := range s {
+		if escaped {
+			cur.WriteRune(r)
+			escaped = false
+			continue
+		}
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+		if inQuotes {
+			if r == quoteChar {
+				inQuotes = false
+				continue
+			}
+			cur.WriteRune(r)
+			continue
+		}
+		switch r {
+		case '"', '\'':
+			inQuotes = true
+			quoteChar = r
+		case ' ', '\t', '\n', '\r':
+			if cur.Len() > 0 {
+				args = append(args, cur.String())
+				cur.Reset()
+			}
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	if cur.Len() > 0 {
+		args = append(args, cur.String())
+	}
+	return args
 }
 
 func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {

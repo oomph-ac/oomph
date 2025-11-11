@@ -38,9 +38,9 @@ func (q *CircularQueue[T]) Append(item T) {
 
 // Get returns the element at logical position index (0 = oldest).
 // It panics if index is out of range.
-func (q *CircularQueue[T]) Get(index int) T {
+func (q *CircularQueue[T]) Get(index int, defaultVal T) T {
 	if index < 0 || index >= q.size {
-		panic("circular queue: index out of range")
+		return defaultVal
 	}
 	return q.items[(q.head+index)%len(q.items)]
 }

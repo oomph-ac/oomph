@@ -78,10 +78,10 @@ func (c *ClicksComponent) AddRightHook(hook player.ClickHook) {
 
 func (c *ClicksComponent) Tick() {
 	if c.clicksLeft.Len() == c.clicksLeft.Cap() {
-		c.cpsLeft -= c.clicksLeft.Get(0)
+		c.cpsLeft -= c.clicksLeft.Get(0, 0)
 	}
 	if c.clicksRight.Len() == c.clicksRight.Cap() {
-		c.cpsRight -= c.clicksRight.Get(0)
+		c.cpsRight -= c.clicksRight.Get(0, 0)
 	}
 	c.clicksLeft.Append(0)
 	c.clicksRight.Append(0)
@@ -95,7 +95,7 @@ func (c *ClicksComponent) clickLeft() {
 	}
 
 	index := leftCap - 1
-	c.clicksLeft.Set(index, c.clicksLeft.Get(index)+1)
+	c.clicksLeft.Set(index, c.clicksLeft.Get(index, 0)+1)
 	c.cpsLeft++
 	c.delayLeft = c.mPlayer.InputCount - c.lastLeftClick
 	c.lastLeftClick = c.mPlayer.InputCount
@@ -113,7 +113,7 @@ func (c *ClicksComponent) clickRight() {
 	}
 
 	index := rightCap - 1
-	c.clicksRight.Set(index, c.clicksRight.Get(index)+1)
+	c.clicksRight.Set(index, c.clicksRight.Get(index, 0)+1)
 	c.cpsRight++
 	c.delayRight = c.mPlayer.InputCount - c.lastRightClick
 	c.lastRightClick = c.mPlayer.InputCount
