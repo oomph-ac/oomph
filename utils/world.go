@@ -57,8 +57,6 @@ func BlockFriction(b world.Block) float32 {
 		return 0.98
 	case "minecraft:blue_ice":
 		return 0.99
-	case "minecraft:soul_sand":
-		return 0.0
 	default:
 		return 0.6
 	}

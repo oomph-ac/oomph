@@ -65,8 +65,12 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	blockFriction := game.DefaultAirFriction
 	moveRelativeSpeed := movement.AirSpeed()
 	if movement.OnGround() {
+		mSpeed := movement.MovementSpeed()
+		if utils.BlockName(blockUnder) == "minecraft:soul_sand" {
+			mSpeed *= 0.543
+		}
 		blockFriction *= utils.BlockFriction(blockUnder)
-		moveRelativeSpeed = movement.MovementSpeed() * (0.16277136 / (blockFriction * blockFriction * blockFriction))
+		moveRelativeSpeed = mSpeed * (0.16277136 / (blockFriction * blockFriction * blockFriction))
 	}
 
 	if movement.Gliding() {
@@ -140,6 +144,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 
 		oldVel := movement.Vel()
 		oldOnGround := movement.OnGround()
+		oldY := movement.Pos().Y()
 
 		tryCollisions(p, p.World(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60), clientJumpPrevented)
 		if supportPos := movement.SupportingBlockPos(); supportPos != nil {
@@ -153,7 +158,13 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 				}
 			}
 		}
-		walkOnBlock(movement, p.Dbg, blockUnder)
+
+		if oldY == movement.Pos().Y() {
+			walkOnBlock(movement, p.Dbg, blockUnder)
+		} else {
+			p.Dbg.Notify(player.DebugModeMovementSim, true, "NO WALKING ON BLOCK FUCK YOU")
+		}
+
 		movement.SetMov(movement.Vel())
 		setPostCollisionMotion(p, oldVel, oldOnGround, blockUnder)
 

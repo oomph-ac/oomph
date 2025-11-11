@@ -74,7 +74,7 @@ func main() {
 	oconfig.Global.Movement.AcceptClientVelocity = false
 	oconfig.Global.Movement.VelocityAcceptanceThreshold = 0.077
 
-	oconfig.Global.Movement.PersuasionThreshold = 0.002
+	oconfig.Global.Movement.PersuasionThreshold = 0.001
 	oconfig.Global.Movement.CorrectionThreshold = 0.003
 
 	oconfig.Global.Combat.MaximumAttackAngle = 90
