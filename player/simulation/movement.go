@@ -142,9 +142,6 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		oldOnGround := movement.OnGround()
 
 		tryCollisions(p, p.World(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60), clientJumpPrevented)
-		walkOnBlock(movement, blockUnder)
-		movement.SetMov(movement.Vel())
-
 		if supportPos := movement.SupportingBlockPos(); supportPos != nil {
 			blockUnder = p.World().Block([3]int(*supportPos))
 		} else {
@@ -156,6 +153,8 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 				}
 			}
 		}
+		walkOnBlock(movement, p.Dbg, blockUnder)
+		movement.SetMov(movement.Vel())
 		setPostCollisionMotion(p, oldVel, oldOnGround, blockUnder)
 
 		if inCobweb {
@@ -241,11 +240,13 @@ func simulateGlide(p *player.Player, movement player.MovementComponent) {
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "(glide) oldVel=%v, collisions=%v diff=%v", oldVel, movement.Vel(), velDiff)
 }
 
-func walkOnBlock(movement player.MovementComponent, blockUnder world.Block) {
+func walkOnBlock(movement player.MovementComponent, dbg *player.Debugger, blockUnder world.Block) {
 	if !movement.OnGround() || movement.Sneaking() {
+		dbg.Notify(player.DebugModeMovementSim, true, "walkOnBlock: conditions not met (onGround=%v sneaking=%v)", movement.OnGround(), movement.Sneaking())
 		return
 	}
 
+	oldVel := movement.Vel()
 	newVel := movement.Vel()
 	switch utils.BlockName(blockUnder) {
 	case "minecraft:slime":
@@ -255,10 +256,8 @@ func walkOnBlock(movement player.MovementComponent, blockUnder world.Block) {
 			newVel[0] *= d1
 			newVel[2] *= d1
 		}
-	case "minecraft:soul_sand":
-		newVel[0] *= 0.3
-		newVel[2] *= 0.3
 	}
+	dbg.Notify(player.DebugModeMovementSim, true, "walkOnBlock: oldVel=%v newVel=%v", oldVel, newVel)
 	movement.SetVel(newVel)
 }
 
