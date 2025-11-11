@@ -57,6 +57,8 @@ func BlockFriction(b world.Block) float32 {
 		return 0.98
 	case "minecraft:blue_ice":
 		return 0.99
+	case "minecraft:soul_sand":
+		return 0.0
 	default:
 		return 0.6
 	}
@@ -86,17 +88,22 @@ func OneWayCollisionBlocks(blocks []BlockSearchResult) []world.Block {
 
 // BlockBoxes returns the bounding boxes of the given block based on it's name.
 func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox {
+	const (
+		sixteenth float32 = 1.0 / 16.0
+		eighth    float32 = 1.0 / 8.0
+	)
+
 	switch BlockName(b) {
 	case "minecraft:portal", "minecraft:end_portal":
 		return []cube.BBox{}
 	case "minecraft:web":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:bed":
-		return []cube.BBox{cube.Box(1.0/16.0, 0, 1.0/16.0, 15.0/16.0, 9.0/16.0, 15.0/16.0)}
+		return []cube.BBox{cube.Box(sixteenth, 0, sixteenth, 15*sixteenth, 9*sixteenth, 15*sixteenth)}
 	case "minecraft:waterlily":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 0.09375, 1)}
 	case "minecraft:soul_sand":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 7.0/8.0, 1)}
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 7*eighth, 1)}
 	case "minecraft:snow_layer":
 		_, dat := b.EncodeBlock()
 		height, ok := dat["height"]
@@ -104,7 +111,7 @@ func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox 
 			return []cube.BBox{}
 		}
 
-		blockBBY := float32(height.(int32)) / 8.0
+		blockBBY := float32(height.(int32)) * eighth
 		return []cube.BBox{cube.Box(0, 0, 0, 1, blockBBY, 1)}
 	case "minecraft:redstone_wire":
 		return []cube.BBox{}
@@ -115,22 +122,22 @@ func BlockBoxes(b world.Block, pos cube.Pos, src world.BlockSource) []cube.BBox 
 	case "minecraft:redstone_torch", "minecraft:unlit_redstone_torch":
 		return []cube.BBox{}
 	case "minecraft:repeater", "minecraft:unpowered_repeater", "minecraft:powered_repeater":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/8.0, 1)}
+		return []cube.BBox{cube.Box(0, 0, 0, 1, eighth, 1)}
 	case "minecraft:comparator", "minecraft:unpowered_comparator", "minecraft:powered_comparator":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 1.0/8.0, 1)}
+		return []cube.BBox{cube.Box(0, 0, 0, 1, eighth, 1)}
 	case "minecraft:daylight_detector", "minecraft:daylight_detector_inverted":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 3.0/8.0, 1)}
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 3*eighth, 1)}
 	case "minecraft:bamboo_sapling", "minecraft:bamboo":
 		return []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
 	case "minecraft:vine", "minecraft:cave_vines", "minecraft:cave_vines_body_with_berries", "minecraft:cave_vines_head_with_berries",
 		"minecraft:twisting_vines", "minecraft:weeping_vines":
 		return []cube.BBox{}
 	case "minecraft:flower_pot":
-		return []cube.BBox{cube.Box(5/16.0, 0, 5/16.0, 11/16.0, 3/8.0, 11/16.0)}
+		return []cube.BBox{cube.Box(5*sixteenth, 0, 5*sixteenth, 11*sixteenth, 3*eighth, 11*sixteenth)}
 	case "minecraft:tallgrass", "minecraft:fern", "minecraft:large_fern", "minecraft:rose_bush", "minecraft:peony", "minecraft:paeonia":
 		return []cube.BBox{}
 	case "minecraft:end_portal_frame":
-		return []cube.BBox{cube.Box(0, 0, 0, 1, 13.0/16.0, 1)}
+		return []cube.BBox{cube.Box(0, 0, 0, 1, 13*sixteenth, 1)}
 	case "minecraft:red_mushroom", "minecraft:brown_mushroom":
 		return []cube.BBox{}
 	case "minecraft:glow_lichen", "minecraft:pink_petals":
