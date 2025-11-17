@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
@@ -976,7 +977,7 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 
 	if !mc.mPlayer.PendingCorrectionACK {
 		// Make sure all of the player's actor data is up-to-date with Oomph's prediction.
-		/* actorData := mc.mPlayer.LastSetActorData
+		actorData := mc.mPlayer.LastSetActorData
 		actorData.Tick = mc.mPlayer.SimulationFrame
 		if f, ok := actorData.EntityMetadata[entity.DataKeyFlags]; ok {
 			flags := f.(int64)
@@ -997,7 +998,8 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 			}
 			actorData.EntityMetadata[entity.DataKeyFlags] = flags
 		}
-		mc.mPlayer.SendPacketToClient(actorData) */
+		mc.mPlayer.SendPacketToClient(actorData)
+
 		// Send the actual movement correction to the client.
 		mc.mPlayer.SendPacketToClient(&packet.CorrectPlayerMovePrediction{
 			PredictionType: packet.PredictionTypePlayer,
