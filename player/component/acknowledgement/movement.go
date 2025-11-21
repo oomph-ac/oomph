@@ -154,7 +154,7 @@ func (ack *PlayerUpdateActorData) Run() {
 		newSize[1] = height.(float32)
 	}
 	if scale, scaleExists := ack.metadata[entity.DataKeyScale]; scaleExists {
-		newSize = newSize.Mul(scale.(float32))
+		newSize[2] = scale.(float32)
 	}
 
 	// Set the new size of the player.
