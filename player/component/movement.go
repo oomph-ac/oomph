@@ -933,6 +933,16 @@ func (mc *AuthoritativeMovementComponent) Reset() {
 	if mc.flying {
 		mc.onGround = false
 	}
+
+	if mc.mPlayer.Opts().Movement.LimitAllVelocity {
+		limitThreshold := mc.mPlayer.Opts().Movement.LimitAllVelocityThreshold
+		if limitThreshold < 0 {
+			limitThreshold = -limitThreshold
+		}
+		mc.vel[0] = game.ClampFloat(mc.vel[0], -limitThreshold, limitThreshold)
+		mc.vel[1] = game.ClampFloat(mc.vel[1], -limitThreshold, limitThreshold)
+		mc.vel[2] = game.ClampFloat(mc.vel[2], -limitThreshold, limitThreshold)
+	}
 }
 
 // PendingCorrections returns the number of pending corrections the movement component has.
