@@ -81,7 +81,7 @@ type AuthoritativeMovementComponent struct {
 
 	slideOffset mgl32.Vec2
 	impulse     mgl32.Vec2
-	size        mgl32.Vec2
+	size        mgl32.Vec3
 
 	supportingBlockPos *cube.Pos
 
@@ -451,18 +451,20 @@ func (mc *AuthoritativeMovementComponent) TicksSinceTeleport() uint64 {
 
 // Size returns the width and height of the movement component in a Vec2. The X-axis
 // contains the width, and the Y-axis contains the height.
-func (mc *AuthoritativeMovementComponent) Size() mgl32.Vec2 {
+func (mc *AuthoritativeMovementComponent) Size() mgl32.Vec3 {
 	return mc.size
 }
 
 // SetSize sets the size of the movement component.
-func (mc *AuthoritativeMovementComponent) SetSize(newSize mgl32.Vec2) {
+func (mc *AuthoritativeMovementComponent) SetSize(newSize mgl32.Vec3) {
 	mc.size = newSize
 }
 
 // BoundingBox returns the bounding box of the movement component translated to it's current position.
 func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
-	width := mc.size[0] / 2
+	scale := mc.size[2]
+	width := (mc.size[0] * 0.5) * scale
+	height := mc.size[1] * scale
 	var yOffset float32
 	if mc.mPlayer.VersionInRange(-1, player.GameVersion1_20_60) {
 		yOffset = mc.slideOffset.Y()
@@ -470,10 +472,10 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 
 	return cube.Box(
 		mc.pos[0]-width,
-		mc.pos[1]+yOffset,
+		(mc.pos[1] + yOffset),
 		mc.pos[2]-width,
 		mc.pos[0]+width,
-		mc.pos[1]+mc.size[1]+yOffset,
+		mc.pos[1]+height+yOffset,
 		mc.pos[2]+width,
 	).GrowVec3(mgl32.Vec3{-1e-3, 0, -1e-3})
 }
