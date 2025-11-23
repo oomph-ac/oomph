@@ -107,8 +107,10 @@ func (c *EntityTrackerComponent) HandleSetActorData(pk *packet.SetActorData) {
 // full authoritative combat enabled, this is called on the "server" goroutine. On all other
 // modes it is called when PlayerAuthInput is received.
 func (c *EntityTrackerComponent) Tick(tick int64) {
-	for _, e := range c.entities {
-		e.Tick(tick)
+	for rid, e := range c.entities {
+		if err := e.Tick(tick); err != nil {
+			c.mPlayer.Log().Error("entity tick failed", "rid", rid, "err", err)
+		}
 	}
 }
 
