@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"log/slog"
+
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/utils"
@@ -12,6 +14,8 @@ const (
 )
 
 type Entity struct {
+	RuntimeId uint64
+
 	Metadata map[uint32]any
 	Type     string
 
@@ -36,11 +40,25 @@ type Entity struct {
 	Scale  float32
 
 	IsPlayer bool
+
+	historySize int
+	log         **slog.Logger
 }
 
 // New creates and returns a new Entity instance.
-func New(entType string, metadata map[uint32]any, pos mgl32.Vec3, historySize int, isPlayer bool, width, height, scale float32) *Entity {
+func New(
+	runtimeId uint64,
+	entType string,
+	metadata map[uint32]any,
+	pos mgl32.Vec3,
+	historySize int,
+	isPlayer bool,
+	width, height, scale float32,
+	log **slog.Logger,
+) *Entity {
 	e := &Entity{
+		RuntimeId: runtimeId,
+
 		Type:     entType,
 		Metadata: metadata,
 
@@ -52,9 +70,12 @@ func New(entType string, metadata map[uint32]any, pos mgl32.Vec3, historySize in
 		Height: height,
 		Scale:  scale,
 
-		PositionHistory: utils.NewCircularQueue[HistoricalPosition](historySize),
+		PositionHistory: utils.NewCircularQueue(historySize, func() (hp HistoricalPosition) { return }),
 
 		IsPlayer: isPlayer,
+
+		log:         log,
+		historySize: historySize,
 	}
 	/* e.InterpolationTicks = EntityMobInterpolationTicks
 	if isPlayer {
@@ -81,13 +102,16 @@ func (e *Entity) ReceivePosition(hp HistoricalPosition) {
 }
 
 // UpdatePosition updates the position of the entity, and adds the previous position to the position history.
-func (e *Entity) UpdatePosition(hp HistoricalPosition) {
+func (e *Entity) UpdatePosition(hp HistoricalPosition) error {
 	e.PrevPosition = e.Position
 	e.Position = hp.Position
 
 	e.PrevVelocity = e.Velocity
 	e.Velocity = e.Position.Sub(e.PrevPosition)
-	e.PositionHistory.Append(hp)
+	if err := e.PositionHistory.Append(hp); err != nil {
+		return err
+	}
+	return nil
 }
 
 // UpdateVelocity updates the velocity of the entity.
@@ -116,9 +140,13 @@ func (e *Entity) BoxExpansion() float32 {
 }
 
 // Tick updates the entity's position based on the interpolation ticks.
-func (e *Entity) Tick(tick int64) {
+func (e *Entity) Tick(tick int64) error {
 	if e.InterpolationTicks < 0 {
-		return
+		return e.UpdatePosition(HistoricalPosition{
+			Position:     e.Position,
+			PrevPosition: e.Position,
+			Tick:         tick,
+		})
 	}
 
 	newPos := e.Position
@@ -129,11 +157,20 @@ func (e *Entity) Tick(tick int64) {
 		newPos = e.RecvPosition
 	}
 
-	e.UpdatePosition(HistoricalPosition{
+	if err := e.UpdatePosition(HistoricalPosition{
 		Position:     newPos,
 		PrevPosition: e.Position,
 		Tick:         tick,
-	})
+	}); err != nil {
+		return err
+	}
 	e.TicksSinceTeleport++
 	e.InterpolationTicks--
+	return nil
+}
+
+func (e *Entity) debug(msg string, args ...any) {
+	if log := *e.log; log != nil {
+		log.Debug(msg, args...)
+	}
 }

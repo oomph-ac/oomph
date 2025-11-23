@@ -28,8 +28,8 @@ type ClicksComponent struct {
 func NewClicksComponent(p *player.Player) *ClicksComponent {
 	return &ClicksComponent{
 		mPlayer:     p,
-		clicksLeft:  utils.NewCircularQueue[int64](player.TicksPerSecond),
-		clicksRight: utils.NewCircularQueue[int64](player.TicksPerSecond),
+		clicksLeft:  utils.NewCircularQueue(player.TicksPerSecond, func() int64 { return 0 }),
+		clicksRight: utils.NewCircularQueue(player.TicksPerSecond, func() int64 { return 0 }),
 	}
 }
 
@@ -77,48 +77,78 @@ func (c *ClicksComponent) AddRightHook(hook player.ClickHook) {
 }
 
 func (c *ClicksComponent) Tick() {
-	if c.clicksLeft.Len() == c.clicksLeft.Cap() {
-		c.cpsLeft -= c.clicksLeft.Get(0, 0)
+	leftClicksOldest, err := c.clicksLeft.Get(0)
+	if err != nil {
+		c.mPlayer.Log().Debug("clicksLeft circular queue read failed - resetting values & re-creating click queue")
+		c.resetAndPropagateLeft()
+	} else {
+		c.cpsLeft -= leftClicksOldest
 	}
-	if c.clicksRight.Len() == c.clicksRight.Cap() {
-		c.cpsRight -= c.clicksRight.Get(0, 0)
+
+	rightClicksOldest, err := c.clicksRight.Get(0)
+	if err != nil {
+		c.mPlayer.Log().Debug("clicksRight circular queue read failed - resetting values & re-creating click queue")
+		c.resetAndPropagateRight()
+	} else {
+		c.cpsRight -= rightClicksOldest
 	}
-	c.clicksLeft.Append(0)
-	c.clicksRight.Append(0)
+
+	_ = c.clicksLeft.Append(0)
+	_ = c.clicksRight.Append(0)
 }
 
 func (c *ClicksComponent) clickLeft() {
-	leftCap := c.clicksLeft.Cap()
-	if leftCap == 0 {
-		c.clicksLeft.Append(1)
+	index := c.clicksLeft.Size() - 1
+	current, err := c.clicksLeft.Get(index)
+	if err != nil {
+		c.mPlayer.Log().Error("clickLeft: failed to obtain value from queue - resetting values & re-creating click queue")
+		c.resetAndPropagateLeft()
 		return
 	}
-
-	index := leftCap - 1
-	c.clicksLeft.Set(index, c.clicksLeft.Get(index, 0)+1)
+	if err := c.clicksLeft.Set(index, current+1); err != nil {
+		c.mPlayer.Log().Error("clickLeft: failed to set value in queue - resetting values & re-creating click queue")
+		c.resetAndPropagateLeft()
+		return
+	}
 	c.cpsLeft++
 	c.delayLeft = c.mPlayer.InputCount - c.lastLeftClick
 	c.lastLeftClick = c.mPlayer.InputCount
-
 	for _, hook := range c.hooksLeft {
 		hook()
 	}
 }
 
 func (c *ClicksComponent) clickRight() {
-	rightCap := c.clicksRight.Cap()
-	if rightCap == 0 {
-		c.clicksRight.Append(1)
+	index := c.clicksRight.Size() - 1
+	current, err := c.clicksRight.Get(index)
+	if err != nil {
+		c.mPlayer.Log().Error("clickRight: failed to obtain value from queue - resetting values & re-creating click queue")
+		c.resetAndPropagateRight()
 		return
 	}
-
-	index := rightCap - 1
-	c.clicksRight.Set(index, c.clicksRight.Get(index, 0)+1)
+	if err := c.clicksRight.Set(index, current+1); err != nil {
+		c.mPlayer.Log().Error("clickRight: failed to set value in queue - resetting values & re-creating click queue")
+		c.resetAndPropagateRight()
+		return
+	}
 	c.cpsRight++
 	c.delayRight = c.mPlayer.InputCount - c.lastRightClick
 	c.lastRightClick = c.mPlayer.InputCount
-
 	for _, hook := range c.hooksRight {
 		hook()
 	}
+}
+
+func (c *ClicksComponent) resetAndPropagateLeft() {
+	c.cpsLeft = 0
+	c.delayLeft = 0
+	c.lastLeftClick = 0
+	c.clicksLeft = utils.NewCircularQueue(player.TicksPerSecond, func() int64 { return 0 })
+}
+
+func (c *ClicksComponent) resetAndPropagateRight() {
+	c.cpsRight = 0
+	c.delayRight = 0
+	c.lastRightClick = 0
+	c.clicksRight = utils.NewCircularQueue(player.TicksPerSecond, func() int64 { return 0 })
 }

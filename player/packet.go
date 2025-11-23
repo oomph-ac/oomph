@@ -330,6 +330,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.AddActor:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			pk.EntityType,
 			pk.EntityMetadata,
 			pk.Position,
@@ -338,8 +339,10 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			width,
 			height,
 			scale,
+			&p.log,
 		))
 		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			pk.EntityType,
 			pk.EntityMetadata,
 			pk.Position,
@@ -348,10 +351,12 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			width,
 			height,
 			scale,
+			&p.log,
 		))
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			"",
 			pk.EntityMetadata,
 			pk.Position,
@@ -360,8 +365,10 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			width,
 			height,
 			scale,
+			&p.log,
 		))
 		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
+			pk.EntityRuntimeID,
 			"",
 			pk.EntityMetadata,
 			pk.Position,
@@ -370,6 +377,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			width,
 			height,
 			scale,
+			&p.log,
 		))
 	case *packet.ChunkRadiusUpdated:
 		p.worldUpdater.SetServerChunkRadius(pk.ChunkRadius + 4)
