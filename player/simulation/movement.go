@@ -92,11 +92,10 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		// Apply knockback if applicable.
 		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied: %v", movement.Vel())
 		// Attempt jump velocity if applicable.
-		p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(p, p.Dbg, &clientJumpPrevented), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
-
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "blockUnder=%s, blockFriction=%v, speed=%v", utils.BlockName(blockUnder), blockFriction, moveRelativeSpeed)
 		moveRelative(movement, moveRelativeSpeed)
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "moveRelative force applied (vel=%v)", movement.Vel())
+		p.Dbg.Notify(player.DebugModeMovementSim, attemptJump(p, p.Dbg, &clientJumpPrevented), "jump force applied (sprint=%v): %v", movement.Sprinting(), movement.Vel())
 
 		nearClimbable := utils.BlockClimbable(p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos()))))
 		if nearClimbable {
@@ -333,6 +332,60 @@ func setPostCollisionMotion(p *player.Player, oldVel mgl32.Vec3, oldOnGround boo
 		newVel[2] = 0
 	}
 	movement.SetVel(newVel)
+}
+
+func isJumpBlocked(p *player.Player, jumpVel mgl32.Vec3) bool {
+	movement := p.Movement()
+	collisionBB := movement.BoundingBox()
+	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(jumpVel), p.World())
+
+	yVel := mgl32.Vec3{0, jumpVel.Y()}
+	xVel := mgl32.Vec3{jumpVel.X()}
+	zVel := mgl32.Vec3{0, 0, jumpVel.Z()}
+
+	for index := len(bbList) - 1; index >= 0; index-- {
+		blockBox := bbList[index]
+		yVel = game.BBClipCollide(blockBox, collisionBB, yVel, false, nil)
+	}
+	collisionBB = collisionBB.Translate(yVel)
+
+	for index := len(bbList) - 1; index >= 0; index-- {
+		blockBox := bbList[index]
+		xVel = game.BBClipCollide(blockBox, collisionBB, xVel, false, nil)
+	}
+	collisionBB = collisionBB.Translate(xVel)
+
+	for index := len(bbList) - 1; index >= 0; index-- {
+		blockBox := bbList[index]
+		zVel = game.BBClipCollide(blockBox, collisionBB, zVel, false, nil)
+	}
+	initalBlockCond := ((xVel[0] != jumpVel[0]) || (zVel[2] != jumpVel[2])) && yVel[1] == jumpVel[1]
+	if !initalBlockCond {
+		return false
+	}
+
+	xVel = mgl32.Vec3{jumpVel.X()}
+	yVel = mgl32.Vec3{0, jumpVel.Y()}
+	zVel = mgl32.Vec3{0, 0, jumpVel.Z()}
+	collisionBB = movement.BoundingBox()
+
+	for index := len(bbList) - 1; index >= 0; index-- {
+		blockBox := bbList[index]
+		xVel = game.BBClipCollide(blockBox, collisionBB, xVel, false, nil)
+	}
+	collisionBB = collisionBB.Translate(xVel)
+
+	for index := len(bbList) - 1; index >= 0; index-- {
+		blockBox := bbList[index]
+		zVel = game.BBClipCollide(blockBox, collisionBB, zVel, false, nil)
+	}
+	collisionBB = collisionBB.Translate(zVel)
+
+	for index := len(bbList) - 1; index >= 0; index-- {
+		blockBox := bbList[index]
+		yVel = game.BBClipCollide(blockBox, collisionBB, yVel, false, nil)
+	}
+	return yVel[1] != jumpVel[1] && xVel[0] == jumpVel[0] && zVel[2] == jumpVel[2]
 }
 
 func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger, useSlideOffset bool, clientJumpPrevented bool) {
@@ -641,19 +694,11 @@ func attemptJump(p *player.Player, dbg *player.Debugger, clientJumpPrevented *bo
 		newVel[2] += game.MCCos(force) * 0.2
 	}
 
-	// FIXME: The client seems to sometimes prevent it's own jump from happening - it is unclear how it is determined, however.
-	// This is a temporary hack to get around this issue for now.
-	clientJump := movement.Client().Pos().Y() - movement.Client().LastPos().Y()
-	hasBlockAbove := false
-	jumpBB := movement.BoundingBox().Translate(newVel)
-	for _, bb := range utils.GetNearbyBBoxes(jumpBB, p.World()) {
-		if bb.Min().Y() > jumpBB.Min().Y() {
-			hasBlockAbove = true
-			break
-		}
-	}
-	if hasBlockAbove && math32.Abs(clientJump) <= 1e-4 && !movement.HasKnockback() && !movement.HasTeleport() && clientJumpPrevented != nil {
+	// TODO: There is probably a more efficient/proper way the bedrock client handles blocking it's own jump, but this
+	// is functional for now.
+	if clientJumpPrevented != nil && !movement.HasKnockback() && !movement.HasTeleport() && isJumpBlocked(p, newVel) {
 		*clientJumpPrevented = true
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "jump determined to be blocked")
 	}
 
 	movement.SetVel(newVel)
