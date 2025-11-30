@@ -141,7 +141,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	case *packet.InventoryTransaction:
 		if tr, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
 			p.inventory.SetHeldSlot(int32(tr.HotBarSlot))
-			if tr.ActionType == protocol.UseItemOnEntityActionAttack {
+			if tr.ActionType == protocol.UseItemOnEntityActionAttack && (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) {
 				// The reason we cancel here is because Oomph also utlizes a full-authoritative system for combat. We need to wait for the
 				// next movement (PlayerAuthInputPacket) the client sends so that we can accurately calculate if the hit is valid.
 				p.Combat().Attack(pk)
