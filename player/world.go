@@ -195,11 +195,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	}
 
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
-		var (
-			newActions          = make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
-			hasPreDestroyAction = p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure
-		)
-
+		newActions := make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
 		for _, action := range pk.BlockActions {
 			p.Dbg.Notify(DebugModeBlockBreaking, true, "blockAction=%v", action)
 			switch action.Action {
@@ -214,13 +210,6 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					)
 					continue
 				}
-
-				if !hasPreDestroyAction {
-					p.Popup("<red>Broke block too early! [2]</red>")
-					p.Dbg.Notify(DebugModeBlockBreaking, true, "cancelled PlayerActionPredictDestroyBlock: no pre-destroy action")
-					continue
-				}
-				hasPreDestroyAction = false
 
 				if !p.tryBreakBlock(cube.Face(action.Face)) {
 					continue
@@ -266,7 +255,6 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 				p.blockBreakProgress += 1.0 / math32.Max(p.expectedBlockBreakTime(action.BlockPos), 0.001)
 				p.worldUpdater.SetBlockBreakPos(&action.BlockPos)
 				p.blockBreakInProgress = true
-				hasPreDestroyAction = true
 
 				// We assume a potential mispredction here because the client while clicking, think it may need to break
 				// a block, but the server may instead think an entity is in the way of that block, constituting
