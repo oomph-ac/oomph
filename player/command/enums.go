@@ -18,7 +18,7 @@ func FindOrCreateEnum(pk *packet.AvailableCommands, enumType string, options []s
 		valueIndex[v] = uint32(i)
 	}
 	// Map each option to its value index in pk.EnumValues, appending if needed.
-	valueIndices := make([]uint, 0, len(options))
+	valueIndices := make([]uint32, 0, len(options))
 	for _, opt := range options {
 		idx, ok := valueIndex[opt]
 		if !ok {
@@ -26,7 +26,7 @@ func FindOrCreateEnum(pk *packet.AvailableCommands, enumType string, options []s
 			pk.EnumValues = append(pk.EnumValues, opt)
 			valueIndex[opt] = idx
 		}
-		valueIndices = append(valueIndices, uint(idx))
+		valueIndices = append(valueIndices, uint32(idx))
 	}
 	// Append the enum and return its index.
 	pk.Enums = append(pk.Enums, protocol.CommandEnum{Type: enumType, ValueIndices: valueIndices})
