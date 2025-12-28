@@ -349,7 +349,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			}
 
 			// Iterate through each block's bounding boxes and check if it is in the way of the ray.
-			for _, blockBB := range utils.BlockBoxes(blockInWay, flooredBlockPos, c.mPlayer.World()) {
+			for _, blockBB := range utils.BlockCollisions(blockInWay, flooredBlockPos, c.mPlayer.World()) {
 				blockBB = blockBB.Translate(blockPos)
 				if _, ok := trace.BBoxIntercept(blockBB, start, end); ok {
 					hitValid = false
