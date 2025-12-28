@@ -96,10 +96,11 @@ func init() {
 			blockStateCounter[blockData.Name] = 0
 		}
 		coll := collisionList.Blocks[blockData.Name][currCount]
-		blockReg, ok := collisionRegistry[blockData.Name]
+		prefixedName := "minecraft:" + blockData.Name
+		blockReg, ok := collisionRegistry[prefixedName]
 		if !ok {
-			collisionRegistry[blockData.Name] = make(map[string][]cube.BBox)
-			blockReg = collisionRegistry[blockData.Name]
+			collisionRegistry[prefixedName] = make(map[string][]cube.BBox)
+			blockReg = collisionRegistry[prefixedName]
 		}
 		blockReg[stateHash] = encodedCollisionToBBox(collisionList.Shapes[coll])
 		blockStateCounter[blockData.Name]++
