@@ -26,6 +26,8 @@ import (
 
 	_ "net/http/pprof"
 
+	_ "github.com/oomph-ac/oomph/utils/collisions"
+
 	"github.com/oomph-ac/oomph/utils"
 )
 

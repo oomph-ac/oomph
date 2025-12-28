@@ -13,7 +13,7 @@ require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
-	github.com/sandertv/gophertunnel v1.51.1
+	github.com/sandertv/gophertunnel v1.52.0
 	github.com/zeebo/xxh3 v1.0.2
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b
 )
@@ -31,9 +31,10 @@ require (
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hjson/hjson-go/v4 v4.4.0 // indirect
-	github.com/klauspost/compress v1.18.1 // indirect
+	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/onsi/gomega v1.36.3 // indirect
+	github.com/oreans/virtualizersdk v0.0.0-20250127084511-5dd538199a75 // indirect
 	github.com/quic-go/quic-go v0.55.0 // indirect
 	github.com/rs/cors v1.11.0 // indirect
 	github.com/samber/lo v1.49.1 // indirect

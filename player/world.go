@@ -116,7 +116,7 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 	}
 
 	// Make a list of BBoxes the block will occupy.
-	boxes := utils.BlockBoxes(b, cube.Pos(replaceBlockPos), p.World())
+	boxes := utils.BlockCollisions(b, cube.Pos(replaceBlockPos), p.World())
 	for index, blockBox := range boxes {
 		boxes[index] = blockBox.Translate(cube.Pos(replaceBlockPos).Vec3())
 	}
@@ -350,7 +350,7 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 	// Check if there is a full obstructing block in the way of the face. If so, the player should not be able to break the block.
 	sidePos := blockPos.Side(interactFace)
 	sideBlock := p.World().Block([3]int(sidePos))
-	sideBBs := utils.BlockBoxes(sideBlock, sidePos, p.World())
+	sideBBs := utils.BlockCollisions(sideBlock, sidePos, p.World())
 	// There are no bounding boxes in the way of this face.
 	if len(sideBBs) == 0 {
 		return true
@@ -395,7 +395,7 @@ func (p *Player) tryRaycastToBlock(blockPos cube.Pos) bool {
 			continue
 		}
 		intersectingBlock := p.World().Block([3]int(flooredPos))
-		for _, intersectingBlockBB := range utils.BlockBoxes(intersectingBlock, flooredPos, p.World()) {
+		for _, intersectingBlockBB := range utils.BlockCollisions(intersectingBlock, flooredPos, p.World()) {
 			intersectingBlockBB = intersectingBlockBB.Translate(intersectingBlockPos)
 			if _, ok := trace.BBoxIntercept(intersectingBlockBB, raycastStart, raycastEnd); ok {
 				return false

@@ -640,7 +640,7 @@ func blocksInside(movement player.MovementComponent, src world.BlockSource) ([]w
 	for _, result := range utils.GetNearbyBlocks(bb.Grow(1), false, true, src) {
 		pos := result.Position
 		block := result.Block
-		boxes := utils.BlockBoxes(block, pos, src)
+		boxes := utils.BlockCollisions(block, pos, src)
 
 		for _, box := range boxes {
 			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
