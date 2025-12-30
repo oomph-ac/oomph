@@ -33,6 +33,8 @@ var ClientDecode = []uint32{
 	packet.IDClientMovementPredictionSync,
 	packet.IDPlayerAction,
 	packet.IDCommandRequest,
+	packet.IDClientCacheBlobStatus,
+	packet.IDPacketViolationWarning,
 }
 
 var ServerDecode = []uint32{
@@ -75,6 +77,19 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 
 	pk := *(ctx.Packet())
 	switch pk := pk.(type) {
+<<<<<<< HEAD
+=======
+	case *packet.PacketViolationWarning:
+		p.Log().Warn(
+			"client sent PacketViolationWarning",
+			"type", pk.Type,
+			"severity", pk.Severity,
+			"packet_id", pk.PacketID,
+			"violation_ctx", pk.ViolationContext,
+		)
+	case *packet.ClientCacheBlobStatus:
+		p.worldUpdater.HandleClientBlobStatus(pk)
+>>>>>>> c6be81b (log packet violations from client)
 	case *packet.CommandRequest:
 		args := splitCommandLine(pk.CommandLine)
 		if len(args) >= 2 && args[0] == "/ac" {
