@@ -85,8 +85,6 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			"packet_id", pk.PacketID,
 			"violation_ctx", pk.ViolationContext,
 		)
-	case *packet.ClientCacheBlobStatus:
-		p.worldUpdater.HandleClientBlobStatus(pk)
 	case *packet.CommandRequest:
 		args := splitCommandLine(pk.CommandLine)
 		if len(args) >= 2 && args[0] == "/ac" {
