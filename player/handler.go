@@ -27,8 +27,9 @@ type EventHandler interface {
 	// HandlePunishment is called when a detection triggers a punishment for a player.
 	HandlePunishment(ctx *event.Context[*Player], detection Detection, message *string)
 	// HandleFlag is called when a detection flags a player.
-	// data is a list of key-value pairs in slog style: key1, val1, key2, val2, ...
-	HandleFlag(ctx *event.Context[*Player], detection Detection)
+	// extraData is a list of key-value pairs in slog style: key1, val1, key2, val2, ... and can be converted
+	// to a map with utils.KeyValsToMap
+	HandleFlag(ctx *event.Context[*Player], detection Detection, extraData []any)
 }
 
 // NopEventHandler is an event handler that does nothing.
@@ -38,7 +39,7 @@ func (NopEventHandler) HandleJoin(*event.Context[*Player])                      
 func (NopEventHandler) HandleQuit(*event.Context[*Player])                           {}
 func (NopEventHandler) HandleCommand(*event.Context[*Player], string, []string)      {}
 func (NopEventHandler) HandlePunishment(*event.Context[*Player], Detection, *string) {}
-func (NopEventHandler) HandleFlag(*event.Context[*Player], Detection)                {}
+func (NopEventHandler) HandleFlag(*event.Context[*Player], Detection, []any)         {}
 
 type ExampleEventHandler struct {
 	connected     map[string]*Player
@@ -222,7 +223,7 @@ func (h *ExampleEventHandler) HandlePunishment(ctx *event.Context[*Player], dete
 
 }
 
-func (h *ExampleEventHandler) HandleFlag(ctx *event.Context[*Player], dtc Detection) {
+func (h *ExampleEventHandler) HandleFlag(ctx *event.Context[*Player], dtc Detection, extraData []any) {
 	p := ctx.Val()
 	m := dtc.Metadata()
 

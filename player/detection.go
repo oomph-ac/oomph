@@ -49,13 +49,13 @@ func (p *Player) PassDetection(d Detection, sub float64) {
 	m.Buffer = math.Max(0, m.Buffer-sub)
 }
 
-func (p *Player) FailDetection(d Detection, keyvals ...any) {
+func (p *Player) FailDetection(d Detection, extraData ...any) {
 	// Ensure kvs are in pairs to avoid misaligned formatting.
-	if len(keyvals)%2 != 0 {
-		keyvals = keyvals[:len(keyvals)-1]
+	if len(extraData)%2 != 0 {
+		extraData = extraData[:len(extraData)-1]
 	}
 	// Append latency consistently to all failure logs/events.
-	keyvals = append(keyvals, "latency", fmt.Sprintf("%dms", p.StackLatency.Milliseconds()))
+	extraData = append(extraData, "latency", fmt.Sprintf("%dms", p.StackLatency.Milliseconds()))
 
 	m := d.Metadata()
 	m.Buffer = math.Min(m.Buffer+1.0, m.MaxBuffer)
@@ -71,7 +71,7 @@ func (p *Player) FailDetection(d Detection, keyvals ...any) {
 	}
 
 	ctx := event.C(p)
-	p.EventHandler().HandleFlag(ctx, d)
+	p.EventHandler().HandleFlag(ctx, d, extraData)
 	if ctx.Cancelled() {
 		m.Violations = oldVl
 		return
@@ -79,7 +79,7 @@ func (p *Player) FailDetection(d Detection, keyvals ...any) {
 
 	m.LastFlagged = p.ServerTick
 	if m.Violations >= 0.01 {
-		extraDatString := utils.KeyValsToString(keyvals...)
+		extraDatString := utils.KeyValsToString(extraData)
 		if oconfig.Global.UseLegacyEvents {
 			p.SendRemoteEvent(oevent.NewFlaggedEvent(
 				p.IdentityDat.DisplayName,
