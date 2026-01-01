@@ -251,6 +251,9 @@ type MovementComponent interface {
 	// SetCorrectionCooldown sets whether the client has synced back with the server for at least one tick after a correction.
 	SetCorrectionCooldown(bool)
 
+	// BBoxCache returns the bounding box cache for collision optimization.
+	BBoxCache() *utils.BBoxCache
+
 	// Sync sends a correction to the client to re-sync the client's movement with the server's.
 	Sync()
 }

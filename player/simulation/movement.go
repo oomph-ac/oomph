@@ -394,7 +394,21 @@ func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger
 	movement := p.Movement()
 	collisionBB := movement.BoundingBox()
 	currVel := movement.Vel()
-	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(currVel), src)
+
+	// Try to get bboxes from cache first
+	var bbList []cube.BBox
+	cachedBBoxes := movement.BBoxCache().Get(movement.Pos(), currVel, p.ServerTick)
+	if cachedBBoxes != nil {
+		bbList = cachedBBoxes
+		utils.RecordCacheHit()
+		dbg.Notify(player.DebugModeMovementSim, true, "bbox cache HIT")
+	} else {
+		bbList = utils.GetNearbyBBoxes(collisionBB.Extend(currVel), src)
+		movement.BBoxCache().Set(movement.Pos(), currVel, bbList, p.ServerTick)
+		utils.RecordCacheMiss()
+		dbg.Notify(player.DebugModeMovementSim, true, "bbox cache MISS")
+	}
+
 	//oneWayBlocks := utils.OneWayCollisionBlocks(utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w))
 
 	// TODO: determine more blocks that are considered to be one-way physics blocks, and
