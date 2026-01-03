@@ -471,6 +471,11 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	}
 
 	breakTime := float32(block.BreakDuration(b, held).Milliseconds())
+	// On versions below 1.21.50, the block break time for wool is shorter by ~25% See https://github.com/oomph-ac/oomph/issues/107
+	if _, isWool := b.(block.Wool); isWool && p.Version < GameVersion1_21_50 {
+		breakTime *= 0.75
+	}
+
 	/* if !p.movement.OnGround() {
 		breakTime *= 5
 	} */
