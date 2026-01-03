@@ -1,6 +1,6 @@
 module github.com/oomph-ac/oomph
 
-go 1.24.1
+go 1.25.1
 
 require (
 	github.com/akmalfairuz/legacy-version v1.5.4
@@ -8,14 +8,14 @@ require (
 	github.com/cooldogedev/spectrum v0.0.40-0.20250527034552-55ddfe1bba67
 	github.com/df-mc/dragonfly v0.10.9
 	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
-	github.com/getsentry/sentry-go v0.27.0
+	github.com/getsentry/sentry-go v0.40.0
 	github.com/go-echarts/statsview v0.4.2
 	github.com/go-gl/mathgl v1.2.0
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
-	github.com/sandertv/go-raknet v1.14.3-0.20250305181847-6af3e95113d6
+	github.com/sandertv/go-raknet v1.14.3-0.20250823121252-325aeea25d25
 	github.com/sandertv/gophertunnel v1.52.0
 	github.com/zeebo/xxh3 v1.0.2
-	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b
+	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9
 )
 
 require (
@@ -30,6 +30,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/hashicorp/go-version v1.8.0 // indirect
 	github.com/hjson/hjson-go/v4 v4.4.0 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
@@ -40,14 +41,14 @@ require (
 	github.com/samber/lo v1.49.1 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
-	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/mod v0.29.0 // indirect
-	golang.org/x/net v0.46.0 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
-	golang.org/x/tools v0.38.0 // indirect
+	golang.org/x/crypto v0.46.0 // indirect
+	golang.org/x/mod v0.31.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/tools v0.40.0 // indirect
 )
 
 //replace github.com/sandertv/go-raknet => github.com/tedacmc/tedac-raknet v0.0.4
