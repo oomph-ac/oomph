@@ -12,8 +12,8 @@ require (
 	github.com/go-echarts/statsview v0.4.2
 	github.com/go-gl/mathgl v1.2.0
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
-	github.com/sandertv/go-raknet v1.14.3-0.20250823121252-325aeea25d25
-	github.com/sandertv/gophertunnel v1.52.0
+	github.com/sandertv/go-raknet v1.15.0
+	github.com/sandertv/gophertunnel v1.52.3-0.20260103191303-85f94a5d3b01
 	github.com/zeebo/xxh3 v1.0.2
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9
 )
@@ -35,7 +35,6 @@ require (
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/onsi/gomega v1.36.3 // indirect
-	github.com/oreans/virtualizersdk v0.0.0-20250127084511-5dd538199a75 // indirect
 	github.com/quic-go/quic-go v0.55.0 // indirect
 	github.com/rs/cors v1.11.0 // indirect
 	github.com/samber/lo v1.49.1 // indirect
@@ -55,9 +54,9 @@ require (
 
 //replace github.com/sandertv/gophertunnel => ../tedac-gophertunnel
 
-replace github.com/sandertv/go-raknet => ../go-raknet
+//replace github.com/sandertv/go-raknet => ../go-raknet
 
-replace github.com/sandertv/gophertunnel => ../gophertunnel
+//replace github.com/sandertv/gophertunnel => ../gophertunnel
 
 replace github.com/df-mc/dragonfly => ../dragonfly
 
