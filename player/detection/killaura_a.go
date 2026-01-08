@@ -62,6 +62,7 @@ func (d *KillauraA) Detect(pk packet.Packet) {
 		if !d.checkDeferredSwing {
 			return
 		}
+		d.checkDeferredSwing = false
 
 		lastSwung := d.mPlayer.Combat().LastSwing()
 		currentTick := d.mPlayer.SimulationFrame
