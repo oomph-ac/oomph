@@ -15,6 +15,7 @@ import (
 	oworld "github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"slices"
 )
 
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
@@ -130,10 +131,15 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 		return
 	}
 
+	exceptedEntityTypes := []string{"minecraft:xp_orb", "minecraft:arrow"}
+
 	// Check if any entity is in the way of the block being placed.
 	entityIntersecting := false
 	if p.Opts().Combat.EnableClientEntityTracking {
 		for _, e := range p.ClientEntityTracker().All() {
+			if slices.Contains(exceptedEntityTypes, e.Type) {
+				continue
+			}
 			if cube.AnyIntersections(boxes, e.Box(e.Position)) {
 				entityIntersecting = true
 				break
@@ -141,6 +147,9 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 		}
 	} else {
 		for _, e := range p.EntityTracker().All() {
+			if slices.Contains(exceptedEntityTypes, e.Type) {
+				continue
+			}
 			if rew, ok := e.Rewind(p.ClientTick); ok && cube.AnyIntersections(boxes, e.Box(rew.Position)) {
 				entityIntersecting = true
 				break
