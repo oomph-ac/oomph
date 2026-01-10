@@ -9,3 +9,11 @@ func GetValueFromStringMap[T any](list map[string]any, key string, value *T) boo
 	}
 	return false
 }
+
+func IsEntityPassBlockPlacement(entityType string) bool {
+	switch entityType {
+	case "minecraft:arrow", "minecraft:xp_orb":
+		return true
+	}
+	return false
+}
