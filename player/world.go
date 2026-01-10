@@ -134,6 +134,9 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 	entityIntersecting := false
 	if p.Opts().Combat.EnableClientEntityTracking {
 		for _, e := range p.ClientEntityTracker().All() {
+			if utils.IsEntityPassBlockPlacement(e.Type) {
+				continue
+			}
 			if cube.AnyIntersections(boxes, e.Box(e.Position)) {
 				entityIntersecting = true
 				break
@@ -141,6 +144,9 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 		}
 	} else {
 		for _, e := range p.EntityTracker().All() {
+			if utils.IsEntityPassBlockPlacement(e.Type) {
+				continue
+			}
 			if rew, ok := e.Rewind(p.ClientTick); ok && cube.AnyIntersections(boxes, e.Box(rew.Position)) {
 				entityIntersecting = true
 				break
