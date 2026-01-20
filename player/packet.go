@@ -182,22 +182,25 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 					inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 					inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
 				} else if c, ok := held.Item().(item.Consumable); ok {
-					if p.StartUseConsumableTick == 0 && c.ConsumeDuration() > 0 && (c.AlwaysConsumable() || p.IsHungry) {
-						p.StartUseConsumableTick = p.InputCount
-						p.consumedSlot = int(tr.HotBarSlot)
-					} else {
-						duration := (p.InputCount - p.StartUseConsumableTick) * 50
-						if duration < (c.ConsumeDuration().Milliseconds() - 50) {
+					_, canConsume := c.(interface{ CanConsume() bool })
+					if canConsume {
+						if p.StartUseConsumableTick == 0 && c.ConsumeDuration() > 0 && (c.AlwaysConsumable() || p.IsHungry) {
 							p.StartUseConsumableTick = p.InputCount
-							ctx.Cancel()
-							p.inventory.ForceSync()
-							//p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
-							//_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
-							p.Popup("<red>Item consumption cooldown</red>")
-							return
+							p.consumedSlot = int(tr.HotBarSlot)
+						} else {
+							duration := (p.InputCount - p.StartUseConsumableTick) * 50
+							if duration < (c.ConsumeDuration().Milliseconds() - 50) {
+								p.StartUseConsumableTick = p.InputCount
+								ctx.Cancel()
+								p.inventory.ForceSync()
+								//p.Message("item cooldown (attempted to consume in %d ticks, %d required)", duration, (c.ConsumeDuration().Milliseconds()/50)-1)
+								//_ = p.inventory.SyncSlot(protocol.WindowIDInventory, int(tr.HotBarSlot))
+								p.Popup("<red>Item consumption cooldown</red>")
+							} else {
+								p.StartUseConsumableTick = 0
+								p.consumedSlot = 0
+							}
 						}
-						p.StartUseConsumableTick = 0
-						p.consumedSlot = 0
 					}
 				}
 			}
