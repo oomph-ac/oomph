@@ -328,6 +328,11 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 	currPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
 	blockX, blockY, blockZ := blockPos[0], blockPos[1], blockPos[2]
 
+	// If the player's head is inside the block they are breaking, allow them to break it.
+	if prevPos[1] == blockY || currPos[1] == blockY {
+		return true
+	}
+
 	belowBlock := currPos[1] < blockY || prevPos[1] < blockY
 	aboveBlock := currPos[1] > blockY || prevPos[1] > blockY
 	if belowBlock {
