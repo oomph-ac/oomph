@@ -182,7 +182,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 					inv, _ := p.inventory.WindowFromWindowID(protocol.WindowIDInventory)
 					inv.SetSlot(int(tr.HotBarSlot), held.Grow(-1))
 				} else if c, ok := held.Item().(item.Consumable); ok {
-					_, canConsume := c.(interface{ CanConsume() bool })
+					canConsume := true
+					if bucket, ok := c.(interface{ CanConsume() bool }); ok {
+						canConsume = bucket.CanConsume()
+					}
 					if canConsume {
 						if p.StartUseConsumableTick == 0 && c.ConsumeDuration() > 0 && (c.AlwaysConsumable() || p.IsHungry) {
 							p.StartUseConsumableTick = p.InputCount
