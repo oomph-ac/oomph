@@ -367,6 +367,8 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 			if (indexBB.Width() == 1 || indexBB.Length() == 1) && indexBB.Height() == 1 {
 				// Continue to search in other faces for free areas.
 				break bb_check
+			} else {
+				return true
 			}
 		}
 	}
