@@ -347,26 +347,30 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 	if currPos[2] > blockZ || prevPos[2] > blockZ {
 		interactableFaces[cube.FaceSouth] = struct{}{}
 	}
+
 	if _, ok := interactableFaces[interactFace]; !ok {
 		p.Dbg.Notify(DebugModeBlockBreaking, true, "interactFace=%v is not interactable (currPos=%v, prevPos=%v, blockPos=%v)", interactFace, currPos, prevPos, blockPos)
 		return false
 	}
 
-	// Check if there is a full obstructing block in the way of the face. If so, the player should not be able to break the block.
-	sidePos := blockPos.Side(interactFace)
-	sideBlock := p.World().Block([3]int(sidePos))
-	sideBBs := utils.BlockCollisions(sideBlock, sidePos, p.World())
-	// There are no bounding boxes in the way of this face.
-	if len(sideBBs) == 0 {
-		return true
-	}
+	for face := range interactableFaces {
+		sidePos := blockPos.Side(face)
+		sideBlock := p.World().Block([3]int(sidePos))
+		sideBBs := utils.BlockCollisions(sideBlock, sidePos, p.World())
 
-	for _, indexBB := range sideBBs {
-		if (indexBB.Width() == 1 || indexBB.Length() == 1) && indexBB.Height() == 1 {
-			return false
+		// There are no bounding boxes in the way of this face, we can interact
+		if len(sideBBs) == 0 {
+			return true
+		}
+	bb_check:
+		for _, indexBB := range sideBBs {
+			if (indexBB.Width() == 1 || indexBB.Length() == 1) && indexBB.Height() == 1 {
+				// Continue to search in other faces for free areas.
+				break bb_check
+			}
 		}
 	}
-	return true
+	return false
 }
 
 // tryRaycastToBlock runs a raycast to the block at the given position. This function assumes that to break the target block, the
