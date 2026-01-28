@@ -132,6 +132,9 @@ type AuthoritativeMovementComponent struct {
 
 	pendingCorrections   int
 	inCorrectionCooldown bool
+
+	// bboxCache caches nearby bounding boxes to reduce expensive lookups
+	bboxCache *utils.BBoxCache
 }
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
@@ -140,6 +143,7 @@ func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementC
 		nonAuthoritative:     &NonAuthoritativeMovement{},
 		defaultMovementSpeed: 0.1,
 		airSpeed:             0.02,
+		bboxCache:            utils.NewBBoxCache(),
 	}
 }
 
