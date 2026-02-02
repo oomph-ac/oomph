@@ -269,3 +269,11 @@ func IsBlockPassInteraction(b world.Block) bool {
 func BlockToCubePos(p [3]int32) cube.Pos {
 	return cube.Pos{int(p[0]), int(p[1]), int(p[2])}
 }
+
+func IsBlockPlaceAlwaysSimBased(b world.Item) bool {
+	switch b.(type) {
+	case block.Vines, block.Ladder:
+		return true
+	}
+	return false
+}
