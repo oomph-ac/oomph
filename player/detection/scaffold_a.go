@@ -2,6 +2,7 @@ package detection
 
 import (
 	"github.com/oomph-ac/oomph/player"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -52,6 +53,9 @@ func (d *ScaffoldA) Detect(pk packet.Packet) {
 		return
 	}
 	if !d.mPlayer.VersionInRange(player.GameVersion1_21_20, protocol.CurrentProtocol) {
+		return
+	}
+	if inHand, _ := d.mPlayer.HeldItems(); utils.IsBlockPlaceAlwaysSimBased(inHand.Item()) {
 		return
 	}
 	if trData.ClickedPosition.LenSqr() == 0 && trData.TriggerType == protocol.TriggerTypePlayerInput {
