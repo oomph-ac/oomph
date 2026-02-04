@@ -164,6 +164,7 @@ func (ack *PlayerUpdateActorData) Run() {
 		flags := f.(int64)
 		ack.mPlayer.Movement().SetImmobile(utils.HasDataFlag(entity.DataFlagImmobile, flags))
 		ack.mPlayer.Movement().SetServerSprint(utils.HasDataFlag(entity.DataFlagSprinting, flags))
+		ack.mPlayer.Movement().SetHasGravity(utils.HasDataFlag(entity.DataFlagAffectedByGravity, flags))
 
 		if !utils.HasDataFlag(entity.DataFlagAction, flags) && ack.mPlayer.StartUseConsumableTick != 0 {
 			ack.mPlayer.StartUseConsumableTick = 0
