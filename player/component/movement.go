@@ -124,6 +124,8 @@ type AuthoritativeMovementComponent struct {
 	gliding         bool
 	glideBoostTicks int64
 
+	hasGravity bool
+
 	flying, mayFly, trustFlyStatus bool
 	justDisabledFlight             bool
 
@@ -506,6 +508,16 @@ func (mc *AuthoritativeMovementComponent) Gravity() float32 {
 // SetGravity sets the gravity of the movement component.
 func (mc *AuthoritativeMovementComponent) SetGravity(newGravity float32) {
 	mc.gravity = newGravity
+}
+
+// HasGravity returns true if the movement component is affected by gravity.
+func (mc *AuthoritativeMovementComponent) HasGravity() bool {
+	return mc.hasGravity
+}
+
+// SetHasGravity sets if the movement component is affected by gravity.
+func (mc *AuthoritativeMovementComponent) SetHasGravity(hg bool) {
+	mc.hasGravity = hg
 }
 
 // JumpHeight returns the jump height of the movement component.

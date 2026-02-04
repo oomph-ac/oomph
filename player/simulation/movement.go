@@ -172,10 +172,11 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	}
 
 	newVel := movement.Vel()
+	p.Dbg.Notify(player.DebugModeMovementSim, !movement.HasGravity(), "not affected by gravity?")
 	if eff, ok := p.Effects().Get(packet.EffectLevitation); ok {
 		levSpeed := game.LevitationGravityMultiplier * float32(eff.Amplifier)
 		newVel[1] += (levSpeed - newVel[1]) * 0.2
-	} else {
+	} else if movement.HasGravity() {
 		newVel[1] -= movement.Gravity()
 		newVel[1] *= game.NormalGravityMultiplier
 	}

@@ -156,6 +156,11 @@ type MovementComponent interface {
 	// SetGravity sets the gravity of the movement component.
 	SetGravity(gravity float32)
 
+	// HasGravity returns true if the movement component is affected by gravity.
+	HasGravity() bool
+	// SetHasGravity sets if the movement component is affected by gravity.
+	SetHasGravity(bool)
+
 	// FallDistance returns the fall distance of the movement component.
 	FallDistance() float32
 	// SetFallDistance sets the fall distance of the movement component.
