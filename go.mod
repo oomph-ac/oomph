@@ -11,6 +11,7 @@ require (
 	github.com/getsentry/sentry-go v0.40.0
 	github.com/go-echarts/statsview v0.4.2
 	github.com/go-gl/mathgl v1.2.0
+	github.com/oomph-ac/bedsim v0.0.0
 	github.com/oomph-ac/oconfig v0.0.0-20250315200330-e36f34d634e5
 	github.com/sandertv/go-raknet v1.15.0
 	github.com/sandertv/gophertunnel v1.52.3-0.20260103191303-85f94a5d3b01
@@ -65,3 +66,5 @@ replace github.com/cooldogedev/spectrum => ../spectrum
 replace github.com/oomph-ac/oconfig => ../oconfig
 
 replace github.com/akmalfairuz/legacy-version => ../legacy-version
+
+replace github.com/oomph-ac/bedsim => ./bedsim
