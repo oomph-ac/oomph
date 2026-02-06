@@ -291,16 +291,7 @@ func (s *Simulator) simulateMovement(state *MovementState) {
 		s.debugf("added climb velocity: %v (collided=%v pressingJump=%v)", newVel, state.CollideX || state.CollideZ, state.PressingJump)
 	}
 
-	blocksInside, isInsideBlock := s.blocksInside(state)
-	inCobweb := false
-	if isInsideBlock {
-		for _, b := range blocksInside {
-			if BlockName(b) == "minecraft:web" {
-				inCobweb = true
-				break
-			}
-		}
-	}
+	inCobweb := s.isInsideCobweb(state)
 
 	if inCobweb {
 		newVel := state.Vel
@@ -367,20 +358,27 @@ func (s *Simulator) simulationIsReliable(state *MovementState) bool {
 		return true
 	}
 
-	bb := state.BoundingBox(s.Options.UseSlideOffset).Grow(1)
-	for _, result := range nearbyBlocks(bb, s.World) {
-		if _, isAir := result.block.(block.Air); isAir {
-			continue
+	stateBB := state.BoundingBox(s.Options.UseSlideOffset)
+	isReliable := true
+	forEachNearbyBlock(stateBB.Grow(1), s.World, func(pos cube.Pos, b world.Block) bool {
+		if _, isAir := b.(block.Air); isAir {
+			return true
 		}
-		if _, isLiquid := result.block.(world.Liquid); isLiquid {
-			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(result.pos.Vec3())
-			if state.BoundingBox(s.Options.UseSlideOffset).IntersectsWith(blockBB) {
+		if _, isLiquid := b.(world.Liquid); isLiquid {
+			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(pos.Vec3())
+			if stateBB.IntersectsWith(blockBB) {
+				isReliable = false
 				return false
 			}
 		}
-		if BlockName(result.block) == "minecraft:bamboo" {
+		if BlockName(b) == "minecraft:bamboo" {
+			isReliable = false
 			return false
 		}
+		return true
+	})
+	if !isReliable {
+		return false
 	}
 
 	if state.GameMode != packet.GameTypeSurvival && state.GameMode != packet.GameTypeAdventure {
@@ -743,16 +741,23 @@ func tryCollisions(state *MovementState, w WorldProvider, useSlideOffset bool, c
 		sim.debugf("inverseYStepVel=%v", inverseYStepVel)
 
 		stepVel := stepYVel.Add(stepXVel).Add(stepZVel)
-		newBBList := w.GetNearbyBBoxes(stepBB)
+		newBBListCount := 0
+		hasStepCollisions := false
+		if sim != nil && sim.Options.Debugf != nil {
+			newBBListCount = len(w.GetNearbyBBoxes(stepBB))
+			hasStepCollisions = newBBListCount > 0
+		} else {
+			hasStepCollisions = hasNearbyBBoxes(w, stepBB)
+		}
 		stepPos := mgl64.Vec3{
 			(stepBB.Min().X() + stepBB.Max().X()) * 0.5,
 			stepBB.Min().Y(),
 			(stepBB.Min().Z() + stepBB.Max().Z()) * 0.5,
 		}
 		sim.debugf("endStepVel=%v endStepPos=%v", stepVel, stepPos)
-		sim.debugf("newBBList count: %d", len(newBBList))
+		sim.debugf("newBBList count: %d", newBBListCount)
 
-		if len(newBBList) == 0 && Vec3HzDistSqr(collisionVel) < Vec3HzDistSqr(stepVel) {
+		if !hasStepCollisions && Vec3HzDistSqr(collisionVel) < Vec3HzDistSqr(stepVel) {
 			// Match vanilla's step-vs-collision tie-breaker using client alignment to avoid false
 			// positives where the server predicts a step that the client rejects.
 			stepPosDist := stepPos.Sub(state.Client.Pos).Len()
@@ -829,7 +834,7 @@ func avoidEdge(state *MovementState, w WorldProvider, useSlideOffset bool, sim *
 	bb := state.BoundingBox(useSlideOffset).GrowVec3(mgl64.Vec3{-edgeBoundry, 0, -edgeBoundry})
 	xMov, zMov := newVel.X(), newVel.Z()
 
-	for xMov != 0.0 && len(w.GetNearbyBBoxes(bb.Translate(mgl64.Vec3{xMov, -StepHeight * 1.01, 0}))) == 0 {
+	for xMov != 0.0 && !hasNearbyBBoxes(w, bb.Translate(mgl64.Vec3{xMov, -StepHeight * 1.01, 0})) {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -839,7 +844,7 @@ func avoidEdge(state *MovementState, w WorldProvider, useSlideOffset bool, sim *
 		}
 	}
 
-	for zMov != 0.0 && len(w.GetNearbyBBoxes(bb.Translate(mgl64.Vec3{0, -StepHeight * 1.01, zMov}))) == 0 {
+	for zMov != 0.0 && !hasNearbyBBoxes(w, bb.Translate(mgl64.Vec3{0, -StepHeight * 1.01, zMov})) {
 		if zMov < offset && zMov >= -offset {
 			zMov = 0
 		} else if zMov > 0 {
@@ -849,7 +854,7 @@ func avoidEdge(state *MovementState, w WorldProvider, useSlideOffset bool, sim *
 		}
 	}
 
-	for xMov != 0.0 && zMov != 0.0 && len(w.GetNearbyBBoxes(bb.Translate(mgl64.Vec3{xMov, -StepHeight * 1.01, zMov}))) == 0 {
+	for xMov != 0.0 && zMov != 0.0 && !hasNearbyBBoxes(w, bb.Translate(mgl64.Vec3{xMov, -StepHeight * 1.01, zMov})) {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -873,53 +878,52 @@ func avoidEdge(state *MovementState, w WorldProvider, useSlideOffset bool, sim *
 	sim.debugf("(avoidEdge): oldVel=%v newVel=%v", oldVel, newVel)
 }
 
-func (s *Simulator) blocksInside(state *MovementState) ([]world.Block, bool) {
-	bb := state.BoundingBox(s.Options.UseSlideOffset)
-	blocks := []world.Block{}
+func (s *Simulator) isInsideCobweb(state *MovementState) bool {
+	if s.World == nil {
+		return false
+	}
 
-	for _, result := range nearbyBlocks(bb.Grow(1), s.World) {
-		pos := result.pos
-		b := result.block
+	bb := state.BoundingBox(s.Options.UseSlideOffset)
+	insideCobweb := false
+	forEachNearbyBlock(bb.Grow(1), s.World, func(pos cube.Pos, b world.Block) bool {
 		if _, isAir := b.(block.Air); isAir {
-			continue
+			return true
+		}
+		if BlockName(b) != "minecraft:web" {
+			return true
 		}
 
 		boxes := s.World.BlockCollisions(pos)
 		for _, box := range boxes {
 			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
-				blocks = append(blocks, b)
-				break
+				insideCobweb = true
+				return false
 			}
 		}
-	}
-
-	return blocks, len(blocks) > 0
+		return true
+	})
+	return insideCobweb
 }
 
-type blockResult struct {
-	pos   cube.Pos
-	block world.Block
-}
-
-func nearbyBlocks(aabb cube.BBox, w WorldProvider) []blockResult {
+func forEachNearbyBlock(aabb cube.BBox, w WorldProvider, visit func(pos cube.Pos, b world.Block) bool) {
 	if w == nil {
-		return nil
+		return
 	}
 	min, max := aabb.Min(), aabb.Max()
 	minX, minY, minZ := int(math.Floor(min[0])), int(math.Floor(min[1])), int(math.Floor(min[2]))
 	maxX, maxY, maxZ := int(math.Ceil(max[0])), int(math.Ceil(max[1])), int(math.Ceil(max[2]))
 
-	blocks := make([]blockResult, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				pos := cube.Pos{x, y, z}
 				b := w.Block(pos)
-				blocks = append(blocks, blockResult{pos: pos, block: b})
+				if !visit(pos, b) {
+					return
+				}
 			}
 		}
 	}
-	return blocks
 }
 
 func checkSupportingBlockPos(state *MovementState, w WorldProvider, useSlideOffset bool, vel mgl64.Vec3) {
@@ -943,25 +947,26 @@ func findSupportingBlock(state *MovementState, w WorldProvider, bb cube.BBox) {
 	minDist := math.MaxFloat64 - 1
 	centerPos := cube.PosFromVec3(state.Pos).Vec3().Add(mgl64.Vec3{0.5, 0.5, 0.5})
 
-	for _, result := range nearbyBlocks(bb, w) {
-		boxes := w.BlockCollisions(result.pos)
+	forEachNearbyBlock(bb, w, func(pos cube.Pos, _ world.Block) bool {
+		boxes := w.BlockCollisions(pos)
 		if len(boxes) == 0 {
-			continue
+			return true
 		}
 
 		for _, box := range boxes {
-			if !bb.IntersectsWith(box.Translate(result.pos.Vec3())) {
+			if !bb.IntersectsWith(box.Translate(pos.Vec3())) {
 				continue
 			}
-			dist := result.pos.Vec3().Sub(centerPos).LenSqr()
+			dist := pos.Vec3().Sub(centerPos).LenSqr()
 			if dist < minDist {
 				minDist = dist
-				pos := result.pos
-				blockPos = &pos
+				supportPos := pos
+				blockPos = &supportPos
 			}
 			break
 		}
-	}
+		return true
+	})
 
 	state.SupportingBlockPos = blockPos
 }
@@ -971,4 +976,18 @@ func (s *Simulator) blockAtPos(pos cube.Pos) world.Block {
 		return block.Air{}
 	}
 	return s.World.Block(pos)
+}
+
+type nearbyBBoxProbe interface {
+	HasNearbyBBoxes(aabb cube.BBox) bool
+}
+
+func hasNearbyBBoxes(w WorldProvider, aabb cube.BBox) bool {
+	if w == nil {
+		return false
+	}
+	if probe, ok := w.(nearbyBBoxProbe); ok {
+		return probe.HasNearbyBBoxes(aabb)
+	}
+	return len(w.GetNearbyBBoxes(aabb)) > 0
 }

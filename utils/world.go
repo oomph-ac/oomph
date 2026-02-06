@@ -189,11 +189,26 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src w
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
 func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
+	bboxes, _ := scanNearbyBBoxes(aabb, src, false)
+	return bboxes
+}
+
+// HasNearbyBBoxes reports if any collidable block bounding box intersects the provided AABB.
+// It mirrors GetNearbyBBoxes but short-circuits on the first match to avoid building a full slice.
+func HasNearbyBBoxes(aabb cube.BBox, src world.BlockSource) bool {
+	_, found := scanNearbyBBoxes(aabb, src, true)
+	return found
+}
+
+func scanNearbyBBoxes(aabb cube.BBox, src world.BlockSource, firstOnly bool) ([]cube.BBox, bool) {
 	grown := aabb.Grow(1.0)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
-	bboxList := make([]cube.BBox, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
+	var bboxList []cube.BBox
+	if !firstOnly {
+		bboxList = make([]cube.BBox, 0, (maxX-minX)*(maxY-minY)*(maxZ-minZ))
+	}
 
 	for x := minX; x <= maxX; x++ {
 		for z := minZ; z <= maxZ; z++ {
@@ -205,15 +220,20 @@ func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
 				}
 
 				for _, box := range BlockCollisions(block, pos, src) {
-					b := box.Translate(pos.Vec3())
-					if b.IntersectsWith(aabb) {
-						bboxList = append(bboxList, b)
+					bb := box.Translate(pos.Vec3())
+					if !bb.IntersectsWith(aabb) {
+						continue
 					}
+					if firstOnly {
+						return nil, true
+					}
+					bboxList = append(bboxList, bb)
 				}
 			}
 		}
 	}
-	return bboxList
+
+	return bboxList, false
 }
 
 // BlockClimbable returns whether the given block is climbable.

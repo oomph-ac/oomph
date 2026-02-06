@@ -198,11 +198,19 @@ func (wp bedsimWorldProvider) GetNearbyBBoxes(aabb df_cube.BBox) []df_cube.BBox 
 		return nil
 	}
 	boxes32 := utils.GetNearbyBBoxes(game.DFBoxToCubeBox(aabb), wp.w)
+
 	boxes := make([]df_cube.BBox, len(boxes32))
 	for i, bb := range boxes32 {
 		boxes[i] = game.CubeBoxToDFBox(bb)
 	}
 	return boxes
+}
+
+func (wp bedsimWorldProvider) HasNearbyBBoxes(aabb df_cube.BBox) bool {
+	if wp.w == nil {
+		return false
+	}
+	return utils.HasNearbyBBoxes(game.DFBoxToCubeBox(aabb), wp.w)
 }
 
 func (wp bedsimWorldProvider) IsChunkLoaded(chunkX, chunkZ int32) bool {
