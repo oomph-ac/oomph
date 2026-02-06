@@ -822,7 +822,11 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	if !mc.pressingJump {
 		mc.jumpDelay = 0
 	}
+
 	mc.gravity = game.NormalGravity
+	if _, ok := mc.mPlayer.Effects().Get(packet.EffectSlowFalling); ok {
+		mc.gravity = game.SlowFallingGravity
+	}
 
 	// The stop flag should be checked first, as this would indicate to us that the player is no longer gliding.
 	// In the case where both flags are sent in the same tick, the gliding status will be set to false.
