@@ -438,10 +438,10 @@ func (s *Simulator) attemptTeleport(state *MovementState) bool {
 func simulateGlide(state *MovementState, sim *Simulator) {
 	radians := math.Pi / 180.0
 	yaw, pitch := state.Rotation.Z()*radians, state.Rotation.X()*radians
-	yawCos := math.Cos(-yaw - math.Pi)
-	yawSin := math.Sin(-yaw - math.Pi)
-	pitchCos := math.Cos(pitch)
-	pitchSin := math.Sin(pitch)
+	yawCos := MCCos(-yaw - math.Pi)
+	yawSin := MCSin(-yaw - math.Pi)
+	pitchCos := MCCos(pitch)
+	pitchSin := MCSin(pitch)
 
 	lookX := yawSin * -pitchCos
 	lookY := -pitchSin
