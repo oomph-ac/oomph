@@ -72,7 +72,7 @@ func BlockClimbable(b world.Block) bool {
 // IsFence returns true if the block is a fence.
 func IsFence(b world.Block) bool {
 	switch b.(type) {
-	case block.WoodFence, block.NetherBrickFence:
+	case block.WoodFence, block.WoodFenceGate, block.NetherBrickFence:
 		return true
 	default:
 		return false
