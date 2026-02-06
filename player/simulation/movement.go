@@ -275,14 +275,14 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 		return true
 	}
 
-	for _, b := range utils.GetNearbyBlocks(movement.BoundingBox().Grow(1), false, true, p.World()) {
-		if _, isLiquid := b.Block.(world.Liquid); isLiquid {
-			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(b.Position.Vec3())
+	for result := range utils.GetNearbyBlocks(movement.BoundingBox().Grow(1), false, true, p.World()) {
+		if _, isLiquid := result.Block.(world.Liquid); isLiquid {
+			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(result.Position.Vec3())
 			if movement.BoundingBox().IntersectsWith(blockBB) {
 				return false
 			}
 		}
-		if utils.BlockName(b.Block) == "minecraft:bamboo" {
+		if utils.BlockName(result.Block) == "minecraft:bamboo" {
 			return false
 		}
 	}
@@ -586,7 +586,7 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 	bb := movement.BoundingBox().GrowVec3(mgl32.Vec3{-edgeBoundry, 0, -edgeBoundry})
 	xMov, zMov := newVel.X(), newVel.Z()
 
-	for xMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, 0}), src)) == 0 {
+	for xMov != 0.0 && utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, 0}), src) {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -596,7 +596,7 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 		}
 	}
 
-	for zMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight * 1.01, zMov}), src)) == 0 {
+	for zMov != 0.0 && utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight * 1.01, zMov}), src) {
 		if zMov < offset && zMov >= -offset {
 			zMov = 0
 		} else if zMov > 0 {
@@ -606,7 +606,7 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 		}
 	}
 
-	for xMov != 0.0 && zMov != 0.0 && len(utils.GetNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, zMov}), src)) == 0 {
+	for xMov != 0.0 && zMov != 0.0 && utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, zMov}), src) {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -636,7 +636,7 @@ func blocksInside(movement player.MovementComponent, src world.BlockSource) ([]w
 	bb := movement.BoundingBox()
 	blocks := []world.Block{}
 
-	for _, result := range utils.GetNearbyBlocks(bb.Grow(1), false, true, src) {
+	for result := range utils.GetNearbyBlocks(bb.Grow(1), false, true, src) {
 		pos := result.Position
 		block := result.Block
 		boxes := utils.BlockCollisions(block, pos, src)

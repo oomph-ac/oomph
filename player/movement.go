@@ -316,7 +316,7 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 		p.movement.SetCorrectionCooldown(false)
 
 		// We can only accept the client's position/velocity if we are not in a cooldown period (and it is specified in the config).
-		srvInsideBlocks, clientInsideBlocks := len(utils.GetNearbyBBoxes(p.movement.BoundingBox(), p.World())) > 0, len(utils.GetNearbyBBoxes(p.movement.ClientBoundingBox(), p.World())) > 0
+		srvInsideBlocks, clientInsideBlocks := utils.HasNearbyBBoxes(p.movement.BoundingBox(), p.World()), utils.HasNearbyBBoxes(p.movement.ClientBoundingBox(), p.World())
 		if !inCooldown && p.movement.PendingTeleports() == 0 && !hasTeleport && !p.movement.Immobile() && srvInsideBlocks == clientInsideBlocks {
 			if p.Opts().Movement.AcceptClientPosition && posDiff.Len() < p.Opts().Movement.PositionAcceptanceThreshold {
 				posDiff = mgl32.Vec3{}
