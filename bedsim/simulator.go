@@ -29,6 +29,9 @@ type SimulationOptions struct {
 
 	LimitAllVelocity          bool
 	LimitAllVelocityThreshold float64
+
+	// Debugf receives internal simulation trace logs for callers that need deep diagnostics.
+	Debugf func(format string, args ...any)
 }
 
 // Simulator orchestrates movement simulation using the provided adapters.

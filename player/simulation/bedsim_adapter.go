@@ -27,6 +27,9 @@ func simulateWithBedsim(p *player.Player, movement player.MovementComponent) bed
 			PositionCorrectionThreshold: float64(p.Opts().Movement.CorrectionThreshold),
 			LimitAllVelocity:            p.Opts().Movement.LimitAllVelocity,
 			LimitAllVelocityThreshold:   float64(p.Opts().Movement.LimitAllVelocityThreshold),
+			Debugf: func(format string, args ...any) {
+				p.Dbg.Notify(player.DebugModeMovementSim, true, format, args...)
+			},
 		},
 	}
 
@@ -38,6 +41,7 @@ func simulateWithBedsim(p *player.Player, movement player.MovementComponent) bed
 func movementStateFromComponent(p *player.Player, movement player.MovementComponent) bedsim.MovementState {
 	client := movement.Client()
 	state := bedsim.MovementState{
+		// Client mirrors raw non-authoritative values used for correction deltas and tie-breaks.
 		Client: bedsim.ClientState{
 			Pos:                 vec32To64(client.Pos()),
 			LastPos:             vec32To64(client.LastPos()),
@@ -61,6 +65,7 @@ func movementStateFromComponent(p *player.Player, movement player.MovementCompon
 		Impulse:      vec2_32To64(movement.Impulse()),
 		Size:         vec32To64(movement.Size()),
 
+		// Supporting block is tracked separately from collision booleans for edge-case jump logic.
 		SupportingBlockPos: toDFPosPtr(movement.SupportingBlockPos()),
 
 		Gravity:      float64(movement.Gravity()),
@@ -120,6 +125,7 @@ func movementStateFromComponent(p *player.Player, movement player.MovementCompon
 		GameMode: p.GameMode,
 	}
 
+	// Preserve current tick's knockback/teleport windows so bedsim keeps the same gates as Oomph.
 	if movement.HasKnockback() {
 		state.TicksSinceKnockback = 0
 	} else {
@@ -145,6 +151,7 @@ func applyBedsimState(movement player.MovementComponent, state *bedsim.MovementS
 	movement.SetSlideOffset(vec2_64To32(state.SlideOffset))
 	movement.SetSupportingBlockPos(toFloatPosPtr(state.SupportingBlockPos))
 
+	// Preserve Oomph's last/current snapshots in the same order as the legacy movement path.
 	movement.SetPos(vec64To32(state.LastPos))
 	movement.SetPos(vec64To32(state.Pos))
 	movement.SetVel(vec64To32(state.LastVel))
