@@ -117,16 +117,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		movement.SetVel(newVel)
 	}
 
-	blocksInside, isInsideBlock := blocksInside(movement, p.World())
-	inCobweb := false
-	if isInsideBlock {
-		for _, b := range blocksInside {
-			if utils.BlockName(b) == "minecraft:web" {
-				inCobweb = true
-				break
-			}
-		}
-	}
+	inCobweb := isInsideCobweb(movement, p.World())
 
 	if inCobweb {
 		newVel := movement.Vel()
@@ -275,10 +266,11 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 		return true
 	}
 
-	for result := range utils.GetNearbyBlocks(movement.BoundingBox().Grow(1), false, true, p.World()) {
+	stateBB := movement.BoundingBox()
+	for result := range utils.GetNearbyBlocks(stateBB.Grow(1), false, true, p.World()) {
 		if _, isLiquid := result.Block.(world.Liquid); isLiquid {
 			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(result.Position.Vec3())
-			if movement.BoundingBox().IntersectsWith(blockBB) {
+			if stateBB.IntersectsWith(blockBB) {
 				return false
 			}
 		}
@@ -478,16 +470,23 @@ func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger
 		dbg.Notify(player.DebugModeMovementSim, true, "inverseYStepVel=%v", inverseYStepVel)
 
 		stepVel := stepYVel.Add(stepXVel).Add(stepZVel)
-		newBBList := utils.GetNearbyBBoxes(stepBB, src)
+		newBBListCount := 0
+		hasStepCollisions := false
+		if dbg != nil && dbg.Enabled(player.DebugModeMovementSim) {
+			newBBListCount = len(utils.GetNearbyBBoxes(stepBB, src))
+			hasStepCollisions = newBBListCount > 0
+		} else {
+			hasStepCollisions = utils.HasNearbyBBoxes(stepBB, src)
+		}
 		stepPos := mgl32.Vec3{
 			(stepBB.Min().X() + stepBB.Max().X()) * 0.5,
 			stepBB.Min().Y(),
 			(stepBB.Min().Z() + stepBB.Max().Z()) * 0.5,
 		}
 		dbg.Notify(player.DebugModeMovementSim, true, "endStepVel=%v endStepPos=%v", stepVel, stepPos)
-		dbg.Notify(player.DebugModeMovementSim, true, "newBBList count: %d", len(newBBList))
+		dbg.Notify(player.DebugModeMovementSim, true, "newBBList count: %d", newBBListCount)
 
-		if len(newBBList) == 0 && game.Vec3HzDistSqr(collisionVel) < game.Vec3HzDistSqr(stepVel) {
+		if !hasStepCollisions && game.Vec3HzDistSqr(collisionVel) < game.Vec3HzDistSqr(stepVel) {
 			// HACK: If a step is possible here, we check which the client seems to align itself better with. The reason this is neccessary
 			// is because in some scenarios, the client seems to reject a step even though Oomph thinks it is possible. This is mainly in scenarios
 			// where the player teleports into a block.
@@ -632,22 +631,24 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 	dbg.Notify(player.DebugModeMovementSim, true, "(avoidEdge): oldVel=%v newVel=%v", oldVel, newVel)
 }
 
-func blocksInside(movement player.MovementComponent, src world.BlockSource) ([]world.Block, bool) {
+func isInsideCobweb(movement player.MovementComponent, src world.BlockSource) bool {
 	bb := movement.BoundingBox()
-	blocks := []world.Block{}
 
 	for result := range utils.GetNearbyBlocks(bb.Grow(1), false, true, src) {
+		if utils.BlockName(result.Block) != "minecraft:web" {
+			continue
+		}
 		pos := result.Position
 		block := result.Block
 		boxes := utils.BlockCollisions(block, pos, src)
 
 		for _, box := range boxes {
 			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
-				blocks = append(blocks, block)
+				return true
 			}
 		}
 	}
-	return blocks, len(blocks) > 0
+	return false
 }
 
 func moveRelative(movement player.MovementComponent, moveRelativeSpeed float32) {
