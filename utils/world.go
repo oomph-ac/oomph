@@ -97,9 +97,15 @@ func BlockCollisions(b world.Block, pos cube.Pos, src world.BlockSource) []cube.
 		bModel = blockmodel.IronBars{}
 	}
 
-	var boxes []cube.BBox
 	dfBoxes := bModel.BBox(df_cube.Pos(pos), src)
-	boxes = make([]cube.BBox, len(dfBoxes))
+	switch len(dfBoxes) {
+	case 0:
+		return nil
+	case 1:
+		return []cube.BBox{game.DFBoxToCubeBox(dfBoxes[0])}
+	}
+
+	boxes := make([]cube.BBox, len(dfBoxes))
 	for i, bb := range dfBoxes {
 		boxes[i] = game.DFBoxToCubeBox(bb)
 	}
@@ -186,44 +192,24 @@ func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src w
 
 // HasNearbyBBoxes returns true if there's at least one bounding box within the given bounding box.
 func HasNearbyBBoxes(aabb cube.BBox, src world.BlockSource) bool {
-	grown := aabb.Grow(1.0)
-	min, max := grown.Min(), grown.Max()
-	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
-	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
-	for x := minX; x <= maxX; x++ {
-		for z := minZ; z <= maxZ; z++ {
-			for y := minY; y <= maxY; y++ {
-				pos := cube.Pos{x, y, z}
-				block := src.Block(df_cube.Pos(pos))
-				if CanPassBlock(block) {
-					continue
-				}
-
-				for _, box := range BlockCollisions(block, pos, src) {
-					b := box.Translate(pos.Vec3())
-					if b.IntersectsWith(aabb) {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
+	_, found := scanNearbyBBoxes(aabb, src, true)
+	return found
 }
 
 // GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
 func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
+	bboxList, _ := scanNearbyBBoxes(aabb, src, false)
+	return bboxList
+}
+
+func scanNearbyBBoxes(aabb cube.BBox, src world.BlockSource, firstOnly bool) ([]cube.BBox, bool) {
 	grown := aabb.Grow(1.0)
 	min, max := grown.Min(), grown.Max()
 	minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
 	maxX, maxY, maxZ := int(math32.Ceil(max[0])), int(math32.Ceil(max[1])), int(math32.Ceil(max[2]))
 
-	var (
-		bboxList []cube.BBox
-
-		iterations int
-		maxIters   int = (maxX - minX) * (maxY - minY) * (maxZ - minZ)
-	)
+	var bboxList []cube.BBox
+	maxIters := (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1)
 
 	for x := minX; x <= maxX; x++ {
 		for z := minZ; z <= maxZ; z++ {
@@ -234,21 +220,25 @@ func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
 					continue
 				}
 
+				posVec := pos.Vec3()
 				for _, box := range BlockCollisions(block, pos, src) {
-					b := box.Translate(pos.Vec3())
-					if b.IntersectsWith(aabb) {
-						if bboxList == nil {
-							bboxList = make([]cube.BBox, 0, maxIters-iterations)
-						}
-						bboxList = append(bboxList, b)
+					b := box.Translate(posVec)
+					if !b.IntersectsWith(aabb) {
+						continue
 					}
+					if firstOnly {
+						return nil, true
+					}
+					if bboxList == nil {
+						bboxList = make([]cube.BBox, 0, maxIters)
+					}
+					bboxList = append(bboxList, b)
 				}
-				iterations++
 			}
 		}
 	}
 
-	return bboxList
+	return bboxList, false
 }
 
 // BlockClimbable returns whether the given block is climbable.
