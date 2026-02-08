@@ -585,7 +585,7 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 	bb := movement.BoundingBox().GrowVec3(mgl32.Vec3{-edgeBoundry, 0, -edgeBoundry})
 	xMov, zMov := newVel.X(), newVel.Z()
 
-	for xMov != 0.0 && utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, 0}), src) {
+	for xMov != 0.0 && !utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, 0}), src) {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
@@ -595,7 +595,7 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 		}
 	}
 
-	for zMov != 0.0 && utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight * 1.01, zMov}), src) {
+	for zMov != 0.0 && !utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{0, -game.StepHeight * 1.01, zMov}), src) {
 		if zMov < offset && zMov >= -offset {
 			zMov = 0
 		} else if zMov > 0 {
@@ -605,7 +605,7 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 		}
 	}
 
-	for xMov != 0.0 && zMov != 0.0 && utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, zMov}), src) {
+	for xMov != 0.0 && zMov != 0.0 && !utils.HasNearbyBBoxes(bb.Translate(mgl32.Vec3{xMov, -game.StepHeight * 1.01, zMov}), src) {
 		if xMov < offset && xMov >= -offset {
 			xMov = 0
 		} else if xMov > 0 {
