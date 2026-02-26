@@ -8,8 +8,6 @@ Oomph implements a server authoritative system for movement and combat, allowing
 
 ## Dependencies
 - [Dragonfly](https://github.com/oomph-ac/dragonfly)
-- [Spectrum](https://github.com/oomph-ac/spectrum)
-- (For your PM server) [Spectrum-PM](https://github.com/oomph-ac/spectrum-pm)
 - [OConfig](https://github.com/oomph-ac/oconfig)
 The multi-version will not be going public at the moment, you may remove the dependency from `go.mod`.
 
@@ -65,4 +63,3 @@ Logic for combat, setting the client & server tick, and lag compensating entitie
 * [JustTalDevelops](https://github.com/JustTalDevelops) - Created the base of Oomph, making it able to intercept packets, and avoiding pesky import cycle.
 * [هاشم](https://github.com/hashimthearab) - Created the base of Oomph
 * [cjmustard](https://www.github.com/cjmustard) - Moral support
-
