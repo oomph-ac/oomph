@@ -13,7 +13,5 @@ players/*
 .DS_Store
 .fleet/
 .vscode.code-workspace
-example/spectrum/spectrum.exe
-example/spectrum/logs/*
 example/default/logs/*
 example/default/proxy.exe
