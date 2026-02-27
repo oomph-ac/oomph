@@ -37,7 +37,7 @@ require (
 	github.com/quic-go/quic-go v0.55.0 // indirect
 	github.com/rs/cors v1.11.0 // indirect
 	github.com/samber/lo v1.49.1 // indirect
-	github.com/sandertv/go-raknet v1.15.0 // indirect
+	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217 // indirect
 	github.com/scylladb/go-set v1.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
@@ -51,4 +51,3 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
 )
-
