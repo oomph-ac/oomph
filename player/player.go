@@ -10,6 +10,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/event"
 	df_world "github.com/df-mc/dragonfly/server/world"
+	"github.com/google/uuid"
 	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
@@ -71,10 +72,14 @@ type Player struct {
 	GameDat     minecraft.GameData
 	Version     int32
 
-	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
-	// we must translate them to new ones, while still retaining the old ones for the client to use.
+	// RuntimeId/UniqueId are the server-side entity IDs for the current upstream connection.
 	RuntimeId uint64
 	UniqueId  int64
+	// ClientRuntimeId/ClientUniqueId are the IDs initially assigned to the local client connection.
+	// When IDModified is true, packet IDs are translated between client IDs and current server IDs.
+	ClientRuntimeId uint64
+	ClientUniqueId  int64
+	IDModified      bool
 
 	// ClientTick is the tick of the client, synchronized with the server's on an interval.
 	// InputCount is the amount of PlayerAuthInput packets the client has sent.
@@ -105,6 +110,12 @@ type Player struct {
 	LastEquipmentData *packet.MobEquipment
 	// LastActorMetadata is the last actor metadata packet sent by the client
 	LastSetActorData *packet.SetActorData
+	// transferBossBars tracks active bossbars so they can be explicitly hidden during fast transfers.
+	transferBossBars map[int64]struct{}
+	// transferPlayerList tracks player-list entries shown to the client so they can be removed during fast transfers.
+	transferPlayerList map[uuid.UUID]struct{}
+	// transferObjectives tracks active scoreboard objective names so they can be removed during fast transfers.
+	transferObjectives map[string]struct{}
 
 	// Recipies is a map of recipe network IDs to recipes.
 	Recipies map[uint32]protocol.Recipe
@@ -231,8 +242,11 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
 
-		Recipies:      make(map[uint32]protocol.Recipe),
-		CreativeItems: make(map[uint32]protocol.CreativeItem),
+		Recipies:           make(map[uint32]protocol.Recipe),
+		CreativeItems:      make(map[uint32]protocol.CreativeItem),
+		transferBossBars:   make(map[int64]struct{}),
+		transferPlayerList: make(map[uuid.UUID]struct{}),
+		transferObjectives: make(map[string]struct{}),
 
 		deferredPackets: make([]packet.Packet, 0, 256),
 

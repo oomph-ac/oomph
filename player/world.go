@@ -58,6 +58,8 @@ type WorldUpdaterComponent interface {
 	Tick()
 	// Flush flushes the world updater component.
 	Flush()
+	// ResetForTransfer resets temporary/pending state that may become stale after a fast transfer.
+	ResetForTransfer()
 }
 
 func (p *Player) SetWorldUpdater(c WorldUpdaterComponent) {

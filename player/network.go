@@ -27,7 +27,10 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 	p.conn = conn
 
 	p.RuntimeId = conn.GameData().EntityRuntimeID
+	p.ClientRuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID
+	p.ClientUniqueId = conn.GameData().EntityUniqueID
+	p.IDModified = false
 
 	p.ClientDat = conn.ClientData()
 	p.IdentityDat = conn.IdentityData()
@@ -42,18 +45,23 @@ func (p *Player) SetServerConn(conn ServerConn) {
 		return
 	}
 
-	if p.serverConn == nil {
-		p.GameDat = conn.GameData()
-		for _, item := range p.GameDat.Items {
-			if i, ok := world.ItemByName(item.Name, 0); ok {
-				p.items[item.RuntimeID] = i
-			}
+	modified := p.serverConn != nil
+
+	p.serverConn = conn
+	p.GameDat = conn.GameData()
+	for _, item := range p.GameDat.Items {
+		if i, ok := world.ItemByName(item.Name, 0); ok {
+			p.items[item.RuntimeID] = i
 		}
 	}
 
-	p.serverConn = conn
 	p.RuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID
+	if !modified {
+		p.ClientRuntimeId = conn.GameData().EntityRuntimeID
+		p.ClientUniqueId = conn.GameData().EntityUniqueID
+	}
+	p.IDModified = modified
 	p.GameMode = conn.GameData().PlayerGameMode
 	if p.GameMode == 5 {
 		p.GameMode = conn.GameData().WorldGameMode
