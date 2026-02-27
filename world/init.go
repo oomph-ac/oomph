@@ -1,6 +1,8 @@
 package world
 
 import (
+	"sync"
+
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/world/chunk"
@@ -8,7 +10,10 @@ import (
 	_ "github.com/oomph-ac/oomph/world/block"
 )
 
-var AirRuntimeID uint32
+var (
+	AirRuntimeID uint32
+	initOnce     sync.Once
+)
 
 // noinspection ALL
 //
@@ -17,10 +22,12 @@ func world_finaliseBlockRegistry()
 
 // FinalizeBlockRegistry finalizes the block registry and then caches the expected runtime ID for air.
 func FinalizeBlockRegistry() {
-	world_finaliseBlockRegistry()
-	airRID, ok := chunk.StateToRuntimeID("minecraft:air", nil)
-	if !ok {
-		panic(oerror.New("unable to find runtime ID for air"))
-	}
-	AirRuntimeID = airRID
+	initOnce.Do(func() {
+		world_finaliseBlockRegistry()
+		airRID, ok := chunk.StateToRuntimeID("minecraft:air", nil)
+		if !ok {
+			panic(oerror.New("unable to find runtime ID for air"))
+		}
+		AirRuntimeID = airRID
+	})
 }

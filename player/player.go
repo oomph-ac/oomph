@@ -214,6 +214,8 @@ type Player struct {
 
 // New creates and returns a new Player instance.
 func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener) *Player {
+	world.FinalizeBlockRegistry()
+
 	p := &Player{
 		MState: mState,
 
