@@ -183,7 +183,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	}
 
 	heldItem := holding.Item()
-	c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "item in hand: %T", heldItem)
+	c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "item in hand (slot %d): %T", c.mPlayer.Inventory().HeldSlot(), heldItem)
 	switch heldItem := heldItem.(type) {
 	case *block.Air:
 		// This only happens when Dragonfly is unsure of what the item is (unregistered), so we use the client-authoritative block in hand.

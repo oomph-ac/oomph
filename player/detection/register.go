@@ -23,7 +23,13 @@ func Register(p *player.Player) {
 	p.RegisterDetection(New_EditionFakerB(p))
 	p.RegisterDetection(New_EditionFakerC(p))
 
+	// inv move detections
 	p.RegisterDetection(New_InvMoveA(p))
+
+	// scaffold detections
+	p.RegisterDetection(New_ScaffoldA(p))
+	p.RegisterDetection(New_ScaffoldB(p))
+	//p.RegisterDetection(New_ScaffoldC(p))
 
 	//p.RegisterDetection(New_NukerA(p))
 

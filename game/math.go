@@ -54,6 +54,26 @@ func AbsNum[T uint | int | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint
 	return a
 }
 
+// Round will round a number to the nearest integer.
+func Round[T float32 | float64, V uint | int | uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64](a T) V {
+	baseFloat := a - T(V(a))
+	base := V(a)
+	if baseFloat >= 0.5 {
+		base++
+	}
+	return base
+}
+
+// PrecisionFloor32 floors a number to the given precision.
+func PrecisionFloor32(a float32, precision float32) int {
+	increaseValueAt := float32(1) - precision
+	floorVal := int(a)
+	if a-float32(floorVal) >= increaseValueAt {
+		floorVal++
+	}
+	return floorVal
+}
+
 // AbsInt64 will return the absolute value of an int64.
 func AbsInt64(a int64) int64 {
 	if a < 0 {
