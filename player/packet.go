@@ -39,6 +39,8 @@ var ClientDecode = []uint32{
 var ServerDecode = []uint32{
 	packet.IDAddActor,
 	packet.IDAddPlayer,
+	packet.IDBossEvent,
+	packet.IDTransfer,
 	packet.IDChunkRadiusUpdated,
 	packet.IDInventorySlot,
 	packet.IDInventoryContent,
@@ -60,6 +62,9 @@ var ServerDecode = []uint32{
 	packet.IDContainerClose,
 	packet.IDCraftingData,
 	packet.IDCreativeContent,
+	packet.IDPlayerList,
+	packet.IDSetDisplayObjective,
+	packet.IDRemoveObjective,
 	packet.IDAvailableCommands,
 }
 
@@ -75,6 +80,10 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 	}()
 
 	pk := *(ctx.Packet())
+	if p.translateClientPacketForTransfer(pk) {
+		ctx.SetModified()
+	}
+
 	switch pk := pk.(type) {
 	case *packet.PacketViolationWarning:
 		p.Log().Warn(
@@ -339,10 +348,23 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	}()
 
 	pk := *(ctx.Packet())
+	if transfer, ok := pk.(*packet.Transfer); ok {
+		if err := p.TryTransfer(transfer.Address, transfer.Port); err != nil {
+			p.Log().Warn("failed to handle upstream transfer", "address", transfer.Address, "port", transfer.Port, "error", err)
+			return
+		}
+		ctx.Cancel()
+		return
+	}
+
 	switch pk := pk.(type) {
 	case *packet.AvailableCommands:
 		p.initOomphCommand(pk)
 	case *packet.AddActor:
+		if p.IDModified && pk.EntityRuntimeID == p.RuntimeId {
+			ctx.Cancel()
+			return
+		}
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
 			pk.EntityRuntimeID,
@@ -369,6 +391,10 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			&p.log,
 		))
 	case *packet.AddPlayer:
+		if p.IDModified && pk.EntityRuntimeID == p.RuntimeId {
+			ctx.Cancel()
+			return
+		}
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
 		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
 			pk.EntityRuntimeID,
@@ -455,6 +481,24 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.RemoveActor:
 		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
 		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
+	case *packet.BossEvent:
+		if pk.EventType == packet.BossEventHide {
+			delete(p.transferBossBars, pk.BossEntityUniqueID)
+		} else {
+			p.transferBossBars[pk.BossEntityUniqueID] = struct{}{}
+		}
+	case *packet.PlayerList:
+		for _, entry := range pk.Entries {
+			if pk.ActionType == packet.PlayerListActionAdd {
+				p.transferPlayerList[entry.UUID] = struct{}{}
+				continue
+			}
+			delete(p.transferPlayerList, entry.UUID)
+		}
+	case *packet.SetDisplayObjective:
+		p.transferObjectives[pk.ObjectiveName] = struct{}{}
+	case *packet.RemoveObjective:
+		delete(p.transferObjectives, pk.ObjectiveName)
 	case *packet.SetActorData:
 		pk.Tick = 0
 		ctx.SetModified()
@@ -520,5 +564,13 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		for _, item := range pk.Items {
 			p.CreativeItems[item.CreativeItemNetworkID] = item
 		}
+	}
+
+	cancel, modified := p.translateServerPacketForTransfer(pk)
+	if cancel {
+		ctx.Cancel()
+	}
+	if modified {
+		ctx.SetModified()
 	}
 }
