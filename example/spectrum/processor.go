@@ -1,4 +1,4 @@
-package oomph
+package main
 
 import (
 	"log/slog"
