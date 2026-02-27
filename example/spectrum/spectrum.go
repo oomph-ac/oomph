@@ -15,10 +15,10 @@ import (
 	"github.com/cooldogedev/spectrum/server"
 	"github.com/cooldogedev/spectrum/session"
 	"github.com/cooldogedev/spectrum/util"
+	"github.com/getsentry/sentry-go"
 	"github.com/go-echarts/statsview"
 	"github.com/go-echarts/statsview/viewer"
 	"github.com/oomph-ac/oconfig"
-	"github.com/oomph-ac/oomph"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -30,6 +30,14 @@ import (
 
 	"github.com/oomph-ac/oomph/utils"
 )
+
+func init() {
+	if dsn := os.Getenv("OOMPH_SENTRY_DSN"); dsn != "" {
+		if err := sentry.Init(sentry.ClientOptions{Dsn: dsn}); err != nil {
+			panic(err)
+		}
+	}
+}
 
 var evHandler = player.NewExampleEventHandler()
 
@@ -157,7 +165,7 @@ func main() {
 				Level: slog.LevelDebug,
 			})
 			playerLog := slog.New(playerLogHandler)
-			proc := oomph.NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
+			proc := NewProcessor(s, proxy.Registry(), proxy.Listener(), playerLog)
 			proc.Player().SetCloser(func() {
 				f.Close()
 			})

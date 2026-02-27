@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/oomph-ac/oomph"
+	"github.com/getsentry/sentry-go"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component"
 	"github.com/oomph-ac/oomph/player/context"
@@ -19,6 +19,14 @@ import (
 	"github.com/go-echarts/statsview/viewer"
 	"github.com/oomph-ac/oomph/utils"
 )
+
+func init() {
+	if dsn := os.Getenv("OOMPH_SENTRY_DSN"); dsn != "" {
+		if err := sentry.Init(sentry.ClientOptions{Dsn: dsn}); err != nil {
+			panic(err)
+		}
+	}
+}
 
 var (
 	localPort  string
