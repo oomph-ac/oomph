@@ -442,6 +442,19 @@ func (c *WorldUpdaterComponent) Flush() {
 	c.batchedBlockUpdates = acknowledgement.NewUpdateBlockBatchACK(c.mPlayer)
 }
 
+func (c *WorldUpdaterComponent) ResetForTransfer() {
+	c.clientPlacedBlocks = make(map[df_cube.Pos]*chainedBlockPlacement)
+	c.pendingBlockUpdates = make(map[df_cube.Pos]uint32)
+	c.batchedBlockUpdates = acknowledgement.NewUpdateBlockBatchACK(c.mPlayer)
+
+	c.breakingBlockPos = nil
+	c.prevPlaceRequest = nil
+	c.initalInteractionAccepted = true
+
+	c.serverChunkRadius = 0
+	c.chunkRadius = 1_000_000_000
+}
+
 func (c *WorldUpdaterComponent) Tick() {
 	for pos, pl := range c.clientPlacedBlocks {
 		pl.remainingTicks--

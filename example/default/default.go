@@ -127,7 +127,6 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 	completion := make(chan struct{}, 1)
 	go func() {
 		defer listener.Disconnect(conn, "connection lost")
-		defer serverConn.Close()
 		defer func() {
 			completion <- struct{}{}
 		}()
@@ -149,7 +148,15 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 				continue
 			}
 
-			if err := serverConn.WritePacket(pk); err != nil {
+			currentServerConn := p.ServerConn()
+			if currentServerConn == nil {
+				return
+			}
+
+			if err := currentServerConn.WritePacket(pk); err != nil {
+				if latestServerConn := p.ServerConn(); latestServerConn != nil && latestServerConn != currentServerConn {
+					continue
+				}
 				var disc minecraft.DisconnectError
 				if ok := errors.As(err, &disc); ok {
 					fmt.Println(err, "Client -> Server")
@@ -160,15 +167,26 @@ func handleConn(conn *minecraft.Conn, listener *minecraft.Listener) {
 		}
 	}()
 	go func() {
-		defer serverConn.Close()
 		defer listener.Disconnect(conn, "connection lost")
 		defer func() {
 			completion <- struct{}{}
 		}()
 
 		for {
-			pk, err := serverConn.ReadPacket()
+			currentServerConn := p.ServerConn()
+			if currentServerConn == nil {
+				return
+			}
+			currentMinecraftServerConn, ok := currentServerConn.(*minecraft.Conn)
+			if !ok {
+				return
+			}
+
+			pk, err := currentMinecraftServerConn.ReadPacket()
 			if err != nil {
+				if latestServerConn := p.ServerConn(); latestServerConn != nil && latestServerConn != currentServerConn {
+					continue
+				}
 				var disc minecraft.DisconnectError
 				if ok := errors.As(err, &disc); ok {
 					fmt.Println(err, "Server -> Client")

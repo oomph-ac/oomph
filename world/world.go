@@ -161,6 +161,15 @@ func (w *World) PurgeChunks() {
 	}
 }
 
+// ChunkPositions returns a snapshot of all chunk positions currently tracked in this world.
+func (w *World) ChunkPositions() []protocol.ChunkPos {
+	positions := make([]protocol.ChunkPos, 0, len(w.chunks))
+	for chunkPos := range w.chunks {
+		positions = append(positions, chunkPos)
+	}
+	return positions
+}
+
 func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
 	if info.Cached {
 		unsubC(info.Hash)
