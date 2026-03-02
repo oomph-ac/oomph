@@ -6,7 +6,7 @@ require (
 	github.com/getsentry/sentry-go v0.43.0
 	github.com/go-echarts/statsview v0.4.2
 	github.com/oomph-ac/oomph v0.0.0-20260208201834-bff025a3d827
-	github.com/sandertv/gophertunnel v1.54.0
+	github.com/sandertv/gophertunnel v1.54.1-0.20260215091226-4f4f52e4a6ca
 )
 
 require (
@@ -14,7 +14,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chewxy/math32 v1.11.1 // indirect
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
-	github.com/df-mc/dragonfly v0.10.10 // indirect
+	github.com/df-mc/dragonfly v0.10.11-0.20260228125342-e0ce8ff28eef // indirect
 	github.com/df-mc/go-playfab v1.0.0 // indirect
 	github.com/df-mc/go-xsapi v1.0.1 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
