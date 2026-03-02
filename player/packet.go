@@ -8,6 +8,7 @@ import (
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/player/context"
@@ -86,7 +87,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		)
 	case *packet.CommandRequest:
 		args := splitCommandLine(pk.CommandLine)
-		if len(args) >= 2 && args[0] == "/ac" {
+		if len(args) >= 2 && args[0] == "/"+oconfig.Global.CommandName {
 			subcommand := args[1]
 			args = args[2:]
 			cmdCtx := event.C(p)
