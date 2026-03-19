@@ -43,7 +43,7 @@ func fetchPrivateField[T any](s any, name string) T {
 	return privateFieldValue.Interface().(T)
 }
 
-func GetRaknetListener(l *minecraft.Listener) (*raknet.Listener, bool) {
+func RaknetListener(l *minecraft.Listener) (*raknet.Listener, bool) {
 	listener := fetchPrivateField[minecraft.NetworkListener](l, "listener")
 	rkListener, ok := listener.(*raknet.Listener)
 	return rkListener, ok
