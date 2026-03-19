@@ -71,7 +71,7 @@ func (ack *SubChunkUpdate) Run() {
 		if new, ok := newChunks[chunkPos]; ok {
 			ch = new
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "reusing chunk in map %v", chunkPos)
-		} else if existing := ack.mPlayer.World().GetChunk(chunkPos); existing != nil {
+		} else if existing := ack.mPlayer.World().Chunk(chunkPos); existing != nil {
 			// We assume that the existing chunk is not cached because the cache does not support SubChunks for the time being.
 			ch = existing
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "using existing chunk %v", chunkPos)

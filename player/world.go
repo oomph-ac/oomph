@@ -8,7 +8,6 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
@@ -311,12 +310,6 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 		return true
 	}
 
-	// If the player is a non-touch player, we should just do a raycast and make sure no blocks are in the way. However, the check
-	// below is faster and really the only way we can account for touch players anyway.
-	/* if p.InputMode != packet.InputModeTouch {
-		return p.tryRaycastToBlock(blockPos)
-	} */
-
 	interactableFaces := make(map[cube.Face]struct{}, 6)
 	prevPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
 	currPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
@@ -373,47 +366,6 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 		}
 	}
 	return false
-}
-
-// tryRaycastToBlock runs a raycast to the block at the given position. This function assumes that to break the target block, the
-// player must be aiming at it at all times, so we just use the previous position & current rotation (movement component
-// isn't updated yet when block actions are handled) instead of trying to account for frame action shitfuckery.
-//
-// It returns true if:
-// 1. The raycast hits, and is within the max interaction distance.
-// 2. There are no blocks in the way of the raycast.
-// OR: if the player is not in survival or adventure mode.
-func (p *Player) tryRaycastToBlock(blockPos cube.Pos) bool {
-	rotation := p.Movement().LastRotation()
-	eyeHeight := game.DefaultPlayerHeightOffset
-	if p.Movement().Sneaking() {
-		eyeHeight = game.SneakingPlayerHeightOffset
-	}
-
-	raycastDir := game.DirectionVector(rotation.Z(), rotation.X())
-	raycastStart := p.Movement().LastPos().Add(mgl32.Vec3{0, eyeHeight, 0})
-	raycastEnd := raycastStart.Add(raycastDir.Mul(game.MaxBlockInteractionDistance))
-
-	brokenBlockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(blockPos.Vec3())
-	raycast, ok := trace.BBoxIntercept(brokenBlockBB, raycastStart, raycastEnd)
-	if !ok {
-		return false
-	}
-	hitPos := raycast.Position()
-	for intersectingBlockPos := range game.BlocksBetween(raycastStart, hitPos, 128) {
-		flooredPos := cube.PosFromVec3(intersectingBlockPos)
-		if flooredPos == blockPos {
-			continue
-		}
-		intersectingBlock := p.World().Block([3]int(flooredPos))
-		for _, intersectingBlockBB := range utils.BlockCollisions(intersectingBlock, flooredPos, p.World()) {
-			intersectingBlockBB = intersectingBlockBB.Translate(intersectingBlockPos)
-			if _, ok := trace.BBoxIntercept(intersectingBlockBB, raycastStart, raycastEnd); ok {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func (p *Player) tryBreakBlock(interactFace cube.Face) bool {
