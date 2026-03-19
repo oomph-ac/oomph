@@ -445,7 +445,7 @@ func (p *Player) Disconnect(reason string) {
 }
 
 func (p *Player) BlockAddress(duration time.Duration) {
-	if rkListener, ok := utils.GetRaknetListener(p.listener); ok {
+	if rkListener, ok := utils.RaknetListener(p.listener); ok {
 		utils.BlockAddress(rkListener, p.RemoteAddr().(*net.UDPAddr).IP, duration)
 	}
 }
