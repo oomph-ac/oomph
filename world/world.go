@@ -68,10 +68,10 @@ func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128) {
 	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], hash)
 }
 
-// GetChunk returns a cached chunk at the position passed. The mutex is
+// Chunk returns a cached chunk at the position passed. The mutex is
 // not locked here because it is assumed that the caller has already locked
 // the mutex before calling this function.
-func (w *World) GetChunk(pos protocol.ChunkPos) *chunk.Chunk {
+func (w *World) Chunk(pos protocol.ChunkPos) *chunk.Chunk {
 	if info, ok := w.chunks[pos]; ok {
 		return info.Chunk
 	}
@@ -95,7 +95,7 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
 	}
 
-	c := w.GetChunk(chunkPos)
+	c := w.Chunk(chunkPos)
 	if c == nil {
 		return block.Air{}
 	}

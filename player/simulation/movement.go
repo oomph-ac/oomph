@@ -44,7 +44,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
 		movement.Reset()
 		return
-	} else if p.World().GetChunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
+	} else if p.World().Chunk(protocol.ChunkPos{int32(movement.Pos().X()) >> 4, int32(movement.Pos().Z()) >> 4}) == nil {
 		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: in unloaded chunk, cancelling all movement", p.SimulationFrame)
 		movement.SetVel(mgl32.Vec3{})
 		return
@@ -267,7 +267,7 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 	}
 
 	stateBB := movement.BoundingBox()
-	for result := range utils.GetNearbyBlocks(stateBB.Grow(1), false, true, p.World()) {
+	for result := range utils.NearbyBlocks(stateBB.Grow(1), false, true, p.World()) {
 		if _, isLiquid := result.Block.(world.Liquid); isLiquid {
 			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(result.Position.Vec3())
 			if stateBB.IntersectsWith(blockBB) {
@@ -328,7 +328,7 @@ func setPostCollisionMotion(p *player.Player, oldVel mgl32.Vec3, oldOnGround boo
 func isJumpBlocked(p *player.Player, jumpVel mgl32.Vec3) bool {
 	movement := p.Movement()
 	collisionBB := movement.BoundingBox()
-	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(jumpVel), p.World())
+	bbList := utils.NearbyBBoxes(collisionBB.Extend(jumpVel), p.World())
 
 	yVel := mgl32.Vec3{0, jumpVel.Y()}
 	xVel := mgl32.Vec3{jumpVel.X()}
@@ -385,8 +385,8 @@ func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger
 	movement := p.Movement()
 	collisionBB := movement.BoundingBox()
 	currVel := movement.Vel()
-	bbList := utils.GetNearbyBBoxes(collisionBB.Extend(currVel), src)
-	//oneWayBlocks := utils.OneWayCollisionBlocks(utils.GetNearbyBlocks(collisionBB.Extend(currVel), false, false, w))
+	bbList := utils.NearbyBBoxes(collisionBB.Extend(currVel), src)
+	//oneWayBlocks := utils.OneWayCollisionBlocks(utils.NearbyBlocks(collisionBB.Extend(currVel), false, false, w))
 
 	// TODO: determine more blocks that are considered to be one-way physics blocks, and
 	// figure out how to calculate ActorCollision::isStuckItem()
@@ -473,7 +473,7 @@ func tryCollisions(p *player.Player, src world.BlockSource, dbg *player.Debugger
 		newBBListCount := 0
 		hasStepCollisions := false
 		if dbg != nil && dbg.Enabled(player.DebugModeMovementSim) {
-			newBBListCount = len(utils.GetNearbyBBoxes(stepBB, src))
+			newBBListCount = len(utils.NearbyBBoxes(stepBB, src))
 			hasStepCollisions = newBBListCount > 0
 		} else {
 			hasStepCollisions = utils.HasNearbyBBoxes(stepBB, src)
@@ -634,7 +634,7 @@ func avoidEdge(movement player.MovementComponent, src world.BlockSource, dbg *pl
 func isInsideCobweb(movement player.MovementComponent, src world.BlockSource) bool {
 	bb := movement.BoundingBox()
 
-	for result := range utils.GetNearbyBlocks(bb.Grow(1), false, true, src) {
+	for result := range utils.NearbyBlocks(bb.Grow(1), false, true, src) {
 		if utils.BlockName(result.Block) != "minecraft:web" {
 			continue
 		}
@@ -736,7 +736,7 @@ func findSupportingBlock(movement player.MovementComponent, bb cube.BBox, w worl
 		minDist   = float32(math.MaxFloat32 - 1)
 		centerPos = cube.PosFromVec3(movement.Pos()).Vec3().Add(mgl32.Vec3{0.5, 0.5, 0.5})
 	)
-	for result := range utils.GetNearbyBlockCollisions(bb, w) {
+	for result := range utils.NearbyBlockCollisions(bb, w) {
 		if dist := result.Position.Vec3().Sub(centerPos).LenSqr(); dist < minDist {
 			minDist = dist
 			blockPos = &result.Position

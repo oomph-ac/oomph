@@ -112,8 +112,8 @@ func BlockCollisions(b world.Block, pos cube.Pos, src world.BlockSource) []cube.
 	return boxes
 }
 
-// GetBlocksInRadius returns a list of block positions within a radius of the given position.
-func GetBlocksInRadius(pos protocol.BlockPos, radius int32) []protocol.BlockPos {
+// BlocksInRadius returns a list of block positions within a radius of the given position.
+func BlocksInRadius(pos protocol.BlockPos, radius int32) []protocol.BlockPos {
 	blocks := []protocol.BlockPos{}
 	for x := -radius; x <= radius; x++ {
 		for y := -radius; y <= radius; y++ {
@@ -125,8 +125,8 @@ func GetBlocksInRadius(pos protocol.BlockPos, radius int32) []protocol.BlockPos 
 	return blocks
 }
 
-// GetNearbyBlockCollisions ...
-func GetNearbyBlockCollisions(aabb cube.BBox, src world.BlockSource) iter.Seq[BlockSearchResult] {
+// NearbyBlockCollisions ...
+func NearbyBlockCollisions(aabb cube.BBox, src world.BlockSource) iter.Seq[BlockSearchResult] {
 	return func(yield func(BlockSearchResult) bool) {
 		min, max := aabb.Min(), aabb.Max()
 		minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
@@ -157,8 +157,8 @@ func GetNearbyBlockCollisions(aabb cube.BBox, src world.BlockSource) iter.Seq[Bl
 	}
 }
 
-// GetNearbyBlocks get the blocks that are within a range of the provided bounding box.
-func GetNearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src world.BlockSource) iter.Seq[BlockSearchResult] {
+// NearbyBlocks get the blocks that are within a range of the provided bounding box.
+func NearbyBlocks(aabb cube.BBox, includeAir bool, includeUnknown bool, src world.BlockSource) iter.Seq[BlockSearchResult] {
 	return func(yield func(BlockSearchResult) bool) {
 		min, max := aabb.Min(), aabb.Max()
 		minX, minY, minZ := int(math32.Floor(min[0])), int(math32.Floor(min[1])), int(math32.Floor(min[2]))
@@ -196,8 +196,8 @@ func HasNearbyBBoxes(aabb cube.BBox, src world.BlockSource) bool {
 	return found
 }
 
-// GetNearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
-func GetNearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
+// NearbyBBoxes returns a list of block bounding boxes that are within the given bounding box.
+func NearbyBBoxes(aabb cube.BBox, src world.BlockSource) []cube.BBox {
 	bboxList, _ := scanNearbyBBoxes(aabb, src, false)
 	return bboxList
 }
