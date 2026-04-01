@@ -638,14 +638,10 @@ func isInsideCobweb(movement player.MovementComponent, src world.BlockSource) bo
 		if utils.BlockName(result.Block) != "minecraft:web" {
 			continue
 		}
-		pos := result.Position
-		block := result.Block
-		boxes := utils.BlockCollisions(block, pos, src)
 
-		for _, box := range boxes {
-			if bb.IntersectsWith(box.Translate(pos.Vec3())) {
-				return true
-			}
+		pos := result.Position
+		if bb.IntersectsWith(cube.Box(0, 0, 0, 1, 1, 1).Translate(pos.Vec3())) {
+			return true
 		}
 	}
 	return false
