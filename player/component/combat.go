@@ -244,6 +244,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		lerpedResult := c.lerp(partialTicks)
 		entityBB := c.entityBB.Translate(lerpedResult.entityPos).Grow(0.1)
 		dV := game.DirectionVector(lerpedResult.rotation.Z(), lerpedResult.rotation.X())
+		rayEnd := lerpedResult.attackPos.Add(dV.Mul(7.0))
 
 		// If the attack position is within the entity's bounding box, the hit is valid and we don't have to do any further checks.
 		if entityBB.Vec3Within(lerpedResult.attackPos) {
@@ -263,7 +264,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			closestAngle = angle
 		}
 
-		if hitResult, ok := trace.BBoxIntercept(entityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
+		if hitResult, ok := trace.BBoxIntercept(entityBB, lerpedResult.attackPos, rayEnd); ok {
 			raycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
 			hitValid = hitValid || raycastDist <= CombatSurvivalReach
 			c.raycastResults = append(c.raycastResults, raycastDist)
@@ -289,7 +290,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 				closestAngle = altAngle
 			}
 
-			if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
+			if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, rayEnd); ok {
 				altRaycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
 				hitValid = hitValid || altRaycastDist <= CombatSurvivalReach
 				c.raycastResults = append(c.raycastResults, altRaycastDist)
