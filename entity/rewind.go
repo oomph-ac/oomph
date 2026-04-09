@@ -31,9 +31,11 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 		delta  int64 = 1_000_000_000_000
 	)
 
-	for hp := range e.PositionHistory.Iter() {
+	e.PositionHistory.ForEach(func(hp HistoricalPosition) bool {
 		if hp.Tick == tick {
-			return hp, true
+			result = hp
+			delta = 0
+			return false
 		}
 
 		currentDelta := hp.Tick - tick
@@ -45,7 +47,8 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 			result = hp
 			delta = currentDelta
 		}
-	}
+		return true
+	})
 
 	return result, true
 }

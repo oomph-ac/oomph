@@ -55,6 +55,16 @@ func (q *CircularQueue[T]) Iter() iter.Seq[T] {
 	}
 }
 
+// ForEach iterates through the queue from oldest to newest and stops early
+// if fn returns false.
+func (q *CircularQueue[T]) ForEach(fn func(item T) bool) {
+	for index := range q.size {
+		if !fn(q.items[(q.head+index)%len(q.items)]) {
+			return
+		}
+	}
+}
+
 // Size returns the maximum number of items the queue can hold.
 func (q *CircularQueue[T]) Size() int {
 	return q.size
