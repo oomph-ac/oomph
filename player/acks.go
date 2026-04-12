@@ -31,6 +31,8 @@ type AcknowledgmentComponent interface {
 	Refresh()
 	// Invalidate labels all pending UpdateBlock acknowledgments as invalid - this is primarily for transfers.
 	Invalidate()
+	// ResetTransferState clears ACK state that must not survive a fast transfer.
+	ResetTransferState()
 }
 
 // Acknowledgment is an interface for client acknowledgments to be ran once the member player

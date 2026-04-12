@@ -258,6 +258,8 @@ type MovementComponent interface {
 
 	// Sync sends a correction to the client to re-sync the client's movement with the server's.
 	Sync()
+	// ResetTransferState clears movement state that must not survive a fast transfer.
+	ResetTransferState(pos mgl32.Vec3)
 }
 
 // NonAuthoritativeMovementInfo represents movement information that the player has sent to the server but has not validated/verified.

@@ -212,6 +212,15 @@ func (ackC *ACKComponent) Invalidate() {
 	}
 }
 
+// ResetTransferState clears all ACK batches so stale acknowledgments from the old backend
+// cannot mutate the new session once the client responds after a fast transfer.
+func (ackC *ACKComponent) ResetTransferState() {
+	ackC.clientTicked = false
+	ackC.ticksSinceLastResponse = 0
+	ackC.pending = ackC.pending[:0]
+	ackC.Refresh()
+}
+
 // Refresh resets the current timestamp of the acknowledgment component.
 func (ackC *ACKComponent) Refresh() {
 	ackC.currentBatch = &ackBatch{timestamp: 0, acks: make([]player.Acknowledgment, 0)}

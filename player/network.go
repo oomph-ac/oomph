@@ -43,14 +43,14 @@ func (p *Player) SetServerConn(conn ServerConn) {
 	}
 
 	if p.serverConn == nil {
-		p.GameDat = conn.GameData()
-		for _, item := range p.GameDat.Items {
+		for _, item := range conn.GameData().Items {
 			if i, ok := world.ItemByName(item.Name, 0); ok {
 				p.items[item.RuntimeID] = i
 			}
 		}
 	}
 
+	p.GameDat = conn.GameData()
 	p.serverConn = conn
 	p.RuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID
@@ -59,8 +59,9 @@ func (p *Player) SetServerConn(conn ServerConn) {
 		p.GameMode = conn.GameData().WorldGameMode
 	}
 
-	p.movement.SetPos(p.GameDat.PlayerPosition)
-	p.movement.SetVel(mgl32.Vec3{})
+	p.PendingCorrectionACK = false
+	p.acks.ResetTransferState()
+	p.movement.ResetTransferState(p.GameDat.PlayerPosition)
 }
 
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
