@@ -1006,6 +1006,9 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 	if !mc.mPlayer.PendingCorrectionACK {
 		// Make sure all of the player's actor data is up-to-date with Oomph's prediction.
 		actorData := mc.mPlayer.LastSetActorData
+		if actorData == nil {
+			return
+		}
 		actorData.Tick = mc.mPlayer.SimulationFrame
 		if f, ok := actorData.EntityMetadata[entity.DataKeyFlags]; ok {
 			flags := f.(int64)
@@ -1038,4 +1041,84 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 		})
 		mc.mPlayer.PendingCorrectionACK = true
 	}
+}
+
+// ResetTransferState clears movement/session state that should never survive a fast transfer.
+func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
+	mc.pos = pos
+	mc.lastPos = pos
+	mc.vel = mgl32.Vec3{}
+	mc.lastVel = mgl32.Vec3{}
+	mc.mov = mgl32.Vec3{}
+	mc.lastMov = mgl32.Vec3{}
+
+	mc.nonAuthoritative.pos = pos
+	mc.nonAuthoritative.lastPos = pos
+	mc.nonAuthoritative.vel = mgl32.Vec3{}
+	mc.nonAuthoritative.lastVel = mgl32.Vec3{}
+	mc.nonAuthoritative.mov = mgl32.Vec3{}
+	mc.nonAuthoritative.lastMov = mgl32.Vec3{}
+	mc.nonAuthoritative.toggledFly = false
+	mc.nonAuthoritative.horizontalCollision = false
+	mc.nonAuthoritative.verticalCollision = false
+
+	mc.slideOffset = mgl32.Vec2{}
+	mc.impulse = mgl32.Vec2{}
+	mc.supportingBlockPos = nil
+
+	mc.gravity = game.NormalGravity
+	mc.jumpHeight = game.DefaultJumpHeight
+	mc.fallDistance = 0
+
+	mc.movementSpeed = mc.defaultMovementSpeed
+	mc.airSpeed = 0.02
+	mc.serverUpdatedSpeed = false
+
+	mc.knockback = mgl32.Vec3{}
+	mc.ticksSinceKb = 1
+
+	mc.pendingTeleportPos = pos
+	mc.pendingTeleports = 0
+	mc.teleportPos = pos
+	mc.ticksSinceTeleport = 1
+	mc.teleportCompletionTicks = 0
+	mc.teleportIsSmoothed = false
+
+	mc.sprinting = false
+	mc.pressingSprint = false
+	mc.serverSprint = false
+	mc.serverSprintApplied = false
+
+	mc.sneaking = false
+	mc.pressingSneak = false
+
+	mc.jumping = false
+	mc.pressingJump = false
+	mc.jumpDelay = 0
+
+	mc.collideX = false
+	mc.collideY = false
+	mc.collideZ = false
+	mc.onGround = false
+
+	mc.penetratedLastFrame = false
+	mc.stuckInCollider = false
+
+	mc.immobile = false
+	mc.noClip = false
+
+	mc.gliding = false
+	mc.glideBoostTicks = 0
+	mc.hasGravity = true
+
+	mc.flying = false
+	mc.mayFly = false
+	mc.trustFlyStatus = false
+	mc.justDisabledFlight = false
+
+	mc.allowedInputs = 65535
+	mc.hasFirstInput = false
+
+	mc.pendingCorrections = 0
+	mc.inCorrectionCooldown = false
 }
