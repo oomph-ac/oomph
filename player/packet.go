@@ -1,7 +1,6 @@
 package player
 
 import (
-	"bytes"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/event"
@@ -415,13 +414,17 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 				p.Log().Warn("unable to decode chunk", "error", err)
 			} else {
 				data := chunk.Encode(c, chunk.NetworkEncoding)
-				chunkBuf := bytes.NewBuffer(nil)
+				totalLen := 1 + len(data.Biomes)
 				for _, sub := range data.SubChunks {
-					chunkBuf.Write(sub)
+					totalLen += len(sub)
 				}
-				chunkBuf.Write(data.Biomes)
-				chunkBuf.WriteByte(0)
-				pk.RawPayload = append([]byte(nil), chunkBuf.Bytes()...)
+				chunkBuf := make([]byte, 0, totalLen)
+				for _, sub := range data.SubChunks {
+					chunkBuf = append(chunkBuf, sub...)
+				}
+				chunkBuf = append(chunkBuf, data.Biomes...)
+				chunkBuf = append(chunkBuf, 0)
+				pk.RawPayload = chunkBuf
 				pk.SubChunkCount = uint32(len(data.SubChunks))
 				ctx.SetModified()
 			}
