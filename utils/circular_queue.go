@@ -61,7 +61,7 @@ func (q *CircularQueue[T]) Size() int {
 }
 
 // Items returns the raw buffer along with the head index and current size.
-// Elements are laid out circularly. element i (0 = oldest) is at
+// Elements are laid out circularly. Element i (0 = oldest) is at
 // buf[(head+i) % len(buf)].
 func (q *CircularQueue[T]) Items() (buf []T, head, size int) {
 	return q.items, q.head, q.size
