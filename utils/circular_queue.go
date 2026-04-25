@@ -60,6 +60,12 @@ func (q *CircularQueue[T]) Size() int {
 	return q.size
 }
 
+// UnsafeItems returns the internal buffer, head, and size without cloning.
+// Mutating the returned slice will affect the queue's internal state.
+func (q *CircularQueue[T]) UnsafeItems() (buf []T, head, size int) {
+	return q.items, q.head, q.size
+}
+
 // Pop removes and returns the oldest element. The boolean ok is false if the
 // queue is empty.
 func (q *CircularQueue[T]) Pop() (item T, ok bool) {

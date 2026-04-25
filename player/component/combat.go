@@ -62,11 +62,14 @@ type AuthoritativeCombatComponent struct {
 }
 
 func NewAuthoritativeCombatComponent(p *player.Player, useClientTracker bool) *AuthoritativeCombatComponent {
+	// Pre-size result slices to avoid reallocations during a typical hit.
+	const sliceCap = (CombatLerpPositionSteps + 1) * 2
+
 	return &AuthoritativeCombatComponent{
 		mPlayer:                p,
-		raycastResults:         make([]float32, 0, CombatLerpPositionSteps*2),
-		rawResults:             make([]float32, 0, CombatLerpPositionSteps*2),
-		angleResults:           make([]float32, 0, CombatLerpPositionSteps*2),
+		raycastResults:         make([]float32, 0, sliceCap),
+		rawResults:             make([]float32, 0, sliceCap),
+		angleResults:           make([]float32, 0, sliceCap),
 		hooks:                  []player.CombatHook{},
 		uniqueAttackedEntities: make(map[uint64]*entity.Entity),
 
@@ -182,11 +185,13 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		return true
 	}
 
-	t := time.Now()
-	defer func() {
-		delta := float64(time.Since(t).Nanoseconds()) / 1_000_000.0
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "took %.4fms to process", delta)
-	}()
+	if c.mPlayer.Dbg.Enabled(player.DebugModeCombat) {
+		t := time.Now()
+		defer func() {
+			delta := float64(time.Since(t).Nanoseconds()) / 1_000_000.0
+			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "took %.4fms to process", delta)
+		}()
+	}
 
 	var (
 		closestHitResult trace.BBoxResult
@@ -213,19 +218,21 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	movement := c.mPlayer.Movement()
-	if movement.PendingCorrections() > 0 && c.useClientTracker {
-		c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "movement component indicates pending corrections (%d) - hit invalidated", movement.PendingCorrections())
-		return false
+	if c.useClientTracker {
+		if pending := movement.PendingCorrections(); pending > 0 {
+			c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "movement component indicates pending corrections (%d) - hit invalidated", pending)
+			return false
+		}
 	}
 
-	hasNonSmoothTeleport := movement.HasTeleport() && !movement.TeleportSmoothed()
-	if hasNonSmoothTeleport {
-		c.startAttackPos = movement.TeleportPos()
-		c.endAttackPos = movement.TeleportPos()
+	if movement.HasTeleport() && !movement.TeleportSmoothed() {
+		teleportPos := movement.TeleportPos()
+		c.startAttackPos = teleportPos
+		c.endAttackPos = teleportPos
 	}
 
-	c.startRotation = c.mPlayer.Movement().LastRotation()
-	c.endRotation = c.mPlayer.Movement().Rotation()
+	c.startRotation = movement.LastRotation()
+	c.endRotation = movement.Rotation()
 
 	var (
 		altEntityStartPos mgl32.Vec3
@@ -239,8 +246,12 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	hitValid := false
+
 	stepAmt := 1.0 / float32(CombatLerpPositionSteps)
-	for partialTicks := float32(0.0); partialTicks <= 1; partialTicks += stepAmt {
+
+	for step := 0; step <= CombatLerpPositionSteps; step++ {
+		partialTicks := float32(step) * stepAmt
+
 		lerpedResult := c.lerp(partialTicks)
 		entityBB := c.entityBB.Translate(lerpedResult.entityPos).Grow(0.1)
 		dV := game.DirectionVector(lerpedResult.rotation.Z(), lerpedResult.rotation.X())
@@ -293,6 +304,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 				altRaycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
 				hitValid = hitValid || altRaycastDist <= CombatSurvivalReach
 				c.raycastResults = append(c.raycastResults, altRaycastDist)
+
 				if altRaycastDist < closestRaycastDist {
 					closestRaycastDist = altRaycastDist
 					closestHitResult = hitResult
@@ -300,9 +312,11 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 				}
 				raycastHit = true
 			}
+
 			closestPoint := game.ClosestPointToBBox(lerpedResult.attackPos, altEntityBB)
 			rawDist := lerpedResult.attackPos.Sub(closestPoint).Len()
 			c.rawResults = append(c.rawResults, rawDist)
+
 			if rawDist < closestRawDist {
 				closestRawDist = rawDist
 				closestRawPos = closestPoint
@@ -312,6 +326,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		closestPoint := game.ClosestPointToBBox(lerpedResult.attackPos, entityBB)
 		rawDist := lerpedResult.attackPos.Sub(closestPoint).Len()
 		c.rawResults = append(c.rawResults, rawDist)
+
 		if rawDist < closestRawDist {
 			closestRawDist = rawDist
 			closestRawPos = closestPoint
@@ -411,29 +426,33 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 	}
 
 	var (
-		minDist        float32 = 1_000_000
 		targetedEntity *entity.Entity
 		rewindData     entity.HistoricalPosition
 		eid            uint64
 	)
 
+	const radiusSq = CombatSurvivalEntitySearchRadius * CombatSurvivalEntitySearchRadius
+	var minDistSq float32 = 1_000_000
+
 	// We subtract the rewind tick by 1 here, because the client has already ticked in this instance (which increases)
 	// the client tick by 1, so we have to rewind to the previous tick.
 	rewTick := c.mPlayer.ClientTick - 1
+	attackPos := c.endAttackPos
 	for rid, e := range c.entityTracker().All() {
 		rewind, ok := e.Rewind(rewTick)
 		if !ok {
 			continue
 		}
 
-		dist := rewind.Position.Sub(c.endAttackPos).Len()
-		if dist <= CombatSurvivalEntitySearchRadius {
-			if dist < minDist {
-				minDist = dist
-				rewindData = rewind
-				targetedEntity = e
-				eid = rid
-			}
+		dx := rewind.Position[0] - attackPos[0]
+		dy := rewind.Position[1] - attackPos[1]
+		dz := rewind.Position[2] - attackPos[2]
+		distSq := dx*dx + dy*dy + dz*dz
+		if distSq <= radiusSq && distSq < minDistSq {
+			minDistSq = distSq
+			rewindData = rewind
+			targetedEntity = e
+			eid = rid
 		}
 	}
 
