@@ -24,7 +24,7 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 			panic(oerror.New("entity.Rewind: unable to re-create entity rewind buffer: recorded history size is zero"))
 		}
 		e.PositionHistory = utils.NewCircularQueue(e.historySize, func() (hp HistoricalPosition) { return })
-		return HistoricalPosition{}, false
+		return HistoricalPosition{}, false // We can't return anything here because we just re-created the buffer.
 	}
 
 	buf, head, size := e.PositionHistory.Items()
