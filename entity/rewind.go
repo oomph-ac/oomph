@@ -28,18 +28,17 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 	}
 
 	buf, head, size := e.PositionHistory.UnsafeItems()
-	bufLen := len(buf)
 
 	var (
-		result    HistoricalPosition
+		best      HistoricalPosition
+		bestDelta int64 = 1_000_000_000_000
 		found     bool
-		bestDelta int64
 	)
 
 	for i := 0; i < size; i++ {
-		hp := buf[(head+i)%bufLen]
+		hp := buf[(head+i)%len(buf)]
 
-		// uninitialized slots.
+		// Skip uninitialized slots.
 		if hp.Tick == 0 {
 			continue
 		}
@@ -50,19 +49,20 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 
 		currentDelta := hp.Tick - tick
 		if currentDelta < 0 {
-			currentDelta = -currentDelta
+			currentDelta *= -1
 		}
 
-		if !found || currentDelta < bestDelta {
+		// Keep old tie behavior: later equal-distance entries override earlier ones.
+		if !found || currentDelta <= bestDelta {
+			best = hp
 			bestDelta = currentDelta
-			result = hp
 			found = true
 			continue
 		}
 
-		// Delta started increasing, so we are past the closest match.
+		// Deltas increased after already finding a candidate -> no better result ahead.
 		break
 	}
 
-	return result, found
+	return best, found
 }
