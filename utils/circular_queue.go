@@ -60,6 +60,13 @@ func (q *CircularQueue[T]) Size() int {
 	return q.size
 }
 
+// Items returns the raw buffer along with the head index and current size.
+// Elements are laid out circularly. element i (0 = oldest) is at
+// buf[(head+i) % len(buf)].
+func (q *CircularQueue[T]) Items() (buf []T, head, size int) {
+	return q.items, q.head, q.size
+}
+
 // Pop removes and returns the oldest element. The boolean ok is false if the
 // queue is empty.
 func (q *CircularQueue[T]) Pop() (item T, ok bool) {

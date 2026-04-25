@@ -16,36 +16,53 @@ type HistoricalPosition struct {
 }
 
 // Rewind looks back in the position history of the entity, and returns the position at the given tick.
+// History is ordered by tick, so once the delta stops improving we can stop scanning.
 func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
-	if e.PositionHistory.Size() == 0 {
+	if e.PositionHistory == nil || e.PositionHistory.Size() == 0 {
 		e.debug("no position history available - attempting to re-create entity buffer", "runtime_id", e.RuntimeId)
 		if e.historySize <= 0 {
 			panic(oerror.New("entity.Rewind: unable to re-create entity rewind buffer: recorded history size is zero"))
 		}
 		e.PositionHistory = utils.NewCircularQueue(e.historySize, func() (hp HistoricalPosition) { return })
-		return HistoricalPosition{}, false // We can't return anything here because we just re-created the buffer.
+		return HistoricalPosition{}, false
 	}
 
+	buf, head, size := e.PositionHistory.Items()
+	bufLen := len(buf)
+
 	var (
-		result HistoricalPosition
-		delta  int64 = 1_000_000_000_000
+		result    HistoricalPosition
+		found     bool
+		bestDelta int64
 	)
 
-	for hp := range e.PositionHistory.Iter() {
+	for i := 0; i < size; i++ {
+		hp := buf[(head+i)%bufLen]
+
+		// uninitialized slots.
+		if hp.Tick == 0 {
+			continue
+		}
+
 		if hp.Tick == tick {
 			return hp, true
 		}
 
 		currentDelta := hp.Tick - tick
 		if currentDelta < 0 {
-			currentDelta *= -1
+			currentDelta = -currentDelta
 		}
 
-		if currentDelta <= delta {
+		if !found || currentDelta < bestDelta {
+			bestDelta = currentDelta
 			result = hp
-			delta = currentDelta
+			found = true
+			continue
 		}
+
+		// Delta started increasing, so we are past the closest match.
+		break
 	}
 
-	return result, true
+	return result, found
 }
