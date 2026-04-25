@@ -27,7 +27,7 @@ func (e *Entity) Rewind(tick int64) (HistoricalPosition, bool) {
 		return HistoricalPosition{}, false // We can't return anything here because we just re-created the buffer.
 	}
 
-	buf, head, size := e.PositionHistory.Items()
+	buf, head, size := e.PositionHistory.UnsafeItems()
 	bufLen := len(buf)
 
 	var (

@@ -60,10 +60,9 @@ func (q *CircularQueue[T]) Size() int {
 	return q.size
 }
 
-// Items returns the raw buffer along with the head index and current size.
-// Elements are laid out circularly. Element i (0 = oldest) is at
-// buf[(head+i) % len(buf)].
-func (q *CircularQueue[T]) Items() (buf []T, head, size int) {
+// UnsafeItems returns the internal buffer, head, and size without cloning.
+// Mutating the returned slice will affect the queue's internal state.
+func (q *CircularQueue[T]) UnsafeItems() (buf []T, head, size int) {
 	return q.items, q.head, q.size
 }
 
