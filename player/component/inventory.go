@@ -154,7 +154,7 @@ func (c *InventoryComponent) RemoveWindow(windowId byte) {
 		return
 	}
 	c.altOpenWindow = nil
-	c.mPlayer.Log().Debug("removed container inventory", "windowID", windowId)
+	//c.mPlayer.Log().Debug("removed container inventory", "windowID", windowId)
 }
 
 func (c *InventoryComponent) SyncSlot(windowID int32, slot int) bool {
@@ -210,7 +210,7 @@ func (c *InventoryComponent) HandleInventoryContent(pk *packet.InventoryContent)
 }
 
 func (c *InventoryComponent) HandleSingleRequest(request protocol.ItemStackRequest) {
-	c.mPlayer.Log().Debug("received item stack request", "requestID", request.RequestID)
+	//c.mPlayer.Log().Debug("received item stack request", "requestID", request.RequestID)
 	tx := newInvRequest(request.RequestID)
 
 	for _, action := range request.Actions {

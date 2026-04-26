@@ -303,6 +303,7 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 		int32(p.movement.Pos().Z()) >> 4,
 	})
 	p.effects.Tick()
+	p.Dbg.StartMovementSimBuffer()
 	p.movement.Update(pk)
 
 	// If the client's prediction of movement deviates from the server, we send a correction so that the client can re-sync.
@@ -360,6 +361,12 @@ func (p *Player) handleMovement(pk *packet.PlayerAuthInput) {
 				)
 			}
 		}
+	}
+
+	if p.movement.PendingCorrections() > 0 {
+		p.Dbg.FlushMovementSimBuffer()
+	} else {
+		p.Dbg.DiscardMovementSimBuffer()
 	}
 
 	// To prevent the server never accepting our position (PMMP), we will always set our position to the final teleport position if a teleport is in progress.

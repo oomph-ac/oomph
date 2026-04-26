@@ -65,6 +65,9 @@ type Debugger struct {
 	Modes       map[int]bool
 	LoggingType byte
 
+	movSimBuf       []string
+	bufferingMovSim bool
+
 	target *Player
 }
 
@@ -106,10 +109,41 @@ func (d *Debugger) Notify(mode int, cond bool, msg string, args ...interface{}) 
 		return
 	}
 
+	formatted := fmt.Sprintf(msg, args...)
+	if mode == DebugModeMovementSim && d.bufferingMovSim {
+		d.movSimBuf = append(d.movSimBuf, formatted)
+		return
+	}
+
+	d.writeDebug(mode, formatted)
+}
+
+func (d *Debugger) writeDebug(mode int, msg string) {
 	switch d.LoggingType {
 	case LoggingTypeLogFile:
-		d.target.Log().Debug("[" + DebugModeList[mode] + "]: " + fmt.Sprintf(msg, args...))
+		d.target.Log().Debug("[" + DebugModeList[mode] + "]: " + msg)
 	default:
-		d.target.Message(msg, args...)
+		d.target.Message("[" + DebugModeList[mode] + "]: " + msg)
 	}
+}
+
+// StartMovementSimBuffer begins buffering movement sim debug logs instead of writing them immediately.
+func (d *Debugger) StartMovementSimBuffer() {
+	d.movSimBuf = d.movSimBuf[:0]
+	d.bufferingMovSim = true
+}
+
+// FlushMovementSimBuffer writes all buffered movement sim logs and ends buffering.
+func (d *Debugger) FlushMovementSimBuffer() {
+	for _, entry := range d.movSimBuf {
+		d.writeDebug(DebugModeMovementSim, entry)
+	}
+	d.movSimBuf = d.movSimBuf[:0]
+	d.bufferingMovSim = false
+}
+
+// DiscardMovementSimBuffer drops all buffered movement sim logs and ends buffering.
+func (d *Debugger) DiscardMovementSimBuffer() {
+	d.movSimBuf = d.movSimBuf[:0]
+	d.bufferingMovSim = false
 }

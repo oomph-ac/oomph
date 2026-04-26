@@ -131,7 +131,7 @@ func (a *transferAction) execute() {
 	a.oldSrcItem, a.oldDstItem = srcItem, dstItem
 
 	if srcItem.Empty() {
-		mPlayer.Log().Debug("unexpected empty source item")
+		//mPlayer.Log().Debug("unexpected empty source item")
 		return
 	}
 	if dstItem.Empty() {
@@ -150,13 +150,13 @@ func (a *transferAction) revert() {
 
 	srcInv, foundSrcInv := mPlayer.Inventory().WindowFromContainerID(int32(a.srcInv))
 	if !foundSrcInv {
-		mPlayer.Log().Debug("source inventory with given container ID not found", "srcInv", a.srcInv)
+		//mPlayer.Log().Debug("source inventory with given container ID not found", "srcInv", a.srcInv)
 		return
 	}
 
 	dstInv, foundDstInv := mPlayer.Inventory().WindowFromContainerID(int32(a.dstInv))
 	if !foundDstInv {
-		mPlayer.Log().Debug("destination inventory with given container ID not found", "dstInv", a.dstInv)
+		//mPlayer.Log().Debug("destination inventory with given container ID not found", "dstInv", a.dstInv)
 		return
 	}
 
@@ -210,13 +210,13 @@ func (a *swapAction) execute() {
 
 	srcInv, foundSrcInv := mPlayer.Inventory().WindowFromContainerID(a.srcInv)
 	if !foundSrcInv {
-		mPlayer.Log().Debug("source inventory with given container ID not found", "srcInv", a.srcInv)
+		//mPlayer.Log().Debug("source inventory with given container ID not found", "srcInv", a.srcInv)
 		return
 	}
 
 	dstInv, foundDstInv := mPlayer.Inventory().WindowFromContainerID(a.dstInv)
 	if !foundDstInv {
-		mPlayer.Log().Debug("detination inventory with given container ID not found", "dstInv", a.dstInv)
+		//mPlayer.Log().Debug("detination inventory with given container ID not found", "dstInv", a.dstInv)
 		return
 	}
 
@@ -236,13 +236,13 @@ func (a *swapAction) revert() {
 
 	srcInv, foundSrcInv := mPlayer.Inventory().WindowFromContainerID(a.srcInv)
 	if !foundSrcInv {
-		mPlayer.Log().Debug("source inventory with given container ID not found", "srcInv", a.srcInv)
+		//mPlayer.Log().Debug("source inventory with given container ID not found", "srcInv", a.srcInv)
 		return
 	}
 
 	dstInv, foundDstInv := mPlayer.Inventory().WindowFromContainerID(a.dstInv)
 	if !foundDstInv {
-		mPlayer.Log().Debug("destination inventory with given container ID not found", "dstInv", a.dstInv)
+		//mPlayer.Log().Debug("destination inventory with given container ID not found", "dstInv", a.dstInv)
 		return
 	}
 
