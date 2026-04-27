@@ -93,6 +93,8 @@ func (c *AuthoritativeCombatComponent) Attack(input *packet.InventoryTransaction
 		e    *entity.Entity
 	)
 	if input != nil {
+		c.mPlayer.ResetTicksSinceAttack()
+
 		data = input.TransactionData.(*protocol.UseItemOnEntityTransactionData)
 		e = c.entityTracker().FindEntity(data.TargetEntityRuntimeID)
 		if e == nil {

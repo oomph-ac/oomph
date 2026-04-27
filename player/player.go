@@ -189,6 +189,9 @@ type Player struct {
 	// clicks is the component that handles click actions from the player.
 	clicks ClicksComponent
 
+	// ticksSinceAttack represents how many ticks have passed since the last attack.
+	ticksSinceAttack int
+
 	// eventHandler is a handler that handles events such as punishments and flags from detections.
 	eventHandler EventHandler
 

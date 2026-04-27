@@ -54,7 +54,19 @@ func (p *Player) ClientCombat() CombatComponent {
 	return p.clientCombat
 }
 
+// TicksSinceAttack returns how many ticks have passed since the last attack.
+func (p *Player) TicksSinceAttack() int {
+	return p.ticksSinceAttack
+}
+
+// ResetTicksSinceAttack resets the attack tick counter.
+func (p *Player) ResetTicksSinceAttack() {
+	p.ticksSinceAttack = 0
+}
+
 func (p *Player) tryRunningClientCombat(pk *packet.PlayerAuthInput) {
+	p.ticksSinceAttack++
+
 	if pk.InputData.Load(packet.InputFlagMissedSwing) {
 		p.Clicks().HandleSwing()
 	}
