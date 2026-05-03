@@ -11,7 +11,7 @@ var hashIronDoor = block.NextHash()
 
 func init() {
 	for _, door := range allIronDoors() {
-		world.RegisterBlock(door)
+		registerBlock(door)
 	}
 }
 

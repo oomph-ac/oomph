@@ -89,7 +89,7 @@ func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
 	}
 
 	decodedChunk, err := chunk.NetworkDecode(
-		AirRuntimeID,
+		BlockRegistry,
 		input.RawPayload,
 		int(input.SubChunkCount),
 		dimension.Range(),

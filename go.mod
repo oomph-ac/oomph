@@ -1,6 +1,6 @@
 module github.com/oomph-ac/oomph
 
-go 1.25.1
+go 1.26.0
 
 require (
 	github.com/chewxy/math32 v1.11.1
@@ -9,7 +9,7 @@ require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/oomph-ac/oconfig v0.0.0-20251121222848-6cf6c66594b8
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
-	github.com/sandertv/gophertunnel v1.54.0
+	github.com/sandertv/gophertunnel v1.55.0
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 )
@@ -30,10 +30,11 @@ require (
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
+	github.com/zaataylor/cartesian v0.0.0-20221028053253-3b3244d82727 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 )
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260211200701-cf4c0f763a16
+replace github.com/df-mc/dragonfly => github.com/hashimthearab/dragonfly v0.0.0-20260503033101-555d3ffe376e

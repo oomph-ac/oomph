@@ -11,7 +11,7 @@ var buttonHash = block.NextHash()
 
 func init() {
 	for _, b := range allButtonBlocks() {
-		world.RegisterBlock(b)
+		registerBlock(b)
 	}
 }
 

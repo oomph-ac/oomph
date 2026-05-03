@@ -11,10 +11,10 @@ var ironTrapdoorHash = block.NextHash()
 
 func init() {
 	for _, dir := range cube.Directions() {
-		world.RegisterBlock(IronTrapdoor{Facing: dir, Open: false, Top: false})
-		world.RegisterBlock(IronTrapdoor{Facing: dir, Open: false, Top: true})
-		world.RegisterBlock(IronTrapdoor{Facing: dir, Open: true, Top: false})
-		world.RegisterBlock(IronTrapdoor{Facing: dir, Open: true, Top: true})
+		registerBlock(IronTrapdoor{Facing: dir, Open: false, Top: false})
+		registerBlock(IronTrapdoor{Facing: dir, Open: false, Top: true})
+		registerBlock(IronTrapdoor{Facing: dir, Open: true, Top: false})
+		registerBlock(IronTrapdoor{Facing: dir, Open: true, Top: true})
 	}
 }
 

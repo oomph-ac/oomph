@@ -12,8 +12,8 @@ var candleHash = block.NextHash()
 func init() {
 	for _, c := range item.Colours() {
 		for i := range 4 {
-			world.RegisterBlock(Candle{Colour: c, Count: int32(i + 1), Lit: false})
-			world.RegisterBlock(Candle{Colour: c, Count: int32(i + 1), Lit: true})
+			registerBlock(Candle{Colour: c, Count: int32(i + 1), Lit: false})
+			registerBlock(Candle{Colour: c, Count: int32(i + 1), Lit: true})
 		}
 	}
 }
