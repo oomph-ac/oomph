@@ -96,6 +96,11 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 	deviceOS := d.mPlayer.ClientDat.DeviceOS
 	titleID := d.mPlayer.IdentityDat.TitleID
 
+	if titleID == "" {
+		// No title ID, newer versions seem to send it a different way. Oh well..
+		return
+	}
+
 	// 1904044383 is the title ID of the preview client in MC:BE. According to @GameParrot, the preview client
 	// can be found on Windows, iOS, and Xbox.
 	if titleID == titleIDPreview {
