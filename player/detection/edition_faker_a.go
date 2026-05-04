@@ -96,8 +96,8 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 	deviceOS := d.mPlayer.ClientDat.DeviceOS
 	titleID := d.mPlayer.IdentityDat.TitleID
 
-	if titleID == "" {
-		// No title ID, newer versions seem to send it a different way. Oh well..
+	// 1.21.90+ clients often omit title ID in chain data; nothing to validate.
+	if titleID == "" && d.mPlayer.Version >= player.GameVersion1_21_90 {
 		return
 	}
 
@@ -140,7 +140,7 @@ func (d *EditionFakerA) Detect(pk packet.Packet) {
 		}
 
 		// Bug with old game version
-		if len(titleID) == 0 && d.mPlayer.Version == player.GameVersion1_21_80 {
+		if titleID == "" && d.mPlayer.Version == player.GameVersion1_21_80 {
 			return
 		}
 
