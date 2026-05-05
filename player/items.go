@@ -4,6 +4,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
 	_ "unsafe"
@@ -18,7 +19,7 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 		}
 	}
 	if it.BlockRuntimeID > 0 {
-		b, _ := world.BlockByRuntimeID(uint32(it.BlockRuntimeID))
+		b, _ := p.World().BlockRegistry().BlockByRuntimeID(uint32(it.BlockRuntimeID))
 		if t, ok = b.(world.Item); !ok {
 			t = block.Air{}
 		}
@@ -28,6 +29,14 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 	}
 	s := item.NewStack(t, int(it.Count))
 	return nbtconv_Item(it.NBTData, &s).AsUnbreakable()
+}
+
+func (p *Player) InstanceFromItem(it item.Stack) protocol.ItemInstance {
+	return utils.InstanceFromItem(p.World().BlockRegistry(), it)
+}
+
+func (p *Player) StackToItem(it protocol.ItemStack) item.Stack {
+	return utils.StackToItem(p.World().BlockRegistry(), it)
 }
 
 // noinspection ALL

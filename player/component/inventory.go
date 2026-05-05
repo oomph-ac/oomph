@@ -9,7 +9,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
-	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -119,7 +118,7 @@ func (c *InventoryComponent) Sync(windowID int32) bool {
 
 	contents := make([]protocol.ItemInstance, inv.Size())
 	for i := range contents {
-		contents[i] = utils.InstanceFromItem(inv.Slot(i))
+		contents[i] = c.mPlayer.InstanceFromItem(inv.Slot(i))
 	}
 	_ = c.mPlayer.WritePacket(&packet.InventoryContent{
 		WindowID: uint32(windowID),
@@ -166,7 +165,7 @@ func (c *InventoryComponent) SyncSlot(windowID int32, slot int) bool {
 	_ = c.mPlayer.WritePacket(&packet.InventorySlot{
 		WindowID: uint32(windowID),
 		Slot:     uint32(slot),
-		NewItem:  utils.InstanceFromItem(inv.Slot(slot)),
+		NewItem:  c.mPlayer.InstanceFromItem(inv.Slot(slot)),
 	})
 
 	return true
@@ -306,7 +305,7 @@ func (c *InventoryComponent) handleCreativeCraftStackRequest(tx *invReq, action 
 	tx.append(newCreateAction(
 		50,
 		protocol.ContainerCreatedOutput,
-		utils.StackToItem(creativeItem.Item),
+		c.mPlayer.StackToItem(creativeItem.Item),
 		c.mPlayer,
 	))
 }
@@ -343,7 +342,7 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 		}
 		recpOutput = make([]item.Stack, len(recp.Output))
 		for index, stack := range recp.Output {
-			recpOutput[index] = utils.StackToItem(stack)
+			recpOutput[index] = c.mPlayer.StackToItem(stack)
 		}
 	case *protocol.ShapelessRecipe:
 		recpBlock = recp.Block
@@ -364,7 +363,7 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 		}
 		recpOutput = make([]item.Stack, len(recp.Output))
 		for index, stack := range recp.Output {
-			recpOutput[index] = utils.StackToItem(stack)
+			recpOutput[index] = c.mPlayer.StackToItem(stack)
 		}
 	default:
 		c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "not shaped or shapeless recipe")
