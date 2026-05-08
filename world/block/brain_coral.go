@@ -13,10 +13,10 @@ var (
 )
 
 func init() {
-	world.RegisterBlock(BrainCoralFan{Direction: cube.FaceUp})
-	world.RegisterBlock(BrainCoralFan{Direction: cube.FaceDown})
-	world.RegisterBlock(DeadBrainCoralFan{Direction: cube.FaceUp})
-	world.RegisterBlock(DeadBrainCoralFan{Direction: cube.FaceDown})
+	registerBlock(BrainCoralFan{Direction: cube.FaceUp})
+	registerBlock(BrainCoralFan{Direction: cube.FaceDown})
+	registerBlock(DeadBrainCoralFan{Direction: cube.FaceUp})
+	registerBlock(DeadBrainCoralFan{Direction: cube.FaceDown})
 }
 
 type BrainCoralFan struct {

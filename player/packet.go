@@ -411,7 +411,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			if !ok {
 				dim = world.Overworld
 			}
-			if c, err := chunk.NetworkDecode(oworld.AirRuntimeID, pk.RawPayload, int(pk.SubChunkCount), dim.Range()); err != nil {
+			if c, err := chunk.NetworkDecode(oworld.BlockRegistry, pk.RawPayload, int(pk.SubChunkCount), dim.Range()); err != nil {
 				p.Log().Warn("unable to decode chunk", "error", err)
 			} else {
 				data := chunk.Encode(c, chunk.NetworkEncoding)

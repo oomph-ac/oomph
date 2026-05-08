@@ -123,7 +123,7 @@ func (d *Debugger) writeDebug(mode int, msg string) {
 	case LoggingTypeLogFile:
 		d.target.Log().Debug("[" + DebugModeList[mode] + "]: " + msg)
 	default:
-		d.target.Message("[" + DebugModeList[mode] + "]: " + msg)
+		d.target.Message("%s", "["+DebugModeList[mode]+"]: "+msg)
 	}
 }
 

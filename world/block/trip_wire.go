@@ -14,10 +14,10 @@ var (
 
 func init() {
 	for _, trip := range allTripwires() {
-		world.RegisterBlock(trip)
+		registerBlock(trip)
 	}
 	for _, hook := range allTripWireHooks() {
-		world.RegisterBlock(hook)
+		registerBlock(hook)
 	}
 }
 
