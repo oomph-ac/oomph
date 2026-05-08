@@ -4,12 +4,12 @@ go 1.26.0
 
 require (
 	github.com/chewxy/math32 v1.11.1
-	github.com/df-mc/dragonfly v0.10.10
+	github.com/df-mc/dragonfly v0.10.14-0.20260508142332-b4a4d55303f9
 	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/go-gl/mathgl v1.2.0
 	github.com/oomph-ac/oconfig v0.0.0-20251121222848-6cf6c66594b8
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
-	github.com/sandertv/gophertunnel v1.55.2
+	github.com/sandertv/gophertunnel v1.56.2
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 )
@@ -18,7 +18,6 @@ require (
 	github.com/brentp/intintmap v0.0.0-20251106190759-56907b1f8479 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
-	github.com/df-mc/go-nethernet v1.0.8 // indirect
 	github.com/df-mc/go-playfab v1.0.0 // indirect
 	github.com/df-mc/go-xsapi v1.0.1 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
@@ -30,34 +29,11 @@ require (
 	github.com/hjson/hjson-go/v4 v4.6.0 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-	github.com/pion/datachannel v1.6.0 // indirect
-	github.com/pion/dtls/v3 v3.1.2 // indirect
-	github.com/pion/ice/v4 v4.2.1 // indirect
-	github.com/pion/interceptor v0.1.44 // indirect
-	github.com/pion/logging v0.2.4 // indirect
-	github.com/pion/mdns/v2 v2.1.0 // indirect
-	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.16 // indirect
-	github.com/pion/rtp v1.10.1 // indirect
-	github.com/pion/sctp v1.9.2 // indirect
-	github.com/pion/sdp/v3 v3.0.18 // indirect
-	github.com/pion/srtp/v3 v3.0.10 // indirect
-	github.com/pion/stun/v3 v3.1.1 // indirect
-	github.com/pion/transport/v4 v4.0.1 // indirect
-	github.com/pion/turn/v4 v4.1.4 // indirect
-	github.com/pion/webrtc/v4 v4.2.10-0.20260224155637-aa3b95c72dd2 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
-	github.com/wlynxg/anet v0.0.5 // indirect
-	github.com/zaataylor/cartesian v0.0.0-20221028053253-3b3244d82727 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
-	golang.org/x/time v0.10.0 // indirect
-)
-
-replace (
-	github.com/df-mc/dragonfly => github.com/hashimthearab/dragonfly v0.0.0-20260505220511-b18a0e370703
-	github.com/sandertv/gophertunnel => github.com/hashimthearab/gophertunnel v1.25.3-0.20260505212233-e24d6f8f72c4
 )
