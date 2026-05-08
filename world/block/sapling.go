@@ -20,7 +20,7 @@ func init() {
 
 	for _, woodType := range woodTypes {
 		for age := uint8(0); age < 2; age++ {
-			world.RegisterBlock(Sapling{Wood: woodType, Age: age})
+			registerBlock(Sapling{Wood: woodType, Age: age})
 		}
 	}
 }

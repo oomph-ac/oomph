@@ -47,6 +47,11 @@ func New(debugFn func(string, ...any)) *World {
 	}
 }
 
+// BlockRegistry returns the registry used to encode block-backed item stacks and chunks for this world.
+func (w *World) BlockRegistry() world.BlockRegistry {
+	return BlockRegistry
+}
+
 func (w *World) SetSTWTicks(ticks uint16) {
 	w.stwTicks = ticks
 }

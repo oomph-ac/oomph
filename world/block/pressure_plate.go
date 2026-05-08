@@ -10,7 +10,7 @@ var pressurePlateHash = block.NextHash()
 
 func init() {
 	for _, plate := range allPressurePlates() {
-		world.RegisterBlock(plate)
+		registerBlock(plate)
 	}
 }
 

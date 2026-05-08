@@ -34,9 +34,9 @@ func ReadItem(data map[string]any, s *item.Stack) item.Stack
 // noinspection ALL
 //
 //go:linkname InstanceFromItem github.com/df-mc/dragonfly/server/session.instanceFromItem
-func InstanceFromItem(it item.Stack) protocol.ItemInstance
+func InstanceFromItem(br world.BlockRegistry, it item.Stack) protocol.ItemInstance
 
 // noinspection ALL
 //
 //go:linkname StackToItem github.com/df-mc/dragonfly/server/session.stackToItem
-func StackToItem(it protocol.ItemStack) item.Stack
+func StackToItem(br world.BlockRegistry, it protocol.ItemStack) item.Stack
