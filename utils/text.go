@@ -16,7 +16,7 @@ func Device(os protocol.DeviceOS) string {
 		return "MacOS"
 	case protocol.DeviceFireOS:
 		return "FireOS"
-	case protocol.DeviceGearVR:
+	case protocol.DeviceGearVR: //nolint:staticcheck // deprecated value we still handle
 		return "Gear VR"
 	case protocol.DeviceHololens:
 		return "Hololens"
@@ -26,7 +26,7 @@ func Device(os protocol.DeviceOS) string {
 		return "Win32"
 	case protocol.DeviceDedicated:
 		return "Dedicated"
-	case protocol.DeviceTVOS:
+	case protocol.DeviceTVOS: //nolint:staticcheck // deprecated value we still handle
 		return "TV"
 	case protocol.DeviceOrbis:
 		return "PlayStation"
@@ -34,7 +34,7 @@ func Device(os protocol.DeviceOS) string {
 		return "Nintendo"
 	case protocol.DeviceXBOX:
 		return "Xbox"
-	case protocol.DeviceWP:
+	case protocol.DeviceWP: //nolint:staticcheck // deprecated value we still handle
 		return "Windows Phone"
 	}
 	return "Unknown"

@@ -22,9 +22,8 @@ func fuckDirection(dir cube.Direction) int32 {
 
 func registerBlock(b world.Block) {
 	defer func() {
-		if recover() != nil {
-			// Some supplemental blocks have moved into Dragonfly. Keep the rest registered without failing on those.
-		}
+		// Some supplemental blocks have moved into Dragonfly. Keep the rest registered without failing on those.
+		_ = recover()
 	}()
 	world.RegisterBlock(b)
 }
