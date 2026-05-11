@@ -1,0 +1,14 @@
+version: "2"
+
+linters:
+  default: none
+  enable: [govet, staticcheck, ineffassign]
+  settings:
+    staticcheck:
+      checks: [all, -S*, -ST*, -QF*]
+
+formatters:
+  enable: [gofmt]
+  settings:
+    gofmt:
+      simplify: false
