@@ -68,8 +68,8 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
 github.com/onsi/gomega v1.17.0 h1:9Luw4uT5HTjHTN8+aNcSThgH1vdXnmdJ8xIfZ4wyTRE=
 github.com/onsi/gomega v1.17.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAlGdZY=
-github.com/oomph-ac/dragonfly v0.0.0-20260508164225-1fd4eacc0847 h1:3dIdjmX+zlx/Yr/o70jEW41y8ba0OG8U38TICa8kVac=
-github.com/oomph-ac/dragonfly v0.0.0-20260508164225-1fd4eacc0847/go.mod h1:DqV/SFGs3YWsePK2/0hBuNBhjvkNxUKho3rxvj2p6I8=
+github.com/oomph-ac/dragonfly v0.0.0-20260511003340-3b206a4f2908 h1:CWVRXgF8SaKrLwO8KdoKIu1kD5+lefwRKy4J0YQSbUQ=
+github.com/oomph-ac/dragonfly v0.0.0-20260511003340-3b206a4f2908/go.mod h1:DqV/SFGs3YWsePK2/0hBuNBhjvkNxUKho3rxvj2p6I8=
 github.com/oomph-ac/oconfig v0.0.0-20251121222848-6cf6c66594b8 h1:1gTiHL3ijqsC5qsmGGw70epWFpOMJhYw3l15+uYhHPA=
 github.com/oomph-ac/oconfig v0.0.0-20251121222848-6cf6c66594b8/go.mod h1:2hkIOpKyeO2X0YhZ3puE+9CjvFiLsSKRz2RwCPDw5ho=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
