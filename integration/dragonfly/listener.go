@@ -107,26 +107,24 @@ func (l *listener) Accept() (session.Conn, error) {
 		CurrentTime: time.Now(),
 	}, l.raw)
 	p.SetConn(conn)
-	p.RuntimeId = player.DirectSelfRuntimeID
-	p.EnableDirectMode()
 	component.Register(p)
 	detection.Register(p)
 	if l.configure != nil {
 		l.configure(p)
 	}
-	return p, nil
+	return newSessionConn(conn, p), nil
 }
 
 func (l *listener) Disconnect(conn session.Conn, reason string) error {
-	p, ok := conn.(*player.Player)
+	c, ok := conn.(*sessionConn)
 	if !ok {
 		return fmt.Errorf("dragonfly integration: unexpected session connection type %T", conn)
 	}
 	var disconnectErr error
-	if p.Conn() != nil && l.raw != nil {
-		disconnectErr = l.raw.Disconnect(p.Conn(), reason)
+	if raw, ok := c.Conn.(*minecraft.Conn); ok && l.raw != nil {
+		disconnectErr = l.raw.Disconnect(raw, reason)
 	}
-	return errors.Join(disconnectErr, p.Close())
+	return errors.Join(disconnectErr, c.Close())
 }
 
 func (l *listener) Close() error {
@@ -138,4 +136,3 @@ func (l *listener) Close() error {
 }
 
 var _ server.Listener = (*listener)(nil)
-var _ session.Conn = (*player.Player)(nil)

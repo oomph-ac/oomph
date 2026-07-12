@@ -44,8 +44,9 @@ func TestListenerFactoryListensOnEphemeralAddress(t *testing.T) {
 
 func TestDisconnectClosesOomphPlayerLifecycle(t *testing.T) {
 	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	c := newSessionConn(newBlockingConn(), p)
 	l := &listener{}
-	if err := l.Disconnect(p, "rejected"); err != nil {
+	if err := l.Disconnect(c, "rejected"); err != nil {
 		t.Fatalf("Disconnect() error = %v", err)
 	}
 	select {
