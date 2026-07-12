@@ -155,6 +155,16 @@ type Player struct {
 	// packet to the destination server.
 	deferredPackets []packet.Packet
 
+	// direct mode is used when Oomph is embedded as Dragonfly's session
+	// connection. The notified queue wakes Dragonfly when Oomph generates a
+	// server-bound packet while the client connection is otherwise idle.
+	directMode    bool
+	directOnce    sync.Once
+	directMu      sync.Mutex
+	directPackets []packet.Packet
+	directNotify  chan struct{}
+	directReads   chan packetRead
+
 	// items ...
 	items map[int16]df_world.Item
 
@@ -339,6 +349,9 @@ func (p *Player) SendPacketToServer(pk packet.Packet) error {
 	}
 
 	if p.MState.IsReplay {
+		return nil
+	} else if p.directMode {
+		p.enqueueDirectPacket(pk)
 		return nil
 	} else if p.serverConn == nil {
 		p.deferredPackets = append(p.deferredPackets, pk)
