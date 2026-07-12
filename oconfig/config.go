@@ -1,5 +1,7 @@
 package oconfig
 
+import "maps"
+
 const (
 	ConfigVersion          uint64 = 7
 	DefaultShutdownMessage        = "§cServer is restarting."
@@ -34,7 +36,6 @@ type Config struct {
 }
 
 var (
-	Global        Config
 	DefaultConfig = Config{
 		Version: ConfigVersion,
 
@@ -227,4 +228,10 @@ var (
 			},
 		},
 	}
+	Global = cloneConfig(DefaultConfig)
 )
+
+func cloneConfig(cfg Config) Config {
+	cfg.Detections = maps.Clone(cfg.Detections)
+	return cfg
+}

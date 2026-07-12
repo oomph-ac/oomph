@@ -14,6 +14,19 @@ func TestDefaultConfigHasCurrentVersion(t *testing.T) {
 	}
 }
 
+func TestGlobalStartsWithIndependentDefaults(t *testing.T) {
+	if Global.Network.MaxACKTimeout != DefaultConfig.Network.MaxACKTimeout {
+		t.Fatalf("Global.Network.MaxACKTimeout = %d, want default %d", Global.Network.MaxACKTimeout, DefaultConfig.Network.MaxACKTimeout)
+	}
+
+	defaultReach := DefaultConfig.Detections["Reach_A"]
+	Global.Detections["Reach_A"] = Detection{MaxVl: 999}
+	t.Cleanup(func() { Global.Detections["Reach_A"] = defaultReach })
+	if got := DefaultConfig.Detections["Reach_A"]; got != defaultReach {
+		t.Fatalf("Global.Detections shares DefaultConfig.Detections: got %#v, want %#v", got, defaultReach)
+	}
+}
+
 func TestDefaultCombatValidatorOptions(t *testing.T) {
 	combat := DefaultConfig.Combat
 	if combat.DisableFullAuthoritative {
