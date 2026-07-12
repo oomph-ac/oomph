@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/event"
-	"github.com/oomph-ac/oconfig"
+	"github.com/oomph-ac/oomph/oconfig"
 	oevent "github.com/oomph-ac/oomph/player/event"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
