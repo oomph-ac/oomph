@@ -8,6 +8,32 @@ import (
 	"testing"
 )
 
+func TestParseRawJSONMigratesVersionSixCombatValidatorOptions(t *testing.T) {
+	cfg, err := ParseRawJSON([]byte(`{
+		version: 6
+		combat_opts: {
+			maximum_attack_angle: 72
+			disable_block_occlusion_check: true
+			maximum_reach: 3.25
+		}
+	}`))
+	if !errors.Is(err, ErrConfigUpdated) {
+		t.Fatalf("ParseRawJSON() error = %v, want ErrConfigUpdated", err)
+	}
+	if cfg.Version != ConfigVersion {
+		t.Fatalf("Version = %d, want %d", cfg.Version, ConfigVersion)
+	}
+	if cfg.Combat.MaximumAttackAngle != 72 {
+		t.Fatalf("MaximumAttackAngle = %v, want preserved value 72", cfg.Combat.MaximumAttackAngle)
+	}
+	if !cfg.Combat.DisableBlockOcclusionCheck || cfg.Combat.MaximumReach != 3.25 {
+		t.Fatalf("existing combat validator values were not preserved: %#v", cfg.Combat)
+	}
+	if cfg.Combat.BBoxExpansion != 0.1 || cfg.Combat.LerpSteps != 10 || cfg.Combat.EntitySearchRadius != 6 {
+		t.Fatalf("combat validator defaults not populated: %#v", cfg.Combat)
+	}
+}
+
 func TestParseRawJSONMigratesVersionFiveWithoutLosingValues(t *testing.T) {
 	defaultReach := DefaultConfig.Detections["Reach_A"]
 	raw := []byte(`{
@@ -59,7 +85,7 @@ func TestParseRawJSONMigratesVersionFiveWithoutLosingValues(t *testing.T) {
 
 func TestParseRawJSONRejectsNewerConfigVersion(t *testing.T) {
 	_, err := ParseRawJSON([]byte(`{
-		version: 7
+		version: 8
 		prefix: future-prefix
 	}`))
 	if !errors.Is(err, ErrConfigTooNew) {
@@ -101,7 +127,7 @@ func TestParseRawJSONVersionZeroDoesNotShareDefaultDetections(t *testing.T) {
 func TestParseJSONDoesNotRewriteNewerConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oomph.hjson")
 	original := []byte(`{
-		version: 7
+		version: 8
 		future_setting: keep-me
 	}`)
 	if err := os.WriteFile(path, original, 0o600); err != nil {
@@ -178,7 +204,7 @@ func TestParseJSONSetsGlobalForCurrentConfig(t *testing.T) {
 func TestParseJSONLeavesCurrentConfigFileUnchanged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oomph.hjson")
 	original := []byte(`{
-		version: 6
+		version: 7
 		prefix: current-prefix
 		third_party_setting: keep-me
 		# preserve this comment and formatting
@@ -213,5 +239,23 @@ func TestParseJSONCreatesMissingConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("created config: %v", err)
+	}
+}
+
+func TestCreateJSONWritesReadableCombatDecimals(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "oomph.hjson")
+	if err := CreateJSON(path); err != nil {
+		t.Fatal(err)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(written)
+	if !strings.Contains(text, "bbox_expansion: 0.1\n") {
+		t.Fatalf("generated config does not contain readable bbox expansion:\n%s", text)
+	}
+	if !strings.Contains(text, "maximum_reach: 2.9\n") {
+		t.Fatalf("generated config does not contain readable maximum reach:\n%s", text)
 	}
 }

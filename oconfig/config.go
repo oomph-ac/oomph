@@ -1,7 +1,7 @@
 package oconfig
 
 const (
-	ConfigVersion          uint64 = 6
+	ConfigVersion          uint64 = 7
 	DefaultShutdownMessage        = "§cServer is restarting."
 )
 
@@ -90,6 +90,15 @@ var (
 			EnableClientEntityTracking: true,
 			AllowNonMobileTouch:        false,
 			AllowSwitchInputMode:       false,
+
+			DisableFullAuthoritative:   false,
+			DisableBlockOcclusionCheck: false,
+			RawDistanceFallback:        false,
+			BBoxExpansion:              0.1,
+			MaximumReach:               2.9,
+			ReachLeniency:              0,
+			LerpSteps:                  10,
+			EntitySearchRadius:         6,
 		},
 
 		Detections: map[string]Detection{

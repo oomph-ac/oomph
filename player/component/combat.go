@@ -16,7 +16,7 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
-// Defaults used as fallback when the matching LocalCombatOpts field is unset
+// Defaults used as fallback when the matching CombatOpts field is unset
 // (see per-field docs for the sentinel each one checks).
 const (
 	CombatLerpPositionSteps                  = 10
@@ -64,14 +64,14 @@ type AuthoritativeCombatComponent struct {
 
 	// lerpSteps is captured at construction so result-slice caps stay correct
 	// and Calculate doesn't re-read it each tick. Runtime LerpSteps mutation
-	// therefore takes effect next session (documented on LocalCombatOpts).
+	// therefore takes effect next session (documented on CombatOpts).
 	lerpSteps int
 }
 
 func NewAuthoritativeCombatComponent(p *player.Player, useClientTracker bool) *AuthoritativeCombatComponent {
 	steps := CombatLerpPositionSteps
-	if cfg := p.Opts(); cfg != nil && cfg.LocalCombat.LerpSteps > 0 {
-		steps = cfg.LocalCombat.LerpSteps
+	if cfg := p.Opts(); cfg != nil && cfg.Combat.LerpSteps > 0 {
+		steps = cfg.Combat.LerpSteps
 	}
 	sliceCap := (steps + 1) * 2
 
@@ -260,19 +260,19 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 
 	hitValid := false
 
-	local := c.mPlayer.Opts().LocalCombat
+	local := c.mPlayer.Opts().Combat
 	lerpSteps := c.lerpSteps // captured at construction; see field doc
 	// 0 is honoured as "exact bbox" for BBoxExpansion; only negative values
 	// fall back to the default.
-	bboxGrow := local.BBoxExpansion
+	bboxGrow := float32(local.BBoxExpansion)
 	if bboxGrow < 0 {
 		bboxGrow = CombatDefaultBBoxExpansion
 	}
-	maxReach := local.MaximumReach
+	maxReach := float32(local.MaximumReach)
 	if maxReach <= 0 {
 		maxReach = CombatSurvivalReach
 	}
-	raycastReach := maxReach + local.ReachLeniency
+	raycastReach := maxReach + float32(local.ReachLeniency)
 
 	stepAmt := 1.0 / float32(lerpSteps)
 
@@ -477,7 +477,7 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 	)
 
 	// 0 is honoured as "don't search"; only negative falls back to the default.
-	radius := c.mPlayer.Opts().LocalCombat.EntitySearchRadius
+	radius := float32(c.mPlayer.Opts().Combat.EntitySearchRadius)
 	if radius < 0 {
 		radius = CombatSurvivalEntitySearchRadius
 	}
