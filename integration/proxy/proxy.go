@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -169,6 +170,7 @@ type session struct {
 	clientRuntimeID uint64
 	clientUniqueID  int64
 	clientDimension int32
+	state           *backendStateTracker
 }
 
 func newSession(proxy *Proxy, p *player.Player, client clientConn, backend Backend) *session {
@@ -177,6 +179,7 @@ func newSession(proxy *Proxy, p *player.Player, client clientConn, backend Backe
 		proxy: proxy, player: p, client: client, backend: backend,
 		clientRuntimeID: data.EntityRuntimeID, clientUniqueID: data.EntityUniqueID,
 		clientDimension: data.Dimension,
+		state:           newBackendStateTracker(),
 	}
 }
 
@@ -257,8 +260,10 @@ func (s *session) backendLoop(ctx context.Context) error {
 		ctx := playercontext.NewHandlePacketContext(&pk)
 		s.player.HandleServerPacket(ctx)
 		if !ctx.Cancelled() {
-			s.rewriteServerPacket(*ctx.Packet())
-			err = s.client.WritePacket(*ctx.Packet())
+			if s.rewriteServerPacket(*ctx.Packet()) {
+				s.state.handle(*ctx.Packet())
+				err = s.client.WritePacket(*ctx.Packet())
+			}
 		}
 		s.routeMu.Unlock()
 		if err != nil {
@@ -289,6 +294,11 @@ func (s *session) transfer(ctx context.Context, address string) (bool, error) {
 }
 
 func (s *session) resetTransferState(state player.BackendTransferState) error {
+	for _, pk := range s.state.clearPackets() {
+		if err := s.client.WritePacket(pk); err != nil {
+			return err
+		}
+	}
 	for _, effectID := range state.EffectIDs {
 		if err := s.client.WritePacket(&packet.MobEffect{EntityRuntimeID: s.clientRuntimeID, Operation: packet.MobEffectRemove, EffectType: effectID}); err != nil {
 			return err
@@ -318,7 +328,12 @@ func transferResetPackets(currentDimension int32, data minecraft.GameData) []pac
 			break
 		}
 	}
-	packets := make([]packet.Packet, 0, 8)
+	packets := make([]packet.Packet, 0, 12)
+	packets = append(packets,
+		&packet.StopSound{StopAll: true},
+		&packet.LevelEvent{EventType: packet.LevelEventStopRaining, EventData: 10_000},
+		&packet.LevelEvent{EventType: packet.LevelEventStopThunderstorm},
+	)
 	if currentDimension == data.Dimension {
 		packets = append(packets,
 			&packet.ChangeDimension{Dimension: fakeDimension, Position: data.PlayerPosition},
@@ -331,8 +346,9 @@ func transferResetPackets(currentDimension int32, data minecraft.GameData) []pac
 		&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn},
 		&packet.PlayerAction{EntityRuntimeID: data.EntityRuntimeID, ActionType: protocol.PlayerActionDimensionChangeDone},
 		&packet.SetPlayerGameType{GameType: data.PlayerGameMode},
+		&packet.SetDifficulty{Difficulty: uint32(data.Difficulty)},
 		&packet.GameRulesChanged{GameRules: data.GameRules},
-		&packet.MovePlayer{EntityRuntimeID: data.EntityRuntimeID, Position: data.PlayerPosition, Mode: packet.MoveModeReset},
+		&packet.MovePlayer{EntityRuntimeID: data.EntityRuntimeID, Position: data.PlayerPosition, Pitch: data.Pitch, Yaw: data.Yaw, HeadYaw: data.Yaw, Mode: packet.MoveModeReset},
 	)
 	return packets
 }
@@ -395,12 +411,18 @@ func (s *session) rewriteClientPacket(pk packet.Packet) {
 			pk.EntityRuntimeID = to
 		}
 	case *packet.Interact:
-		if pk.TargetEntityRuntimeID == from {
+		if pk.TargetEntityRuntimeID == math.MaxInt64 {
+			pk.TargetEntityRuntimeID = from
+		} else if pk.TargetEntityRuntimeID == from {
 			pk.TargetEntityRuntimeID = to
 		}
 	case *packet.InventoryTransaction:
-		if tx, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok && tx.TargetEntityRuntimeID == from {
-			tx.TargetEntityRuntimeID = to
+		if tx, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
+			if tx.TargetEntityRuntimeID == math.MaxInt64 {
+				tx.TargetEntityRuntimeID = from
+			} else if tx.TargetEntityRuntimeID == from {
+				tx.TargetEntityRuntimeID = to
+			}
 		}
 	case *packet.ContainerOpen:
 		if pk.ContainerEntityUniqueID == s.clientUniqueID {
@@ -409,64 +431,68 @@ func (s *session) rewriteClientPacket(pk packet.Packet) {
 	}
 }
 
-func (s *session) rewriteServerPacket(pk packet.Packet) {
+func (s *session) rewriteServerPacket(pk packet.Packet) bool {
 	from, to := s.player.RuntimeId, s.clientRuntimeID
-	switch pk := pk.(type) {
-	case *packet.MovePlayer:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.MobEquipment:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.Animate:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.ActorEvent:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.PlayerAction:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.SetActorData:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.SetActorMotion:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.UpdateAttributes:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.MobEffect:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.Respawn:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.MobArmourEquipment:
-		if pk.EntityRuntimeID == from {
-			pk.EntityRuntimeID = to
-		}
-	case *packet.UpdateAbilities:
-		if pk.AbilityData.EntityUniqueID == s.player.UniqueId {
-			pk.AbilityData.EntityUniqueID = s.clientUniqueID
-		}
-	case *packet.ContainerOpen:
-		if pk.ContainerEntityUniqueID == s.player.UniqueId {
-			pk.ContainerEntityUniqueID = s.clientUniqueID
-		}
-	case *packet.RemoveActor:
-		if pk.EntityUniqueID == s.player.UniqueId {
-			pk.EntityUniqueID = s.clientUniqueID
+	rewriteRuntimeID := func(id *uint64) {
+		if *id == from {
+			*id = to
+		} else if from != to && *id == to {
+			*id = math.MaxInt64
 		}
 	}
+	rewriteUniqueID := func(id *int64) {
+		if *id == s.player.UniqueId {
+			*id = s.clientUniqueID
+		} else if s.player.UniqueId != s.clientUniqueID && *id == s.clientUniqueID {
+			*id = math.MaxInt64
+		}
+	}
+	switch pk := pk.(type) {
+	case *packet.AddPlayer:
+		if pk.EntityRuntimeID == from {
+			return false
+		}
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+		rewriteUniqueID(&pk.AbilityData.EntityUniqueID)
+	case *packet.AddActor:
+		if pk.EntityRuntimeID == from {
+			return false
+		}
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+		rewriteUniqueID(&pk.EntityUniqueID)
+	case *packet.AddItemActor:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+		rewriteUniqueID(&pk.EntityUniqueID)
+	case *packet.MoveActorAbsolute:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.MovePlayer:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.MobEquipment:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.Animate:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.ActorEvent:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.PlayerAction:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.SetActorData:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.SetActorMotion:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.UpdateAttributes:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.MobEffect:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.Respawn:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.MobArmourEquipment:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+	case *packet.UpdateAbilities:
+		rewriteUniqueID(&pk.AbilityData.EntityUniqueID)
+	case *packet.ContainerOpen:
+		rewriteUniqueID(&pk.ContainerEntityUniqueID)
+	case *packet.RemoveActor:
+		rewriteUniqueID(&pk.EntityUniqueID)
+	}
+	return true
 }
