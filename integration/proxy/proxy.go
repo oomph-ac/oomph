@@ -463,6 +463,9 @@ func (s *session) rewriteServerPacket(pk packet.Packet) bool {
 	case *packet.AddItemActor:
 		rewriteRuntimeID(&pk.EntityRuntimeID)
 		rewriteUniqueID(&pk.EntityUniqueID)
+	case *packet.AddPainting:
+		rewriteRuntimeID(&pk.EntityRuntimeID)
+		rewriteUniqueID(&pk.EntityUniqueID)
 	case *packet.MoveActorAbsolute:
 		rewriteRuntimeID(&pk.EntityRuntimeID)
 	case *packet.MovePlayer:

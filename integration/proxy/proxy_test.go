@@ -145,8 +145,8 @@ func TestRuntimeIDRewriteCoversSelfActorPackets(t *testing.T) {
 }
 
 func TestRuntimeIDRewriteAvoidsBackendEntityCollision(t *testing.T) {
-	p := &player.Player{RuntimeId: 27}
-	s := &session{player: p, clientRuntimeID: 1}
+	p := &player.Player{RuntimeId: 27, UniqueId: 84}
+	s := &session{player: p, clientRuntimeID: 1, clientUniqueID: 2}
 	pk := &packet.MoveActorAbsolute{EntityRuntimeID: 1}
 	if !s.rewriteServerPacket(pk) {
 		t.Fatal("collision packet was suppressed")
@@ -158,6 +158,11 @@ func TestRuntimeIDRewriteAvoidsBackendEntityCollision(t *testing.T) {
 	s.rewriteClientPacket(clientPacket)
 	if clientPacket.TargetEntityRuntimeID != 1 {
 		t.Fatalf("collision target runtime ID = %d, want backend entity ID 1", clientPacket.TargetEntityRuntimeID)
+	}
+	painting := &packet.AddPainting{EntityRuntimeID: 1, EntityUniqueID: 2}
+	s.rewriteServerPacket(painting)
+	if painting.EntityRuntimeID != math.MaxInt64 || painting.EntityUniqueID != math.MaxInt64 {
+		t.Fatalf("painting collision IDs = %d/%d, want sentinel", painting.EntityRuntimeID, painting.EntityUniqueID)
 	}
 }
 
