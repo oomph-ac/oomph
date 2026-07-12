@@ -119,6 +119,5 @@ func (p *Player) Latency() time.Duration {
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
 	//data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
-	p.GameMode = data.PlayerGameMode
 	return p.conn.StartGameContext(ctx, data)
 }
