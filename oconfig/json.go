@@ -34,7 +34,7 @@ func ParseRawJSON(data []byte) (Config, error) {
 			newCfg.Prefix = DefaultConfig.Prefix
 			newCfg.GCPercent = DefaultConfig.GCPercent
 			newCfg.MemThreshold = DefaultConfig.MemThreshold
-			newCfg.Detections = DefaultConfig.Detections
+			newCfg.Detections = maps.Clone(DefaultConfig.Detections)
 		case 2:
 			newCfg.Network = DefaultConfig.Network
 		case 3:
@@ -59,6 +59,9 @@ func ParseRawJSON(data []byte) (Config, error) {
 func ParseJSON(file string) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("unable to read config file: %w", err)
+		}
 		if err = CreateJSON(file); err != nil {
 			return err
 		}
@@ -78,10 +81,6 @@ func ParseJSON(file string) error {
 		return ErrConfigUpdated
 	}
 
-	if writeErr := WriteJSON(file, parsedCfg); writeErr != nil {
-		return fmt.Errorf("unable to re-write config file: %w", writeErr)
-	}
-
 	Global = parsedCfg
 	return nil
 }
@@ -90,52 +89,64 @@ func ParseJSON(file string) error {
 // owned by wrappers or future versions. Spectrum's obsolete token is explicitly
 // removed during the version-5 to version-6 migration.
 func writeMigratedJSON(file string, original []byte, cfg Config) error {
-	var existing map[string]any
+	var existing hjson.Node
 	if err := hjson.Unmarshal(original, &existing); err != nil {
 		return fmt.Errorf("unable to preserve existing config fields: %w", err)
 	}
-	knownData, err := hjson.Marshal(cfg)
+	knownData, err := hjson.MarshalWithOptions(cfg, configEncoderOptions())
 	if err != nil {
 		return fmt.Errorf("unable to marshal migrated config: %w", err)
 	}
-	var known map[string]any
+	var known hjson.Node
 	if err := hjson.Unmarshal(knownData, &known); err != nil {
 		return fmt.Errorf("unable to prepare migrated config: %w", err)
 	}
-	mergeConfig(existing, known)
-	delete(existing, "spectrum_api_token")
+	if err := mergeConfigNodes(&existing, &known); err != nil {
+		return fmt.Errorf("unable to merge migrated config: %w", err)
+	}
+	if _, _, err := existing.DeleteKey("spectrum_api_token"); err != nil {
+		return fmt.Errorf("unable to remove Spectrum config: %w", err)
+	}
 	return writeValue(file, existing)
 }
 
-func mergeConfig(dst, src map[string]any) {
-	for key, value := range src {
-		srcMap, srcOK := value.(map[string]any)
-		dstMap, dstOK := dst[key].(map[string]any)
-		if srcOK && dstOK {
-			mergeConfig(dstMap, srcMap)
+func mergeConfigNodes(dst, src *hjson.Node) error {
+	dstMap, dstOK := dst.Value.(*hjson.OrderedMap)
+	srcMap, srcOK := src.Value.(*hjson.OrderedMap)
+	if !dstOK || !srcOK {
+		return fmt.Errorf("expected config objects, got %T and %T", dst.Value, src.Value)
+	}
+	for _, key := range srcMap.Keys {
+		srcChild, ok := srcMap.Map[key].(*hjson.Node)
+		if !ok {
+			return fmt.Errorf("expected source node for %q, got %T", key, srcMap.Map[key])
+		}
+		dstValue, exists := dstMap.AtKey(key)
+		if !exists {
+			dstMap.Set(key, srcChild)
 			continue
 		}
-		dst[key] = value
+		dstChild, ok := dstValue.(*hjson.Node)
+		if !ok {
+			return fmt.Errorf("expected destination node for %q, got %T", key, dstValue)
+		}
+		_, dstNested := dstChild.Value.(*hjson.OrderedMap)
+		_, srcNested := srcChild.Value.(*hjson.OrderedMap)
+		if dstNested && srcNested {
+			if err := mergeConfigNodes(dstChild, srcChild); err != nil {
+				return err
+			}
+			continue
+		}
+		dstChild.Value = srcChild.Value
 	}
+	return nil
 }
 
 // CreateJSON creates a new JSON file with default config.
 func CreateJSON(file string) error {
-	// Create a new config file
-	_, err := os.Create(file)
-	if err != nil {
-		return fmt.Errorf("unable to create config file: %v", err)
-	}
-
 	// Write default config to file.
-	dat, err := hjson.MarshalWithOptions(DefaultConfig, hjson.EncoderOptions{
-		IndentBy:              "    ",
-		EmitRootBraces:        true,
-		QuoteAlways:           false,
-		QuoteAmbiguousStrings: false,
-		Eol:                   "\n",
-		Comments:              true,
-	})
+	dat, err := hjson.MarshalWithOptions(DefaultConfig, configEncoderOptions())
 	if err != nil {
 		return fmt.Errorf("unable to write default config to file: %v", err)
 	}
@@ -167,4 +178,15 @@ func writeValue(file string, value any) error {
 		return fmt.Errorf("unable to write config to file: %v", err)
 	}
 	return nil
+}
+
+func configEncoderOptions() hjson.EncoderOptions {
+	return hjson.EncoderOptions{
+		IndentBy:              "    ",
+		EmitRootBraces:        true,
+		QuoteAlways:           false,
+		QuoteAmbiguousStrings: false,
+		Eol:                   "\n",
+		Comments:              true,
+	}
 }

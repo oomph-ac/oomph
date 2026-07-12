@@ -83,6 +83,21 @@ func TestParseRawJSONPreservesVersionOneNetworkOptions(t *testing.T) {
 	}
 }
 
+func TestParseRawJSONVersionZeroDoesNotShareDefaultDetections(t *testing.T) {
+	cfg, err := ParseRawJSON([]byte(`{
+		version: 0
+		prefix: legacy
+	}`))
+	if !errors.Is(err, ErrConfigUpdated) {
+		t.Fatalf("ParseRawJSON() error = %v, want ErrConfigUpdated", err)
+	}
+	defaultReach := DefaultConfig.Detections["Reach_A"]
+	cfg.Detections["Reach_A"] = Detection{MaxVl: 999}
+	if got := DefaultConfig.Detections["Reach_A"]; got != defaultReach {
+		t.Fatalf("version-zero config shares DefaultConfig.Detections: got %#v, want %#v", got, defaultReach)
+	}
+}
+
 func TestParseJSONDoesNotRewriteNewerConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oomph.hjson")
 	original := []byte(`{
@@ -113,6 +128,7 @@ func TestParseJSONRewritesLegacyConfigWithoutSpectrumSetting(t *testing.T) {
 		spectrum_api_token: legacy-secret
 		prefix: custom-prefix
 		third_party_setting: keep-me
+		# wrapper-owned comment
 	}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +150,12 @@ func TestParseJSONRewritesLegacyConfigWithoutSpectrumSetting(t *testing.T) {
 	if !strings.Contains(string(written), "third_party_setting") || !strings.Contains(string(written), "keep-me") {
 		t.Fatalf("rewritten config lost an unknown setting:\n%s", written)
 	}
+	if !strings.Contains(string(written), "# wrapper-owned comment") {
+		t.Fatalf("rewritten config lost an existing comment:\n%s", written)
+	}
+	if !strings.Contains(string(written), "The maximum amount of CPS that Oomph will allow") {
+		t.Fatalf("rewritten config omitted documentation for migrated defaults:\n%s", written)
+	}
 }
 
 func TestParseJSONSetsGlobalForCurrentConfig(t *testing.T) {
@@ -150,6 +172,37 @@ func TestParseJSONSetsGlobalForCurrentConfig(t *testing.T) {
 	}
 	if Global.Prefix != "global-prefix" {
 		t.Fatalf("Global.Prefix = %q, want global-prefix", Global.Prefix)
+	}
+}
+
+func TestParseJSONLeavesCurrentConfigFileUnchanged(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "oomph.hjson")
+	original := []byte(`{
+		version: 6
+		prefix: current-prefix
+		third_party_setting: keep-me
+		# preserve this comment and formatting
+	}`)
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ParseJSON(path); err != nil {
+		t.Fatalf("ParseJSON() error = %v", err)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(written) != string(original) {
+		t.Fatalf("current config was rewritten:\ngot:  %s\nwant: %s", written, original)
+	}
+}
+
+func TestParseJSONReturnsNonNotExistReadErrors(t *testing.T) {
+	err := ParseJSON(t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "unable to read config file") {
+		t.Fatalf("ParseJSON() error = %v, want read error", err)
 	}
 }
 
