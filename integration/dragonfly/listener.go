@@ -16,6 +16,7 @@ import (
 	"github.com/oomph-ac/oomph/player/component"
 	"github.com/oomph-ac/oomph/player/detection"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // Config configures the native Oomph listener used by Dragonfly.
@@ -32,7 +33,8 @@ type Config struct {
 
 // Listener returns a Dragonfly listener factory backed by an Oomph player
 // connection. The surrounding server.Config remains authoritative for status,
-// authentication, resource packs, compression, and player limits.
+// authentication, resource packs, explicitly configured compression, and
+// player limits. Compression defaults to Snappy when left unset.
 func Listener(ctx context.Context, cfg Config) func(server.Config) (server.Listener, error) {
 	return func(conf server.Config) (server.Listener, error) {
 		if cfg.Address == "" {
@@ -48,7 +50,7 @@ func Listener(ctx context.Context, cfg Config) func(server.Config) (server.Liste
 			AuthenticationDisabled: conf.AuthDisabled,
 			ResourcePacks:          conf.Resources,
 			TexturePacksRequired:   conf.ResourcesRequired,
-			Compression:            conf.Compression,
+			Compression:            listenerCompression(conf.Compression),
 			AcceptedProtocols:      cfg.AcceptedProtocols,
 			FlushRate:              -1,
 		}
@@ -70,6 +72,13 @@ func Listener(ctx context.Context, cfg Config) func(server.Config) (server.Liste
 		}()
 		return l, nil
 	}
+}
+
+func listenerCompression(compression packet.Compression) packet.Compression {
+	if compression == nil {
+		return packet.SnappyCompression
+	}
+	return compression
 }
 
 type listener struct {

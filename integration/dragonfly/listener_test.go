@@ -10,7 +10,22 @@ import (
 	"github.com/df-mc/dragonfly/server"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+func TestListenerCompressionDefaultsToSnappy(t *testing.T) {
+	got := listenerCompression(nil)
+	if got.EncodeCompression() != packet.SnappyCompression.EncodeCompression() {
+		t.Fatalf("default compression ID = %d, want Snappy ID %d", got.EncodeCompression(), packet.SnappyCompression.EncodeCompression())
+	}
+}
+
+func TestListenerCompressionPreservesExplicitSetting(t *testing.T) {
+	got := listenerCompression(packet.FlateCompression)
+	if got.EncodeCompression() != packet.FlateCompression.EncodeCompression() {
+		t.Fatalf("compression ID = %d, want explicit Flate ID %d", got.EncodeCompression(), packet.FlateCompression.EncodeCompression())
+	}
+}
 
 func TestListenerFactoryListensOnEphemeralAddress(t *testing.T) {
 	factory := Listener(context.Background(), Config{Address: "127.0.0.1:0"})
