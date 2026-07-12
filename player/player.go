@@ -162,6 +162,7 @@ type Player struct {
 	directOnce    sync.Once
 	directMu      sync.Mutex
 	directPackets []packet.Packet
+	directHead    int
 	directNotify  chan struct{}
 	directReads   chan packetRead
 

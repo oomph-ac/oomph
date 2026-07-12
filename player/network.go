@@ -13,6 +13,10 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+// DirectSelfRuntimeID is the runtime ID Dragonfly uses for the controllable
+// player on a session connection.
+const DirectSelfRuntimeID uint64 = 1
+
 // Conn returns the connection to the client.
 func (p *Player) Conn() *minecraft.Conn {
 	return p.conn
@@ -170,13 +174,19 @@ func (p *Player) enqueueDirectPacket(pk packet.Packet) {
 func (p *Player) popDirectPacket() (packet.Packet, bool) {
 	p.directMu.Lock()
 	defer p.directMu.Unlock()
-	if len(p.directPackets) == 0 {
+	if p.directHead == len(p.directPackets) {
 		return nil, false
 	}
-	pk := p.directPackets[0]
-	copy(p.directPackets, p.directPackets[1:])
-	p.directPackets[len(p.directPackets)-1] = nil
-	p.directPackets = p.directPackets[:len(p.directPackets)-1]
+	pk := p.directPackets[p.directHead]
+	p.directPackets[p.directHead] = nil
+	p.directHead++
+	if p.directHead == len(p.directPackets) {
+		p.directPackets = p.directPackets[:0]
+		p.directHead = 0
+	} else if p.directHead >= 64 && p.directHead*2 >= len(p.directPackets) {
+		p.directPackets = append(p.directPackets[:0], p.directPackets[p.directHead:]...)
+		p.directHead = 0
+	}
 	return pk, true
 }
 
@@ -225,10 +235,10 @@ func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) 
 
 func (p *Player) applyDirectGameData(data minecraft.GameData) {
 	p.GameDat = data
-	p.RuntimeId = 1
+	p.RuntimeId = DirectSelfRuntimeID
 	p.UniqueId = data.EntityUniqueID
 	p.GameMode = data.PlayerGameMode
-	if p.GameMode == 5 {
+	if p.GameMode == packet.GameTypeDefault {
 		p.GameMode = data.WorldGameMode
 	}
 	if p.movement != nil {

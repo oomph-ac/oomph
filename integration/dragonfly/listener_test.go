@@ -46,3 +46,28 @@ func TestListenerFactoryRequiresAddress(t *testing.T) {
 		t.Fatal("Listener() accepted an empty address")
 	}
 }
+
+func TestListenerClosesWhenContextIsCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	l, err := Listener(ctx, Config{Address: "127.0.0.1:0"})(server.Config{
+		Log:            slog.New(slog.NewTextHandler(io.Discard, nil)),
+		StatusProvider: minecraft.NewStatusProvider("Oomph test", "Oomph test"),
+	})
+	if err != nil {
+		t.Fatalf("Listener() error = %v", err)
+	}
+	acceptErr := make(chan error, 1)
+	go func() {
+		_, err := l.Accept()
+		acceptErr <- err
+	}()
+	cancel()
+	select {
+	case err := <-acceptErr:
+		if err == nil {
+			t.Fatal("Accept returned nil after context cancellation")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("context cancellation did not close the listener")
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/df-mc/dragonfly/server"
@@ -59,7 +60,15 @@ func Listener(ctx context.Context, cfg Config) func(server.Config) (server.Liste
 			return nil, fmt.Errorf("dragonfly integration: listen: %w", err)
 		}
 		log.Info("Dragonfly with Oomph listening", "addr", raw.Addr())
-		return &listener{raw: raw, log: log, configure: cfg.Configure}, nil
+		l := &listener{raw: raw, log: log, configure: cfg.Configure, done: make(chan struct{})}
+		go func() {
+			select {
+			case <-ctx.Done():
+				_ = l.Close()
+			case <-l.done:
+			}
+		}()
+		return l, nil
 	}
 }
 
@@ -67,6 +76,9 @@ type listener struct {
 	raw       *minecraft.Listener
 	log       *slog.Logger
 	configure func(*player.Player)
+	done      chan struct{}
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func (l *listener) Accept() (session.Conn, error) {
@@ -86,7 +98,7 @@ func (l *listener) Accept() (session.Conn, error) {
 		CurrentTime: time.Now(),
 	}, l.raw)
 	p.SetConn(conn)
-	p.RuntimeId = 1
+	p.RuntimeId = player.DirectSelfRuntimeID
 	p.EnableDirectMode()
 	component.Register(p)
 	detection.Register(p)
@@ -109,7 +121,11 @@ func (l *listener) Disconnect(conn session.Conn, reason string) error {
 }
 
 func (l *listener) Close() error {
-	return l.raw.Close()
+	l.closeOnce.Do(func() {
+		close(l.done)
+		l.closeErr = l.raw.Close()
+	})
+	return l.closeErr
 }
 
 var _ server.Listener = (*listener)(nil)
