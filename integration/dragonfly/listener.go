@@ -1,5 +1,5 @@
 // Package dragonfly integrates Oomph directly into a Dragonfly server without
-// an intermediate Spectrum proxy or downstream transport.
+// an intermediate proxy or downstream transport.
 package dragonfly
 
 import (

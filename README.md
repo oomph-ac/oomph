@@ -15,8 +15,8 @@ The multi-version will not be going public at the moment, you may remove the dep
 
 ## Dragonfly integration
 
-Dragonfly servers can run Oomph directly, without Spectrum or a second proxy
-process. Use the native listener from `integration/dragonfly`; a complete server
+Dragonfly servers can run Oomph directly, without a second proxy process. Use
+the native listener from `integration/dragonfly`; a complete server
 entry point is available in [`example/dragonfly`](./example/dragonfly).
 
 ## Server Authoritative Movement
