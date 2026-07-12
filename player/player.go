@@ -10,9 +10,9 @@ import (
 
 	"github.com/df-mc/dragonfly/server/event"
 	df_world "github.com/df-mc/dragonfly/server/world"
-	"github.com/oomph-ac/oconfig"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
+	"github.com/oomph-ac/oomph/oconfig"
 	"github.com/oomph-ac/oomph/oerror"
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/utils"

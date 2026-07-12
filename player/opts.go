@@ -1,6 +1,6 @@
 package player
 
-import "github.com/oomph-ac/oconfig"
+import "github.com/oomph-ac/oomph/oconfig"
 
 type Opts struct {
 	Combat   oconfig.CombatOpts

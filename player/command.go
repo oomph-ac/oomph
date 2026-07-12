@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/oomph-ac/oconfig"
+	"github.com/oomph-ac/oomph/oconfig"
 	"github.com/oomph-ac/oomph/player/command"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
