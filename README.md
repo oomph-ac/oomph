@@ -14,8 +14,10 @@ The multi-version will not be going public at the moment, you may remove the dep
 ## Standalone proxy
 
 Servers that are not built on Dragonfly can run Oomph as a native RakNet
-proxy. A complete client/backend forwarding example is available in
-[`example/default`](./example/default).
+proxy through `integration/proxy`. It keeps the client connected when a backend
+sends `packet.Transfer`, swaps only after the new backend has completed login,
+and resets Oomph's backend-specific state. A runnable entry point is available
+in [`example/default`](./example/default).
 
 ## Dragonfly integration
 

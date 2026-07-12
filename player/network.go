@@ -63,6 +63,37 @@ func (p *Player) SetServerConn(conn ServerConn) {
 	p.movement.ResetTransferState(p.GameDat.PlayerPosition)
 }
 
+// BackendTransferState contains client-visible state that must be cleared when
+// a proxy switches this player to another backend.
+type BackendTransferState struct {
+	EffectIDs []int32
+}
+
+// TransferServerConn atomically installs a backend and clears state owned by
+// the previous backend. It uses the same processing lock as packet handling and
+// Tick, so no component can observe a partially reset transfer.
+func (p *Player) TransferServerConn(conn ServerConn) BackendTransferState {
+	p.procMu.Lock()
+	defer p.procMu.Unlock()
+
+	state := BackendTransferState{EffectIDs: make([]int32, 0, len(p.effects.All()))}
+	for effectID := range p.effects.All() {
+		state.EffectIDs = append(state.EffectIDs, effectID)
+	}
+	p.SetServerConn(conn)
+	p.world.PurgeChunks()
+	for rid := range p.entTracker.All() {
+		p.entTracker.RemoveEntity(rid)
+	}
+	for rid := range p.clientEntTracker.All() {
+		p.clientEntTracker.RemoveEntity(rid)
+	}
+	p.effects.RemoveAll()
+	p.combat.Reset()
+	p.clientCombat.Reset()
+	return state
+}
+
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.
 func (p *Player) ChunkRadius() int {
 	return p.conn.ChunkRadius()
