@@ -99,7 +99,7 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 			int32(pos[1]),
 			int32(pos[2]),
 		},
-		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
+		NewBlockRuntimeID: oworld.RuntimeIDToNetworkBlockID(world.BlockRuntimeID(p.World().Block(pos)), p.BlockNetworkIDsHashed()),
 		Flags:             packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	}
@@ -166,11 +166,11 @@ func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
 	for _, pos := range positions {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: pos,
-			NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(df_cube.Pos{
+			NewBlockRuntimeID: oworld.RuntimeIDToNetworkBlockID(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
 				int(pos.X()),
 				int(pos.Y()),
 				int(pos.Z()),
-			})),
+			})), p.BlockNetworkIDsHashed()),
 			Flags: packet.BlockUpdateNeighbours,
 			Layer: 0, // TODO: Implement and account for multi-layer blocks.
 		})

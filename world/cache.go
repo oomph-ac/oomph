@@ -47,7 +47,7 @@ func unsubSC(hash xxh3.Uint128) {
 	}
 }
 
-func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos) (*CachedSubChunk, error) {
+func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos, useHashes bool) (*CachedSubChunk, error) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
@@ -63,6 +63,11 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	if err != nil {
 		return nil, err
 	}
+	// When the connection uses block network ID hashes, the decoded palettes contain block state hashes rather
+	// than runtime IDs. Convert them back so the rest of oomph can treat the sub chunk like any other.
+	if useHashes {
+		convertSubChunkHashPalettes(decodedSC)
+	}
 
 	cachedSC := &CachedSubChunk{hash: hash, layer: index, sc: decodedSC}
 	cachedSC.subs.Add(1)
@@ -72,7 +77,7 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	return cachedSC, nil
 }
 
-func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
+func CacheChunk(input *packet.LevelChunk, useHashes bool) (ChunkInfo, error) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
@@ -96,6 +101,11 @@ func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
 	)
 	if err != nil {
 		return ChunkInfo{}, err
+	}
+	// When the connection uses block network ID hashes, the decoded palettes contain block state hashes rather
+	// than runtime IDs. Convert them before compacting so air is recognised and the chunk behaves normally.
+	if useHashes {
+		convertHashPalettesToRuntimeIDs(decodedChunk)
 	}
 	decodedChunk.Compact()
 

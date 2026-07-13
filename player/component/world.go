@@ -14,6 +14,7 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	"github.com/oomph-ac/oomph/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/utils"
+	oworld "github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -77,7 +78,8 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", pk.NewBlockRuntimeID, "pos", pos)
 		return
 	}
-	c.AddPendingUpdate(pos, pk.NewBlockRuntimeID)
+	useHashes := c.mPlayer.BlockNetworkIDsHashed()
+	c.AddPendingUpdate(pos, oworld.NetworkBlockIDToRuntimeID(pk.NewBlockRuntimeID, useHashes))
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -85,11 +87,12 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 	if !c.mPlayer.Ready {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
+	useHashes := c.mPlayer.BlockNetworkIDsHashed()
 	for _, entry := range pk.Blocks {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, entry.BlockRuntimeID)
+		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, oworld.NetworkBlockIDToRuntimeID(entry.BlockRuntimeID, useHashes))
 	}
 	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, entry.BlockRuntimeID)
+		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, oworld.NetworkBlockIDToRuntimeID(entry.BlockRuntimeID, useHashes))
 	}
 }
 
@@ -188,7 +191,8 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	case *block.Air:
 		// This only happens when Dragonfly is unsure of what the item is (unregistered), so we use the client-authoritative block in hand.
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "called c.mPlayer.PlaceBlock: using client-authoritative block in hand")
-		if b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID)); ok {
+		heldBlockRID := oworld.NetworkBlockIDToRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID), c.mPlayer.BlockNetworkIDsHashed())
+		if b, ok := df_world.BlockByRuntimeID(heldBlockRID); ok {
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "placing block with runtime ID: %d", dat.HeldItem.Stack.BlockRuntimeID)
 
 			// If the block at the position is not replacable, we want to place the block on the side of the block.

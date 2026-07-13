@@ -16,6 +16,13 @@ func (p *Player) Conn() *minecraft.Conn {
 	return p.conn
 }
 
+// BlockNetworkIDsHashed returns whether block network IDs on this session are block state hashes rather than
+// runtime IDs. This is negotiated by the server via the UseBlockNetworkIDHashes field of the StartGame packet
+// and applies to every packet carrying block network IDs (chunks, block updates, item stacks, etc.).
+func (p *Player) BlockNetworkIDsHashed() bool {
+	return p.GameDat.UseBlockNetworkIDHashes
+}
+
 // ServerConn returns the connection to the server.
 func (p *Player) ServerConn() ServerConn {
 	return p.serverConn

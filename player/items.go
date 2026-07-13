@@ -5,6 +5,7 @@ import (
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/utils"
+	oworld "github.com/oomph-ac/oomph/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 
 	_ "unsafe"
@@ -19,7 +20,7 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 		}
 	}
 	if it.BlockRuntimeID > 0 {
-		b, _ := p.World().BlockRegistry().BlockByRuntimeID(uint32(it.BlockRuntimeID))
+		b, _ := p.World().BlockRegistry().BlockByRuntimeID(oworld.NetworkBlockIDToRuntimeID(uint32(it.BlockRuntimeID), p.BlockNetworkIDsHashed()))
 		if t, ok = b.(world.Item); !ok {
 			t = block.Air{}
 		}
@@ -32,10 +33,21 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 }
 
 func (p *Player) InstanceFromItem(it item.Stack) protocol.ItemInstance {
-	return utils.InstanceFromItem(p.World().BlockRegistry(), it)
+	inst := utils.InstanceFromItem(p.World().BlockRegistry(), it)
+	// The block runtime ID embedded in an item instance is a network block ID. When the session uses block
+	// network ID hashes, convert the dragonfly runtime ID to its hash before it is sent to the client.
+	if p.BlockNetworkIDsHashed() && inst.Stack.BlockRuntimeID != 0 {
+		inst.Stack.BlockRuntimeID = int32(oworld.RuntimeIDToNetworkBlockID(uint32(inst.Stack.BlockRuntimeID), true))
+	}
+	return inst
 }
 
 func (p *Player) StackToItem(it protocol.ItemStack) item.Stack {
+	// The block runtime ID of an item stack received over the network is a network block ID. Convert it to a
+	// dragonfly runtime ID when the session uses block network ID hashes.
+	if p.BlockNetworkIDsHashed() && it.BlockRuntimeID != 0 {
+		it.BlockRuntimeID = int32(oworld.NetworkBlockIDToRuntimeID(uint32(it.BlockRuntimeID), true))
+	}
 	return utils.StackToItem(p.World().BlockRegistry(), it)
 }
 
