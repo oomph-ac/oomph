@@ -2,7 +2,7 @@ module github.com/oomph-ac/oomph
 
 go 1.26.0
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260713225844-d3a42efadf41
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260713230435-a683785ee72e
 
 replace github.com/sandertv/gophertunnel => github.com/hashimthearab/gophertunnel v1.25.3-0.20260713165240-828896b9c778
 
