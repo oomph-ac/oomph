@@ -11,21 +11,18 @@ Oomph implements a server authoritative system for movement and combat, allowing
 - [OConfig](./oconfig)
 The multi-version will not be going public at the moment, you may remove the dependency from `go.mod`.
 
-## Standalone proxy
+## Setup
 
-Servers that are not built on Dragonfly can run Oomph as a native RakNet
-proxy through `integration/proxy`. It keeps the client connected when a backend
-sends `packet.Transfer`, swaps only after the new backend has completed login,
-and resets Oomph's backend-specific state. A runnable entry point is available
-in [`example/default`](./example/default).
+Choose the integration that matches your server software:
 
-## Dragonfly integration
+| Server software | Setup |
+| --- | --- |
+| PocketMine-MP | [Run the standalone proxy and install Oomph-PM](./docs/setup.md#pocketmine-mp) |
+| Dragonfly | [Embed Oomph's native Dragonfly listener](./docs/setup.md#dragonfly) |
+| PowerNukkitX or other Bedrock software | [Run the standalone proxy](./docs/setup.md#other-server-software) |
 
-Dragonfly servers can run Oomph directly, without a second proxy process. Use
-the native listener from `integration/dragonfly`; a complete server
-entry point is available in [`example/dragonfly`](./example/dragonfly). The
-listener defaults to Snappy compression unless `server.Config.Compression` is
-set explicitly.
+See the [complete setup guide](./docs/setup.md) for network topology,
+configuration, startup order, and verification steps.
 
 ## Server Authoritative Movement
 Similar to what is implemented in BDS, Oomph attempts to replicate the movement of players and send any corrections if deemed neccessary. Unlike BDS, Oomph accounts for latency, making it much smoother than the current vanilla system. As of now, Oomph has known issues with the following:
