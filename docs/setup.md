@@ -59,7 +59,8 @@ replace PocketMine's network interface.
 
 ### 3. Start Oomph
 
-Build the checked-in standalone example:
+Build the checked-in [`example/default`](../example/default) standalone
+example:
 
 ```bash
 cd example/default
