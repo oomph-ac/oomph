@@ -42,6 +42,7 @@ func (p *Player) SetServerConn(conn ServerConn) {
 	}
 
 	if p.serverConn == nil {
+		p.clientUsesBlockNetworkIDHashes = conn.GameData().UseBlockNetworkIDHashes
 		for _, item := range conn.GameData().Items {
 			if i, ok := world.ItemByName(item.Name, 0); ok {
 				p.items[item.RuntimeID] = i

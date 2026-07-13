@@ -16,16 +16,17 @@ import (
 )
 
 type ChunkInfo struct {
-	Cached bool
-	Hash   xxh3.Uint128
-	Chunk  *chunk.Chunk
+	Cached        bool
+	Hash          xxh3.Uint128
+	networkHashes bool
+	Chunk         *chunk.Chunk
 }
 
 type World struct {
 	lastCleanPos protocol.ChunkPos
 
 	chunks    map[protocol.ChunkPos]ChunkInfo
-	subChunks map[protocol.ChunkPos][]xxh3.Uint128
+	subChunks map[protocol.ChunkPos][]blockCacheKey
 
 	exemptedChunks map[protocol.ChunkPos]struct{}
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
@@ -38,7 +39,7 @@ type World struct {
 func New(debugFn func(string, ...any)) *World {
 	return &World{
 		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
-		subChunks: make(map[protocol.ChunkPos][]xxh3.Uint128),
+		subChunks: make(map[protocol.ChunkPos][]blockCacheKey),
 
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
@@ -66,11 +67,11 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkInfo) {
 }
 
 // AddSubChunk adds a subchunk to the world.
-func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128) {
+func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128, networkHashes bool) {
 	if _, ok := w.subChunks[chunkPos]; !ok {
-		w.subChunks[chunkPos] = make([]xxh3.Uint128, 0, 16)
+		w.subChunks[chunkPos] = make([]blockCacheKey, 0, 16)
 	}
-	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], hash)
+	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], blockCacheKey{hash: hash, networkHashes: networkHashes})
 }
 
 // Chunk returns a cached chunk at the position passed. The mutex is
@@ -168,11 +169,11 @@ func (w *World) PurgeChunks() {
 
 func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
 	if info.Cached {
-		unsubC(info.Hash)
+		unsubC(blockCacheKey{hash: info.Hash, networkHashes: info.networkHashes})
 	}
 	if subChunks, ok := w.subChunks[chunkPos]; ok {
-		for _, subChunkHash := range subChunks {
-			unsubSC(subChunkHash)
+		for _, subChunkKey := range subChunks {
+			unsubSC(subChunkKey)
 		}
 	}
 	delete(w.subChunks, chunkPos)

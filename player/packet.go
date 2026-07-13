@@ -1,13 +1,11 @@
 package player
 
 import (
-	"bytes"
 	"strings"
 
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oconfig"
@@ -39,13 +37,17 @@ var ClientDecode = []uint32{
 
 var ServerDecode = []uint32{
 	packet.IDAddActor,
+	packet.IDAddItemActor,
 	packet.IDAddPlayer,
 	packet.IDChunkRadiusUpdated,
 	packet.IDInventorySlot,
 	packet.IDInventoryContent,
+	packet.IDInventoryTransaction,
 	packet.IDItemStackResponse,
 	packet.IDLevelChunk,
 	packet.IDMobEffect,
+	packet.IDMobEquipment,
+	packet.IDMobArmourEquipment,
 	packet.IDMoveActorAbsolute,
 	packet.IDMovePlayer,
 	packet.IDRemoveActor,
@@ -56,6 +58,7 @@ var ServerDecode = []uint32{
 	packet.IDUpdateAbilities,
 	packet.IDUpdateAttributes,
 	packet.IDUpdateBlock,
+	packet.IDUpdateBlockSynced,
 	packet.IDUpdateSubChunkBlocks,
 	packet.IDContainerOpen,
 	packet.IDContainerClose,
@@ -278,6 +281,67 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	}
 	p.RunDetections(pk)
+	if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes && p.rewriteClientBlockNetworkIDs(pk) {
+		ctx.SetModified()
+	}
+}
+
+func (p *Player) rewriteClientBlockNetworkIDs(pk packet.Packet) bool {
+	rewriteStack := func(stack *protocol.ItemStack) {
+		if stack.BlockRuntimeID != 0 {
+			stack.BlockRuntimeID = int32(p.BlockRuntimeIDFromClientToBackend(uint32(stack.BlockRuntimeID)))
+		}
+	}
+	rewriteCraftResults := func(actions []protocol.StackRequestAction) bool {
+		modified := false
+		for _, action := range actions {
+			if action, ok := action.(*protocol.CraftResultsDeprecatedStackRequestAction); ok {
+				for i := range action.ResultItems {
+					rewriteStack(&action.ResultItems[i])
+				}
+				modified = true
+			}
+		}
+		return modified
+	}
+	switch pk := pk.(type) {
+	case *packet.PlayerAuthInput:
+		modified := false
+		if pk.InputData.Load(packet.InputFlagPerformItemInteraction) {
+			pk.ItemInteractionData.BlockRuntimeID = p.BlockRuntimeIDFromClientToBackend(pk.ItemInteractionData.BlockRuntimeID)
+			rewriteStack(&pk.ItemInteractionData.HeldItem.Stack)
+			modified = true
+		}
+		if pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
+			modified = rewriteCraftResults(pk.ItemStackRequest.Actions) || modified
+		}
+		return modified
+	case *packet.ItemStackRequest:
+		modified := false
+		for i := range pk.Requests {
+			modified = rewriteCraftResults(pk.Requests[i].Actions) || modified
+		}
+		return modified
+	case *packet.InventoryTransaction:
+		for i := range pk.Actions {
+			rewriteStack(&pk.Actions[i].OldItem.Stack)
+			rewriteStack(&pk.Actions[i].NewItem.Stack)
+		}
+		switch data := pk.TransactionData.(type) {
+		case *protocol.UseItemTransactionData:
+			data.BlockRuntimeID = p.BlockRuntimeIDFromClientToBackend(data.BlockRuntimeID)
+			rewriteStack(&data.HeldItem.Stack)
+		case *protocol.UseItemOnEntityTransactionData:
+			rewriteStack(&data.HeldItem.Stack)
+		case *protocol.ReleaseItemTransactionData:
+			rewriteStack(&data.HeldItem.Stack)
+		}
+		return true
+	case *packet.MobEquipment:
+		rewriteStack(&pk.NewItem.Stack)
+		return true
+	}
+	return false
 }
 
 // splitCommandLine splits a command line into arguments, preserving quoted substrings
@@ -404,30 +468,16 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.ItemStackResponse:
 		p.inventory.HandleItemStackResponse(pk)
 	case *packet.LevelChunk:
-		// HACK: For some reason, some chunks forwarded through gophertunnel will spawn invisible blocks? Lunar had this issue as well
-		// and seemed to have fixed it by fully re-encoding the chunk.
-		if p.opts.Network.AttemptFixChunks && !pk.CacheEnabled && !(pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless) {
-			dim, ok := world.DimensionByID(int(pk.Dimension))
-			if !ok {
-				dim = world.Overworld
-			}
-			if c, err := chunk.NetworkDecode(oworld.BlockRegistry, pk.RawPayload, int(pk.SubChunkCount), dim.Range()); err != nil {
-				p.Log().Warn("unable to decode chunk", "error", err)
+		p.worldUpdater.HandleLevelChunk(pk)
+		backendHashes, clientHashes := p.GameDat.UseBlockNetworkIDHashes, p.clientUsesBlockNetworkIDHashes
+		fullChunk := !pk.CacheEnabled && pk.SubChunkCount != protocol.SubChunkRequestModeLimited && pk.SubChunkCount != protocol.SubChunkRequestModeLimitless
+		if fullChunk && (p.opts.Network.AttemptFixChunks || backendHashes != clientHashes) {
+			if err := oworld.ReencodeLevelChunk(pk, backendHashes, clientHashes); err != nil {
+				p.Log().Warn("unable to re-encode chunk", "error", err)
 			} else {
-				data := chunk.Encode(c, chunk.NetworkEncoding)
-				chunkBuf := bytes.NewBuffer(nil)
-				for _, sub := range data.SubChunks {
-					chunkBuf.Write(sub)
-				}
-				chunkBuf.Write(data.Biomes)
-				chunkBuf.WriteByte(0)
-				pk.RawPayload = append([]byte(nil), chunkBuf.Bytes()...)
-				pk.SubChunkCount = uint32(len(data.SubChunks))
 				ctx.SetModified()
 			}
 		}
-
-		p.worldUpdater.HandleLevelChunk(pk)
 	case *packet.MobEffect:
 		pk.Tick = 0
 		ctx.SetModified()
@@ -479,6 +529,26 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.gamemodeHandle.Handle(pk)
 	case *packet.SubChunk:
 		p.worldUpdater.HandleSubChunk(pk)
+		backendHashes, clientHashes := p.GameDat.UseBlockNetworkIDHashes, p.clientUsesBlockNetworkIDHashes
+		if !pk.CacheEnabled && backendHashes != clientHashes {
+			dimension, ok := world.DimensionByID(int(pk.Dimension))
+			if !ok {
+				dimension = world.Overworld
+			}
+			for i := range pk.SubChunkEntries {
+				entry := &pk.SubChunkEntries[i]
+				if entry.Result != protocol.SubChunkResultSuccess {
+					continue
+				}
+				payload, err := oworld.ReencodeSubChunk(entry.RawPayload, dimension, backendHashes, clientHashes)
+				if err != nil {
+					p.Log().Warn("unable to re-encode subchunk", "error", err)
+					continue
+				}
+				entry.RawPayload = payload
+				ctx.SetModified()
+			}
+		}
 	case *packet.UpdateAbilities:
 		if pk.AbilityData.EntityUniqueID == p.UniqueId {
 			p.movement.ServerUpdate(pk)
@@ -492,8 +562,26 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
+		if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes {
+			pk.NewBlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(pk.NewBlockRuntimeID)
+			ctx.SetModified()
+		}
+	case *packet.UpdateBlockSynced:
+		if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes {
+			pk.NewBlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(pk.NewBlockRuntimeID)
+			ctx.SetModified()
+		}
 	case *packet.UpdateSubChunkBlocks:
 		p.worldUpdater.HandleUpdateSubChunkBlocks(pk)
+		if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes {
+			for i := range pk.Blocks {
+				pk.Blocks[i].BlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(pk.Blocks[i].BlockRuntimeID)
+			}
+			for i := range pk.Extra {
+				pk.Extra[i].BlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(pk.Extra[i].BlockRuntimeID)
+			}
+			ctx.SetModified()
+		}
 	case *packet.ContainerOpen:
 		p.inventory.CreateWindow(pk.WindowID, pk.ContainerType)
 	case *packet.ContainerClose:
@@ -522,4 +610,117 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			p.CreativeItems[item.CreativeItemNetworkID] = item
 		}
 	}
+	if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes && p.rewriteServerItemBlockNetworkIDs(pk) {
+		ctx.SetModified()
+	}
+}
+
+func (p *Player) rewriteServerItemBlockNetworkIDs(pk packet.Packet) bool {
+	rewriteStack := func(stack *protocol.ItemStack) {
+		if stack.BlockRuntimeID != 0 {
+			stack.BlockRuntimeID = int32(p.BlockRuntimeIDFromBackendToClient(uint32(stack.BlockRuntimeID)))
+		}
+	}
+	switch pk := pk.(type) {
+	case *packet.InventorySlot:
+		rewriteStack(&pk.NewItem.Stack)
+		if storageItem, ok := pk.StorageItem.Value(); ok {
+			rewriteStack(&storageItem.Stack)
+			pk.StorageItem = protocol.Option(storageItem)
+		}
+		return true
+	case *packet.InventoryContent:
+		// The inventory ACK retains the original slice for later processing in the backend's ID mode.
+		pk.Content = append([]protocol.ItemInstance(nil), pk.Content...)
+		for i := range pk.Content {
+			rewriteStack(&pk.Content[i].Stack)
+		}
+		rewriteStack(&pk.StorageItem.Stack)
+		return true
+	case *packet.MobEquipment:
+		rewriteStack(&pk.NewItem.Stack)
+		return true
+	case *packet.MobArmourEquipment:
+		rewriteStack(&pk.Helmet.Stack)
+		rewriteStack(&pk.Chestplate.Stack)
+		rewriteStack(&pk.Leggings.Stack)
+		rewriteStack(&pk.Boots.Stack)
+		rewriteStack(&pk.Body.Stack)
+		return true
+	case *packet.AddPlayer:
+		rewriteStack(&pk.HeldItem.Stack)
+		return true
+	case *packet.AddItemActor:
+		rewriteStack(&pk.Item.Stack)
+		return true
+	case *packet.CreativeContent:
+		for i := range pk.Groups {
+			rewriteStack(&pk.Groups[i].Icon)
+		}
+		for i := range pk.Items {
+			rewriteStack(&pk.Items[i].Item)
+		}
+		return true
+	case *packet.InventoryTransaction:
+		for i := range pk.Actions {
+			rewriteStack(&pk.Actions[i].OldItem.Stack)
+			rewriteStack(&pk.Actions[i].NewItem.Stack)
+		}
+		switch data := pk.TransactionData.(type) {
+		case *protocol.UseItemTransactionData:
+			data.BlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(data.BlockRuntimeID)
+			rewriteStack(&data.HeldItem.Stack)
+		case *protocol.UseItemOnEntityTransactionData:
+			rewriteStack(&data.HeldItem.Stack)
+		case *protocol.ReleaseItemTransactionData:
+			rewriteStack(&data.HeldItem.Stack)
+		}
+		return true
+	case *packet.CraftingData:
+		for i, recipe := range pk.Recipes {
+			switch recipe := recipe.(type) {
+			case *protocol.ShapedRecipe:
+				clientRecipe := *recipe
+				clientRecipe.Output = append([]protocol.ItemStack(nil), recipe.Output...)
+				for outputIndex := range clientRecipe.Output {
+					rewriteStack(&clientRecipe.Output[outputIndex])
+				}
+				pk.Recipes[i] = &clientRecipe
+			case *protocol.ShulkerBoxRecipe:
+				clientRecipe := *recipe
+				clientRecipe.Output = append([]protocol.ItemStack(nil), recipe.Output...)
+				for outputIndex := range clientRecipe.Output {
+					rewriteStack(&clientRecipe.Output[outputIndex])
+				}
+				pk.Recipes[i] = &clientRecipe
+			case *protocol.ShapelessChemistryRecipe:
+				clientRecipe := *recipe
+				clientRecipe.Output = append([]protocol.ItemStack(nil), recipe.Output...)
+				for outputIndex := range clientRecipe.Output {
+					rewriteStack(&clientRecipe.Output[outputIndex])
+				}
+				pk.Recipes[i] = &clientRecipe
+			case *protocol.ShapedChemistryRecipe:
+				clientRecipe := *recipe
+				clientRecipe.Output = append([]protocol.ItemStack(nil), recipe.Output...)
+				for outputIndex := range clientRecipe.Output {
+					rewriteStack(&clientRecipe.Output[outputIndex])
+				}
+				pk.Recipes[i] = &clientRecipe
+			case *protocol.ShapelessRecipe:
+				clientRecipe := *recipe
+				clientRecipe.Output = append([]protocol.ItemStack(nil), recipe.Output...)
+				for outputIndex := range clientRecipe.Output {
+					rewriteStack(&clientRecipe.Output[outputIndex])
+				}
+				pk.Recipes[i] = &clientRecipe
+			case *protocol.SmithingTransformRecipe:
+				clientRecipe := *recipe
+				rewriteStack(&clientRecipe.Result)
+				pk.Recipes[i] = &clientRecipe
+			}
+		}
+		return true
+	}
+	return false
 }

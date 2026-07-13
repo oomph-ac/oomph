@@ -71,6 +71,58 @@ func (p *Player) World() *oworld.World {
 	return p.world
 }
 
+// BlockRuntimeIDFromNetwork converts a network block hash to the runtime ID used by Oomph's block registry when the
+// backend enabled hashed block network IDs. Unknown values are preserved so callers can retain their existing fallback.
+func (p *Player) BlockRuntimeIDFromNetwork(id uint32) uint32 {
+	return p.convertBlockRuntimeID(id, p.GameDat.UseBlockNetworkIDHashes, false)
+}
+
+// BlockRuntimeIDToNetwork converts an Oomph block runtime ID to the hash expected by clients when the backend enabled
+// hashed block network IDs. Unknown values are preserved so custom block fallbacks remain intact.
+func (p *Player) BlockRuntimeIDToNetwork(id uint32) uint32 {
+	return p.convertBlockRuntimeID(id, false, p.clientUsesBlockNetworkIDHashes)
+}
+
+// BlockRuntimeIDFromClient converts a client-visible block ID to Oomph's registry runtime ID.
+func (p *Player) BlockRuntimeIDFromClient(id uint32) uint32 {
+	return p.convertBlockRuntimeID(id, p.clientUsesBlockNetworkIDHashes, false)
+}
+
+// BlockRuntimeIDToBackend converts an Oomph registry runtime ID to the current backend's network representation.
+func (p *Player) BlockRuntimeIDToBackend(id uint32) uint32 {
+	return p.convertBlockRuntimeID(id, false, p.GameDat.UseBlockNetworkIDHashes)
+}
+
+// BlockRuntimeIDFromBackendToClient translates a block ID from the current backend's representation to the one fixed
+// by the client's initial StartGame packet.
+func (p *Player) BlockRuntimeIDFromBackendToClient(id uint32) uint32 {
+	return p.convertBlockRuntimeID(id, p.GameDat.UseBlockNetworkIDHashes, p.clientUsesBlockNetworkIDHashes)
+}
+
+// BlockRuntimeIDFromClientToBackend translates a client-visible block ID to the current backend's representation.
+func (p *Player) BlockRuntimeIDFromClientToBackend(id uint32) uint32 {
+	return p.convertBlockRuntimeID(id, p.clientUsesBlockNetworkIDHashes, p.GameDat.UseBlockNetworkIDHashes)
+}
+
+func (p *Player) convertBlockRuntimeID(id uint32, fromHashes, toHashes bool) uint32 {
+	if fromHashes == toHashes {
+		return id
+	}
+	if fromHashes {
+		converted, ok := p.World().BlockRegistry().HashToRuntimeID(id)
+		if !ok {
+			return id
+		}
+		id = converted
+	}
+	if toHashes {
+		if converted, ok := p.World().BlockRegistry().RuntimeIDToHash(id); ok {
+			return converted
+		}
+	}
+	return id
+}
+
 // This function is deprecated and instead, the user should call p.World().PurgeChunks() directly.
 func (p *Player) RegenerateWorld() {
 	p.world.PurgeChunks()
@@ -99,7 +151,7 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 			int32(pos[1]),
 			int32(pos[2]),
 		},
-		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
+		NewBlockRuntimeID: p.BlockRuntimeIDToNetwork(world.BlockRuntimeID(p.World().Block(pos))),
 		Flags:             packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	}
@@ -166,11 +218,11 @@ func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
 	for _, pos := range positions {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: pos,
-			NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(df_cube.Pos{
+			NewBlockRuntimeID: p.BlockRuntimeIDToNetwork(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
 				int(pos.X()),
 				int(pos.Y()),
 				int(pos.Z()),
-			})),
+			}))),
 			Flags: packet.BlockUpdateNeighbours,
 			Layer: 0, // TODO: Implement and account for multi-layer blocks.
 		})

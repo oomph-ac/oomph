@@ -54,8 +54,8 @@ github.com/onsi/ginkgo v1.16.5/go.mod h1:+E8gABHa3K6zRBolWtd+ROzc/U5bkGt0FwiG042
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.17.0 h1:9Luw4uT5HTjHTN8+aNcSThgH1vdXnmdJ8xIfZ4wyTRE=
 github.com/onsi/gomega v1.17.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAlGdZY=
-github.com/oomph-ac/dragonfly v0.0.0-20260702190811-865056f9d47f h1:F1qyVUh1JMkYI1o6XzOQy1cFFdanPsOepv+jZSzZ3qo=
-github.com/oomph-ac/dragonfly v0.0.0-20260702190811-865056f9d47f/go.mod h1:OFJjCz3xfDalVZEtV4lJdbenwKDEAczKHikHN7kVwMc=
+github.com/oomph-ac/dragonfly v0.0.0-20260713224537-2de5b48545f8 h1:dQCMLVDOpW2ZmPNfOJk4YKxPnCvQmg9N+0K58PgO5cI=
+github.com/oomph-ac/dragonfly v0.0.0-20260713224537-2de5b48545f8/go.mod h1:OFJjCz3xfDalVZEtV4lJdbenwKDEAczKHikHN7kVwMc=
 github.com/pion/datachannel v1.6.0 h1:XecBlj+cvsxhAMZWFfFcPyUaDZtd7IJvrXqlXD/53i0=
 github.com/pion/datachannel v1.6.0/go.mod h1:ur+wzYF8mWdC+Mkis5Thosk+u/VOL287apDNEbFpsIk=
 github.com/pion/dtls/v3 v3.1.2 h1:gqEdOUXLtCGW+afsBLO0LtDD8GnuBBjEy6HRtyofZTc=

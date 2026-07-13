@@ -18,8 +18,8 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 			t = block.Air{}
 		}
 	}
-	if it.BlockRuntimeID > 0 {
-		b, _ := p.World().BlockRegistry().BlockByRuntimeID(uint32(it.BlockRuntimeID))
+	if it.BlockRuntimeID != 0 {
+		b, _ := p.World().BlockRegistry().BlockByRuntimeID(p.BlockRuntimeIDFromNetwork(uint32(it.BlockRuntimeID)))
 		if t, ok = b.(world.Item); !ok {
 			t = block.Air{}
 		}
@@ -32,10 +32,17 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 }
 
 func (p *Player) InstanceFromItem(it item.Stack) protocol.ItemInstance {
-	return utils.InstanceFromItem(p.World().BlockRegistry(), it)
+	instance := utils.InstanceFromItem(p.World().BlockRegistry(), it)
+	if instance.Stack.BlockRuntimeID != 0 {
+		instance.Stack.BlockRuntimeID = int32(p.BlockRuntimeIDToNetwork(uint32(instance.Stack.BlockRuntimeID)))
+	}
+	return instance
 }
 
 func (p *Player) StackToItem(it protocol.ItemStack) item.Stack {
+	if it.BlockRuntimeID != 0 {
+		it.BlockRuntimeID = int32(p.BlockRuntimeIDFromNetwork(uint32(it.BlockRuntimeID)))
+	}
 	return utils.StackToItem(p.World().BlockRegistry(), it)
 }
 

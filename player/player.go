@@ -71,6 +71,10 @@ type Player struct {
 	GameDat     minecraft.GameData
 	Version     int32
 
+	// clientUsesBlockNetworkIDHashes is fixed by the initial backend's StartGame. It remains unchanged across fast
+	// backend transfers because the connected client does not receive another StartGame packet.
+	clientUsesBlockNetworkIDHashes bool
+
 	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
 	RuntimeId uint64

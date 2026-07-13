@@ -14,45 +14,50 @@ import (
 )
 
 var (
-	chunkCache = make(map[xxh3.Uint128]*CachedChunk)
+	chunkCache = make(map[blockCacheKey]*CachedChunk)
 	cMu        sync.Mutex
 
-	subChunkCache = make(map[xxh3.Uint128]*CachedSubChunk)
+	subChunkCache = make(map[blockCacheKey]*CachedSubChunk)
 	scMu          sync.Mutex
 )
 
-func unsubC(hash xxh3.Uint128) {
+type blockCacheKey struct {
+	hash          xxh3.Uint128
+	networkHashes bool
+}
+
+func unsubC(key blockCacheKey) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
-	if c, ok := chunkCache[hash]; ok {
+	if c, ok := chunkCache[key]; ok {
 		c.subs.Add(-1)
 		if c.subs.Load() <= 0 {
-			delete(chunkCache, hash)
+			delete(chunkCache, key)
 		}
 	}
 }
 
-func unsubSC(hash xxh3.Uint128) {
+func unsubSC(key blockCacheKey) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
-	if c, ok := subChunkCache[hash]; ok {
+	if c, ok := subChunkCache[key]; ok {
 		//fmt.Println("unsubscribing from subchunk", hash, c.subs.Load())
 		c.subs.Add(-1)
 		if c.subs.Load() <= 0 {
 			//fmt.Println("deleting subchunk from cache", hash)
-			delete(subChunkCache, hash)
+			delete(subChunkCache, key)
 		}
 	}
 }
 
-func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos) (*CachedSubChunk, error) {
+func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos, networkHashes bool) (*CachedSubChunk, error) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
-	hash := xxh3.Hash128(payload.Bytes())
-	if sc, ok := subChunkCache[hash]; ok {
+	key := blockCacheKey{hash: xxh3.Hash128(payload.Bytes()), networkHashes: networkHashes}
+	if sc, ok := subChunkCache[key]; ok {
 		sc.subs.Add(1)
 		//fmt.Println("returning cached subchunk", hash)
 		return sc, nil
@@ -63,24 +68,27 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	if err != nil {
 		return nil, err
 	}
+	if networkHashes {
+		decodedSC.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
+	}
 
-	cachedSC := &CachedSubChunk{hash: hash, layer: index, sc: decodedSC}
+	cachedSC := &CachedSubChunk{hash: key.hash, layer: index, sc: decodedSC}
 	cachedSC.subs.Add(1)
-	subChunkCache[hash] = cachedSC
+	subChunkCache[key] = cachedSC
 
 	//fmt.Println("newly cached subchunk", hash)
 	return cachedSC, nil
 }
 
-func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
+func CacheChunk(input *packet.LevelChunk, networkHashes bool) (ChunkInfo, error) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
-	hash := xxh3.Hash128(input.RawPayload)
-	if c, ok := chunkCache[hash]; ok {
+	key := blockCacheKey{hash: xxh3.Hash128(input.RawPayload), networkHashes: networkHashes}
+	if c, ok := chunkCache[key]; ok {
 		c.subs.Add(1)
-		//fmt.Println("returning cached chunk", hash)
-		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true}, nil
+		//fmt.Println("returning cached chunk", key.hash)
+		return ChunkInfo{Hash: key.hash, networkHashes: networkHashes, Chunk: c.chunk, Cached: true}, nil
 	}
 
 	dimension, ok := world.DimensionByID(int(input.Dimension))
@@ -97,12 +105,73 @@ func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
 	if err != nil {
 		return ChunkInfo{}, err
 	}
+	if networkHashes {
+		decodedChunk.ConvertBlockNetworkHashesToRuntimeIDs()
+	}
 	decodedChunk.Compact()
 
-	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk}
+	cachedChunk := &CachedChunk{hash: key.hash, chunk: decodedChunk}
 	cachedChunk.subs.Add(1)
-	chunkCache[hash] = cachedChunk
-	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true}, nil
+	chunkCache[key] = cachedChunk
+	return ChunkInfo{Hash: key.hash, networkHashes: networkHashes, Chunk: cachedChunk.chunk, Cached: true}, nil
+}
+
+// ReencodeLevelChunk converts the block palettes in input between network ID representations while preserving trailing
+// block entity data.
+func ReencodeLevelChunk(input *packet.LevelChunk, sourceHashes, targetHashes bool) error {
+	dimension, ok := world.DimensionByID(int(input.Dimension))
+	if !ok {
+		return fmt.Errorf("unknown dimension %v", input.Dimension)
+	}
+	buf := bytes.NewBuffer(input.RawPayload)
+	decoded, _, err := chunk.NetworkDecodeBuffer(BlockRegistry, buf, int(input.SubChunkCount), dimension.Range())
+	if err != nil {
+		return err
+	}
+	if sourceHashes {
+		decoded.ConvertBlockNetworkHashesToRuntimeIDs()
+	}
+	var data chunk.SerialisedData
+	if targetHashes {
+		data = chunk.EncodeWithBlockNetworkHashes(decoded)
+	} else {
+		data = chunk.Encode(decoded, chunk.NetworkEncoding)
+	}
+	out := bytes.NewBuffer(make([]byte, 0, len(input.RawPayload)))
+	for _, sub := range data.SubChunks {
+		out.Write(sub)
+	}
+	out.Write(data.Biomes)
+	out.Write(buf.Bytes())
+	input.RawPayload = out.Bytes()
+	input.SubChunkCount = uint32(len(data.SubChunks))
+	return nil
+}
+
+// ReencodeSubChunk converts one successful SubChunk entry between network ID representations while preserving trailing
+// block entity data.
+func ReencodeSubChunk(payload []byte, dimension world.Dimension, sourceHashes, targetHashes bool) ([]byte, error) {
+	buf := bytes.NewBuffer(payload)
+	decodedChunk := chunk.New(BlockRegistry, dimension.Range())
+	var index byte
+	decoded, err := decodeSubChunk(buf, decodedChunk, &index, chunk.NetworkEncoding)
+	if err != nil {
+		return nil, err
+	}
+	if sourceHashes {
+		decoded.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
+	}
+	if int(index) >= len(decodedChunk.Sub()) {
+		return nil, fmt.Errorf("subchunk index %d out of range", index)
+	}
+	decodedChunk.Sub()[index] = decoded
+	var encoded []byte
+	if targetHashes {
+		encoded = chunk.EncodeSubChunkWithBlockNetworkHashes(decodedChunk, int(index))
+	} else {
+		encoded = chunk.EncodeSubChunk(decodedChunk, chunk.NetworkEncoding, int(index))
+	}
+	return append(encoded, buf.Bytes()...), nil
 }
 
 type CachedSubChunk struct {
