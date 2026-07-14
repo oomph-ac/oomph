@@ -293,6 +293,46 @@ func TestRewriteServerBlockNetworkIDsCoversFallingBlockMetadata(t *testing.T) {
 	}
 }
 
+func TestRewriteServerBlockNetworkIDsCoversBlockValuedActorMetadata(t *testing.T) {
+	world.FinalizeBlockRegistry()
+	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
+	stoneHash, ok := world.BlockRegistry.RuntimeIDToHash(stoneRID)
+	if !ok {
+		t.Fatal("stone has no network hash")
+	}
+	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
+	setBlockNetworkModes(p, blocknetwork.RuntimeIDs, blocknetwork.Hashes)
+
+	spawnMetadata := map[uint32]any{protocol.EntityDataKeyCarryBlockRuntimeID: int32(stoneHash)}
+	spawn := &packet.AddActor{EntityType: "minecraft:enderman", EntityMetadata: spawnMetadata}
+	if !p.rewriteServerBlockNetworkIDs(spawn) {
+		t.Fatal("carried-block spawn metadata was not rewritten")
+	}
+	if got := uint32(spawn.EntityMetadata[protocol.EntityDataKeyCarryBlockRuntimeID].(int32)); got != stoneRID {
+		t.Fatalf("carried-block spawn metadata ID = %d, want runtime ID %d", got, stoneRID)
+	}
+	if got := uint32(spawnMetadata[protocol.EntityDataKeyCarryBlockRuntimeID].(int32)); got != stoneHash {
+		t.Fatalf("retained backend spawn metadata ID = %d, want hash %d", got, stoneHash)
+	}
+
+	updateMetadata := map[uint32]any{
+		protocol.EntityDataKeyCarryBlockRuntimeID:  int32(stoneHash),
+		protocol.EntityDataKeyDisplayTileRuntimeID: int32(stoneHash),
+	}
+	update := &packet.SetActorData{EntityMetadata: updateMetadata}
+	if !p.rewriteServerBlockNetworkIDs(update) {
+		t.Fatal("block-valued actor metadata update was not rewritten")
+	}
+	for _, key := range []uint32{protocol.EntityDataKeyCarryBlockRuntimeID, protocol.EntityDataKeyDisplayTileRuntimeID} {
+		if got := uint32(update.EntityMetadata[key].(int32)); got != stoneRID {
+			t.Fatalf("actor metadata key %d ID = %d, want runtime ID %d", key, got, stoneRID)
+		}
+		if got := uint32(updateMetadata[key].(int32)); got != stoneHash {
+			t.Fatalf("retained backend metadata key %d ID = %d, want hash %d", key, got, stoneHash)
+		}
+	}
+}
+
 func TestRewriteServerRecipesPreservesBackendOutputs(t *testing.T) {
 	world.FinalizeBlockRegistry()
 	stoneRID := dfworld.BlockRuntimeID(block.Stone{})

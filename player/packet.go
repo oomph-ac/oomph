@@ -651,12 +651,15 @@ func (p *Player) rewriteServerBlockNetworkIDs(pk packet.Packet) bool {
 		return true
 	case *packet.AddPlayer:
 		rewriteStack(&pk.HeldItem.Stack)
+		metadata, _ := rewriteActorBlockMetadata(pk.EntityMetadata, p.BackendToClientBlockNetwork(), false)
+		pk.EntityMetadata = metadata
 		return true
 	case *packet.AddActor:
-		if pk.EntityType != fallingBlockEntityType {
-			return false
-		}
-		metadata, modified := rewriteFallingBlockMetadata(pk.EntityMetadata, p.BackendToClientBlockNetwork())
+		metadata, modified := rewriteActorBlockMetadata(pk.EntityMetadata, p.BackendToClientBlockNetwork(), pk.EntityType == fallingBlockEntityType)
+		pk.EntityMetadata = metadata
+		return modified
+	case *packet.SetActorData:
+		metadata, modified := rewriteActorBlockMetadata(pk.EntityMetadata, p.BackendToClientBlockNetwork(), false)
 		pk.EntityMetadata = metadata
 		return modified
 	case *packet.AddItemActor:

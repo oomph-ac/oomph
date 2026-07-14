@@ -48,15 +48,31 @@ func levelSoundUsesBlockNetworkID(soundType string) bool {
 	}
 }
 
-func rewriteFallingBlockMetadata(metadata map[uint32]any, translator blocknetwork.Translator) (map[uint32]any, bool) {
-	value, ok := metadata[protocol.EntityDataKeyVariant].(int32)
-	if !ok {
+func rewriteActorBlockMetadata(metadata map[uint32]any, translator blocknetwork.Translator, fallingBlock bool) (map[uint32]any, bool) {
+	keys := []uint32{protocol.EntityDataKeyDisplayTileRuntimeID, protocol.EntityDataKeyCarryBlockRuntimeID}
+	if fallingBlock {
+		keys = append(keys, protocol.EntityDataKeyVariant)
+	}
+	var clientMetadata map[uint32]any
+	for _, key := range keys {
+		value, ok := metadata[key].(int32)
+		if !ok {
+			continue
+		}
+		translated := int32(translator.Translate(uint32(value)))
+		if translated == value {
+			continue
+		}
+		if clientMetadata == nil {
+			clientMetadata = make(map[uint32]any, len(metadata))
+			for key, value := range metadata {
+				clientMetadata[key] = value
+			}
+		}
+		clientMetadata[key] = translated
+	}
+	if clientMetadata == nil {
 		return metadata, false
 	}
-	clientMetadata := make(map[uint32]any, len(metadata))
-	for key, value := range metadata {
-		clientMetadata[key] = value
-	}
-	clientMetadata[protocol.EntityDataKeyVariant] = int32(translator.Translate(uint32(value)))
 	return clientMetadata, true
 }
