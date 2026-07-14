@@ -8,6 +8,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/zeebo/xxh3"
@@ -22,8 +23,8 @@ var (
 )
 
 type blockCacheKey struct {
-	hash          xxh3.Uint128
-	networkHashes bool
+	hash xxh3.Uint128
+	mode blocknetwork.Mode
 }
 
 func unsubC(key blockCacheKey) {
@@ -52,11 +53,11 @@ func unsubSC(key blockCacheKey) {
 	}
 }
 
-func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos, networkHashes bool) (*CachedSubChunk, error) {
+func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos, codec blocknetwork.Codec) (*CachedSubChunk, error) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
-	key := blockCacheKey{hash: xxh3.Hash128(payload.Bytes()), networkHashes: networkHashes}
+	key := blockCacheKey{hash: xxh3.Hash128(payload.Bytes()), mode: codec.Mode()}
 	if sc, ok := subChunkCache[key]; ok {
 		sc.subs.Add(1)
 		//fmt.Println("returning cached subchunk", hash)
@@ -68,7 +69,7 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos,
 	if err != nil {
 		return nil, err
 	}
-	if networkHashes {
+	if codec.Mode() == blocknetwork.Hashes {
 		decodedSC.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
 	}
 
@@ -80,15 +81,15 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos,
 	return cachedSC, nil
 }
 
-func CacheChunk(input *packet.LevelChunk, networkHashes bool) (ChunkInfo, error) {
+func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, error) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
-	key := blockCacheKey{hash: xxh3.Hash128(input.RawPayload), networkHashes: networkHashes}
+	key := blockCacheKey{hash: xxh3.Hash128(input.RawPayload), mode: codec.Mode()}
 	if c, ok := chunkCache[key]; ok {
 		c.subs.Add(1)
 		//fmt.Println("returning cached chunk", key.hash)
-		return ChunkInfo{Hash: key.hash, networkHashes: networkHashes, Chunk: c.chunk, Cached: true}, nil
+		return ChunkInfo{Hash: key.hash, blockNetworkMode: codec.Mode(), Chunk: c.chunk, Cached: true}, nil
 	}
 
 	dimension, ok := world.DimensionByID(int(input.Dimension))
@@ -105,7 +106,7 @@ func CacheChunk(input *packet.LevelChunk, networkHashes bool) (ChunkInfo, error)
 	if err != nil {
 		return ChunkInfo{}, err
 	}
-	if networkHashes {
+	if codec.Mode() == blocknetwork.Hashes {
 		decodedChunk.ConvertBlockNetworkHashesToRuntimeIDs()
 	}
 	decodedChunk.Compact()
@@ -113,12 +114,12 @@ func CacheChunk(input *packet.LevelChunk, networkHashes bool) (ChunkInfo, error)
 	cachedChunk := &CachedChunk{hash: key.hash, chunk: decodedChunk}
 	cachedChunk.subs.Add(1)
 	chunkCache[key] = cachedChunk
-	return ChunkInfo{Hash: key.hash, networkHashes: networkHashes, Chunk: cachedChunk.chunk, Cached: true}, nil
+	return ChunkInfo{Hash: key.hash, blockNetworkMode: codec.Mode(), Chunk: cachedChunk.chunk, Cached: true}, nil
 }
 
 // ReencodeLevelChunk converts the block palettes in input between network ID representations while preserving trailing
 // block entity data.
-func ReencodeLevelChunk(input *packet.LevelChunk, sourceHashes, targetHashes bool) error {
+func ReencodeLevelChunk(input *packet.LevelChunk, source, target blocknetwork.Codec) error {
 	dimension, ok := world.DimensionByID(int(input.Dimension))
 	if !ok {
 		return fmt.Errorf("unknown dimension %v", input.Dimension)
@@ -128,11 +129,11 @@ func ReencodeLevelChunk(input *packet.LevelChunk, sourceHashes, targetHashes boo
 	if err != nil {
 		return err
 	}
-	if sourceHashes {
+	if source.Mode() == blocknetwork.Hashes {
 		decoded.ConvertBlockNetworkHashesToRuntimeIDs()
 	}
 	var data chunk.SerialisedData
-	if targetHashes {
+	if target.Mode() == blocknetwork.Hashes {
 		data = chunk.EncodeWithBlockNetworkHashes(decoded)
 	} else {
 		data = chunk.Encode(decoded, chunk.NetworkEncoding)
@@ -150,7 +151,7 @@ func ReencodeLevelChunk(input *packet.LevelChunk, sourceHashes, targetHashes boo
 
 // ReencodeSubChunk converts one successful SubChunk entry between network ID representations while preserving trailing
 // block entity data.
-func ReencodeSubChunk(payload []byte, dimension world.Dimension, sourceHashes, targetHashes bool) ([]byte, error) {
+func ReencodeSubChunk(payload []byte, dimension world.Dimension, source, target blocknetwork.Codec) ([]byte, error) {
 	buf := bytes.NewBuffer(payload)
 	decodedChunk := chunk.New(BlockRegistry, dimension.Range())
 	var index byte
@@ -158,7 +159,7 @@ func ReencodeSubChunk(payload []byte, dimension world.Dimension, sourceHashes, t
 	if err != nil {
 		return nil, err
 	}
-	if sourceHashes {
+	if source.Mode() == blocknetwork.Hashes {
 		decoded.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
 	}
 	if int(index) >= len(decodedChunk.Sub()) {
@@ -166,7 +167,7 @@ func ReencodeSubChunk(payload []byte, dimension world.Dimension, sourceHashes, t
 	}
 	decodedChunk.Sub()[index] = decoded
 	var encoded []byte
-	if targetHashes {
+	if target.Mode() == blocknetwork.Hashes {
 		encoded = chunk.EncodeSubChunkWithBlockNetworkHashes(decodedChunk, int(index))
 	} else {
 		encoded = chunk.EncodeSubChunk(decodedChunk, chunk.NetworkEncoding, int(index))

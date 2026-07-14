@@ -10,9 +10,15 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	dfworld "github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/world"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+func setBlockNetworkModes(p *Player, client, backend blocknetwork.Mode) {
+	p.clientBlockNetwork = blocknetwork.NewCodec(world.BlockRegistry, client)
+	p.backendBlockNetwork = blocknetwork.NewCodec(world.BlockRegistry, backend)
+}
 
 func TestBlockRuntimeIDToNetworkUsesHashMode(t *testing.T) {
 	world.FinalizeBlockRegistry()
@@ -22,7 +28,7 @@ func TestBlockRuntimeIDToNetworkUsesHashMode(t *testing.T) {
 		t.Fatal("stone has no network hash")
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.clientUsesBlockNetworkIDHashes = true
+	p.clientBlockNetwork = blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.Hashes)
 
 	if got := p.BlockRuntimeIDToNetwork(stoneRID); got != stoneHash {
 		t.Fatalf("network block ID = %d, want hash %d", got, stoneHash)
@@ -61,7 +67,7 @@ func TestConvertToStackAcceptsSignedBlockNetworkHash(t *testing.T) {
 		t.Fatalf("stone network hash = %d, want a signed-negative hash", stoneHash)
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.GameDat.UseBlockNetworkIDHashes = true
+	p.backendBlockNetwork = blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.Hashes)
 
 	stack := p.ConvertToStack(protocol.ItemStack{BlockRuntimeID: int32(stoneHash), Count: 1})
 	if _, ok := stack.Item().(block.Stone); !ok {
@@ -77,8 +83,7 @@ func TestBlockRuntimeIDTranslationSeparatesClientAndBackendModes(t *testing.T) {
 		t.Fatal("stone has no network hash")
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.clientUsesBlockNetworkIDHashes = true
-	p.GameDat.UseBlockNetworkIDHashes = false
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
 
 	if got := p.BlockRuntimeIDFromClient(stoneHash); got != stoneRID {
 		t.Fatalf("client hash translated to %d, want runtime ID %d", got, stoneRID)
@@ -96,8 +101,7 @@ func TestRewriteClientBlockNetworkIDsCoversAuthInputInteraction(t *testing.T) {
 		t.Fatal("stone has no network hash")
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.clientUsesBlockNetworkIDHashes = true
-	p.GameDat.UseBlockNetworkIDHashes = false
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
 	inputData := protocol.NewBitset(200)
 	inputData.Set(packet.InputFlagPerformItemInteraction)
 	pk := &packet.PlayerAuthInput{
@@ -127,8 +131,7 @@ func TestRewriteClientBlockNetworkIDsCoversAuthInputCraftResults(t *testing.T) {
 		t.Fatal("stone has no network hash")
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.clientUsesBlockNetworkIDHashes = true
-	p.GameDat.UseBlockNetworkIDHashes = false
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
 	inputData := protocol.NewBitset(200)
 	inputData.Set(packet.InputFlagPerformItemStackRequest)
 	action := &protocol.CraftResultsDeprecatedStackRequestAction{
@@ -157,8 +160,7 @@ func TestRewriteClientBlockNetworkIDsCoversStandaloneCraftResults(t *testing.T) 
 		t.Fatal("stone has no network hash")
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.clientUsesBlockNetworkIDHashes = true
-	p.GameDat.UseBlockNetworkIDHashes = false
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
 	action := &protocol.CraftResultsDeprecatedStackRequestAction{
 		ResultItems: []protocol.ItemStack{{BlockRuntimeID: int32(stoneHash)}},
 	}
@@ -182,8 +184,7 @@ func TestRewriteServerInventoryStackUsesRetainedClientMode(t *testing.T) {
 		t.Fatal("stone has no network hash")
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.clientUsesBlockNetworkIDHashes = false
-	p.GameDat.UseBlockNetworkIDHashes = true
+	setBlockNetworkModes(p, blocknetwork.RuntimeIDs, blocknetwork.Hashes)
 	pk := &packet.InventorySlot{
 		NewItem:     protocol.ItemInstance{Stack: protocol.ItemStack{BlockRuntimeID: int32(stoneHash)}},
 		StorageItem: protocol.Option(protocol.ItemInstance{Stack: protocol.ItemStack{BlockRuntimeID: int32(stoneHash)}}),
@@ -223,8 +224,7 @@ func TestRewriteServerRecipesPreservesBackendOutputs(t *testing.T) {
 		t.Fatal("stone has no network hash")
 	}
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
-	p.clientUsesBlockNetworkIDHashes = true
-	p.GameDat.UseBlockNetworkIDHashes = false
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
 	backendRecipe := &protocol.ShapedChemistryRecipe{ShapedRecipe: protocol.ShapedRecipe{
 		Output: []protocol.ItemStack{{BlockRuntimeID: int32(stoneRID)}},
 	}}

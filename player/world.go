@@ -12,6 +12,7 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	oworld "github.com/oomph-ac/oomph/world"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -74,51 +75,46 @@ func (p *Player) World() *oworld.World {
 // BlockRuntimeIDFromNetwork converts a network block hash to the runtime ID used by Oomph's block registry when the
 // backend enabled hashed block network IDs. Unknown values are preserved so callers can retain their existing fallback.
 func (p *Player) BlockRuntimeIDFromNetwork(id uint32) uint32 {
-	return p.convertBlockRuntimeID(id, p.GameDat.UseBlockNetworkIDHashes, false)
+	return blockRuntimeIDFromNetwork(p.backendBlockNetwork, id)
 }
 
 // BlockRuntimeIDToNetwork converts an Oomph block runtime ID to the hash expected by clients when the backend enabled
 // hashed block network IDs. Unknown values are preserved so custom block fallbacks remain intact.
 func (p *Player) BlockRuntimeIDToNetwork(id uint32) uint32 {
-	return p.convertBlockRuntimeID(id, false, p.clientUsesBlockNetworkIDHashes)
+	return blockRuntimeIDToNetwork(p.clientBlockNetwork, id)
 }
 
 // BlockRuntimeIDFromClient converts a client-visible block ID to Oomph's registry runtime ID.
 func (p *Player) BlockRuntimeIDFromClient(id uint32) uint32 {
-	return p.convertBlockRuntimeID(id, p.clientUsesBlockNetworkIDHashes, false)
+	return blockRuntimeIDFromNetwork(p.clientBlockNetwork, id)
 }
 
 // BlockRuntimeIDToBackend converts an Oomph registry runtime ID to the current backend's network representation.
 func (p *Player) BlockRuntimeIDToBackend(id uint32) uint32 {
-	return p.convertBlockRuntimeID(id, false, p.GameDat.UseBlockNetworkIDHashes)
+	return blockRuntimeIDToNetwork(p.backendBlockNetwork, id)
 }
 
 // BlockRuntimeIDFromBackendToClient translates a block ID from the current backend's representation to the one fixed
 // by the client's initial StartGame packet.
 func (p *Player) BlockRuntimeIDFromBackendToClient(id uint32) uint32 {
-	return p.convertBlockRuntimeID(id, p.GameDat.UseBlockNetworkIDHashes, p.clientUsesBlockNetworkIDHashes)
+	return p.BackendToClientBlockNetwork().Translate(id)
 }
 
 // BlockRuntimeIDFromClientToBackend translates a client-visible block ID to the current backend's representation.
 func (p *Player) BlockRuntimeIDFromClientToBackend(id uint32) uint32 {
-	return p.convertBlockRuntimeID(id, p.clientUsesBlockNetworkIDHashes, p.GameDat.UseBlockNetworkIDHashes)
+	return p.ClientToBackendBlockNetwork().Translate(id)
 }
 
-func (p *Player) convertBlockRuntimeID(id uint32, fromHashes, toHashes bool) uint32 {
-	if fromHashes == toHashes {
-		return id
+func blockRuntimeIDFromNetwork(codec blocknetwork.Codec, id uint32) uint32 {
+	if runtimeID, ok := codec.ToRuntimeID(id); ok {
+		return runtimeID
 	}
-	if fromHashes {
-		converted, ok := p.World().BlockRegistry().HashToRuntimeID(id)
-		if !ok {
-			return id
-		}
-		id = converted
-	}
-	if toHashes {
-		if converted, ok := p.World().BlockRegistry().RuntimeIDToHash(id); ok {
-			return converted
-		}
+	return id
+}
+
+func blockRuntimeIDToNetwork(codec blocknetwork.Codec, id uint32) uint32 {
+	if networkID, ok := codec.FromRuntimeID(id); ok {
+		return networkID
 	}
 	return id
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/oomph-ac/oomph/player"
 	playercontext "github.com/oomph-ac/oomph/player/context"
 	oomphworld "github.com/oomph-ac/oomph/world"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -55,7 +56,7 @@ func TestWorldUpdaterDecodesHashedLevelChunk(t *testing.T) {
 
 	p := player.New(slog.New(slog.NewTextHandler(io.Discard, nil)), player.MonitoringState{CurrentTime: time.Now()}, nil)
 	Register(p)
-	p.GameDat.UseBlockNetworkIDHashes = true
+	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: true}})
 	p.WorldUpdater().HandleLevelChunk(&packet.LevelChunk{
 		Position:      protocol.ChunkPos{0, 0},
 		Dimension:     packet.DimensionOverworld,
@@ -79,7 +80,7 @@ func TestWorldUpdaterConvertsHashedBlockUpdate(t *testing.T) {
 	}
 	p := player.New(slog.New(slog.NewTextHandler(io.Discard, nil)), player.MonitoringState{CurrentTime: time.Now()}, nil)
 	Register(p)
-	p.GameDat.UseBlockNetworkIDHashes = true
+	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: true}})
 	updater := p.WorldUpdater().(*WorldUpdaterComponent)
 	position := cube.Pos{4, 5, 6}
 
@@ -103,7 +104,25 @@ func TestClientBlockHashModeSurvivesBackendTransfer(t *testing.T) {
 	p := player.New(slog.New(slog.NewTextHandler(io.Discard, nil)), player.MonitoringState{CurrentTime: time.Now()}, nil)
 	Register(p)
 	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: true}})
+	if got := p.ClientBlockNetwork().Mode(); got != blocknetwork.Hashes {
+		t.Fatalf("initial client mode = %v, want Hashes", got)
+	}
+	if got := p.BackendBlockNetwork().Mode(); got != blocknetwork.Hashes {
+		t.Fatalf("initial backend mode = %v, want Hashes", got)
+	}
+	if p.ClientToBackendBlockNetwork().Required() || p.BackendToClientBlockNetwork().Required() {
+		t.Fatal("matching initial endpoint modes require translation")
+	}
 	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: false}})
+	if got := p.ClientBlockNetwork().Mode(); got != blocknetwork.Hashes {
+		t.Fatalf("client mode after transfer = %v, want retained Hashes", got)
+	}
+	if got := p.BackendBlockNetwork().Mode(); got != blocknetwork.RuntimeIDs {
+		t.Fatalf("backend mode after transfer = %v, want RuntimeIDs", got)
+	}
+	if !p.ClientToBackendBlockNetwork().Required() || !p.BackendToClientBlockNetwork().Required() {
+		t.Fatal("different endpoint modes do not require translation")
+	}
 
 	if got := p.BlockRuntimeIDToNetwork(stoneRID); got != stoneHash {
 		t.Fatalf("client block ID after transfer = %d, want initial hash %d", got, stoneHash)

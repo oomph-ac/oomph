@@ -7,6 +7,7 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/zeebo/xxh3"
 
@@ -16,10 +17,10 @@ import (
 )
 
 type ChunkInfo struct {
-	Cached        bool
-	Hash          xxh3.Uint128
-	networkHashes bool
-	Chunk         *chunk.Chunk
+	Cached           bool
+	Hash             xxh3.Uint128
+	blockNetworkMode blocknetwork.Mode
+	Chunk            *chunk.Chunk
 }
 
 type World struct {
@@ -67,11 +68,11 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkInfo) {
 }
 
 // AddSubChunk adds a subchunk to the world.
-func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128, networkHashes bool) {
+func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128, codec blocknetwork.Codec) {
 	if _, ok := w.subChunks[chunkPos]; !ok {
 		w.subChunks[chunkPos] = make([]blockCacheKey, 0, 16)
 	}
-	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], blockCacheKey{hash: hash, networkHashes: networkHashes})
+	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], blockCacheKey{hash: hash, mode: codec.Mode()})
 }
 
 // Chunk returns a cached chunk at the position passed. The mutex is
@@ -169,7 +170,7 @@ func (w *World) PurgeChunks() {
 
 func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
 	if info.Cached {
-		unsubC(blockCacheKey{hash: info.Hash, networkHashes: info.networkHashes})
+		unsubC(blockCacheKey{hash: info.Hash, mode: info.blockNetworkMode})
 	}
 	if subChunks, ok := w.subChunks[chunkPos]; ok {
 		for _, subChunkKey := range subChunks {

@@ -281,7 +281,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	}
 	p.RunDetections(pk)
-	if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes && p.rewriteClientBlockNetworkIDs(pk) {
+	if p.ClientToBackendBlockNetwork().Required() && p.rewriteClientBlockNetworkIDs(pk) {
 		ctx.SetModified()
 	}
 }
@@ -469,10 +469,9 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.inventory.HandleItemStackResponse(pk)
 	case *packet.LevelChunk:
 		p.worldUpdater.HandleLevelChunk(pk)
-		backendHashes, clientHashes := p.GameDat.UseBlockNetworkIDHashes, p.clientUsesBlockNetworkIDHashes
 		fullChunk := !pk.CacheEnabled && pk.SubChunkCount != protocol.SubChunkRequestModeLimited && pk.SubChunkCount != protocol.SubChunkRequestModeLimitless
-		if fullChunk && (p.opts.Network.AttemptFixChunks || backendHashes != clientHashes) {
-			if err := oworld.ReencodeLevelChunk(pk, backendHashes, clientHashes); err != nil {
+		if fullChunk && (p.opts.Network.AttemptFixChunks || p.BackendToClientBlockNetwork().Required()) {
+			if err := oworld.ReencodeLevelChunk(pk, p.BackendBlockNetwork(), p.ClientBlockNetwork()); err != nil {
 				p.Log().Warn("unable to re-encode chunk", "error", err)
 			} else {
 				ctx.SetModified()
@@ -529,8 +528,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.gamemodeHandle.Handle(pk)
 	case *packet.SubChunk:
 		p.worldUpdater.HandleSubChunk(pk)
-		backendHashes, clientHashes := p.GameDat.UseBlockNetworkIDHashes, p.clientUsesBlockNetworkIDHashes
-		if !pk.CacheEnabled && backendHashes != clientHashes {
+		if !pk.CacheEnabled && p.BackendToClientBlockNetwork().Required() {
 			dimension, ok := world.DimensionByID(int(pk.Dimension))
 			if !ok {
 				dimension = world.Overworld
@@ -540,7 +538,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 				if entry.Result != protocol.SubChunkResultSuccess {
 					continue
 				}
-				payload, err := oworld.ReencodeSubChunk(entry.RawPayload, dimension, backendHashes, clientHashes)
+				payload, err := oworld.ReencodeSubChunk(entry.RawPayload, dimension, p.BackendBlockNetwork(), p.ClientBlockNetwork())
 				if err != nil {
 					p.Log().Warn("unable to re-encode subchunk", "error", err)
 					continue
@@ -562,18 +560,18 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
-		if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes {
+		if p.BackendToClientBlockNetwork().Required() {
 			pk.NewBlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(pk.NewBlockRuntimeID)
 			ctx.SetModified()
 		}
 	case *packet.UpdateBlockSynced:
-		if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes {
+		if p.BackendToClientBlockNetwork().Required() {
 			pk.NewBlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(pk.NewBlockRuntimeID)
 			ctx.SetModified()
 		}
 	case *packet.UpdateSubChunkBlocks:
 		p.worldUpdater.HandleUpdateSubChunkBlocks(pk)
-		if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes {
+		if p.BackendToClientBlockNetwork().Required() {
 			for i := range pk.Blocks {
 				pk.Blocks[i].BlockRuntimeID = p.BlockRuntimeIDFromBackendToClient(pk.Blocks[i].BlockRuntimeID)
 			}
@@ -610,7 +608,7 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			p.CreativeItems[item.CreativeItemNetworkID] = item
 		}
 	}
-	if p.GameDat.UseBlockNetworkIDHashes != p.clientUsesBlockNetworkIDHashes && p.rewriteServerItemBlockNetworkIDs(pk) {
+	if p.BackendToClientBlockNetwork().Required() && p.rewriteServerItemBlockNetworkIDs(pk) {
 		ctx.SetModified()
 	}
 }

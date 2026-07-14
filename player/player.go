@@ -17,6 +17,7 @@ import (
 	"github.com/oomph-ac/oomph/player/context"
 	"github.com/oomph-ac/oomph/utils"
 	"github.com/oomph-ac/oomph/world"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -71,9 +72,10 @@ type Player struct {
 	GameDat     minecraft.GameData
 	Version     int32
 
-	// clientUsesBlockNetworkIDHashes is fixed by the initial backend's StartGame. It remains unchanged across fast
-	// backend transfers because the connected client does not receive another StartGame packet.
-	clientUsesBlockNetworkIDHashes bool
+	// clientBlockNetwork is fixed by the initial backend's StartGame. It remains unchanged across fast backend
+	// transfers because the connected client does not receive another StartGame packet.
+	clientBlockNetwork  blocknetwork.Codec
+	backendBlockNetwork blocknetwork.Codec
 
 	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
@@ -252,6 +254,9 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 		log: log,
 
 		listener: listener,
+
+		clientBlockNetwork:  blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.RuntimeIDs),
+		backendBlockNetwork: blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.RuntimeIDs),
 
 		remoteEventFunc: func(e RemoteEvent, p *Player) {
 			enc, _ := json.Marshal(e)

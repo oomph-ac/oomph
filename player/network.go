@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -41,14 +42,16 @@ func (p *Player) SetServerConn(conn ServerConn) {
 		return
 	}
 
+	backendBlockNetwork := blocknetwork.NewCodec(p.World().BlockRegistry(), blocknetwork.ModeFromHashes(conn.GameData().UseBlockNetworkIDHashes))
 	if p.serverConn == nil {
-		p.clientUsesBlockNetworkIDHashes = conn.GameData().UseBlockNetworkIDHashes
+		p.clientBlockNetwork = backendBlockNetwork
 		for _, item := range conn.GameData().Items {
 			if i, ok := world.ItemByName(item.Name, 0); ok {
 				p.items[item.RuntimeID] = i
 			}
 		}
 	}
+	p.backendBlockNetwork = backendBlockNetwork
 
 	p.GameDat = conn.GameData()
 	p.serverConn = conn
@@ -62,6 +65,26 @@ func (p *Player) SetServerConn(conn ServerConn) {
 	p.PendingCorrectionACK = false
 	p.acks.ResetTransferState()
 	p.movement.ResetTransferState(p.GameDat.PlayerPosition)
+}
+
+// ClientBlockNetwork returns the codec for block IDs visible to the client.
+func (p *Player) ClientBlockNetwork() blocknetwork.Codec {
+	return p.clientBlockNetwork
+}
+
+// BackendBlockNetwork returns the codec for block IDs used by the current backend.
+func (p *Player) BackendBlockNetwork() blocknetwork.Codec {
+	return p.backendBlockNetwork
+}
+
+// ClientToBackendBlockNetwork returns a translator for client-originated block IDs.
+func (p *Player) ClientToBackendBlockNetwork() blocknetwork.Translator {
+	return blocknetwork.NewTranslator(p.clientBlockNetwork, p.backendBlockNetwork)
+}
+
+// BackendToClientBlockNetwork returns a translator for backend-originated block IDs.
+func (p *Player) BackendToClientBlockNetwork() blocknetwork.Translator {
+	return blocknetwork.NewTranslator(p.backendBlockNetwork, p.clientBlockNetwork)
 }
 
 // BackendTransferState contains client-visible state that must be cleared when
