@@ -22,7 +22,7 @@ func setBlockNetworkModes(p *Player, client, backend blocknetwork.Mode) {
 	p.backendBlockNetwork = blocknetwork.NewCodec(world.BlockRegistry, backend)
 }
 
-func TestBlockRuntimeIDToNetworkUsesHashMode(t *testing.T) {
+func TestBlockRuntimeIDToClientUsesHashMode(t *testing.T) {
 	world.FinalizeBlockRegistry()
 	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
 	stoneHash, ok := world.BlockRegistry.RuntimeIDToHash(stoneRID)
@@ -32,7 +32,7 @@ func TestBlockRuntimeIDToNetworkUsesHashMode(t *testing.T) {
 	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
 	p.clientBlockNetwork = blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.Hashes)
 
-	if got := p.BlockRuntimeIDToNetwork(stoneRID); got != stoneHash {
+	if got := p.BlockRuntimeIDToClient(stoneRID); got != stoneHash {
 		t.Fatalf("network block ID = %d, want hash %d", got, stoneHash)
 	}
 }
@@ -90,7 +90,7 @@ func TestBlockRuntimeIDTranslationSeparatesClientAndBackendModes(t *testing.T) {
 	if got := p.BlockRuntimeIDFromClient(stoneHash); got != stoneRID {
 		t.Fatalf("client hash translated to %d, want runtime ID %d", got, stoneRID)
 	}
-	if got := p.BlockRuntimeIDFromClientToBackend(stoneHash); got != stoneRID {
+	if got := p.ClientToBackendBlockNetwork().Translate(stoneHash); got != stoneRID {
 		t.Fatalf("client hash translated for backend to %d, want runtime ID %d", got, stoneRID)
 	}
 }
@@ -234,6 +234,45 @@ func TestRewriteServerInventoryStackUsesRetainedClientMode(t *testing.T) {
 	}
 	if got := uint32(original[0].Stack.BlockRuntimeID); got != stoneHash {
 		t.Fatalf("retained backend inventory block ID = %d, want hash %d", got, stoneHash)
+	}
+}
+
+func TestRewriteBlockNetworkIDsReportsOnlyActualChanges(t *testing.T) {
+	world.FinalizeBlockRegistry()
+	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
+
+	clientPackets := map[string]packet.Packet{
+		"empty inventory transaction": &packet.InventoryTransaction{},
+		"empty equipment":             &packet.MobEquipment{},
+		"unrelated sound":             &packet.LevelSoundEvent{SoundType: packet.SoundEventAttackNoDamage},
+	}
+	for name, pk := range clientPackets {
+		t.Run("client/"+name, func(t *testing.T) {
+			if p.rewriteClientBlockNetworkIDs(pk) {
+				t.Fatal("packet reported a block network ID rewrite without changing an ID")
+			}
+		})
+	}
+
+	setBlockNetworkModes(p, blocknetwork.RuntimeIDs, blocknetwork.Hashes)
+	serverPackets := map[string]packet.Packet{
+		"empty inventory slot":    &packet.InventorySlot{},
+		"empty inventory content": &packet.InventoryContent{},
+		"empty equipment":         &packet.MobEquipment{},
+		"empty player spawn":      &packet.AddPlayer{},
+		"empty item actor":        &packet.AddItemActor{},
+		"empty creative content":  &packet.CreativeContent{},
+		"empty transaction":       &packet.InventoryTransaction{},
+		"empty crafting data":     &packet.CraftingData{},
+		"unrelated sound":         &packet.LevelSoundEvent{SoundType: packet.SoundEventAttackNoDamage},
+	}
+	for name, pk := range serverPackets {
+		t.Run("server/"+name, func(t *testing.T) {
+			if p.rewriteServerBlockNetworkIDs(pk) {
+				t.Fatal("packet reported a block network ID rewrite without changing an ID")
+			}
+		})
 	}
 }
 

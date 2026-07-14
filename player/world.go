@@ -72,37 +72,21 @@ func (p *Player) World() *oworld.World {
 	return p.world
 }
 
-// BlockRuntimeIDFromNetwork converts a network block hash to the runtime ID used by Oomph's block registry when the
-// backend enabled hashed block network IDs. Unknown values are preserved so callers can retain their existing fallback.
-func (p *Player) BlockRuntimeIDFromNetwork(id uint32) uint32 {
+// BlockRuntimeIDFromBackend converts a backend block ID to Oomph's canonical registry runtime ID.
+// Unknown values are preserved so callers can retain their existing fallback.
+func (p *Player) BlockRuntimeIDFromBackend(id uint32) uint32 {
 	return blockRuntimeIDFromNetwork(p.backendBlockNetwork, id)
 }
 
-// BlockRuntimeIDToNetwork converts an Oomph block runtime ID to the hash expected by clients when the backend enabled
-// hashed block network IDs. Unknown values are preserved so custom block fallbacks remain intact.
-func (p *Player) BlockRuntimeIDToNetwork(id uint32) uint32 {
+// BlockRuntimeIDToClient converts a canonical registry runtime ID to the client's block ID representation.
+// Unknown values are preserved so custom block fallbacks remain intact.
+func (p *Player) BlockRuntimeIDToClient(id uint32) uint32 {
 	return blockRuntimeIDToNetwork(p.clientBlockNetwork, id)
 }
 
 // BlockRuntimeIDFromClient converts a client-visible block ID to Oomph's registry runtime ID.
 func (p *Player) BlockRuntimeIDFromClient(id uint32) uint32 {
 	return blockRuntimeIDFromNetwork(p.clientBlockNetwork, id)
-}
-
-// BlockRuntimeIDToBackend converts an Oomph registry runtime ID to the current backend's network representation.
-func (p *Player) BlockRuntimeIDToBackend(id uint32) uint32 {
-	return blockRuntimeIDToNetwork(p.backendBlockNetwork, id)
-}
-
-// BlockRuntimeIDFromBackendToClient translates a block ID from the current backend's representation to the one fixed
-// by the client's initial StartGame packet.
-func (p *Player) BlockRuntimeIDFromBackendToClient(id uint32) uint32 {
-	return p.BackendToClientBlockNetwork().Translate(id)
-}
-
-// BlockRuntimeIDFromClientToBackend translates a client-visible block ID to the current backend's representation.
-func (p *Player) BlockRuntimeIDFromClientToBackend(id uint32) uint32 {
-	return p.ClientToBackendBlockNetwork().Translate(id)
 }
 
 func blockRuntimeIDFromNetwork(codec blocknetwork.Codec, id uint32) uint32 {
@@ -148,7 +132,7 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 			int32(pos[1]),
 			int32(pos[2]),
 		},
-		NewBlockRuntimeID: p.BlockRuntimeIDToNetwork(blockRuntimeID),
+		NewBlockRuntimeID: p.BlockRuntimeIDToClient(blockRuntimeID),
 		Flags:             packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	}
@@ -215,7 +199,7 @@ func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
 	for _, pos := range positions {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: pos,
-			NewBlockRuntimeID: p.BlockRuntimeIDToNetwork(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
+			NewBlockRuntimeID: p.BlockRuntimeIDToClient(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
 				int(pos.X()),
 				int(pos.Y()),
 				int(pos.Z()),

@@ -77,7 +77,7 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", pk.NewBlockRuntimeID, "pos", pos)
 		return
 	}
-	c.AddPendingUpdate(pos, c.mPlayer.BlockRuntimeIDFromNetwork(pk.NewBlockRuntimeID))
+	c.AddPendingUpdate(pos, c.mPlayer.BlockRuntimeIDFromBackend(pk.NewBlockRuntimeID))
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -86,10 +86,10 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
 	for _, entry := range pk.Blocks {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.BlockRuntimeIDFromNetwork(entry.BlockRuntimeID))
+		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.BlockRuntimeIDFromBackend(entry.BlockRuntimeID))
 	}
 	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.BlockRuntimeIDFromNetwork(entry.BlockRuntimeID))
+		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.BlockRuntimeIDFromBackend(entry.BlockRuntimeID))
 	}
 }
 

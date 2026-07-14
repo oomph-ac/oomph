@@ -124,7 +124,7 @@ func TestClientBlockHashModeSurvivesBackendTransfer(t *testing.T) {
 		t.Fatal("different endpoint modes do not require translation")
 	}
 
-	if got := p.BlockRuntimeIDToNetwork(stoneRID); got != stoneHash {
+	if got := p.BlockRuntimeIDToClient(stoneRID); got != stoneHash {
 		t.Fatalf("client block ID after transfer = %d, want initial hash %d", got, stoneHash)
 	}
 }
@@ -216,6 +216,26 @@ func TestUpdateBlockSyncedIsTranslatedToRetainedClientMode(t *testing.T) {
 
 	if got := pk.(*packet.UpdateBlockSynced).NewBlockRuntimeID; got != stoneRID {
 		t.Fatalf("forwarded block ID = %d, want client runtime ID %d", got, stoneRID)
+	}
+}
+
+func TestUnknownUpdateBlockSyncedDoesNotMarkPacketModified(t *testing.T) {
+	oomphworld.FinalizeBlockRegistry()
+	p := player.New(slog.New(slog.NewTextHandler(io.Discard, nil)), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	Register(p)
+	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: false}})
+	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: true}})
+	const unknownHash = uint32(1_000_000_000)
+	pk := packet.Packet(&packet.UpdateBlockSynced{NewBlockRuntimeID: unknownHash})
+	ctx := playercontext.NewHandlePacketContext(&pk)
+
+	p.HandleServerPacket(ctx)
+
+	if ctx.Modified() {
+		t.Fatal("unknown preserved block ID marked packet modified")
+	}
+	if got := pk.(*packet.UpdateBlockSynced).NewBlockRuntimeID; got != unknownHash {
+		t.Fatalf("unknown block ID = %d, want preserved value %d", got, unknownHash)
 	}
 }
 
