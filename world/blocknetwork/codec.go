@@ -26,7 +26,8 @@ func (c Codec) ToRuntimeID(networkID uint32) (uint32, bool) {
 	if c.mode == Hashes {
 		return c.registry.HashToRuntimeID(networkID)
 	}
-	return networkID, networkID < uint32(c.registry.BlockCount())
+	_, _, ok := c.registry.RuntimeIDToState(networkID)
+	return networkID, ok
 }
 
 // FromRuntimeID converts a canonical block-registry runtime ID to the codec's network representation.
@@ -34,7 +35,8 @@ func (c Codec) FromRuntimeID(runtimeID uint32) (uint32, bool) {
 	if c.mode == Hashes {
 		return c.registry.RuntimeIDToHash(runtimeID)
 	}
-	return runtimeID, runtimeID < uint32(c.registry.BlockCount())
+	_, _, ok := c.registry.RuntimeIDToState(runtimeID)
+	return runtimeID, ok
 }
 
 // Translator converts block IDs from one endpoint codec to another.

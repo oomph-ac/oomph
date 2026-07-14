@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/df-mc/dragonfly/server/block"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/oomph-ac/oomph/world/blocknetwork"
 )
@@ -77,6 +78,21 @@ func TestCodecRejectsUnknownIDs(t *testing.T) {
 	}
 	if _, ok := hashCodec.FromRuntimeID(unknownRuntimeID); ok {
 		t.Fatalf("hash codec encoded unknown runtime ID %d", unknownRuntimeID)
+	}
+}
+
+func TestRuntimeCodecUsesRegistryLookupInsteadOfAssumingDenseIDs(t *testing.T) {
+	t.Parallel()
+
+	runtimeID := world.BlockRegistry.BlockRuntimeID(block.Stone{})
+	registry := sparseBlockRegistry{BlockRegistry: world.BlockRegistry, missing: runtimeID}
+	codec := blocknetwork.NewCodec(registry, blocknetwork.RuntimeIDs)
+
+	if _, ok := codec.ToRuntimeID(runtimeID); ok {
+		t.Fatalf("runtime codec accepted missing runtime ID %d", runtimeID)
+	}
+	if _, ok := codec.FromRuntimeID(runtimeID); ok {
+		t.Fatalf("runtime codec encoded missing runtime ID %d", runtimeID)
 	}
 }
 
@@ -170,4 +186,16 @@ func highBitNetworkHash(t *testing.T) (uint32, uint32) {
 	}
 	t.Fatal("block registry contains no high-bit network hash")
 	return 0, 0
+}
+
+type sparseBlockRegistry struct {
+	chunk.BlockRegistry
+	missing uint32
+}
+
+func (r sparseBlockRegistry) RuntimeIDToState(runtimeID uint32) (string, map[string]any, bool) {
+	if runtimeID == r.missing {
+		return "", nil, false
+	}
+	return r.BlockRegistry.RuntimeIDToState(runtimeID)
 }
