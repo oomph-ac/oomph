@@ -19,9 +19,10 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 		}
 	}
 	if it.BlockRuntimeID != 0 {
-		b, _ := p.World().BlockRegistry().BlockByRuntimeID(p.DecodeBlockRuntimeID(uint32(it.BlockRuntimeID)))
-		if t, ok = b.(world.Item); !ok {
-			t = block.Air{}
+		if b, found := p.World().BlockRegistry().BlockByRuntimeID(p.DecodeBlockRuntimeID(uint32(it.BlockRuntimeID))); found {
+			if t, ok = b.(world.Item); !ok {
+				t = block.Air{}
+			}
 		}
 	}
 	if nbter, ok := t.(world.NBTer); ok && len(it.NBTData) != 0 {
