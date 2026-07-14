@@ -182,24 +182,6 @@ func TestCodecEncodesChunkWithoutMutatingCanonicalSource(t *testing.T) {
 	}
 }
 
-func TestCodecEncodesSubChunkForMode(t *testing.T) {
-	c := chunk.New(world.BlockRegistry, dfworld.Overworld.Range())
-	c.SetBlock(1, 0, 1, 0, world.BlockRegistry.BlockRuntimeID(block.Stone{}))
-	for _, mode := range []blocknetwork.Mode{blocknetwork.RuntimeIDs, blocknetwork.Hashes} {
-		codec := blocknetwork.NewCodec(world.BlockRegistry, mode)
-		got := codec.EncodeSubChunk(c, 0)
-		var want []byte
-		if mode == blocknetwork.Hashes {
-			want = chunk.EncodeSubChunkWithBlockNetworkHashes(c, 0)
-		} else {
-			want = chunk.EncodeSubChunk(c, chunk.NetworkEncoding, 0)
-		}
-		if !bytes.Equal(got, want) {
-			t.Fatalf("EncodeSubChunk mode %v did not use expected network representation", mode)
-		}
-	}
-}
-
 func TestTranslatorConvertsBetweenModes(t *testing.T) {
 	t.Parallel()
 

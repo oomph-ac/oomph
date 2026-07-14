@@ -69,17 +69,6 @@ func (c Codec) EncodeChunk(ch *chunk.Chunk) chunk.SerialisedData {
 	return chunk.Encode(ch, chunk.NetworkEncoding)
 }
 
-// EncodeSubChunk encodes one canonical sub-chunk using the codec's network representation without mutating ch.
-func (c Codec) EncodeSubChunk(ch *chunk.Chunk, index int) []byte {
-	if ch == nil || index < 0 || index >= len(ch.Sub()) {
-		return nil
-	}
-	if c.mode == Hashes {
-		return chunk.EncodeSubChunkWithBlockNetworkHashes(ch, index)
-	}
-	return chunk.EncodeSubChunk(ch, chunk.NetworkEncoding, index)
-}
-
 // Translator converts block IDs from one endpoint codec to another.
 type Translator struct {
 	source Codec
