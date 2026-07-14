@@ -114,12 +114,13 @@ type AuthoritativeMovementComponent struct {
 
 	sneaking, pressingSneak bool
 	swimming                bool
+	swimAmount              float32
 	autoJumpingInWater      bool
 	wantDown                bool
 	wantDownSlow            bool
 
-	jumping, pressingJump bool
-	jumpDelay             uint64
+	jumping, pressingJump, effectiveJumping bool
+	jumpDelay                               uint64
 
 	collideX, collideY, collideZ bool
 	onGround                     bool
@@ -338,6 +339,11 @@ func (mc *AuthoritativeMovementComponent) PressingJump() bool {
 	return mc.pressingJump
 }
 
+// EffectiveJumping returns the jumping state produced by continuous jump, automatic liquid jump, or block ascent input.
+func (mc *AuthoritativeMovementComponent) EffectiveJumping() bool {
+	return mc.effectiveJumping
+}
+
 // JumpDelay returns the number of ticks until the movement component can make another jump.
 func (mc *AuthoritativeMovementComponent) JumpDelay() uint64 {
 	return mc.jumpDelay
@@ -371,6 +377,11 @@ func (mc *AuthoritativeMovementComponent) Swimming() bool {
 // SetSwimming sets whether the movement component is using the swimming movement pose.
 func (mc *AuthoritativeMovementComponent) SetSwimming(swimming bool) {
 	mc.swimming = swimming
+}
+
+// SwimAmount returns the client swim-pose interpolation amount.
+func (mc *AuthoritativeMovementComponent) SwimAmount() float32 {
+	return mc.swimAmount
 }
 
 // AutoJumpingInWater returns whether the client is automatically swimming upward.
@@ -870,6 +881,11 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.swimming = true
 		mc.sneaking = false
 	}
+	if mc.swimming {
+		mc.swimAmount = game.ClampFloat(mc.swimAmount+0.1, 0, 1)
+	} else {
+		mc.swimAmount = game.ClampFloat(mc.swimAmount-0.1, 0, 1)
+	}
 	mc.autoJumpingInWater = pk.InputData.Load(packet.InputFlagAutoJumpingInWater)
 	mc.wantDown = pk.InputData.Load(packet.InputFlagWantDown)
 	mc.wantDownSlow = pk.InputData.Load(packet.InputFlagWantDownSlow)
@@ -881,18 +897,12 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		pk.MoveVector,
 	)
 
-	maxImpulse := float32(1.0)
-	/* if pk.MoveVector[0] != 0 && pk.MoveVector[1] != 0 {
-		maxImpulse = game.MaxNormalizedImpulse
-	} */
-	if mc.mPlayer.StartUseConsumableTick != 0 {
-		maxImpulse *= game.MaxConsumingImpulse
-	}
-	pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -maxImpulse, maxImpulse)
-	pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -maxImpulse, maxImpulse)
+	pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -1, 1)
+	pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -1, 1)
 
 	mc.jumping = pk.InputData.Load(packet.InputFlagStartJumping)
 	mc.pressingJump = pk.InputData.Load(packet.InputFlagJumping)
+	mc.effectiveJumping = mc.pressingJump || mc.autoJumpingInWater || pk.InputData.Load(packet.InputFlagAscendBlock)
 	mc.jumpHeight = game.DefaultJumpHeight
 	if jumpBoost, ok := mc.mPlayer.Effects().Get(packet.EffectJumpBoost); ok {
 		mc.jumpHeight += float32(jumpBoost.Amplifier) * 0.1
@@ -921,11 +931,13 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.mPlayer.Dbg.Notify(
 		player.DebugModeMovementSim,
 		true,
-		"input swimming=%t sneaking=%t jumping=%t pressingJump=%t autoJumpingInWater=%t wantDown=%t wantDownSlow=%t jumpCurrentRaw=%t",
+		"input swimming=%t swimAmount=%.1f sneaking=%t jumping=%t pressingJump=%t effectiveJumping=%t autoJumpingInWater=%t wantDown=%t wantDownSlow=%t jumpCurrentRaw=%t",
 		mc.swimming,
+		mc.swimAmount,
 		mc.sneaking,
 		mc.jumping,
 		mc.pressingJump,
+		mc.effectiveJumping,
 		mc.autoJumpingInWater,
 		mc.wantDown,
 		mc.wantDownSlow,
@@ -1209,12 +1221,14 @@ func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
 	mc.sneaking = false
 	mc.pressingSneak = false
 	mc.swimming = false
+	mc.swimAmount = 0
 	mc.autoJumpingInWater = false
 	mc.wantDown = false
 	mc.wantDownSlow = false
 
 	mc.jumping = false
 	mc.pressingJump = false
+	mc.effectiveJumping = false
 	mc.jumpDelay = 0
 
 	mc.collideX = false

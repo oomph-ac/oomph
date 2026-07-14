@@ -138,7 +138,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		if newVel[1] < negClimbSpeed {
 			newVel[1] = negClimbSpeed
 		}
-		if movement.PressingJump() || movement.XCollision() || movement.ZCollision() {
+		if movement.EffectiveJumping() || movement.XCollision() || movement.ZCollision() {
 			newVel[1] = game.ClimbSpeed
 		}
 		if movement.Sneaking() && newVel[1] < 0 {
@@ -312,6 +312,7 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, liquid world.Liquid) {
 	initialY := movement.Pos().Y()
 	_, water := liquid.(block.Water)
+	jumping := movement.EffectiveJumping()
 	if water {
 		if movement.WantDown() || movement.WantDownSlow() {
 			vel := movement.Vel()
@@ -321,15 +322,13 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 		updateSwimTravel(p, movement)
 	}
 
-	if movement.PressingJump() {
+	if jumping {
 		newVel := movement.Vel()
 		below := liquidMovementBlock(p, df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.1}))))
-		if movement.Swimming() {
-			if _, air := below.(block.Air); air {
-				newVel[1] = 0
-			} else {
-				newVel[1] += 0.04
-			}
+		_, belowAir := below.(block.Air)
+		legacyTransition := p.VersionInRange(-1, player.GameVersion1_21_120) && movement.SwimAmount() > 0 && movement.SwimAmount() < 1
+		if movement.Swimming() && belowAir || legacyTransition {
+			newVel[1] = 0
 		} else {
 			newVel[1] += 0.04
 		}
@@ -388,10 +387,13 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 		}
 		vel[1] -= gravity
 	}
-	if water && (movement.XCollision() || movement.ZCollision()) {
+	if movement.XCollision() || movement.ZCollision() {
 		raised := mgl32.Vec3{vel.X(), vel.Y() + 0.6 + initialY - movement.Pos().Y(), vel.Z()}
 		raisedBox := movement.BoundingBox().Translate(raised)
-		if !utils.HasNearbyBBoxes(raisedBox, p.World()) {
+		hasCollision := utils.HasNearbyBBoxes(raisedBox, p.World())
+		hasLiquid := containsAnyLiquid(p, raisedBox)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "liquid exit probe collision=%t liquid=%t box=%v", hasCollision, hasLiquid, raisedBox)
+		if !hasCollision && !hasLiquid {
 			vel[1] = 0.3
 		}
 	}
@@ -401,7 +403,7 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 }
 
 func updateSwimTravel(p *player.Player, movement player.MovementComponent) {
-	if !movement.Swimming() || movement.PressingJump() {
+	if !movement.Swimming() || movement.EffectiveJumping() {
 		return
 	}
 	pitch := movement.Rotation().X() * math32.Pi / 180
@@ -414,10 +416,13 @@ func updateSwimTravel(p *player.Player, movement player.MovementComponent) {
 	if targetY > 0 && !movement.WantDownSlow() {
 		belowPos := df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.1})))
 		if _, belowAir := liquidMovementBlock(p, belowPos).(block.Air); belowAir {
-			vel := movement.Vel()
-			vel[1] = 0
-			movement.SetVel(vel)
-			return
+			liquidPos := df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.2})))
+			if _, liquid := liquidAt(p, liquidPos); !liquid {
+				vel := movement.Vel()
+				vel[1] = 0
+				movement.SetVel(vel)
+				return
+			}
 		}
 	}
 	vel := movement.Vel()
@@ -481,6 +486,23 @@ func liquidAt(p *player.Player, pos df_cube.Pos) (world.Liquid, bool) {
 	return liquid, ok
 }
 
+// containsAnyLiquid returns whether the box covers a block containing liquid.
+func containsAnyLiquid(p *player.Player, box cube.BBox) bool {
+	min, max := box.Min(), box.Max()
+	minX, minY, minZ := int(math.Floor(float64(min.X()))), int(math.Floor(float64(min.Y()))), int(math.Floor(float64(min.Z())))
+	maxX, maxY, maxZ := int(math.Ceil(float64(max.X()))), int(math.Ceil(float64(max.Y()))), int(math.Ceil(float64(max.Z())))
+	for x := minX; x < maxX; x++ {
+		for z := minZ; z < maxZ; z++ {
+			for y := minY; y < maxY; y++ {
+				if _, ok := liquidAt(p, df_cube.Pos{x, y, z}); ok {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func applyLiquidFlow(p *player.Player, movement player.MovementComponent, positions []df_cube.Pos) {
 	flow := mgl32.Vec3{}
 	for _, pos := range positions {
@@ -491,7 +513,6 @@ func applyLiquidFlow(p *player.Player, movement player.MovementComponent, positi
 		}
 		flow = flow.Add(liquidFlow(p, pos, water))
 	}
-	flow[1] = 0
 	if length := flow.Len(); length >= 1e-4 {
 		vel := movement.Vel().Add(flow.Mul(0.014 / length))
 		movement.SetVel(vel)

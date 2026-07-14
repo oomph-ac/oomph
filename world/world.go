@@ -110,8 +110,6 @@ func (w *World) BlockLayer(pos df_cube.Pos, layer uint8) world.Block {
 		if b, ok := blockUpdates[df_cube.Pos(blockPos)]; ok {
 			return b
 		}
-	} else {
-		updates[chunkPos] = make(map[df_cube.Pos]world.Block)
 	}
 
 	c := w.Chunk(chunkPos)

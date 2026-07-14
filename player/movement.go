@@ -84,6 +84,8 @@ type MovementComponent interface {
 	Jumping() bool
 	// PressingJump returns true if the movement component is holding down the key bound to the jump action.
 	PressingJump() bool
+	// EffectiveJumping returns the jumping state produced by continuous jump, automatic liquid jump, or block ascent input.
+	EffectiveJumping() bool
 	// JumpDelay returns the number of ticks until the movement component can make another jump.
 	JumpDelay() uint64
 	// SetJumpDelay sets the number of ticks until the movement component can make another jump.
@@ -100,6 +102,8 @@ type MovementComponent interface {
 	Swimming() bool
 	// SetSwimming sets whether the movement component is using the swimming movement pose.
 	SetSwimming(swimming bool)
+	// SwimAmount returns the client swim-pose interpolation amount.
+	SwimAmount() float32
 	// AutoJumpingInWater returns whether the client is automatically swimming upward.
 	AutoJumpingInWater() bool
 	// WantDown returns whether the client requested downward movement.
