@@ -914,6 +914,17 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	}
 
 	mc.impulse = pk.MoveVector.Mul(0.98)
+	mc.mPlayer.Dbg.Notify(
+		player.DebugModeMovementSim,
+		true,
+		"input swimming=%t jumping=%t pressingJump=%t autoJumpingInWater=%t wantDownSlow=%t jumpCurrentRaw=%t",
+		mc.swimming,
+		mc.jumping,
+		mc.pressingJump,
+		mc.autoJumpingInWater,
+		mc.wantDownSlow,
+		pk.InputData.Load(packet.InputFlagJumpCurrentRaw),
+	)
 	simulation.SimulatePlayerMovement(mc.mPlayer, mc)
 
 	// On older versions, there seems to be a delay before the sprinting status is actually applied.
