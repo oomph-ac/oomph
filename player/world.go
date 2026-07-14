@@ -461,22 +461,21 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		return 1
 	}
 
-	breakTime := float32(block.BreakDuration(b, held).Milliseconds())
+	breakContext := block.BreakContext{}
+	if effect, ok := p.effects.Get(packet.EffectHaste); ok {
+		breakContext.HasteLevel = int(effect.Amplifier)
+	}
+	if effect, ok := p.effects.Get(packet.EffectConduitPower); ok {
+		breakContext.ConduitPowerLevel = int(effect.Amplifier)
+	}
+	if effect, ok := p.effects.Get(packet.EffectMiningFatigue); ok {
+		breakContext.MiningFatigueLevel = int(effect.Amplifier)
+	}
+	breakTime := float32(block.BreakDuration(b, held, breakContext).Milliseconds())
 	// On versions below 1.21.50, the block break time for wool is shorter by ~25% See https://github.com/oomph-ac/oomph/issues/107
 	if _, isWool := b.(block.Wool); isWool && p.Version < GameVersion1_21_50 {
 		breakTime *= 0.75
 	}
 
-	/* if !p.movement.OnGround() {
-		breakTime *= 5
-	} */
-	for effectID, e := range p.effects.All() {
-		switch effectID {
-		case packet.EffectHaste:
-			breakTime *= float32(1 - (0.2 * float64(e.Amplifier)))
-		case packet.EffectMiningFatigue:
-			breakTime *= float32(1 + (0.3 * float64(e.Amplifier)))
-		}
-	}
 	return float32(breakTime / 50)
 }
