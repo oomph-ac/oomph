@@ -7,6 +7,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
+	"github.com/df-mc/dragonfly/server/item/enchantment"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -59,6 +60,26 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	// Reset the velocity to zero if it's significantly small.
 	if movement.Vel().LenSqr() < 1e-12 {
 		movement.SetVel(mgl32.Vec3{})
+	}
+
+	waterBlocks := touchingLiquidBlocks[block.Water](p, movement)
+	lavaBlocks := touchingLiquidBlocks[block.Lava](p, movement)
+	if movement.Swimming() && len(waterBlocks) == 0 {
+		movement.SetSwimming(false)
+	}
+	if !movement.Flying() && (len(waterBlocks) != 0 || len(lavaBlocks) != 0) {
+		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied in liquid: %v", movement.Vel())
+		if len(waterBlocks) != 0 {
+			applyLiquidFlow(p, movement, waterBlocks)
+			simulateLiquidTravel(p, movement, block.Water{})
+		} else {
+			simulateLiquidTravel(p, movement, block.Lava{})
+		}
+		if movement.Gliding() && movement.OnGround() {
+			movement.SetGliding(false)
+			movement.SetGlideBoost(0)
+		}
+		return
 	}
 
 	blockUnder := p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 0.5}))))
@@ -268,12 +289,6 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 
 	stateBB := movement.BoundingBox()
 	for result := range utils.NearbyBlocks(stateBB.Grow(1), false, true, p.World()) {
-		if _, isLiquid := result.Block.(world.Liquid); isLiquid {
-			blockBB := cube.Box(0, 0, 0, 1, 1, 1).Translate(result.Position.Vec3())
-			if stateBB.IntersectsWith(blockBB) {
-				return false
-			}
-		}
 		if utils.BlockName(result.Block) == "minecraft:bamboo" {
 			return false
 		}
@@ -281,6 +296,244 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 
 	return (p.GameMode == packet.GameTypeSurvival || p.GameMode == packet.GameTypeAdventure) &&
 		!(movement.Flying() || movement.JustDisabledFlight() || movement.NoClip() || !p.Alive)
+}
+
+func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, liquid world.Liquid) {
+	initialY := movement.Pos().Y()
+	_, water := liquid.(block.Water)
+	if water {
+		updateSwimTravel(p, movement)
+	}
+
+	if movement.PressingJump() {
+		newVel := movement.Vel()
+		below := p.World().Block(df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 1.1}))))
+		if movement.Swimming() {
+			if _, air := below.(block.Air); air {
+				newVel[1] = 0
+			} else {
+				newVel[1] += 0.04
+			}
+		} else {
+			newVel[1] += 0.04
+		}
+		movement.SetVel(newVel)
+	}
+
+	moveRelativeSpeed := movement.LavaMovementSpeed()
+	depthStriderLevel := float32(0)
+	if water {
+		moveRelativeSpeed = movement.UnderwaterMovementSpeed()
+		if enchant, ok := p.Inventory().Boots().Enchantment(enchantment.DepthStrider); ok {
+			depthStriderLevel = math32.Min(float32(enchant.Level()), float32(enchantment.DepthStrider.MaxLevel()))
+			if !movement.OnGround() {
+				depthStriderLevel *= 0.5
+			}
+		}
+		depthStriderFraction := depthStriderLevel / float32(enchantment.DepthStrider.MaxLevel())
+		if multiplier := movement.SwimSpeedMultiplier(); multiplier > 1 {
+			moveRelativeSpeed *= (0.7 + depthStriderFraction*0.3) * multiplier
+		} else {
+			moveRelativeSpeed += (movement.MovementSpeed() - moveRelativeSpeed) * depthStriderFraction
+		}
+	}
+	moveRelative(movement, moveRelativeSpeed)
+	oldVel := movement.Vel()
+	oldOnGround := movement.OnGround()
+	tryCollisions(p, p.World(), p.Dbg, p.VersionInRange(-1, player.GameVersion1_20_60), false)
+	setPostCollisionMotion(p, oldVel, oldOnGround, block.Air{})
+	movement.SetMov(movement.Vel())
+
+	if movement.XCollision() || movement.ZCollision() {
+		vel := movement.Vel()
+		raised := mgl32.Vec3{vel.X(), vel.Y() + 0.6 + initialY - movement.Pos().Y(), vel.Z()}
+		if !utils.HasNearbyBBoxes(movement.BoundingBox().Translate(raised), p.World()) {
+			vel[1] = 0.3
+			movement.SetVel(vel)
+		}
+	}
+
+	vel := movement.Vel()
+	if water {
+		drag := float32(0.8)
+		if movement.Sprinting() {
+			drag = 0.9
+		}
+		if depthStriderLevel > 0 && movement.SwimSpeedMultiplier() <= 1 {
+			drag += (0.54600006 - drag) * (depthStriderLevel / float32(enchantment.DepthStrider.MaxLevel()))
+		}
+		vel[0] *= drag
+		vel[1] *= 0.8
+		vel[2] *= drag
+	} else {
+		vel = vel.Mul(0.5)
+	}
+	if levitation, ok := p.Effects().Get(packet.EffectLevitation); ok {
+		target := game.LevitationGravityMultiplier * float32(levitation.Amplifier+1)
+		vel[1] += (target - vel[1]) * 0.2
+	} else if movement.HasGravity() {
+		vel[1] -= 0.02
+	}
+	movement.SetVel(vel)
+	movement.SetFallDistance(0)
+	p.Dbg.Notify(player.DebugModeMovementSim, true, "endOfLiquidFrame type=%T vel=%v pos=%v", liquid, vel, movement.Pos())
+}
+
+func updateSwimTravel(p *player.Player, movement player.MovementComponent) {
+	if !movement.Swimming() || movement.PressingJump() {
+		return
+	}
+	pitch := movement.Rotation().X() * math32.Pi / 180
+	targetY := -game.MCSin(pitch)
+	rate := float32(0.06)
+	if targetY < -0.2 {
+		rate = 0.085
+	}
+
+	if targetY > 0 && !movement.WantDownSlow() {
+		belowPos := df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 1.1})))
+		_, belowAir := p.World().Block(belowPos).(block.Air)
+		_, liquidBelow := liquidAt(p, df_cube.Pos(cube.PosFromVec3(movement.Pos().Sub(mgl32.Vec3{0, 1.2}))))
+		if belowAir && !liquidBelow {
+			vel := movement.Vel()
+			vel[1] = 0
+			movement.SetVel(vel)
+			return
+		}
+	}
+	vel := movement.Vel()
+	vel[1] += (targetY - vel[1]) * rate
+	movement.SetVel(vel)
+}
+
+func touchingLiquidBlocks[T world.Liquid](p *player.Player, movement player.MovementComponent) []df_cube.Pos {
+	box := movement.BoundingBox().GrowVec3(mgl32.Vec3{1e-4, 0, 1e-4})
+	offset := mgl32.Vec3{0.001, 0.401, 0.001}
+	var target T
+	if _, lava := any(target).(block.Lava); lava {
+		offset = mgl32.Vec3{0.1, 0.4, 0.1}
+	}
+	box = shrinkBox(box, offset)
+
+	min, max := box.Min(), box.Max()
+	minX, minY, minZ := int(math.Floor(float64(min.X()))), int(math.Floor(float64(min.Y()))), int(math.Floor(float64(min.Z())))
+	maxX, maxY, maxZ := int(math.Floor(float64(max.X()+1))), int(math.Floor(float64(max.Y()+1))), int(math.Floor(float64(max.Z()+1)))
+	positions := make([]df_cube.Pos, 0, 4)
+	for x := minX; x < maxX; x++ {
+		for y := minY; y < maxY; y++ {
+			for z := minZ; z < maxZ; z++ {
+				pos := df_cube.Pos{x, y, z}
+				if liquid, ok := liquidAt(p, pos); ok {
+					if _, matches := liquid.(T); matches {
+						positions = append(positions, pos)
+					}
+				}
+			}
+		}
+	}
+	return positions
+}
+
+func shrinkBox(box cube.BBox, offset mgl32.Vec3) cube.BBox {
+	min, max := box.Min().Add(offset), box.Max().Sub(offset)
+	originalMin, originalMax := box.Min(), box.Max()
+	for axis := 0; axis < 3; axis++ {
+		if min[axis] > max[axis] {
+			mid := (originalMin[axis] + originalMax[axis]) * 0.5
+			min[axis], max[axis] = mid, mid
+		}
+	}
+	return cube.Box(min.X(), min.Y(), min.Z(), max.X(), max.Y(), max.Z())
+}
+
+func liquidAt(p *player.Player, pos df_cube.Pos) (world.Liquid, bool) {
+	if liquid, ok := p.World().BlockLayer(pos, 1).(world.Liquid); ok {
+		return liquid, true
+	}
+	liquid, ok := p.World().Block(pos).(world.Liquid)
+	return liquid, ok
+}
+
+func applyLiquidFlow(p *player.Player, movement player.MovementComponent, positions []df_cube.Pos) {
+	flow := mgl32.Vec3{}
+	for _, pos := range positions {
+		liquid, ok := liquidAt(p, pos)
+		water, waterOK := liquid.(block.Water)
+		if !ok || !waterOK {
+			continue
+		}
+		flow = flow.Add(liquidFlow(p, pos, water))
+	}
+	if length := flow.Len(); length >= 1e-4 {
+		vel := movement.Vel().Add(flow.Mul(0.014 / length))
+		movement.SetVel(vel)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "water flow applied flow=%v vel=%v", flow, vel)
+	}
+}
+
+func liquidFlow(p *player.Player, pos df_cube.Pos, water block.Water) mgl32.Vec3 {
+	currentDecay := liquidDecay(water)
+	flow := mgl32.Vec3{}
+	faces := []struct {
+		delta df_cube.Pos
+		vec   mgl32.Vec3
+	}{
+		{df_cube.Pos{-1, 0, 0}, mgl32.Vec3{-1, 0, 0}},
+		{df_cube.Pos{1, 0, 0}, mgl32.Vec3{1, 0, 0}},
+		{df_cube.Pos{0, 0, -1}, mgl32.Vec3{0, 0, -1}},
+		{df_cube.Pos{0, 0, 1}, mgl32.Vec3{0, 0, 1}},
+	}
+	for _, face := range faces {
+		neighbourPos := df_cube.Pos{pos[0] + face.delta[0], pos[1], pos[2] + face.delta[2]}
+		if neighbour, ok := liquidAt(p, neighbourPos); ok {
+			neighbourWater, same := neighbour.(block.Water)
+			if same {
+				if !liquidFlowSideClosed(p, pos, neighbourPos) && !liquidFlowSideClosed(p, neighbourPos, pos) {
+					flow = flow.Add(face.vec.Mul(float32(liquidDecay(neighbourWater) - currentDecay)))
+				}
+				continue
+			}
+		}
+		if len(utils.BlockCollisions(p.World().Block(neighbourPos), cube.Pos(neighbourPos), p.World())) != 0 {
+			continue
+		}
+		below := df_cube.Pos{neighbourPos[0], neighbourPos[1] - 1, neighbourPos[2]}
+		if lower, ok := liquidAt(p, below); ok {
+			if lowerWater, same := lower.(block.Water); same {
+				flow = flow.Add(face.vec.Mul(float32(liquidDecay(lowerWater) - currentDecay + 8)))
+			}
+		}
+	}
+	if water.LiquidFalling() {
+		for _, face := range faces {
+			neighbourPos := df_cube.Pos{pos[0] + face.delta[0], pos[1], pos[2] + face.delta[2]}
+			aboveNeighbour := df_cube.Pos{neighbourPos[0], neighbourPos[1] + 1, neighbourPos[2]}
+			if len(utils.BlockCollisions(p.World().Block(neighbourPos), cube.Pos(neighbourPos), p.World())) != 0 ||
+				len(utils.BlockCollisions(p.World().Block(aboveNeighbour), cube.Pos(aboveNeighbour), p.World())) != 0 {
+				if length := flow.Len(); length > 1e-4 {
+					flow = flow.Mul(1 / length)
+				}
+				flow[1] -= 6
+				break
+			}
+		}
+	}
+	if length := flow.Len(); length > 1e-4 {
+		return flow.Mul(1 / length)
+	}
+	return mgl32.Vec3{}
+}
+
+func liquidFlowSideClosed(p *player.Player, pos, side df_cube.Pos) bool {
+	stairs, ok := p.World().Block(pos).(block.Stairs)
+	return ok && stairs.Model().FaceSolid(pos, pos.Face(side), p.World())
+}
+
+func liquidDecay(liquid world.Liquid) int {
+	if liquid.LiquidFalling() {
+		return 0
+	}
+	return 8 - liquid.LiquidDepth()
 }
 
 func landOnBlock(movement player.MovementComponent, old mgl32.Vec3, blockUnder world.Block) {

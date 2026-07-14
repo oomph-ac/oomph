@@ -124,6 +124,10 @@ func (ack *UpdateAttributes) Run() {
 		case "minecraft:movement":
 			ack.mPlayer.Movement().SetMovementSpeed(attribute.Value)
 			ack.mPlayer.Movement().SetDefaultMovementSpeed(attribute.Default)
+		case "minecraft:underwater_movement":
+			ack.mPlayer.Movement().SetUnderwaterMovementSpeed(attribute.Value)
+		case "minecraft:lava_movement":
+			ack.mPlayer.Movement().SetLavaMovementSpeed(attribute.Value)
 		case "minecraft:health":
 			ack.mPlayer.Alive = attribute.Value > 0
 		case "minecraft:player.hunger":
@@ -165,6 +169,7 @@ func (ack *PlayerUpdateActorData) Run() {
 		ack.mPlayer.Movement().SetImmobile(utils.HasDataFlag(entity.DataFlagImmobile, flags))
 		ack.mPlayer.Movement().SetServerSprint(utils.HasDataFlag(entity.DataFlagSprinting, flags))
 		ack.mPlayer.Movement().SetHasGravity(utils.HasDataFlag(entity.DataFlagAffectedByGravity, flags))
+		ack.mPlayer.Movement().SetSwimming(utils.HasDataFlag(entity.DataFlagSwimming, flags))
 
 		if !utils.HasDataFlag(entity.DataFlagAction, flags) && ack.mPlayer.StartUseConsumableTick != 0 {
 			ack.mPlayer.StartUseConsumableTick = 0

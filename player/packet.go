@@ -432,6 +432,10 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		pk.Tick = 0
 		ctx.SetModified()
 		p.Movement().ServerUpdate(pk)
+	case *packet.MovementEffect:
+		if pk.EntityRuntimeID == p.RuntimeId {
+			p.Movement().ServerUpdate(pk)
+		}
 	case *packet.MoveActorAbsolute:
 		if pk.EntityRuntimeID != p.RuntimeId {
 			p.entTracker.HandleMoveActorAbsolute(pk)

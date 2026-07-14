@@ -10,6 +10,7 @@ import (
 type UpdateBlockBatch struct {
 	mPlayer *player.Player
 	updates map[df_cube.Pos]uint32
+	layer   uint8
 
 	expiresIn int64
 	valid     bool
@@ -17,6 +18,11 @@ type UpdateBlockBatch struct {
 
 func NewUpdateBlockBatchACK(p *player.Player) *UpdateBlockBatch {
 	return &UpdateBlockBatch{mPlayer: p, updates: make(map[df_cube.Pos]uint32), valid: true}
+}
+
+// NewLayerUpdateBlockBatchACK creates a block update batch for a non-primary Bedrock storage layer.
+func NewLayerUpdateBlockBatchACK(p *player.Player, layer uint8) *UpdateBlockBatch {
+	return &UpdateBlockBatch{mPlayer: p, updates: make(map[df_cube.Pos]uint32), layer: layer, valid: true}
 }
 
 func (ack *UpdateBlockBatch) Blocks() map[df_cube.Pos]uint32 {
@@ -50,8 +56,10 @@ func (ack *UpdateBlockBatch) Run() {
 			ack.mPlayer.Log().Warn("unable to find block with runtime ID", "blockRuntimeID", bRuntimeID)
 			b = block.Air{}
 		}
-		ack.mPlayer.World().SetBlock(pos, b, nil)
-		ack.mPlayer.WorldUpdater().RemovePendingUpdate(pos, bRuntimeID)
+		ack.mPlayer.World().SetBlockLayer(pos, b, ack.layer)
+		if ack.layer == 0 {
+			ack.mPlayer.WorldUpdater().RemovePendingUpdate(pos, bRuntimeID)
+		}
 	}
 	ack.updates = nil
 }

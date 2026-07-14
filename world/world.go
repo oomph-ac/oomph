@@ -27,8 +27,9 @@ type World struct {
 	chunks    map[protocol.ChunkPos]ChunkInfo
 	subChunks map[protocol.ChunkPos][]xxh3.Uint128
 
-	exemptedChunks map[protocol.ChunkPos]struct{}
-	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
+	exemptedChunks    map[protocol.ChunkPos]struct{}
+	blockUpdates      map[protocol.ChunkPos]map[df_cube.Pos]world.Block
+	extraBlockUpdates map[protocol.ChunkPos]map[df_cube.Pos]world.Block
 
 	debugFn func(string, ...any)
 
@@ -40,8 +41,9 @@ func New(debugFn func(string, ...any)) *World {
 		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
 		subChunks: make(map[protocol.ChunkPos][]xxh3.Uint128),
 
-		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
-		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
+		exemptedChunks:    make(map[protocol.ChunkPos]struct{}),
+		blockUpdates:      make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
+		extraBlockUpdates: make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
 
 		debugFn: debugFn,
 	}
@@ -85,19 +87,31 @@ func (w *World) Chunk(pos protocol.ChunkPos) *chunk.Chunk {
 
 // Block returns the block at the position passed.
 func (w *World) Block(pos df_cube.Pos) world.Block {
+	return w.BlockLayer(pos, 0)
+}
+
+// BlockLayer returns the block at the position and storage layer passed.
+func (w *World) BlockLayer(pos df_cube.Pos, layer uint8) world.Block {
+	if layer > 1 {
+		return block.Air{}
+	}
 	blockPos := cube.Pos(pos)
 	if blockPos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
 
 	chunkPos := protocol.ChunkPos{int32(blockPos[0]) >> 4, int32(blockPos[2]) >> 4}
-	blockUpdates, found := w.blockUpdates[chunkPos]
+	updates := w.blockUpdates
+	if layer == 1 {
+		updates = w.extraBlockUpdates
+	}
+	blockUpdates, found := updates[chunkPos]
 	if found {
 		if b, ok := blockUpdates[df_cube.Pos(blockPos)]; ok {
 			return b
 		}
 	} else {
-		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
+		updates[chunkPos] = make(map[df_cube.Pos]world.Block)
 	}
 
 	c := w.Chunk(chunkPos)
@@ -105,8 +119,7 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 		return block.Air{}
 	}
 
-	// TODO: Implement and account for multi-layer blocks.
-	rid := c.Block(uint8(blockPos[0]), int16(blockPos[1]), uint8(blockPos[2]), 0)
+	rid := c.Block(uint8(blockPos[0]), int16(blockPos[1]), uint8(blockPos[2]), layer)
 	if b, ok := world.BlockByRuntimeID(rid); ok {
 		return b
 	}
@@ -115,14 +128,23 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 
 // SetBlock sets the block at the position passed.
 func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
-	if cube.Pos(pos).OutOfBounds(cube.Range(world.Overworld.Range())) {
+	w.SetBlockLayer(pos, b, 0)
+}
+
+// SetBlockLayer updates a block in the selected Bedrock storage layer.
+func (w *World) SetBlockLayer(pos df_cube.Pos, b world.Block, layer uint8) {
+	if layer > 1 || cube.Pos(pos).OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return
 	}
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
-	if w.blockUpdates[chunkPos] == nil {
-		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
+	updates := w.blockUpdates
+	if layer == 1 {
+		updates = w.extraBlockUpdates
 	}
-	w.blockUpdates[chunkPos][pos] = b
+	if updates[chunkPos] == nil {
+		updates[chunkPos] = make(map[df_cube.Pos]world.Block)
+	}
+	updates[chunkPos][pos] = b
 }
 
 // CleanChunks cleans up the chunks in respect to the given chunk radius and chunk position.
@@ -178,6 +200,7 @@ func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
 	delete(w.subChunks, chunkPos)
 	delete(w.chunks, chunkPos)
 	delete(w.blockUpdates, chunkPos)
+	delete(w.extraBlockUpdates, chunkPos)
 }
 
 // chunkInRange returns true if the chunk position is within the given radius of the chunk position.

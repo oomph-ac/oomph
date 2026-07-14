@@ -96,6 +96,15 @@ type MovementComponent interface {
 	// SetPressingSneak sets if the movement component is holding down the key bound o the sneak action.
 	SetPressingSneak(pressing bool)
 
+	// Swimming returns whether the client is using the swimming movement pose.
+	Swimming() bool
+	// SetSwimming sets whether the movement component is using the swimming movement pose.
+	SetSwimming(swimming bool)
+	// AutoJumpingInWater returns whether the client is automatically swimming upward.
+	AutoJumpingInWater() bool
+	// WantDownSlow returns whether the client requested the slow downward swim input.
+	WantDownSlow() bool
+
 	// PenetratedLastFrame returns true if the movement component had penetrated through a block in
 	// the previous simulation frame.
 	PenetratedLastFrame() bool
@@ -179,6 +188,18 @@ type MovementComponent interface {
 	AirSpeed() float32
 	// SetAirSpeed sets the movement speed of the movement component while off ground.
 	SetAirSpeed(airSpeed float32)
+	// UnderwaterMovementSpeed returns the base relative acceleration in water.
+	UnderwaterMovementSpeed() float32
+	// SetUnderwaterMovementSpeed sets the base relative acceleration in water.
+	SetUnderwaterMovementSpeed(speed float32)
+	// LavaMovementSpeed returns the base relative acceleration in lava.
+	LavaMovementSpeed() float32
+	// SetLavaMovementSpeed sets the base relative acceleration in lava.
+	SetLavaMovementSpeed(speed float32)
+	// SwimSpeedMultiplier returns the transient water-speed multiplier applied by movement effects such as a dolphin boost.
+	SwimSpeedMultiplier() float32
+	// SetSwimSpeedMultiplier sets the transient water-speed multiplier.
+	SetSwimSpeedMultiplier(multiplier float32)
 
 	// JumpHeight returns the jump height of the movement component.
 	JumpHeight() float32

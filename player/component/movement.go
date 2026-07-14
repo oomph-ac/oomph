@@ -89,10 +89,14 @@ type AuthoritativeMovementComponent struct {
 	jumpHeight   float32
 	fallDistance float32
 
-	movementSpeed        float32
-	defaultMovementSpeed float32
-	airSpeed             float32
-	serverUpdatedSpeed   bool
+	movementSpeed           float32
+	defaultMovementSpeed    float32
+	airSpeed                float32
+	underwaterMovementSpeed float32
+	lavaMovementSpeed       float32
+	swimSpeedMultiplier     float32
+	dolphinBoostTicks       int64
+	serverUpdatedSpeed      bool
 
 	knockback    mgl32.Vec3
 	ticksSinceKb uint64
@@ -109,6 +113,9 @@ type AuthoritativeMovementComponent struct {
 	serverSprint, serverSprintApplied bool
 
 	sneaking, pressingSneak bool
+	swimming                bool
+	autoJumpingInWater      bool
+	wantDownSlow            bool
 
 	jumping, pressingJump bool
 	jumpDelay             uint64
@@ -138,10 +145,13 @@ type AuthoritativeMovementComponent struct {
 
 func NewAuthoritativeMovementComponent(p *player.Player) *AuthoritativeMovementComponent {
 	return &AuthoritativeMovementComponent{
-		mPlayer:              p,
-		nonAuthoritative:     &NonAuthoritativeMovement{},
-		defaultMovementSpeed: 0.1,
-		airSpeed:             0.02,
+		mPlayer:                 p,
+		nonAuthoritative:        &NonAuthoritativeMovement{},
+		defaultMovementSpeed:    0.1,
+		airSpeed:                0.02,
+		underwaterMovementSpeed: 0.02,
+		lavaMovementSpeed:       0.02,
+		swimSpeedMultiplier:     1,
 	}
 }
 
@@ -352,6 +362,26 @@ func (mc *AuthoritativeMovementComponent) SetPressingSneak(pressing bool) {
 	mc.pressingSneak = pressing
 }
 
+// Swimming returns whether the client is using the swimming movement pose.
+func (mc *AuthoritativeMovementComponent) Swimming() bool {
+	return mc.swimming
+}
+
+// SetSwimming sets whether the movement component is using the swimming movement pose.
+func (mc *AuthoritativeMovementComponent) SetSwimming(swimming bool) {
+	mc.swimming = swimming
+}
+
+// AutoJumpingInWater returns whether the client is automatically swimming upward.
+func (mc *AuthoritativeMovementComponent) AutoJumpingInWater() bool {
+	return mc.autoJumpingInWater
+}
+
+// WantDownSlow returns whether the client requested the slow downward swim input.
+func (mc *AuthoritativeMovementComponent) WantDownSlow() bool {
+	return mc.wantDownSlow
+}
+
 // PenetratedLastFrame returns true if the movement component had penetrated through a block in
 // the previous simulation frame.
 func (mc *AuthoritativeMovementComponent) PenetratedLastFrame() bool {
@@ -467,6 +497,9 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 	scale := mc.size[2]
 	width := (mc.size[0] * 0.5) * scale
 	height := mc.size[1] * scale
+	if mc.swimming {
+		height = mc.size[0] * scale
+	}
 	var yOffset float32
 	if mc.mPlayer.VersionInRange(-1, player.GameVersion1_20_60) {
 		yOffset = mc.slideOffset.Y()
@@ -485,6 +518,10 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 // ClientBoundingBox returns the bounding box of the movement component translated to the client's position.
 func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox {
 	width := mc.size[0] / 2
+	height := mc.size[1]
+	if mc.swimming {
+		height = mc.size[0]
+	}
 	var yOffset float32
 	if mc.mPlayer.VersionInRange(-1, player.GameVersion1_20_60) {
 		yOffset = mc.slideOffset.Y()
@@ -495,7 +532,7 @@ func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox {
 		mc.nonAuthoritative.pos[1]+yOffset,
 		mc.nonAuthoritative.pos[2]-width,
 		mc.nonAuthoritative.pos[0]+width,
-		mc.nonAuthoritative.pos[1]+mc.size[1]+yOffset,
+		mc.nonAuthoritative.pos[1]+height+yOffset,
 		mc.nonAuthoritative.pos[2]+width,
 	).GrowVec3(mgl32.Vec3{-1e-4, 0, -1e-4})
 }
@@ -569,6 +606,36 @@ func (mc *AuthoritativeMovementComponent) AirSpeed() float32 {
 // SetAirSpeed sets the movement speed of the movement component while off ground.
 func (mc *AuthoritativeMovementComponent) SetAirSpeed(newSpeed float32) {
 	mc.airSpeed = newSpeed
+}
+
+// UnderwaterMovementSpeed returns the base relative acceleration in water.
+func (mc *AuthoritativeMovementComponent) UnderwaterMovementSpeed() float32 {
+	return mc.underwaterMovementSpeed
+}
+
+// SetUnderwaterMovementSpeed sets the base relative acceleration in water.
+func (mc *AuthoritativeMovementComponent) SetUnderwaterMovementSpeed(speed float32) {
+	mc.underwaterMovementSpeed = speed
+}
+
+// LavaMovementSpeed returns the base relative acceleration in lava.
+func (mc *AuthoritativeMovementComponent) LavaMovementSpeed() float32 {
+	return mc.lavaMovementSpeed
+}
+
+// SetLavaMovementSpeed sets the base relative acceleration in lava.
+func (mc *AuthoritativeMovementComponent) SetLavaMovementSpeed(speed float32) {
+	mc.lavaMovementSpeed = speed
+}
+
+// SwimSpeedMultiplier returns the transient water-speed multiplier.
+func (mc *AuthoritativeMovementComponent) SwimSpeedMultiplier() float32 {
+	return mc.swimSpeedMultiplier
+}
+
+// SetSwimSpeedMultiplier sets the transient water-speed multiplier.
+func (mc *AuthoritativeMovementComponent) SetSwimSpeedMultiplier(multiplier float32) {
+	mc.swimSpeedMultiplier = multiplier
 }
 
 // XCollision returns true if the movement component is collided with a block
@@ -791,6 +858,15 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.sneaking = pk.InputData.Load(packet.InputFlagSneakDown)
 	}
 
+	if pk.InputData.Load(packet.InputFlagStopSwimming) {
+		mc.swimming = false
+	} else if pk.InputData.Load(packet.InputFlagStartSwimming) {
+		mc.swimming = true
+		mc.sneaking = false
+	}
+	mc.autoJumpingInWater = pk.InputData.Load(packet.InputFlagAutoJumpingInWater)
+	mc.wantDownSlow = pk.InputData.Load(packet.InputFlagWantDownSlow)
+
 	mc.mPlayer.Dbg.Notify(
 		player.DebugModeMovementSim,
 		true,
@@ -876,6 +952,13 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	}
 
 	mc.glideBoostTicks--
+	if mc.dolphinBoostTicks > 0 {
+		mc.dolphinBoostTicks--
+		if mc.dolphinBoostTicks <= 0 {
+			mc.dolphinBoostTicks = 0
+			mc.swimSpeedMultiplier = 1
+		}
+	}
 	mc.ticksSinceKb++
 	mc.ticksSinceTeleport++
 	if mc.jumpDelay > 0 {
@@ -896,6 +979,14 @@ func (mc *AuthoritativeMovementComponent) ServerUpdate(pk packet.Packet) {
 				pk.Duration,
 				pk.Operation,
 			))
+		}
+	case *packet.MovementEffect:
+		if pk.EntityRuntimeID == mc.mPlayer.RuntimeId && pk.Type == packet.MovementEffectTypeDolphinBoost {
+			mc.dolphinBoostTicks = max(0, int64(pk.Duration))
+			mc.swimSpeedMultiplier = 1
+			if mc.dolphinBoostTicks > 0 {
+				mc.swimSpeedMultiplier = 2
+			}
 		}
 	case *packet.MoveActorAbsolute:
 		if utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport) {
@@ -1027,6 +1118,11 @@ func (mc *AuthoritativeMovementComponent) Sync() {
 			} else {
 				flags = utils.RemoveFlag(flags, entity.DataFlagImmobile)
 			}
+			if mc.swimming {
+				flags = utils.AddFlag(flags, entity.DataFlagSwimming)
+			} else {
+				flags = utils.RemoveFlag(flags, entity.DataFlagSwimming)
+			}
 			actorData.EntityMetadata[entity.DataKeyFlags] = flags
 		}
 		mc.mPlayer.SendPacketToClient(actorData)
@@ -1072,6 +1168,10 @@ func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
 
 	mc.movementSpeed = mc.defaultMovementSpeed
 	mc.airSpeed = 0.02
+	mc.underwaterMovementSpeed = 0.02
+	mc.lavaMovementSpeed = 0.02
+	mc.swimSpeedMultiplier = 1
+	mc.dolphinBoostTicks = 0
 	mc.serverUpdatedSpeed = false
 
 	mc.knockback = mgl32.Vec3{}
@@ -1091,6 +1191,9 @@ func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
 
 	mc.sneaking = false
 	mc.pressingSneak = false
+	mc.swimming = false
+	mc.autoJumpingInWater = false
+	mc.wantDownSlow = false
 
 	mc.jumping = false
 	mc.pressingJump = false

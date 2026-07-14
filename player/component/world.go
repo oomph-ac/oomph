@@ -25,9 +25,10 @@ type WorldUpdaterComponent struct {
 	chunkRadius       int32
 	serverChunkRadius int32
 
-	clientPlacedBlocks  map[df_cube.Pos]*chainedBlockPlacement
-	pendingBlockUpdates map[df_cube.Pos]uint32
-	batchedBlockUpdates *acknowledgement.UpdateBlockBatch
+	clientPlacedBlocks       map[df_cube.Pos]*chainedBlockPlacement
+	pendingBlockUpdates      map[df_cube.Pos]uint32
+	batchedBlockUpdates      *acknowledgement.UpdateBlockBatch
+	batchedExtraBlockUpdates *acknowledgement.UpdateBlockBatch
 
 	breakingBlockPos *protocol.BlockPos
 	prevPlaceRequest *protocol.UseItemTransactionData
@@ -40,9 +41,10 @@ func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 		mPlayer:     p,
 		chunkRadius: 1_000_000_000,
 
-		clientPlacedBlocks:  make(map[df_cube.Pos]*chainedBlockPlacement),
-		pendingBlockUpdates: make(map[df_cube.Pos]uint32),
-		batchedBlockUpdates: acknowledgement.NewUpdateBlockBatchACK(p),
+		clientPlacedBlocks:       make(map[df_cube.Pos]*chainedBlockPlacement),
+		pendingBlockUpdates:      make(map[df_cube.Pos]uint32),
+		batchedBlockUpdates:      acknowledgement.NewUpdateBlockBatchACK(p),
+		batchedExtraBlockUpdates: acknowledgement.NewLayerUpdateBlockBatchACK(p, 1),
 
 		initalInteractionAccepted: true,
 	}
@@ -73,8 +75,12 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 // HandleUpdateBlock handles an UpdateBlock packet from the server.
 func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	pos := df_cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
-	if pk.Layer != 0 {
+	if pk.Layer > 1 {
 		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", pk.NewBlockRuntimeID, "pos", pos)
+		return
+	}
+	if pk.Layer == 1 {
+		c.batchedExtraBlockUpdates.SetBlock(pos, pk.NewBlockRuntimeID)
 		return
 	}
 	c.AddPendingUpdate(pos, pk.NewBlockRuntimeID)
@@ -89,7 +95,7 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, entry.BlockRuntimeID)
 	}
 	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, entry.BlockRuntimeID)
+		c.batchedExtraBlockUpdates.SetBlock(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, entry.BlockRuntimeID)
 	}
 }
 
@@ -391,7 +397,7 @@ func (c *WorldUpdaterComponent) RemovePendingUpdate(pos df_cube.Pos, blockRuntim
 }
 
 func (c *WorldUpdaterComponent) Flush() {
-	if !c.batchedBlockUpdates.HasUpdates() {
+	if !c.batchedBlockUpdates.HasUpdates() && !c.batchedExtraBlockUpdates.HasUpdates() {
 		return
 	}
 
@@ -434,12 +440,20 @@ func (c *WorldUpdaterComponent) Flush() {
 	}
 
 	c.batchedBlockUpdates.SetExpiry(blockAckTimeout)
+	c.batchedExtraBlockUpdates.SetExpiry(blockAckTimeout)
 	if noLagComp {
 		c.batchedBlockUpdates.Run()
+		c.batchedExtraBlockUpdates.Run()
 	} else {
-		c.mPlayer.ACKs().Add(c.batchedBlockUpdates)
+		if c.batchedBlockUpdates.HasUpdates() {
+			c.mPlayer.ACKs().Add(c.batchedBlockUpdates)
+		}
+		if c.batchedExtraBlockUpdates.HasUpdates() {
+			c.mPlayer.ACKs().Add(c.batchedExtraBlockUpdates)
+		}
 	}
 	c.batchedBlockUpdates = acknowledgement.NewUpdateBlockBatchACK(c.mPlayer)
+	c.batchedExtraBlockUpdates = acknowledgement.NewLayerUpdateBlockBatchACK(c.mPlayer, 1)
 }
 
 func (c *WorldUpdaterComponent) Tick() {
