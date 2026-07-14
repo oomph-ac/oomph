@@ -5,7 +5,6 @@ import (
 
 	"github.com/df-mc/dragonfly/server/event"
 	"github.com/df-mc/dragonfly/server/item"
-	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/oconfig"
@@ -37,19 +36,13 @@ var ClientDecode = []uint32{
 
 var ServerDecode = []uint32{
 	packet.IDAddActor,
-	packet.IDAddItemActor,
 	packet.IDAddPlayer,
 	packet.IDChunkRadiusUpdated,
 	packet.IDInventorySlot,
 	packet.IDInventoryContent,
-	packet.IDInventoryTransaction,
 	packet.IDItemStackResponse,
-	packet.IDLevelEvent,
 	packet.IDLevelChunk,
-	packet.IDLevelSoundEvent,
 	packet.IDMobEffect,
-	packet.IDMobEquipment,
-	packet.IDMobArmourEquipment,
 	packet.IDMoveActorAbsolute,
 	packet.IDMovePlayer,
 	packet.IDRemoveActor,
@@ -60,7 +53,6 @@ var ServerDecode = []uint32{
 	packet.IDUpdateAbilities,
 	packet.IDUpdateAttributes,
 	packet.IDUpdateBlock,
-	packet.IDUpdateBlockSynced,
 	packet.IDUpdateSubChunkBlocks,
 	packet.IDContainerOpen,
 	packet.IDContainerClose,
@@ -262,7 +254,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			ctx.Cancel()
 		}
 	case *packet.MobEquipment:
-		p.retainClientEquipment(pk)
+		p.LastEquipmentData = pk
 		if pk.WindowID == protocol.WindowIDInventory {
 			p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
 		}
@@ -283,74 +275,6 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 		}
 	}
 	p.RunDetections(pk)
-	if p.ClientToBackendBlockNetwork().Required() && p.rewriteClientBlockNetworkIDs(pk) {
-		ctx.SetModified()
-	}
-}
-
-func (p *Player) rewriteClientBlockNetworkIDs(pk packet.Packet) bool {
-	translator := p.ClientToBackendBlockNetwork()
-	rewriteCraftResults := func(actions []protocol.StackRequestAction) bool {
-		modified := false
-		for _, action := range actions {
-			if action, ok := action.(*protocol.CraftResultsDeprecatedStackRequestAction); ok {
-				for i := range action.ResultItems {
-					modified = rewriteStackBlockNetworkID(&action.ResultItems[i], translator) || modified
-				}
-			}
-		}
-		return modified
-	}
-	switch pk := pk.(type) {
-	case *packet.PlayerAuthInput:
-		modified := false
-		if pk.InputData.Load(packet.InputFlagPerformItemInteraction) {
-			changed := rewriteBlockNetworkID(&pk.ItemInteractionData.BlockRuntimeID, translator)
-			modified = rewriteStackBlockNetworkID(&pk.ItemInteractionData.HeldItem.Stack, translator) || changed
-		}
-		if pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
-			modified = rewriteCraftResults(pk.ItemStackRequest.Actions) || modified
-		}
-		return modified
-	case *packet.ItemStackRequest:
-		modified := false
-		for i := range pk.Requests {
-			modified = rewriteCraftResults(pk.Requests[i].Actions) || modified
-		}
-		return modified
-	case *packet.InventoryTransaction:
-		modified := false
-		for i := range pk.Actions {
-			modified = rewriteStackBlockNetworkID(&pk.Actions[i].OldItem.Stack, translator) || modified
-			modified = rewriteStackBlockNetworkID(&pk.Actions[i].NewItem.Stack, translator) || modified
-		}
-		switch data := pk.TransactionData.(type) {
-		case *protocol.UseItemTransactionData:
-			changed := rewriteBlockNetworkID(&data.BlockRuntimeID, translator)
-			modified = rewriteStackBlockNetworkID(&data.HeldItem.Stack, translator) || modified || changed
-		case *protocol.UseItemOnEntityTransactionData:
-			modified = rewriteStackBlockNetworkID(&data.HeldItem.Stack, translator) || modified
-		case *protocol.ReleaseItemTransactionData:
-			modified = rewriteStackBlockNetworkID(&data.HeldItem.Stack, translator) || modified
-		}
-		return modified
-	case *packet.MobEquipment:
-		return rewriteStackBlockNetworkID(&pk.NewItem.Stack, translator)
-	case *packet.LevelSoundEvent:
-		return rewriteLevelSoundBlockNetworkID(pk, translator)
-	}
-	return false
-}
-
-func (p *Player) retainClientEquipment(pk *packet.MobEquipment) {
-	retained := *pk
-	p.LastEquipmentData = &retained
-}
-
-// ClientItemForBackend translates an item retained in the client's block network mode to the current backend mode.
-func (p *Player) ClientItemForBackend(instance protocol.ItemInstance) protocol.ItemInstance {
-	rewriteStackBlockNetworkID(&instance.Stack, p.ClientToBackendBlockNetwork())
-	return instance
 }
 
 // splitCommandLine splits a command line into arguments, preserving quoted substrings
@@ -479,8 +403,8 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.LevelChunk:
 		p.worldUpdater.HandleLevelChunk(pk)
 		fullChunk := !pk.CacheEnabled && pk.SubChunkCount != protocol.SubChunkRequestModeLimited && pk.SubChunkCount != protocol.SubChunkRequestModeLimitless
-		if fullChunk && (p.opts.Network.AttemptFixChunks || p.BackendToClientBlockNetwork().Required()) {
-			if err := oworld.ReencodeLevelChunk(pk, p.BackendBlockNetwork(), p.ClientBlockNetwork()); err != nil {
+		if fullChunk && p.opts.Network.AttemptFixChunks {
+			if err := oworld.ReencodeLevelChunk(pk, p.BlockNetwork()); err != nil {
 				p.Log().Warn("unable to re-encode chunk", "error", err)
 			} else {
 				ctx.SetModified()
@@ -537,25 +461,6 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		p.gamemodeHandle.Handle(pk)
 	case *packet.SubChunk:
 		p.worldUpdater.HandleSubChunk(pk)
-		if !pk.CacheEnabled && p.BackendToClientBlockNetwork().Required() {
-			dimension, ok := world.DimensionByID(int(pk.Dimension))
-			if !ok {
-				dimension = world.Overworld
-			}
-			for i := range pk.SubChunkEntries {
-				entry := &pk.SubChunkEntries[i]
-				if entry.Result != protocol.SubChunkResultSuccess {
-					continue
-				}
-				payload, err := oworld.ReencodeSubChunk(entry.RawPayload, dimension, p.BackendBlockNetwork(), p.ClientBlockNetwork())
-				if err != nil {
-					p.Log().Warn("unable to re-encode subchunk", "error", err)
-					continue
-				}
-				entry.RawPayload = payload
-				ctx.SetModified()
-			}
-		}
 	case *packet.UpdateAbilities:
 		if pk.AbilityData.EntityUniqueID == p.UniqueId {
 			p.movement.ServerUpdate(pk)
@@ -569,36 +474,8 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		}
 	case *packet.UpdateBlock:
 		p.worldUpdater.HandleUpdateBlock(pk)
-		if p.BackendToClientBlockNetwork().Required() {
-			if rewriteBlockNetworkID(&pk.NewBlockRuntimeID, p.BackendToClientBlockNetwork()) {
-				ctx.SetModified()
-			}
-		}
-	case *packet.UpdateBlockSynced:
-		if p.BackendToClientBlockNetwork().Required() {
-			if rewriteBlockNetworkID(&pk.NewBlockRuntimeID, p.BackendToClientBlockNetwork()) {
-				ctx.SetModified()
-			}
-		}
 	case *packet.UpdateSubChunkBlocks:
 		p.worldUpdater.HandleUpdateSubChunkBlocks(pk)
-		if p.BackendToClientBlockNetwork().Required() {
-			translator := p.BackendToClientBlockNetwork()
-			modified := false
-			for i := range pk.Blocks {
-				if rewriteBlockNetworkID(&pk.Blocks[i].BlockRuntimeID, translator) {
-					modified = true
-				}
-			}
-			for i := range pk.Extra {
-				if rewriteBlockNetworkID(&pk.Extra[i].BlockRuntimeID, translator) {
-					modified = true
-				}
-			}
-			if modified {
-				ctx.SetModified()
-			}
-		}
 	case *packet.ContainerOpen:
 		p.inventory.CreateWindow(pk.WindowID, pk.ContainerType)
 	case *packet.ContainerClose:
@@ -627,105 +504,4 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			p.CreativeItems[item.CreativeItemNetworkID] = item
 		}
 	}
-	if p.BackendToClientBlockNetwork().Required() && p.rewriteServerBlockNetworkIDs(pk) {
-		ctx.SetModified()
-	}
-}
-
-func (p *Player) rewriteServerBlockNetworkIDs(pk packet.Packet) bool {
-	translator := p.BackendToClientBlockNetwork()
-	switch pk := pk.(type) {
-	case *packet.InventorySlot:
-		modified := rewriteStackBlockNetworkID(&pk.NewItem.Stack, translator)
-		if storageItem, ok := pk.StorageItem.Value(); ok {
-			if rewriteStackBlockNetworkID(&storageItem.Stack, translator) {
-				pk.StorageItem = protocol.Option(storageItem)
-				modified = true
-			}
-		}
-		return modified
-	case *packet.InventoryContent:
-		// The inventory ACK retains the original slice for later processing in the backend's ID mode.
-		modified := false
-		for i := range pk.Content {
-			stack := pk.Content[i].Stack
-			if !rewriteStackBlockNetworkID(&stack, translator) {
-				continue
-			}
-			if !modified {
-				pk.Content = append([]protocol.ItemInstance(nil), pk.Content...)
-			}
-			pk.Content[i].Stack = stack
-			modified = true
-		}
-		return rewriteStackBlockNetworkID(&pk.StorageItem.Stack, translator) || modified
-	case *packet.MobEquipment:
-		return rewriteStackBlockNetworkID(&pk.NewItem.Stack, translator)
-	case *packet.MobArmourEquipment:
-		modified := rewriteStackBlockNetworkID(&pk.Helmet.Stack, translator)
-		modified = rewriteStackBlockNetworkID(&pk.Chestplate.Stack, translator) || modified
-		modified = rewriteStackBlockNetworkID(&pk.Leggings.Stack, translator) || modified
-		modified = rewriteStackBlockNetworkID(&pk.Boots.Stack, translator) || modified
-		return rewriteStackBlockNetworkID(&pk.Body.Stack, translator) || modified
-	case *packet.AddPlayer:
-		modified := rewriteStackBlockNetworkID(&pk.HeldItem.Stack, translator)
-		metadata, metadataModified := rewriteActorBlockMetadata(pk.EntityMetadata, translator, false)
-		pk.EntityMetadata = metadata
-		return modified || metadataModified
-	case *packet.AddActor:
-		metadata, modified := rewriteActorBlockMetadata(pk.EntityMetadata, translator, pk.EntityType == fallingBlockEntityType)
-		pk.EntityMetadata = metadata
-		return modified
-	case *packet.SetActorData:
-		fallingBlock := false
-		if p.entTracker != nil {
-			if actor := p.entTracker.FindEntity(pk.EntityRuntimeID); actor != nil {
-				fallingBlock = actor.Type == fallingBlockEntityType
-			}
-		}
-		metadata, modified := rewriteActorBlockMetadata(pk.EntityMetadata, translator, fallingBlock)
-		pk.EntityMetadata = metadata
-		return modified
-	case *packet.AddItemActor:
-		return rewriteStackBlockNetworkID(&pk.Item.Stack, translator)
-	case *packet.LevelEvent:
-		return rewriteLevelEventBlockNetworkID(pk, translator)
-	case *packet.LevelSoundEvent:
-		return rewriteLevelSoundBlockNetworkID(pk, translator)
-	case *packet.CreativeContent:
-		modified := false
-		for i := range pk.Groups {
-			modified = rewriteStackBlockNetworkID(&pk.Groups[i].Icon, translator) || modified
-		}
-		for i := range pk.Items {
-			modified = rewriteStackBlockNetworkID(&pk.Items[i].Item, translator) || modified
-		}
-		return modified
-	case *packet.InventoryTransaction:
-		modified := false
-		for i := range pk.Actions {
-			modified = rewriteStackBlockNetworkID(&pk.Actions[i].OldItem.Stack, translator) || modified
-			modified = rewriteStackBlockNetworkID(&pk.Actions[i].NewItem.Stack, translator) || modified
-		}
-		switch data := pk.TransactionData.(type) {
-		case *protocol.UseItemTransactionData:
-			changed := rewriteBlockNetworkID(&data.BlockRuntimeID, translator)
-			modified = rewriteStackBlockNetworkID(&data.HeldItem.Stack, translator) || modified || changed
-		case *protocol.UseItemOnEntityTransactionData:
-			modified = rewriteStackBlockNetworkID(&data.HeldItem.Stack, translator) || modified
-		case *protocol.ReleaseItemTransactionData:
-			modified = rewriteStackBlockNetworkID(&data.HeldItem.Stack, translator) || modified
-		}
-		return modified
-	case *packet.CraftingData:
-		modified := false
-		for i, recipe := range pk.Recipes {
-			if clientRecipe, changed := rewriteRecipeBlockNetworkIDs(recipe, translator); changed {
-				pk.Recipes[i] = clientRecipe
-				modified = true
-			}
-		}
-		return modified
-	}
-	return false
 }

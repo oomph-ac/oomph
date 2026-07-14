@@ -207,7 +207,7 @@ func TestTransferResetSynchronizesWithPlayerTick(t *testing.T) {
 	p.SetServerConn(backend)
 	go p.StartTicking()
 	for i := 0; i < 100; i++ {
-		p.TransferServerConn(&fakeBackend{data: minecraft.GameData{EntityRuntimeID: uint64(i + 2)}})
+		_, _ = p.TransferServerConn(&fakeBackend{data: minecraft.GameData{EntityRuntimeID: uint64(i + 2)}})
 	}
 	_ = p.Close()
 	select {

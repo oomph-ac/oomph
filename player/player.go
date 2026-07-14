@@ -72,10 +72,9 @@ type Player struct {
 	GameDat     minecraft.GameData
 	Version     int32
 
-	// clientBlockNetwork is fixed by the initial backend's StartGame. It remains unchanged across fast backend
-	// transfers because the connected client does not receive another StartGame packet.
-	clientBlockNetwork  blocknetwork.Codec
-	backendBlockNetwork blocknetwork.Codec
+	// blockNetwork is fixed by the initial backend's StartGame. All backends reachable through an instant transfer
+	// must use the same block-network representation because the client does not receive another StartGame packet.
+	blockNetwork blocknetwork.Codec
 
 	// With fast transfers, the client will still retain it's original runtime and unique IDs, so
 	// we must translate them to new ones, while still retaining the old ones for the client to use.
@@ -255,8 +254,7 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 
 		listener: listener,
 
-		clientBlockNetwork:  blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.RuntimeIDs),
-		backendBlockNetwork: blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.RuntimeIDs),
+		blockNetwork: blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.RuntimeIDs),
 
 		remoteEventFunc: func(e RemoteEvent, p *Player) {
 			enc, _ := json.Marshal(e)

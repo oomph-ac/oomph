@@ -72,21 +72,16 @@ func (p *Player) World() *oworld.World {
 	return p.world
 }
 
-// BlockRuntimeIDFromBackend converts a backend block ID to Oomph's canonical registry runtime ID.
+// DecodeBlockRuntimeID converts a network block ID to Oomph's canonical registry runtime ID.
 // Unknown values are preserved so callers can retain their existing fallback.
-func (p *Player) BlockRuntimeIDFromBackend(id uint32) uint32 {
-	return blockRuntimeIDFromNetwork(p.backendBlockNetwork, id)
+func (p *Player) DecodeBlockRuntimeID(id uint32) uint32 {
+	return blockRuntimeIDFromNetwork(p.blockNetwork, id)
 }
 
-// BlockRuntimeIDToClient converts a canonical registry runtime ID to the client's block ID representation.
+// EncodeBlockRuntimeID converts a canonical registry runtime ID to the session's network representation.
 // Unknown values are preserved so custom block fallbacks remain intact.
-func (p *Player) BlockRuntimeIDToClient(id uint32) uint32 {
-	return blockRuntimeIDToNetwork(p.clientBlockNetwork, id)
-}
-
-// BlockRuntimeIDFromClient converts a client-visible block ID to Oomph's registry runtime ID.
-func (p *Player) BlockRuntimeIDFromClient(id uint32) uint32 {
-	return blockRuntimeIDFromNetwork(p.clientBlockNetwork, id)
+func (p *Player) EncodeBlockRuntimeID(id uint32) uint32 {
+	return blockRuntimeIDToNetwork(p.blockNetwork, id)
 }
 
 func blockRuntimeIDFromNetwork(codec blocknetwork.Codec, id uint32) uint32 {
@@ -132,7 +127,7 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 			int32(pos[1]),
 			int32(pos[2]),
 		},
-		NewBlockRuntimeID: p.BlockRuntimeIDToClient(blockRuntimeID),
+		NewBlockRuntimeID: p.EncodeBlockRuntimeID(blockRuntimeID),
 		Flags:             packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	}
@@ -199,7 +194,7 @@ func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
 	for _, pos := range positions {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: pos,
-			NewBlockRuntimeID: p.BlockRuntimeIDToClient(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
+			NewBlockRuntimeID: p.EncodeBlockRuntimeID(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
 				int(pos.X()),
 				int(pos.Y()),
 				int(pos.Z()),

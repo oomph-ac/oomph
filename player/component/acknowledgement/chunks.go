@@ -29,7 +29,7 @@ func (ack *ChunkUpdate) Run() {
 		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
 		return
 	}
-	cInfo, err := oworld.CacheChunk(ack.pk, ack.mPlayer.BackendBlockNetwork())
+	cInfo, err := oworld.CacheChunk(ack.pk, ack.mPlayer.BlockNetwork())
 	if err != nil {
 		ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
 		return
@@ -93,13 +93,13 @@ func (ack *SubChunkUpdate) Run() {
 			bufUsed = true
 			buf.Write(entry.RawPayload)
 
-			cachedSub, err := oworld.CacheSubChunk(buf, ch, chunkPos, ack.mPlayer.BackendBlockNetwork())
+			cachedSub, err := oworld.CacheSubChunk(buf, ch, chunkPos, ack.mPlayer.BlockNetwork())
 			if err != nil {
 				ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
 				continue
 			}
 			ch.Sub()[cachedSub.Layer()] = cachedSub.SubChunk()
-			ack.mPlayer.World().AddSubChunk(chunkPos, cachedSub.Hash(), ack.mPlayer.BackendBlockNetwork())
+			ack.mPlayer.World().AddSubChunk(chunkPos, cachedSub.Hash(), ack.mPlayer.BlockNetwork())
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "cached subchunk %d at %v", cachedSub.Layer(), chunkPos)
 		case protocol.SubChunkResultSuccessAllAir:
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all-air chunk at %v", chunkPos)

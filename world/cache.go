@@ -117,9 +117,9 @@ func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, 
 	return ChunkInfo{Hash: key.hash, blockNetworkMode: codec.Mode(), Chunk: cachedChunk.chunk, Cached: true}, nil
 }
 
-// ReencodeLevelChunk converts the block palettes in input between network ID representations while preserving trailing
-// block entity data.
-func ReencodeLevelChunk(input *packet.LevelChunk, source, target blocknetwork.Codec) error {
+// ReencodeLevelChunk fully re-encodes the block palettes in input while preserving the session's block-network
+// representation and trailing block entity data.
+func ReencodeLevelChunk(input *packet.LevelChunk, codec blocknetwork.Codec) error {
 	dimension, ok := world.DimensionByID(int(input.Dimension))
 	if !ok {
 		return fmt.Errorf("unknown dimension %v", input.Dimension)
@@ -129,11 +129,11 @@ func ReencodeLevelChunk(input *packet.LevelChunk, source, target blocknetwork.Co
 	if err != nil {
 		return err
 	}
-	if source.Mode() == blocknetwork.Hashes {
+	if codec.Mode() == blocknetwork.Hashes {
 		decoded.ConvertBlockNetworkHashesToRuntimeIDs()
 	}
 	var data chunk.SerialisedData
-	if target.Mode() == blocknetwork.Hashes {
+	if codec.Mode() == blocknetwork.Hashes {
 		data = chunk.EncodeWithBlockNetworkHashes(decoded)
 	} else {
 		data = chunk.Encode(decoded, chunk.NetworkEncoding)
@@ -147,32 +147,6 @@ func ReencodeLevelChunk(input *packet.LevelChunk, source, target blocknetwork.Co
 	input.RawPayload = out.Bytes()
 	input.SubChunkCount = uint32(len(data.SubChunks))
 	return nil
-}
-
-// ReencodeSubChunk converts one successful SubChunk entry between network ID representations while preserving trailing
-// block entity data.
-func ReencodeSubChunk(payload []byte, dimension world.Dimension, source, target blocknetwork.Codec) ([]byte, error) {
-	buf := bytes.NewBuffer(payload)
-	decodedChunk := chunk.New(BlockRegistry, dimension.Range())
-	var index byte
-	decoded, err := decodeSubChunk(buf, decodedChunk, &index, chunk.NetworkEncoding)
-	if err != nil {
-		return nil, err
-	}
-	if source.Mode() == blocknetwork.Hashes {
-		decoded.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
-	}
-	if int(index) >= len(decodedChunk.Sub()) {
-		return nil, fmt.Errorf("subchunk index %d out of range", index)
-	}
-	decodedChunk.Sub()[index] = decoded
-	var encoded []byte
-	if target.Mode() == blocknetwork.Hashes {
-		encoded = chunk.EncodeSubChunkWithBlockNetworkHashes(decodedChunk, int(index))
-	} else {
-		encoded = chunk.EncodeSubChunk(decodedChunk, chunk.NetworkEncoding, int(index))
-	}
-	return append(encoded, buf.Bytes()...), nil
 }
 
 type CachedSubChunk struct {
