@@ -102,6 +102,8 @@ type MovementComponent interface {
 	SetSwimming(swimming bool)
 	// AutoJumpingInWater returns whether the client is automatically swimming upward.
 	AutoJumpingInWater() bool
+	// WantDown returns whether the client requested downward movement.
+	WantDown() bool
 	// WantDownSlow returns whether the client requested the slow downward swim input.
 	WantDownSlow() bool
 

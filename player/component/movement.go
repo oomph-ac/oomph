@@ -115,6 +115,7 @@ type AuthoritativeMovementComponent struct {
 	sneaking, pressingSneak bool
 	swimming                bool
 	autoJumpingInWater      bool
+	wantDown                bool
 	wantDownSlow            bool
 
 	jumping, pressingJump bool
@@ -375,6 +376,11 @@ func (mc *AuthoritativeMovementComponent) SetSwimming(swimming bool) {
 // AutoJumpingInWater returns whether the client is automatically swimming upward.
 func (mc *AuthoritativeMovementComponent) AutoJumpingInWater() bool {
 	return mc.autoJumpingInWater
+}
+
+// WantDown returns whether the client requested downward movement.
+func (mc *AuthoritativeMovementComponent) WantDown() bool {
+	return mc.wantDown
 }
 
 // WantDownSlow returns whether the client requested the slow downward swim input.
@@ -865,6 +871,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.sneaking = false
 	}
 	mc.autoJumpingInWater = pk.InputData.Load(packet.InputFlagAutoJumpingInWater)
+	mc.wantDown = pk.InputData.Load(packet.InputFlagWantDown)
 	mc.wantDownSlow = pk.InputData.Load(packet.InputFlagWantDownSlow)
 
 	mc.mPlayer.Dbg.Notify(
@@ -880,9 +887,6 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	} */
 	if mc.mPlayer.StartUseConsumableTick != 0 {
 		maxImpulse *= game.MaxConsumingImpulse
-	}
-	if mc.sneaking {
-		maxImpulse *= game.MaxSneakImpulse
 	}
 	pk.MoveVector[0] = game.ClampFloat(pk.MoveVector[0], -maxImpulse, maxImpulse)
 	pk.MoveVector[1] = game.ClampFloat(pk.MoveVector[1], -maxImpulse, maxImpulse)
@@ -917,11 +921,13 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	mc.mPlayer.Dbg.Notify(
 		player.DebugModeMovementSim,
 		true,
-		"input swimming=%t jumping=%t pressingJump=%t autoJumpingInWater=%t wantDownSlow=%t jumpCurrentRaw=%t",
+		"input swimming=%t sneaking=%t jumping=%t pressingJump=%t autoJumpingInWater=%t wantDown=%t wantDownSlow=%t jumpCurrentRaw=%t",
 		mc.swimming,
+		mc.sneaking,
 		mc.jumping,
 		mc.pressingJump,
 		mc.autoJumpingInWater,
+		mc.wantDown,
 		mc.wantDownSlow,
 		pk.InputData.Load(packet.InputFlagJumpCurrentRaw),
 	)
@@ -1204,6 +1210,7 @@ func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
 	mc.pressingSneak = false
 	mc.swimming = false
 	mc.autoJumpingInWater = false
+	mc.wantDown = false
 	mc.wantDownSlow = false
 
 	mc.jumping = false

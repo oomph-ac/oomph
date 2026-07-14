@@ -101,6 +101,9 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		blockFriction *= utils.BlockFriction(blockUnder)
 		moveRelativeSpeed = mSpeed * (0.16277136 / (blockFriction * blockFriction * blockFriction))
 	}
+	if movement.Sneaking() {
+		moveRelativeSpeed *= game.MaxSneakImpulse
+	}
 
 	if movement.Gliding() {
 		_, hasElytra := p.Inventory().Chestplate().Item().(item.Elytra)
@@ -310,6 +313,11 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 	initialY := movement.Pos().Y()
 	_, water := liquid.(block.Water)
 	if water {
+		if movement.WantDown() || movement.WantDownSlow() {
+			vel := movement.Vel()
+			vel[1] -= 0.04
+			movement.SetVel(vel)
+		}
 		updateSwimTravel(p, movement)
 	}
 
@@ -380,10 +388,10 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 		}
 		vel[1] -= gravity
 	}
-	if water && (movement.XCollision() || movement.ZCollision() || movement.Client().HorizontalCollision()) {
+	if water && (movement.XCollision() || movement.ZCollision()) {
 		raised := mgl32.Vec3{vel.X(), vel.Y() + 0.6 + initialY - movement.Pos().Y(), vel.Z()}
 		raisedBox := movement.BoundingBox().Translate(raised)
-		if !utils.HasNearbyBBoxes(raisedBox, p.World()) && !containsAnyLiquid(p, raisedBox) {
+		if !utils.HasNearbyBBoxes(raisedBox, p.World()) {
 			vel[1] = 0.3
 		}
 	}
@@ -471,22 +479,6 @@ func liquidAt(p *player.Player, pos df_cube.Pos) (world.Liquid, bool) {
 	}
 	liquid, ok := p.World().Block(pos).(world.Liquid)
 	return liquid, ok
-}
-
-func containsAnyLiquid(p *player.Player, box cube.BBox) bool {
-	min, max := box.Min(), box.Max()
-	minX, minY, minZ := int(math.Floor(float64(min.X()))), int(math.Floor(float64(min.Y()))), int(math.Floor(float64(min.Z())))
-	maxX, maxY, maxZ := int(math.Ceil(float64(max.X()))), int(math.Ceil(float64(max.Y()))), int(math.Ceil(float64(max.Z())))
-	for x := minX; x < maxX; x++ {
-		for y := minY; y < maxY; y++ {
-			for z := minZ; z < maxZ; z++ {
-				if _, ok := liquidAt(p, df_cube.Pos{x, y, z}); ok {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 func applyLiquidFlow(p *player.Player, movement player.MovementComponent, positions []df_cube.Pos) {
