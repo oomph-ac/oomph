@@ -875,13 +875,14 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 		mc.sneaking = pk.InputData.Load(packet.InputFlagSneakDown)
 	}
 
+	wasSwimming := mc.swimming
 	if pk.InputData.Load(packet.InputFlagStopSwimming) {
 		mc.swimming = false
 	} else if pk.InputData.Load(packet.InputFlagStartSwimming) {
 		mc.swimming = true
 		mc.sneaking = false
 	}
-	if mc.swimming {
+	if wasSwimming {
 		mc.swimAmount = game.ClampFloat(mc.swimAmount+0.1, 0, 1)
 	} else {
 		mc.swimAmount = game.ClampFloat(mc.swimAmount-0.1, 0, 1)

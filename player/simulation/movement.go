@@ -101,10 +101,6 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		blockFriction *= utils.BlockFriction(blockUnder)
 		moveRelativeSpeed = mSpeed * (0.16277136 / (blockFriction * blockFriction * blockFriction))
 	}
-	if movement.Sneaking() {
-		moveRelativeSpeed *= game.MaxSneakImpulse
-	}
-
 	if movement.Gliding() {
 		_, hasElytra := p.Inventory().Chestplate().Item().(item.Elytra)
 		if hasElytra && !movement.OnGround() {
@@ -326,8 +322,8 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 		newVel := movement.Vel()
 		below := liquidMovementBlock(p, df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.1}))))
 		_, belowAir := below.(block.Air)
-		legacyTransition := p.VersionInRange(-1, player.GameVersion1_21_120) && movement.SwimAmount() > 0 && movement.SwimAmount() < 1
-		if movement.Swimming() && belowAir || legacyTransition {
+		swimTransition := movement.SwimAmount() > 0 && movement.SwimAmount() < 1
+		if movement.Swimming() && belowAir || swimTransition {
 			newVel[1] = 0
 		} else {
 			newVel[1] += 0.04
