@@ -141,17 +141,18 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 	if p.WorldUpdater().HasPendingUpdate(pos) {
 		return
 	}
+	blockRuntimeID := world.BlockRuntimeID(p.World().Block(pos))
 	pk := &packet.UpdateBlock{
 		Position: protocol.BlockPos{
 			int32(pos[0]),
 			int32(pos[1]),
 			int32(pos[2]),
 		},
-		NewBlockRuntimeID: p.BlockRuntimeIDToNetwork(world.BlockRuntimeID(p.World().Block(pos))),
+		NewBlockRuntimeID: p.BlockRuntimeIDToNetwork(blockRuntimeID),
 		Flags:             packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	}
-	p.WorldUpdater().HandleUpdateBlock(pk)
+	p.WorldUpdater().AddPendingUpdate(pos, blockRuntimeID)
 	_ = p.SendPacketToClient(pk)
 }
 

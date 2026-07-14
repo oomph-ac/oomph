@@ -129,6 +129,31 @@ func TestClientBlockHashModeSurvivesBackendTransfer(t *testing.T) {
 	}
 }
 
+func TestSyncBlockQueuesCanonicalRuntimeIDAcrossModes(t *testing.T) {
+	oomphworld.FinalizeBlockRegistry()
+	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
+	stoneHash, ok := oomphworld.BlockRegistry.RuntimeIDToHash(stoneRID)
+	if !ok {
+		t.Fatal("stone has no network hash")
+	}
+	p := player.New(slog.New(slog.NewTextHandler(io.Discard, nil)), player.MonitoringState{
+		CurrentTime: time.Now(),
+		IsReplay:    true,
+	}, nil)
+	Register(p)
+	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: true}})
+	p.SetServerConn(hashModeServerConn{data: minecraft.GameData{UseBlockNetworkIDHashes: false}})
+	position := cube.Pos{4, 5, 6}
+	p.World().SetBlock(position, block.Stone{}, nil)
+
+	p.SyncBlock(position)
+
+	updater := p.WorldUpdater().(*WorldUpdaterComponent)
+	if got := updater.batchedBlockUpdates.Blocks()[position]; got != stoneRID {
+		t.Fatalf("pending block runtime ID = %d, want canonical runtime ID %d (client hash %d)", got, stoneRID, stoneHash)
+	}
+}
+
 func TestLevelChunkIsTranslatedToRetainedClientHashModeAfterTransfer(t *testing.T) {
 	oomphworld.FinalizeBlockRegistry()
 	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
