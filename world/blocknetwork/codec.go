@@ -13,6 +13,9 @@ func NewCodec(registry chunk.BlockRegistry, mode Mode) Codec {
 	if registry == nil {
 		panic("blocknetwork: nil block registry")
 	}
+	if mode != RuntimeIDs && mode != Hashes {
+		panic("blocknetwork: invalid mode")
+	}
 	return Codec{registry: registry, mode: mode}
 }
 
@@ -37,6 +40,44 @@ func (c Codec) FromRuntimeID(runtimeID uint32) (uint32, bool) {
 	}
 	_, _, ok := c.registry.RuntimeIDToState(runtimeID)
 	return runtimeID, ok
+}
+
+// NormalizeChunk converts block palettes in ch from the codec's network representation to canonical runtime IDs.
+// Unknown IDs are preserved.
+func (c Codec) NormalizeChunk(ch *chunk.Chunk) {
+	if ch != nil && c.mode == Hashes {
+		ch.ConvertBlockNetworkHashesToRuntimeIDs()
+	}
+}
+
+// NormalizeSubChunk converts block palettes in sub from the codec's network representation to canonical runtime IDs.
+// Unknown IDs are preserved.
+func (c Codec) NormalizeSubChunk(sub *chunk.SubChunk) {
+	if sub != nil && c.mode == Hashes {
+		sub.ConvertBlockNetworkHashesToRuntimeIDs(c.registry)
+	}
+}
+
+// EncodeChunk encodes a canonical chunk using the codec's network representation without mutating ch.
+func (c Codec) EncodeChunk(ch *chunk.Chunk) chunk.SerialisedData {
+	if ch == nil {
+		return chunk.SerialisedData{}
+	}
+	if c.mode == Hashes {
+		return chunk.EncodeWithBlockNetworkHashes(ch)
+	}
+	return chunk.Encode(ch, chunk.NetworkEncoding)
+}
+
+// EncodeSubChunk encodes one canonical sub-chunk using the codec's network representation without mutating ch.
+func (c Codec) EncodeSubChunk(ch *chunk.Chunk, index int) []byte {
+	if ch == nil || index < 0 || index >= len(ch.Sub()) {
+		return nil
+	}
+	if c.mode == Hashes {
+		return chunk.EncodeSubChunkWithBlockNetworkHashes(ch, index)
+	}
+	return chunk.EncodeSubChunk(ch, chunk.NetworkEncoding, index)
 }
 
 // Translator converts block IDs from one endpoint codec to another.

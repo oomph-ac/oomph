@@ -1,11 +1,13 @@
 package blocknetwork_test
 
 import (
+	"bytes"
 	"math"
 	"os"
 	"testing"
 
 	"github.com/df-mc/dragonfly/server/block"
+	dfworld "github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/oomph-ac/oomph/world/blocknetwork"
@@ -96,6 +98,108 @@ func TestRuntimeCodecUsesRegistryLookupInsteadOfAssumingDenseIDs(t *testing.T) {
 	}
 }
 
+func TestCodecNormalizesChunkPalettes(t *testing.T) {
+	runtimeID := world.BlockRegistry.BlockRuntimeID(block.Stone{})
+	networkHash, ok := world.BlockRegistry.RuntimeIDToHash(runtimeID)
+	if !ok {
+		t.Fatal("stone runtime ID has no network hash")
+	}
+
+	for _, test := range []struct {
+		name    string
+		mode    blocknetwork.Mode
+		inputID uint32
+	}{
+		{name: "runtime IDs", mode: blocknetwork.RuntimeIDs, inputID: runtimeID},
+		{name: "hashes", mode: blocknetwork.Hashes, inputID: networkHash},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := chunk.New(world.BlockRegistry, dfworld.Overworld.Range())
+			c.SetBlock(1, 0, 1, 0, test.inputID)
+			codec := blocknetwork.NewCodec(world.BlockRegistry, test.mode)
+
+			codec.NormalizeChunk(c)
+
+			if got := c.Block(1, 0, 1, 0); got != runtimeID {
+				t.Fatalf("normalized block ID = %d, want runtime ID %d", got, runtimeID)
+			}
+		})
+	}
+}
+
+func TestCodecNormalizesSubChunkPalettesAndPreservesUnknownIDs(t *testing.T) {
+	runtimeID := world.BlockRegistry.BlockRuntimeID(block.Stone{})
+	networkHash, ok := world.BlockRegistry.RuntimeIDToHash(runtimeID)
+	if !ok {
+		t.Fatal("stone runtime ID has no network hash")
+	}
+	unknownHash := unknownPaletteID(t)
+	c := chunk.New(world.BlockRegistry, dfworld.Overworld.Range())
+	c.SetBlock(1, 0, 1, 0, networkHash)
+	c.SetBlock(2, 0, 2, 0, unknownHash)
+	codec := blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.Hashes)
+
+	codec.NormalizeSubChunk(c.Sub()[c.SubIndex(0)])
+
+	if got := c.Block(1, 0, 1, 0); got != runtimeID {
+		t.Fatalf("normalized block ID = %d, want runtime ID %d", got, runtimeID)
+	}
+	if got := c.Block(2, 0, 2, 0); got != unknownHash {
+		t.Fatalf("unknown block ID = %d, want preserved hash %d", got, unknownHash)
+	}
+}
+
+func TestCodecEncodesChunkWithoutMutatingCanonicalSource(t *testing.T) {
+	runtimeID := world.BlockRegistry.BlockRuntimeID(block.Stone{})
+	networkHash, ok := world.BlockRegistry.RuntimeIDToHash(runtimeID)
+	if !ok {
+		t.Fatal("stone runtime ID has no network hash")
+	}
+
+	for _, test := range []struct {
+		name   string
+		mode   blocknetwork.Mode
+		wantID uint32
+	}{
+		{name: "runtime IDs", mode: blocknetwork.RuntimeIDs, wantID: runtimeID},
+		{name: "hashes", mode: blocknetwork.Hashes, wantID: networkHash},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := chunk.New(world.BlockRegistry, dfworld.Overworld.Range())
+			c.SetBlock(1, 0, 1, 0, runtimeID)
+			codec := blocknetwork.NewCodec(world.BlockRegistry, test.mode)
+
+			encoded := codec.EncodeChunk(c)
+			decoded := decodeChunk(t, encoded)
+
+			if got := decoded.Block(1, 0, 1, 0); got != test.wantID {
+				t.Fatalf("encoded block ID = %d, want %d", got, test.wantID)
+			}
+			if got := c.Block(1, 0, 1, 0); got != runtimeID {
+				t.Fatalf("source block ID = %d, want unchanged runtime ID %d", got, runtimeID)
+			}
+		})
+	}
+}
+
+func TestCodecEncodesSubChunkForMode(t *testing.T) {
+	c := chunk.New(world.BlockRegistry, dfworld.Overworld.Range())
+	c.SetBlock(1, 0, 1, 0, world.BlockRegistry.BlockRuntimeID(block.Stone{}))
+	for _, mode := range []blocknetwork.Mode{blocknetwork.RuntimeIDs, blocknetwork.Hashes} {
+		codec := blocknetwork.NewCodec(world.BlockRegistry, mode)
+		got := codec.EncodeSubChunk(c, 0)
+		var want []byte
+		if mode == blocknetwork.Hashes {
+			want = chunk.EncodeSubChunkWithBlockNetworkHashes(c, 0)
+		} else {
+			want = chunk.EncodeSubChunk(c, chunk.NetworkEncoding, 0)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("EncodeSubChunk mode %v did not use expected network representation", mode)
+		}
+	}
+}
+
 func TestTranslatorConvertsBetweenModes(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +271,17 @@ func TestNewCodecRejectsNilRegistry(t *testing.T) {
 	blocknetwork.NewCodec(nil, blocknetwork.RuntimeIDs)
 }
 
+func TestNewCodecRejectsInvalidMode(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewCodec accepted an invalid mode")
+		}
+	}()
+	blocknetwork.NewCodec(world.BlockRegistry, blocknetwork.Mode(255))
+}
+
 func unknownNetworkHash(t *testing.T) uint32 {
 	t.Helper()
 	for hash := uint32(math.MaxUint32); ; hash-- {
@@ -174,6 +289,17 @@ func unknownNetworkHash(t *testing.T) uint32 {
 			return hash
 		}
 	}
+}
+
+func unknownPaletteID(t *testing.T) uint32 {
+	t.Helper()
+	for hash := uint32(1_000_000_000); hash > 0; hash-- {
+		if _, ok := world.BlockRegistry.HashToRuntimeID(hash); !ok {
+			return hash
+		}
+	}
+	t.Fatal("block registry has no unknown palette ID")
+	return 0
 }
 
 func highBitNetworkHash(t *testing.T) (uint32, uint32) {
@@ -186,6 +312,20 @@ func highBitNetworkHash(t *testing.T) (uint32, uint32) {
 	}
 	t.Fatal("block registry contains no high-bit network hash")
 	return 0, 0
+}
+
+func decodeChunk(t *testing.T, data chunk.SerialisedData) *chunk.Chunk {
+	t.Helper()
+	raw := bytes.NewBuffer(nil)
+	for _, sub := range data.SubChunks {
+		raw.Write(sub)
+	}
+	raw.Write(data.Biomes)
+	decoded, err := chunk.NetworkDecode(world.BlockRegistry, raw.Bytes(), len(data.SubChunks), dfworld.Overworld.Range())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return decoded
 }
 
 type sparseBlockRegistry struct {
