@@ -7,7 +7,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/zeebo/xxh3"
 
@@ -17,17 +16,16 @@ import (
 )
 
 type ChunkInfo struct {
-	Cached           bool
-	Hash             xxh3.Uint128
-	blockNetworkMode blocknetwork.Mode
-	Chunk            *chunk.Chunk
+	Cached bool
+	Hash   xxh3.Uint128
+	Chunk  *chunk.Chunk
 }
 
 type World struct {
 	lastCleanPos protocol.ChunkPos
 
 	chunks    map[protocol.ChunkPos]ChunkInfo
-	subChunks map[protocol.ChunkPos][]blockCacheKey
+	subChunks map[protocol.ChunkPos][]xxh3.Uint128
 
 	exemptedChunks map[protocol.ChunkPos]struct{}
 	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
@@ -40,7 +38,7 @@ type World struct {
 func New(debugFn func(string, ...any)) *World {
 	return &World{
 		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
-		subChunks: make(map[protocol.ChunkPos][]blockCacheKey),
+		subChunks: make(map[protocol.ChunkPos][]xxh3.Uint128),
 
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
 		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
@@ -68,11 +66,11 @@ func (w *World) AddChunk(chunkPos protocol.ChunkPos, c ChunkInfo) {
 }
 
 // AddSubChunk adds a subchunk to the world.
-func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128, codec blocknetwork.Codec) {
+func (w *World) AddSubChunk(chunkPos protocol.ChunkPos, hash xxh3.Uint128) {
 	if _, ok := w.subChunks[chunkPos]; !ok {
-		w.subChunks[chunkPos] = make([]blockCacheKey, 0, 16)
+		w.subChunks[chunkPos] = make([]xxh3.Uint128, 0, 16)
 	}
-	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], blockCacheKey{hash: hash, mode: codec.Mode()})
+	w.subChunks[chunkPos] = append(w.subChunks[chunkPos], hash)
 }
 
 // Chunk returns a cached chunk at the position passed. The mutex is
@@ -170,11 +168,11 @@ func (w *World) PurgeChunks() {
 
 func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
 	if info.Cached {
-		unsubC(blockCacheKey{hash: info.Hash, mode: info.blockNetworkMode})
+		unsubC(info.Hash)
 	}
 	if subChunks, ok := w.subChunks[chunkPos]; ok {
-		for _, subChunkKey := range subChunks {
-			unsubSC(subChunkKey)
+		for _, subChunkHash := range subChunks {
+			unsubSC(subChunkHash)
 		}
 	}
 	delete(w.subChunks, chunkPos)

@@ -99,7 +99,7 @@ func (ack *SubChunkUpdate) Run() {
 				continue
 			}
 			ch.Sub()[cachedSub.Layer()] = cachedSub.SubChunk()
-			ack.mPlayer.World().AddSubChunk(chunkPos, cachedSub.Hash(), ack.mPlayer.BlockNetwork())
+			ack.mPlayer.World().AddSubChunk(chunkPos, cachedSub.Hash())
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "cached subchunk %d at %v", cachedSub.Layer(), chunkPos)
 		case protocol.SubChunkResultSuccessAllAir:
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all-air chunk at %v", chunkPos)

@@ -15,40 +15,35 @@ import (
 )
 
 var (
-	chunkCache = make(map[blockCacheKey]*CachedChunk)
+	chunkCache = make(map[xxh3.Uint128]*CachedChunk)
 	cMu        sync.Mutex
 
-	subChunkCache = make(map[blockCacheKey]*CachedSubChunk)
+	subChunkCache = make(map[xxh3.Uint128]*CachedSubChunk)
 	scMu          sync.Mutex
 )
 
-type blockCacheKey struct {
-	hash xxh3.Uint128
-	mode blocknetwork.Mode
-}
-
-func unsubC(key blockCacheKey) {
+func unsubC(hash xxh3.Uint128) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
-	if c, ok := chunkCache[key]; ok {
+	if c, ok := chunkCache[hash]; ok {
 		c.subs.Add(-1)
 		if c.subs.Load() <= 0 {
-			delete(chunkCache, key)
+			delete(chunkCache, hash)
 		}
 	}
 }
 
-func unsubSC(key blockCacheKey) {
+func unsubSC(hash xxh3.Uint128) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
-	if c, ok := subChunkCache[key]; ok {
+	if c, ok := subChunkCache[hash]; ok {
 		//fmt.Println("unsubscribing from subchunk", hash, c.subs.Load())
 		c.subs.Add(-1)
 		if c.subs.Load() <= 0 {
 			//fmt.Println("deleting subchunk from cache", hash)
-			delete(subChunkCache, key)
+			delete(subChunkCache, hash)
 		}
 	}
 }
@@ -57,8 +52,8 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos,
 	scMu.Lock()
 	defer scMu.Unlock()
 
-	key := blockCacheKey{hash: xxh3.Hash128(payload.Bytes()), mode: codec.Mode()}
-	if sc, ok := subChunkCache[key]; ok {
+	hash := xxh3.Hash128Seed(payload.Bytes(), uint64(codec.Mode()))
+	if sc, ok := subChunkCache[hash]; ok {
 		sc.subs.Add(1)
 		//fmt.Println("returning cached subchunk", hash)
 		return sc, nil
@@ -73,9 +68,9 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos,
 		decodedSC.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
 	}
 
-	cachedSC := &CachedSubChunk{hash: key.hash, layer: index, sc: decodedSC}
+	cachedSC := &CachedSubChunk{hash: hash, layer: index, sc: decodedSC}
 	cachedSC.subs.Add(1)
-	subChunkCache[key] = cachedSC
+	subChunkCache[hash] = cachedSC
 
 	//fmt.Println("newly cached subchunk", hash)
 	return cachedSC, nil
@@ -85,11 +80,11 @@ func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, 
 	cMu.Lock()
 	defer cMu.Unlock()
 
-	key := blockCacheKey{hash: xxh3.Hash128(input.RawPayload), mode: codec.Mode()}
-	if c, ok := chunkCache[key]; ok {
+	hash := xxh3.Hash128Seed(input.RawPayload, uint64(codec.Mode()))
+	if c, ok := chunkCache[hash]; ok {
 		c.subs.Add(1)
-		//fmt.Println("returning cached chunk", key.hash)
-		return ChunkInfo{Hash: key.hash, blockNetworkMode: codec.Mode(), Chunk: c.chunk, Cached: true}, nil
+		//fmt.Println("returning cached chunk", hash)
+		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true}, nil
 	}
 
 	dimension, ok := world.DimensionByID(int(input.Dimension))
@@ -111,10 +106,10 @@ func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, 
 	}
 	decodedChunk.Compact()
 
-	cachedChunk := &CachedChunk{hash: key.hash, chunk: decodedChunk}
+	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk}
 	cachedChunk.subs.Add(1)
-	chunkCache[key] = cachedChunk
-	return ChunkInfo{Hash: key.hash, blockNetworkMode: codec.Mode(), Chunk: cachedChunk.chunk, Cached: true}, nil
+	chunkCache[hash] = cachedChunk
+	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true}, nil
 }
 
 // ReencodeLevelChunk fully re-encodes the block palettes in input while preserving the session's block-network
