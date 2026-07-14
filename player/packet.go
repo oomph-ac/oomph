@@ -44,7 +44,9 @@ var ServerDecode = []uint32{
 	packet.IDInventoryContent,
 	packet.IDInventoryTransaction,
 	packet.IDItemStackResponse,
+	packet.IDLevelEvent,
 	packet.IDLevelChunk,
+	packet.IDLevelSoundEvent,
 	packet.IDMobEffect,
 	packet.IDMobEquipment,
 	packet.IDMobArmourEquipment,
@@ -340,6 +342,8 @@ func (p *Player) rewriteClientBlockNetworkIDs(pk packet.Packet) bool {
 	case *packet.MobEquipment:
 		rewriteStack(&pk.NewItem.Stack)
 		return true
+	case *packet.LevelSoundEvent:
+		return rewriteLevelSoundBlockNetworkID(pk, p.ClientToBackendBlockNetwork())
 	}
 	return false
 }
@@ -608,12 +612,12 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 			p.CreativeItems[item.CreativeItemNetworkID] = item
 		}
 	}
-	if p.BackendToClientBlockNetwork().Required() && p.rewriteServerItemBlockNetworkIDs(pk) {
+	if p.BackendToClientBlockNetwork().Required() && p.rewriteServerBlockNetworkIDs(pk) {
 		ctx.SetModified()
 	}
 }
 
-func (p *Player) rewriteServerItemBlockNetworkIDs(pk packet.Packet) bool {
+func (p *Player) rewriteServerBlockNetworkIDs(pk packet.Packet) bool {
 	rewriteStack := func(stack *protocol.ItemStack) {
 		if stack.BlockRuntimeID != 0 {
 			stack.BlockRuntimeID = int32(p.BlockRuntimeIDFromBackendToClient(uint32(stack.BlockRuntimeID)))
@@ -648,9 +652,20 @@ func (p *Player) rewriteServerItemBlockNetworkIDs(pk packet.Packet) bool {
 	case *packet.AddPlayer:
 		rewriteStack(&pk.HeldItem.Stack)
 		return true
+	case *packet.AddActor:
+		if pk.EntityType != fallingBlockEntityType {
+			return false
+		}
+		metadata, modified := rewriteFallingBlockMetadata(pk.EntityMetadata, p.BackendToClientBlockNetwork())
+		pk.EntityMetadata = metadata
+		return modified
 	case *packet.AddItemActor:
 		rewriteStack(&pk.Item.Stack)
 		return true
+	case *packet.LevelEvent:
+		return rewriteLevelEventBlockNetworkID(pk, p.BackendToClientBlockNetwork())
+	case *packet.LevelSoundEvent:
+		return rewriteLevelSoundBlockNetworkID(pk, p.BackendToClientBlockNetwork())
 	case *packet.CreativeContent:
 		for i := range pk.Groups {
 			rewriteStack(&pk.Groups[i].Icon)

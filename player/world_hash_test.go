@@ -176,6 +176,25 @@ func TestRewriteClientBlockNetworkIDsCoversStandaloneCraftResults(t *testing.T) 
 	}
 }
 
+func TestRewriteClientBlockNetworkIDsCoversBlockSound(t *testing.T) {
+	world.FinalizeBlockRegistry()
+	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
+	stoneHash, ok := world.BlockRegistry.RuntimeIDToHash(stoneRID)
+	if !ok {
+		t.Fatal("stone has no network hash")
+	}
+	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
+	pk := &packet.LevelSoundEvent{SoundType: packet.SoundEventPlace, ExtraData: int32(stoneHash)}
+
+	if !p.rewriteClientBlockNetworkIDs(pk) {
+		t.Fatal("block sound was not rewritten")
+	}
+	if got := uint32(pk.ExtraData); got != stoneRID {
+		t.Fatalf("block sound ID = %d, want runtime ID %d", got, stoneRID)
+	}
+}
+
 func TestRewriteServerInventoryStackUsesRetainedClientMode(t *testing.T) {
 	world.FinalizeBlockRegistry()
 	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
@@ -190,7 +209,7 @@ func TestRewriteServerInventoryStackUsesRetainedClientMode(t *testing.T) {
 		StorageItem: protocol.Option(protocol.ItemInstance{Stack: protocol.ItemStack{BlockRuntimeID: int32(stoneHash)}}),
 	}
 
-	if !p.rewriteServerItemBlockNetworkIDs(pk) {
+	if !p.rewriteServerBlockNetworkIDs(pk) {
 		t.Fatal("inventory slot was not rewritten")
 	}
 	if got := uint32(pk.NewItem.Stack.BlockRuntimeID); got != stoneRID {
@@ -205,7 +224,7 @@ func TestRewriteServerInventoryStackUsesRetainedClientMode(t *testing.T) {
 	}
 	original := []protocol.ItemInstance{{Stack: protocol.ItemStack{BlockRuntimeID: int32(stoneHash)}}}
 	content := &packet.InventoryContent{Content: original}
-	if !p.rewriteServerItemBlockNetworkIDs(content) {
+	if !p.rewriteServerBlockNetworkIDs(content) {
 		t.Fatal("inventory content was not rewritten")
 	}
 	if got := uint32(content.Content[0].Stack.BlockRuntimeID); got != stoneRID {
@@ -213,6 +232,64 @@ func TestRewriteServerInventoryStackUsesRetainedClientMode(t *testing.T) {
 	}
 	if got := uint32(original[0].Stack.BlockRuntimeID); got != stoneHash {
 		t.Fatalf("retained backend inventory block ID = %d, want hash %d", got, stoneHash)
+	}
+}
+
+func TestRewriteServerBlockNetworkIDsCoversBlockEvents(t *testing.T) {
+	world.FinalizeBlockRegistry()
+	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
+	stoneHash, ok := world.BlockRegistry.RuntimeIDToHash(stoneRID)
+	if !ok {
+		t.Fatal("stone has no network hash")
+	}
+	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
+	setBlockNetworkModes(p, blocknetwork.RuntimeIDs, blocknetwork.Hashes)
+
+	event := &packet.LevelEvent{EventType: packet.LevelEventParticlesDestroyBlock, EventData: int32(stoneHash)}
+	if !p.rewriteServerBlockNetworkIDs(event) {
+		t.Fatal("block event was not rewritten")
+	}
+	if got := uint32(event.EventData); got != stoneRID {
+		t.Fatalf("block event ID = %d, want runtime ID %d", got, stoneRID)
+	}
+
+	sound := &packet.LevelSoundEvent{SoundType: packet.SoundEventHit, ExtraData: int32(stoneHash)}
+	if !p.rewriteServerBlockNetworkIDs(sound) {
+		t.Fatal("block sound was not rewritten")
+	}
+	if got := uint32(sound.ExtraData); got != stoneRID {
+		t.Fatalf("block sound ID = %d, want runtime ID %d", got, stoneRID)
+	}
+}
+
+func TestRewriteServerBlockNetworkIDsCoversFallingBlockMetadata(t *testing.T) {
+	world.FinalizeBlockRegistry()
+	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
+	stoneHash, ok := world.BlockRegistry.RuntimeIDToHash(stoneRID)
+	if !ok {
+		t.Fatal("stone has no network hash")
+	}
+	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
+	setBlockNetworkModes(p, blocknetwork.RuntimeIDs, blocknetwork.Hashes)
+	backendMetadata := map[uint32]any{protocol.EntityDataKeyVariant: int32(stoneHash)}
+	pk := &packet.AddActor{EntityType: "minecraft:falling_block", EntityMetadata: backendMetadata}
+
+	if !p.rewriteServerBlockNetworkIDs(pk) {
+		t.Fatal("falling-block metadata was not rewritten")
+	}
+	if got := uint32(pk.EntityMetadata[protocol.EntityDataKeyVariant].(int32)); got != stoneRID {
+		t.Fatalf("falling-block metadata ID = %d, want runtime ID %d", got, stoneRID)
+	}
+	if got := uint32(backendMetadata[protocol.EntityDataKeyVariant].(int32)); got != stoneHash {
+		t.Fatalf("retained backend metadata ID = %d, want hash %d", got, stoneHash)
+	}
+
+	unrelated := &packet.AddActor{
+		EntityType:     "minecraft:tropicalfish",
+		EntityMetadata: map[uint32]any{protocol.EntityDataKeyVariant: int32(stoneHash)},
+	}
+	if p.rewriteServerBlockNetworkIDs(unrelated) {
+		t.Fatal("unrelated entity variant was rewritten")
 	}
 }
 
@@ -230,7 +307,7 @@ func TestRewriteServerRecipesPreservesBackendOutputs(t *testing.T) {
 	}}
 	pk := &packet.CraftingData{Recipes: []protocol.Recipe{backendRecipe}}
 
-	if !p.rewriteServerItemBlockNetworkIDs(pk) {
+	if !p.rewriteServerBlockNetworkIDs(pk) {
 		t.Fatal("crafting data was not rewritten")
 	}
 	clientRecipe := pk.Recipes[0].(*protocol.ShapedChemistryRecipe)
