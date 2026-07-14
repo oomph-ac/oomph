@@ -77,7 +77,7 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", pk.NewBlockRuntimeID, "pos", pos)
 		return
 	}
-	c.AddPendingUpdate(pos, pk.NewBlockRuntimeID)
+	c.AddPendingUpdate(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -86,10 +86,10 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
 	for _, entry := range pk.Blocks {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, entry.BlockRuntimeID)
+		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
 	}
 	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, entry.BlockRuntimeID)
+		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
 	}
 }
 
@@ -188,7 +188,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	case *block.Air:
 		// This only happens when Dragonfly is unsure of what the item is (unregistered), so we use the client-authoritative block in hand.
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "called c.mPlayer.PlaceBlock: using client-authoritative block in hand")
-		if b, ok := df_world.BlockByRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID)); ok {
+		if b, ok := df_world.BlockByRuntimeID(c.mPlayer.DecodeBlockRuntimeID(uint32(dat.HeldItem.Stack.BlockRuntimeID))); ok {
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "placing block with runtime ID: %d", dat.HeldItem.Stack.BlockRuntimeID)
 
 			// If the block at the position is not replacable, we want to place the block on the side of the block.

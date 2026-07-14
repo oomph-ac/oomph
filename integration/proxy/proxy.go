@@ -285,8 +285,13 @@ func (s *session) transfer(ctx context.Context, address string) (bool, error) {
 	}
 
 	s.routeMu.Lock()
+	state, err := s.player.TransferServerConn(backend)
+	if err != nil {
+		s.routeMu.Unlock()
+		_ = backend.Close()
+		return false, err
+	}
 	old := s.swapBackend(backend)
-	state := s.player.TransferServerConn(backend)
 	err = s.resetTransferState(state)
 	s.routeMu.Unlock()
 	_ = old.Close()
