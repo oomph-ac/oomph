@@ -138,7 +138,7 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 			newVel[1] = 0
 		}
 
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "added climb velocity: %v (collided=%v pressingJump=%v)", newVel, movement.XCollision() || movement.ZCollision(), movement.PressingJump())
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "added climb velocity: %v (collided=%v effectiveJumping=%v)", newVel, movement.XCollision() || movement.ZCollision(), movement.EffectiveJumping())
 		movement.SetVel(newVel)
 	}
 
