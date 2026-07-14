@@ -9,6 +9,8 @@ import (
 
 	"github.com/df-mc/dragonfly/server/block"
 	dfworld "github.com/df-mc/dragonfly/server/world"
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/oomph/entity"
 	"github.com/oomph-ac/oomph/world"
 	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -318,12 +320,14 @@ func TestRewriteServerBlockNetworkIDsCoversBlockValuedActorMetadata(t *testing.T
 	updateMetadata := map[uint32]any{
 		protocol.EntityDataKeyCarryBlockRuntimeID:  int32(stoneHash),
 		protocol.EntityDataKeyDisplayTileRuntimeID: int32(stoneHash),
+		protocol.EntityDataKeyVariant:              int32(stoneHash),
 	}
-	update := &packet.SetActorData{EntityMetadata: updateMetadata}
+	p.entTracker = actorTypeTracker{entity: &entity.Entity{Type: fallingBlockEntityType}}
+	update := &packet.SetActorData{EntityRuntimeID: 42, EntityMetadata: updateMetadata}
 	if !p.rewriteServerBlockNetworkIDs(update) {
 		t.Fatal("block-valued actor metadata update was not rewritten")
 	}
-	for _, key := range []uint32{protocol.EntityDataKeyCarryBlockRuntimeID, protocol.EntityDataKeyDisplayTileRuntimeID} {
+	for _, key := range []uint32{protocol.EntityDataKeyCarryBlockRuntimeID, protocol.EntityDataKeyDisplayTileRuntimeID, protocol.EntityDataKeyVariant} {
 		if got := uint32(update.EntityMetadata[key].(int32)); got != stoneRID {
 			t.Fatalf("actor metadata key %d ID = %d, want runtime ID %d", key, got, stoneRID)
 		}
@@ -332,6 +336,46 @@ func TestRewriteServerBlockNetworkIDsCoversBlockValuedActorMetadata(t *testing.T
 		}
 	}
 }
+
+func TestRetainedClientEquipmentIsIndependentOfBackendTranslation(t *testing.T) {
+	world.FinalizeBlockRegistry()
+	stoneRID := dfworld.BlockRuntimeID(block.Stone{})
+	stoneHash, ok := world.BlockRegistry.RuntimeIDToHash(stoneRID)
+	if !ok {
+		t.Fatal("stone has no network hash")
+	}
+	p := New(slog.New(slog.NewTextHandler(io.Discard, nil)), MonitoringState{CurrentTime: time.Now()}, nil)
+	setBlockNetworkModes(p, blocknetwork.Hashes, blocknetwork.RuntimeIDs)
+	pk := &packet.MobEquipment{NewItem: protocol.ItemInstance{Stack: protocol.ItemStack{BlockRuntimeID: int32(stoneHash)}}}
+
+	p.retainClientEquipment(pk)
+	p.rewriteClientBlockNetworkIDs(pk)
+
+	if got := uint32(pk.NewItem.Stack.BlockRuntimeID); got != stoneRID {
+		t.Fatalf("backend equipment block ID = %d, want runtime ID %d", got, stoneRID)
+	}
+	if got := uint32(p.LastEquipmentData.NewItem.Stack.BlockRuntimeID); got != stoneHash {
+		t.Fatalf("retained client equipment block ID = %d, want hash %d", got, stoneHash)
+	}
+	generated := p.ClientItemForBackend(p.LastEquipmentData.NewItem)
+	if got := uint32(generated.Stack.BlockRuntimeID); got != stoneRID {
+		t.Fatalf("generated backend equipment block ID = %d, want runtime ID %d", got, stoneRID)
+	}
+}
+
+type actorTypeTracker struct {
+	entity *entity.Entity
+}
+
+func (actorTypeTracker) AddEntity(uint64, *entity.Entity)                  {}
+func (actorTypeTracker) RemoveEntity(uint64)                               {}
+func (t actorTypeTracker) FindEntity(uint64) *entity.Entity                { return t.entity }
+func (actorTypeTracker) All() map[uint64]*entity.Entity                    { return nil }
+func (actorTypeTracker) MoveEntity(uint64, int64, mgl32.Vec3, bool)        {}
+func (actorTypeTracker) HandleMovePlayer(*packet.MovePlayer)               {}
+func (actorTypeTracker) HandleMoveActorAbsolute(*packet.MoveActorAbsolute) {}
+func (actorTypeTracker) HandleSetActorData(*packet.SetActorData)           {}
+func (actorTypeTracker) Tick(int64)                                        {}
 
 func TestRewriteServerRecipesPreservesBackendOutputs(t *testing.T) {
 	world.FinalizeBlockRegistry()

@@ -517,7 +517,7 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 
 	var newItem protocol.ItemInstance
 	if c.mPlayer.LastEquipmentData != nil {
-		newItem = c.mPlayer.LastEquipmentData.NewItem
+		newItem = c.mPlayer.ClientItemForBackend(c.mPlayer.LastEquipmentData.NewItem)
 	}
 
 	c.attackInput = &packet.InventoryTransaction{

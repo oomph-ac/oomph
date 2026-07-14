@@ -262,7 +262,7 @@ func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
 			ctx.Cancel()
 		}
 	case *packet.MobEquipment:
-		p.LastEquipmentData = pk
+		p.retainClientEquipment(pk)
 		if pk.WindowID == protocol.WindowIDInventory {
 			p.inventory.SetHeldSlot(int32(pk.HotBarSlot))
 		}
@@ -346,6 +346,19 @@ func (p *Player) rewriteClientBlockNetworkIDs(pk packet.Packet) bool {
 		return rewriteLevelSoundBlockNetworkID(pk, p.ClientToBackendBlockNetwork())
 	}
 	return false
+}
+
+func (p *Player) retainClientEquipment(pk *packet.MobEquipment) {
+	retained := *pk
+	p.LastEquipmentData = &retained
+}
+
+// ClientItemForBackend translates an item retained in the client's block network mode to the current backend mode.
+func (p *Player) ClientItemForBackend(instance protocol.ItemInstance) protocol.ItemInstance {
+	if instance.Stack.BlockRuntimeID != 0 {
+		instance.Stack.BlockRuntimeID = int32(p.BlockRuntimeIDFromClientToBackend(uint32(instance.Stack.BlockRuntimeID)))
+	}
+	return instance
 }
 
 // splitCommandLine splits a command line into arguments, preserving quoted substrings
@@ -659,7 +672,13 @@ func (p *Player) rewriteServerBlockNetworkIDs(pk packet.Packet) bool {
 		pk.EntityMetadata = metadata
 		return modified
 	case *packet.SetActorData:
-		metadata, modified := rewriteActorBlockMetadata(pk.EntityMetadata, p.BackendToClientBlockNetwork(), false)
+		fallingBlock := false
+		if p.entTracker != nil {
+			if actor := p.entTracker.FindEntity(pk.EntityRuntimeID); actor != nil {
+				fallingBlock = actor.Type == fallingBlockEntityType
+			}
+		}
+		metadata, modified := rewriteActorBlockMetadata(pk.EntityMetadata, p.BackendToClientBlockNetwork(), fallingBlock)
 		pk.EntityMetadata = metadata
 		return modified
 	case *packet.AddItemActor:
