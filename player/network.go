@@ -2,10 +2,12 @@ package player
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -41,7 +43,9 @@ func (p *Player) SetServerConn(conn ServerConn) {
 		return
 	}
 
+	blockNetwork := blocknetwork.NewCodec(p.World().BlockRegistry(), blocknetwork.ModeFromHashes(conn.GameData().UseBlockNetworkIDHashes))
 	if p.serverConn == nil {
+		p.blockNetwork = blockNetwork
 		for _, item := range conn.GameData().Items {
 			if i, ok := world.ItemByName(item.Name, 0); ok {
 				p.items[item.RuntimeID] = i
@@ -63,6 +67,11 @@ func (p *Player) SetServerConn(conn ServerConn) {
 	p.movement.ResetTransferState(p.GameDat.PlayerPosition)
 }
 
+// BlockNetwork returns the codec shared by the client and every backend in this session.
+func (p *Player) BlockNetwork() blocknetwork.Codec {
+	return p.blockNetwork
+}
+
 // BackendTransferState contains client-visible state that must be cleared when
 // a proxy switches this player to another backend.
 type BackendTransferState struct {
@@ -72,11 +81,15 @@ type BackendTransferState struct {
 // TransferServerConn atomically installs a backend and clears state owned by
 // the previous backend. It uses the same processing lock as packet handling and
 // Tick, so no component can observe a partially reset transfer.
-func (p *Player) TransferServerConn(conn ServerConn) BackendTransferState {
+func (p *Player) TransferServerConn(conn ServerConn) (BackendTransferState, error) {
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
 
 	state := BackendTransferState{EffectIDs: make([]int32, 0, len(p.effects.All()))}
+	targetMode := blocknetwork.ModeFromHashes(conn.GameData().UseBlockNetworkIDHashes)
+	if targetMode != p.blockNetwork.Mode() {
+		return state, fmt.Errorf("backend block-hash setting %t does not match session setting %t", targetMode == blocknetwork.Hashes, p.blockNetwork.Mode() == blocknetwork.Hashes)
+	}
 	for effectID := range p.effects.All() {
 		state.EffectIDs = append(state.EffectIDs, effectID)
 	}
@@ -91,7 +104,7 @@ func (p *Player) TransferServerConn(conn ServerConn) BackendTransferState {
 	p.effects.RemoveAll()
 	p.combat.Reset()
 	p.clientCombat.Reset()
-	return state
+	return state, nil
 }
 
 // ChunkRadius returns the chunk radius as requested by the client at the other end of the conn.

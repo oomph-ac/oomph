@@ -8,6 +8,7 @@ import (
 
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 	"github.com/zeebo/xxh3"
@@ -47,11 +48,11 @@ func unsubSC(hash xxh3.Uint128) {
 	}
 }
 
-func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos) (*CachedSubChunk, error) {
+func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos, codec blocknetwork.Codec) (*CachedSubChunk, error) {
 	scMu.Lock()
 	defer scMu.Unlock()
 
-	hash := xxh3.Hash128(payload.Bytes())
+	hash := xxh3.Hash128Seed(payload.Bytes(), uint64(codec.Mode()))
 	if sc, ok := subChunkCache[hash]; ok {
 		sc.subs.Add(1)
 		//fmt.Println("returning cached subchunk", hash)
@@ -63,6 +64,9 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	if err != nil {
 		return nil, err
 	}
+	if codec.Mode() == blocknetwork.Hashes {
+		decodedSC.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
+	}
 
 	cachedSC := &CachedSubChunk{hash: hash, layer: index, sc: decodedSC}
 	cachedSC.subs.Add(1)
@@ -72,11 +76,11 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos)
 	return cachedSC, nil
 }
 
-func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
+func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, error) {
 	cMu.Lock()
 	defer cMu.Unlock()
 
-	hash := xxh3.Hash128(input.RawPayload)
+	hash := xxh3.Hash128Seed(input.RawPayload, uint64(codec.Mode()))
 	if c, ok := chunkCache[hash]; ok {
 		c.subs.Add(1)
 		//fmt.Println("returning cached chunk", hash)
@@ -97,12 +101,47 @@ func CacheChunk(input *packet.LevelChunk) (ChunkInfo, error) {
 	if err != nil {
 		return ChunkInfo{}, err
 	}
-	decodedChunk.Compact()
+	if codec.Mode() == blocknetwork.Hashes {
+		decodedChunk.ConvertBlockNetworkHashesToRuntimeIDs()
+	}
+	decodedChunk.CompactForRuntimeCache()
 
 	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk}
 	cachedChunk.subs.Add(1)
 	chunkCache[hash] = cachedChunk
 	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true}, nil
+}
+
+// ReencodeLevelChunk fully re-encodes the block palettes in input while preserving the session's block-network
+// representation and trailing block entity data.
+func ReencodeLevelChunk(input *packet.LevelChunk, codec blocknetwork.Codec) error {
+	dimension, ok := world.DimensionByID(int(input.Dimension))
+	if !ok {
+		return fmt.Errorf("unknown dimension %v", input.Dimension)
+	}
+	buf := bytes.NewBuffer(input.RawPayload)
+	decoded, _, err := chunk.NetworkDecodeBuffer(BlockRegistry, buf, int(input.SubChunkCount), dimension.Range())
+	if err != nil {
+		return err
+	}
+	if codec.Mode() == blocknetwork.Hashes {
+		decoded.ConvertBlockNetworkHashesToRuntimeIDs()
+	}
+	var data chunk.SerialisedData
+	if codec.Mode() == blocknetwork.Hashes {
+		data = chunk.EncodeWithBlockNetworkHashes(decoded)
+	} else {
+		data = chunk.Encode(decoded, chunk.NetworkEncoding)
+	}
+	out := bytes.NewBuffer(make([]byte, 0, len(input.RawPayload)))
+	for _, sub := range data.SubChunks {
+		out.Write(sub)
+	}
+	out.Write(data.Biomes)
+	out.Write(buf.Bytes())
+	input.RawPayload = out.Bytes()
+	input.SubChunkCount = uint32(len(data.SubChunks))
+	return nil
 }
 
 type CachedSubChunk struct {

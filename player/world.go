@@ -12,6 +12,7 @@ import (
 	"github.com/oomph-ac/oomph/game"
 	"github.com/oomph-ac/oomph/utils"
 	oworld "github.com/oomph-ac/oomph/world"
+	"github.com/oomph-ac/oomph/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -71,6 +72,32 @@ func (p *Player) World() *oworld.World {
 	return p.world
 }
 
+// DecodeBlockRuntimeID converts a network block ID to Oomph's canonical registry runtime ID.
+// Unknown values are preserved so callers can retain their existing fallback.
+func (p *Player) DecodeBlockRuntimeID(id uint32) uint32 {
+	return blockRuntimeIDFromNetwork(p.blockNetwork, id)
+}
+
+// EncodeBlockRuntimeID converts a canonical registry runtime ID to the session's network representation.
+// Unknown values are preserved so custom block fallbacks remain intact.
+func (p *Player) EncodeBlockRuntimeID(id uint32) uint32 {
+	return blockRuntimeIDToNetwork(p.blockNetwork, id)
+}
+
+func blockRuntimeIDFromNetwork(codec blocknetwork.Codec, id uint32) uint32 {
+	if runtimeID, ok := codec.ToRuntimeID(id); ok {
+		return runtimeID
+	}
+	return id
+}
+
+func blockRuntimeIDToNetwork(codec blocknetwork.Codec, id uint32) uint32 {
+	if networkID, ok := codec.FromRuntimeID(id); ok {
+		return networkID
+	}
+	return id
+}
+
 // This function is deprecated and instead, the user should call p.World().PurgeChunks() directly.
 func (p *Player) RegenerateWorld() {
 	p.world.PurgeChunks()
@@ -93,17 +120,18 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 	if p.WorldUpdater().HasPendingUpdate(pos) {
 		return
 	}
+	blockRuntimeID := world.BlockRuntimeID(p.World().Block(pos))
 	pk := &packet.UpdateBlock{
 		Position: protocol.BlockPos{
 			int32(pos[0]),
 			int32(pos[1]),
 			int32(pos[2]),
 		},
-		NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(pos)),
+		NewBlockRuntimeID: p.EncodeBlockRuntimeID(blockRuntimeID),
 		Flags:             packet.BlockUpdateNetwork,
 		Layer:             0, // TODO: Implement and account for multi-layer blocks.
 	}
-	p.WorldUpdater().HandleUpdateBlock(pk)
+	p.WorldUpdater().AddPendingUpdate(pos, blockRuntimeID)
 	_ = p.SendPacketToClient(pk)
 }
 
@@ -166,11 +194,11 @@ func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
 	for _, pos := range positions {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: pos,
-			NewBlockRuntimeID: world.BlockRuntimeID(p.World().Block(df_cube.Pos{
+			NewBlockRuntimeID: p.EncodeBlockRuntimeID(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
 				int(pos.X()),
 				int(pos.Y()),
 				int(pos.Z()),
-			})),
+			}))),
 			Flags: packet.BlockUpdateNeighbours,
 			Layer: 0, // TODO: Implement and account for multi-layer blocks.
 		})
@@ -433,22 +461,21 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		return 1
 	}
 
-	breakTime := float32(block.BreakDuration(b, held).Milliseconds())
+	breakContext := block.BreakContext{}
+	if effect, ok := p.effects.Get(packet.EffectHaste); ok {
+		breakContext.HasteLevel = int(effect.Amplifier)
+	}
+	if effect, ok := p.effects.Get(packet.EffectConduitPower); ok {
+		breakContext.ConduitPowerLevel = int(effect.Amplifier)
+	}
+	if effect, ok := p.effects.Get(packet.EffectMiningFatigue); ok {
+		breakContext.MiningFatigueLevel = int(effect.Amplifier)
+	}
+	breakTime := float32(block.BreakDuration(b, held, breakContext).Milliseconds())
 	// On versions below 1.21.50, the block break time for wool is shorter by ~25% See https://github.com/oomph-ac/oomph/issues/107
 	if _, isWool := b.(block.Wool); isWool && p.Version < GameVersion1_21_50 {
 		breakTime *= 0.75
 	}
 
-	/* if !p.movement.OnGround() {
-		breakTime *= 5
-	} */
-	for effectID, e := range p.effects.All() {
-		switch effectID {
-		case packet.EffectHaste:
-			breakTime *= float32(1 - (0.2 * float64(e.Amplifier)))
-		case packet.EffectMiningFatigue:
-			breakTime *= float32(1 + (0.3 * float64(e.Amplifier)))
-		}
-	}
 	return float32(breakTime / 50)
 }

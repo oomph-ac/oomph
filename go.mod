@@ -2,9 +2,7 @@ module github.com/oomph-ac/oomph
 
 go 1.26.0
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260702190811-865056f9d47f
-
-replace github.com/sandertv/gophertunnel => github.com/hashimthearab/gophertunnel v1.25.3-0.20260713165240-828896b9c778
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260714052818-ea2fd40ad95e
 
 require (
 	github.com/chewxy/math32 v1.11.1
@@ -14,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hjson/hjson-go/v4 v4.6.0
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
-	github.com/sandertv/gophertunnel v1.57.0
+	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 )
