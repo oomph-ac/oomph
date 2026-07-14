@@ -72,9 +72,6 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		len(lavaBlocks),
 		movement.Swimming(),
 	)
-	if movement.Swimming() && len(waterBlocks) == 0 {
-		movement.SetSwimming(false)
-	}
 	if !movement.Flying() && (len(waterBlocks) != 0 || len(lavaBlocks) != 0) {
 		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied in liquid: %v", movement.Vel())
 		if len(waterBlocks) != 0 {
@@ -320,10 +317,17 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 
 	if jumping {
 		newVel := movement.Vel()
-		below := liquidMovementBlock(p, df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.1}))))
-		_, belowAir := below.(block.Air)
+		jumpUnsupported := false
+		if movement.Swimming() {
+			blockPos := df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.1})))
+			if _, air := liquidMovementBlock(p, blockPos).(block.Air); air {
+				liquidPos := df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.2})))
+				_, supported := liquidAt(p, liquidPos)
+				jumpUnsupported = !supported
+			}
+		}
 		swimTransition := movement.SwimAmount() > 0 && movement.SwimAmount() < 1
-		if movement.Swimming() && belowAir || swimTransition {
+		if jumpUnsupported || swimTransition {
 			newVel[1] = 0
 		} else {
 			newVel[1] += 0.04
