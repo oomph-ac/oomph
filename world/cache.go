@@ -104,7 +104,7 @@ func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, 
 	if codec.Mode() == blocknetwork.Hashes {
 		decodedChunk.ConvertBlockNetworkHashesToRuntimeIDs()
 	}
-	decodedChunk.Compact()
+	decodedChunk.CompactForRuntimeCache()
 
 	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk}
 	cachedChunk.subs.Add(1)
