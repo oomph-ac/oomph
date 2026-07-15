@@ -319,28 +319,32 @@ func (*fakeBackend) DoSpawn() error                     { return nil }
 func (f *fakeBackend) Flush() error                     { return f.flushErr }
 func (*fakeBackend) Close() error                       { return nil }
 
-type fakeBatchBackend struct {
-	*fakeBackend
+type batchRecorder struct {
 	batches   [][]packet.Packet
 	immediate [][]packet.Packet
 }
 
-func newFakeBatchBackend() *fakeBatchBackend {
-	return &fakeBatchBackend{fakeBackend: &fakeBackend{}}
-}
-
-func (f *fakeBatchBackend) ReadBatch() ([]packet.Packet, error) {
-	if len(f.batches) == 0 {
+func (b *batchRecorder) ReadBatch() ([]packet.Packet, error) {
+	if len(b.batches) == 0 {
 		return nil, io.EOF
 	}
-	batch := f.batches[0]
-	f.batches = f.batches[1:]
+	batch := b.batches[0]
+	b.batches = b.batches[1:]
 	return batch, nil
 }
 
-func (f *fakeBatchBackend) WritePacketImmediate(packets ...packet.Packet) error {
-	f.immediate = append(f.immediate, append([]packet.Packet(nil), packets...))
+func (b *batchRecorder) WritePacketImmediate(packets ...packet.Packet) error {
+	b.immediate = append(b.immediate, append([]packet.Packet(nil), packets...))
 	return nil
+}
+
+type fakeBatchBackend struct {
+	*fakeBackend
+	batchRecorder
+}
+
+func newFakeBatchBackend() *fakeBatchBackend {
+	return &fakeBatchBackend{fakeBackend: &fakeBackend{}}
 }
 
 type fakeClient struct {
@@ -358,24 +362,9 @@ func (*fakeClient) Close() error                       { return nil }
 
 type fakeBatchClient struct {
 	*fakeClient
-	batches   [][]packet.Packet
-	immediate [][]packet.Packet
+	batchRecorder
 }
 
 func newFakeBatchClient() *fakeBatchClient {
 	return &fakeBatchClient{fakeClient: &fakeClient{}}
-}
-
-func (f *fakeBatchClient) ReadBatch() ([]packet.Packet, error) {
-	if len(f.batches) == 0 {
-		return nil, io.EOF
-	}
-	batch := f.batches[0]
-	f.batches = f.batches[1:]
-	return batch, nil
-}
-
-func (f *fakeBatchClient) WritePacketImmediate(packets ...packet.Packet) error {
-	f.immediate = append(f.immediate, append([]packet.Packet(nil), packets...))
-	return nil
 }

@@ -26,10 +26,9 @@ func main() {
 	}
 	utils.InitializeBlockNameMapping()
 	p, err := proxy.Listen(ctx, proxy.Config{
-		LocalAddress:          os.Args[1],
-		RemoteAddress:         os.Args[2],
-		Log:                   slog.Default(),
-		EnableBatchForwarding: true,
+		LocalAddress:  os.Args[1],
+		RemoteAddress: os.Args[2],
+		Log:           slog.Default(),
 		Listen: minecraft.ListenConfig{
 			StatusProvider:      status,
 			FlushRate:           -1,
