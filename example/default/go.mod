@@ -62,4 +62,4 @@ replace github.com/oomph-ac/oomph => ../..
 
 replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260714052818-ea2fd40ad95e
 
-replace github.com/sandertv/gophertunnel => github.com/HashimTheArab/gophertunnel v1.25.3-0.20260710171453-23b8e112bf20
+replace github.com/sandertv/gophertunnel => github.com/HashimTheArab/gophertunnel v1.25.3-0.20260715074019-617c6898198d
