@@ -10,7 +10,7 @@ require (
 	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/go-gl/mathgl v1.2.0
 	github.com/hjson/hjson-go/v4 v4.6.0
-	github.com/oomph-ac/oomph/deps/proxy v0.0.0-20260715223327-9c432ed36de3
+	github.com/oomph-ac/oomph/deps/proxy v0.0.0-20260715223936-2d1710747b9b
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
 	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
 	github.com/zeebo/xxh3 v1.1.0
