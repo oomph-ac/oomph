@@ -77,6 +77,9 @@ func Wrap(ctx context.Context, next func(server.Config) (server.Listener, error)
 		if err != nil {
 			return nil, fmt.Errorf("dragonfly integration: create wrapped listener: %w", err)
 		}
+		if base == nil {
+			return nil, fmt.Errorf("dragonfly integration: wrapped listener factory returned nil")
+		}
 		log := conf.Log
 		if log == nil {
 			log = slog.Default()

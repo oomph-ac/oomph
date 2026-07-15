@@ -70,6 +70,15 @@ func TestWrapUsesSuppliedListenerFactory(t *testing.T) {
 	}
 }
 
+func TestWrapRejectsNilListener(t *testing.T) {
+	_, err := Wrap(context.Background(), func(server.Config) (server.Listener, error) {
+		return nil, nil
+	}, nil)(server.Config{Log: slog.Default()})
+	if err == nil {
+		t.Fatal("Wrap() accepted a nil listener")
+	}
+}
+
 func TestWrappedListenerDisconnectDelegatesAndClosesOomphPlayer(t *testing.T) {
 	base := newStubListener()
 	l, err := Wrap(context.Background(), func(server.Config) (server.Listener, error) {
