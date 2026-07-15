@@ -310,6 +310,13 @@ func (s *session) forwardClientBatch(packets []packet.Packet) error {
 }
 
 func (s *session) backendLoop(ctx context.Context) error {
+	if s.batchForwarding {
+		return s.backendBatchLoop(ctx)
+	}
+	return s.backendPacketLoop(ctx)
+}
+
+func (s *session) backendPacketLoop(ctx context.Context) error {
 	for {
 		backend, generation := s.currentBackend()
 		pk, err := backend.ReadPacket()
@@ -350,12 +357,78 @@ func (s *session) backendLoop(ctx context.Context) error {
 	}
 }
 
+func (s *session) backendBatchLoop(ctx context.Context) error {
+	for {
+		backend, generation := s.currentBackend()
+		batchBackend, err := batchCapabilities("backend", backend)
+		if err != nil {
+			return err
+		}
+		packets, err := batchBackend.ReadBatch()
+		if err != nil {
+			if s.isCurrent(backend, generation) {
+				return err
+			}
+			continue
+		}
+		if !s.isCurrent(backend, generation) {
+			continue
+		}
+		transfer, err := s.forwardBackendBatch(packets)
+		if err != nil {
+			return err
+		}
+		if transfer == nil {
+			continue
+		}
+		address := net.JoinHostPort(transfer.Address, fmt.Sprint(transfer.Port))
+		committed, err := s.transfer(ctx, address)
+		if err != nil && committed {
+			return fmt.Errorf("proxy: committed transfer to %s failed synchronization: %w", address, err)
+		}
+		if err != nil {
+			s.proxy.cfg.Log.Warn("backend transfer failed", "address", address, "err", err)
+			s.player.Message("<red>Unable to transfer to %s.</red>", address)
+		}
+	}
+}
+
+func (s *session) forwardBackendBatch(packets []packet.Packet) (*packet.Transfer, error) {
+	client, err := batchCapabilities("client", s.client)
+	if err != nil {
+		return nil, err
+	}
+
+	s.routeMu.Lock()
+	defer s.routeMu.Unlock()
+
+	forwarded := make([]packet.Packet, 0, len(packets))
+	for _, pk := range packets {
+		if transfer, ok := pk.(*packet.Transfer); ok {
+			return transfer, client.WritePacketImmediate(forwarded...)
+		}
+		packetCtx := playercontext.NewHandlePacketContext(&pk)
+		s.player.HandleServerPacket(packetCtx)
+		if !packetCtx.Cancelled() && s.rewriteServerPacket(*packetCtx.Packet()) {
+			s.state.handle(*packetCtx.Packet())
+			forwarded = append(forwarded, *packetCtx.Packet())
+		}
+	}
+	return nil, client.WritePacketImmediate(forwarded...)
+}
+
 func (s *session) transfer(ctx context.Context, address string) (bool, error) {
 	s.transferMu.Lock()
 	defer s.transferMu.Unlock()
 	backend, err := s.proxy.cfg.Dial(ctx, address, s.player.IdentityDat, s.player.ClientDat, s.client.RemoteAddr().String())
 	if err != nil {
 		return false, err
+	}
+	if s.batchForwarding {
+		if _, err := batchCapabilities("backend", backend); err != nil {
+			_ = backend.Close()
+			return false, err
+		}
 	}
 	if err := backend.DoSpawn(); err != nil {
 		_ = backend.Close()

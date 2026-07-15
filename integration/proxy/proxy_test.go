@@ -63,6 +63,49 @@ func TestClientBatchFlushesWhenNoPacketsSurvive(t *testing.T) {
 	}
 }
 
+func TestBackendBatchForwardsPacketsInOrderImmediately(t *testing.T) {
+	client := newFakeBatchClient()
+	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	s := &session{player: p, client: client, state: newBackendStateTracker()}
+	first := &packet.Text{Message: "first"}
+	second := &packet.Text{Message: "second"}
+
+	transfer, err := s.forwardBackendBatch([]packet.Packet{first, second})
+	if err != nil {
+		t.Fatalf("forwardBackendBatch: %v", err)
+	}
+	if transfer != nil {
+		t.Fatalf("forwardBackendBatch transfer = %#v, want nil", transfer)
+	}
+	if len(client.immediate) != 1 {
+		t.Fatalf("immediate writes = %d, want 1", len(client.immediate))
+	}
+	got := client.immediate[0]
+	if len(got) != 2 || got[0] != first || got[1] != second {
+		t.Fatalf("immediate batch = %#v, want original packet order", got)
+	}
+}
+
+func TestBackendBatchFlushesPrefixAndDropsTailAtTransfer(t *testing.T) {
+	client := newFakeBatchClient()
+	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	s := &session{player: p, client: client, state: newBackendStateTracker()}
+	first := &packet.Text{Message: "first"}
+	handoff := &packet.Transfer{Address: "127.0.0.1", Port: 19133}
+	tail := &packet.Text{Message: "old backend tail"}
+
+	transfer, err := s.forwardBackendBatch([]packet.Packet{first, handoff, tail})
+	if err != nil {
+		t.Fatalf("forwardBackendBatch: %v", err)
+	}
+	if transfer != handoff {
+		t.Fatalf("forwardBackendBatch transfer = %#v, want %#v", transfer, handoff)
+	}
+	if len(client.immediate) != 1 || len(client.immediate[0]) != 1 || client.immediate[0][0] != first {
+		t.Fatalf("immediate writes = %#v, want only pre-transfer packet", client.immediate)
+	}
+}
+
 func TestBackendSwapInvalidatesOldGeneration(t *testing.T) {
 	old := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 1}}
 	next := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 9}}
@@ -312,3 +355,27 @@ func (f *fakeClient) WritePacket(pk packet.Packet) error {
 func (*fakeClient) StartGame(minecraft.GameData) error { return nil }
 func (*fakeClient) RemoteAddr() net.Addr               { return nil }
 func (*fakeClient) Close() error                       { return nil }
+
+type fakeBatchClient struct {
+	*fakeClient
+	batches   [][]packet.Packet
+	immediate [][]packet.Packet
+}
+
+func newFakeBatchClient() *fakeBatchClient {
+	return &fakeBatchClient{fakeClient: &fakeClient{}}
+}
+
+func (f *fakeBatchClient) ReadBatch() ([]packet.Packet, error) {
+	if len(f.batches) == 0 {
+		return nil, io.EOF
+	}
+	batch := f.batches[0]
+	f.batches = f.batches[1:]
+	return batch, nil
+}
+
+func (f *fakeBatchClient) WritePacketImmediate(packets ...packet.Packet) error {
+	f.immediate = append(f.immediate, append([]packet.Packet(nil), packets...))
+	return nil
+}
