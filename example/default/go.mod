@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/oomph-ac/oomph v0.0.0-20260208201834-bff025a3d827
-	github.com/sandertv/gophertunnel v1.57.0
+	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
 )
 
 require (
@@ -28,6 +28,7 @@ require (
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
+	github.com/oomph-ac/oomph/deps/proxy v0.0.0-20260715223936-2d1710747b9b // indirect
 	github.com/pion/datachannel v1.6.0 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect
 	github.com/pion/ice/v4 v4.2.1 // indirect
@@ -59,6 +60,4 @@ require (
 
 replace github.com/oomph-ac/oomph => ../..
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260702190811-865056f9d47f
-
-replace github.com/sandertv/gophertunnel => github.com/hashimthearab/gophertunnel v1.25.3-0.20260713165240-828896b9c778
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260714052818-ea2fd40ad95e

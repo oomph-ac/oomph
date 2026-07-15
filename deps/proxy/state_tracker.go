@@ -11,6 +11,7 @@ import (
 // ownership of the session.
 type backendStateTracker struct {
 	bossBars    map[int64]struct{}
+	effects     map[int32]struct{}
 	entities    map[int64]struct{}
 	players     map[uuid.UUID]struct{}
 	scoreboards map[string]struct{}
@@ -19,13 +20,14 @@ type backendStateTracker struct {
 func newBackendStateTracker() *backendStateTracker {
 	return &backendStateTracker{
 		bossBars:    map[int64]struct{}{},
+		effects:     map[int32]struct{}{},
 		entities:    map[int64]struct{}{},
 		players:     map[uuid.UUID]struct{}{},
 		scoreboards: map[string]struct{}{},
 	}
 }
 
-func (t *backendStateTracker) handle(pk packet.Packet) {
+func (t *backendStateTracker) handle(pk packet.Packet, clientRuntimeID uint64) {
 	switch pk := pk.(type) {
 	case *packet.AddActor:
 		t.entities[pk.EntityUniqueID] = struct{}{}
@@ -43,6 +45,15 @@ func (t *backendStateTracker) handle(pk packet.Packet) {
 		} else {
 			t.bossBars[pk.BossEntityUniqueID] = struct{}{}
 		}
+	case *packet.MobEffect:
+		if pk.EntityRuntimeID != clientRuntimeID {
+			break
+		}
+		if pk.Operation == packet.MobEffectAdd || pk.Operation == packet.MobEffectModify {
+			t.effects[pk.EffectType] = struct{}{}
+		} else if pk.Operation == packet.MobEffectRemove {
+			delete(t.effects, pk.EffectType)
+		}
 	case *packet.PlayerList:
 		for _, entry := range pk.Entries {
 			if pk.ActionType == packet.PlayerListActionAdd {
@@ -58,13 +69,16 @@ func (t *backendStateTracker) handle(pk packet.Packet) {
 	}
 }
 
-func (t *backendStateTracker) clearPackets() []packet.Packet {
-	packets := make([]packet.Packet, 0, len(t.entities)+len(t.bossBars)+len(t.scoreboards)+1)
+func (t *backendStateTracker) clearPackets(clientRuntimeID uint64) []packet.Packet {
+	packets := make([]packet.Packet, 0, len(t.entities)+len(t.bossBars)+len(t.effects)+len(t.scoreboards)+1)
 	for id := range t.entities {
 		packets = append(packets, &packet.RemoveActor{EntityUniqueID: id})
 	}
 	for id := range t.bossBars {
 		packets = append(packets, &packet.BossEvent{BossEntityUniqueID: id, EventType: packet.BossEventHide})
+	}
+	for id := range t.effects {
+		packets = append(packets, &packet.MobEffect{EntityRuntimeID: clientRuntimeID, EffectType: id, Operation: packet.MobEffectRemove})
 	}
 	if len(t.players) != 0 {
 		entries := make([]protocol.PlayerListEntry, 0, len(t.players))
@@ -78,6 +92,7 @@ func (t *backendStateTracker) clearPackets() []packet.Packet {
 	}
 	clear(t.entities)
 	clear(t.bossBars)
+	clear(t.effects)
 	clear(t.players)
 	clear(t.scoreboards)
 	return packets
