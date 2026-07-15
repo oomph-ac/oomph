@@ -1,6 +1,6 @@
 module example
 
-go 1.26.0
+go 1.26.1
 
 require (
 	github.com/oomph-ac/oomph v0.0.0-20260208201834-bff025a3d827

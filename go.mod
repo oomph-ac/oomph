@@ -1,6 +1,6 @@
 module github.com/oomph-ac/oomph
 
-go 1.26.0
+go 1.26.1
 
 replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260714052818-ea2fd40ad95e
 
