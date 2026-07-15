@@ -62,16 +62,39 @@ func Listener(ctx context.Context, cfg Config) func(server.Config) (server.Liste
 			return nil, fmt.Errorf("dragonfly integration: listen: %w", err)
 		}
 		log.Info("Dragonfly with Oomph listening", "addr", raw.Addr())
-		l := &listener{raw: raw, log: log, configure: cfg.Configure, done: make(chan struct{})}
-		go func() {
-			select {
-			case <-ctx.Done():
-				_ = l.Close()
-			case <-l.done:
-			}
-		}()
-		return l, nil
+		return newListener(ctx, nil, raw, log, cfg.Configure), nil
 	}
+}
+
+// Wrap adds Oomph packet processing to a Dragonfly listener factory backed by
+// a gophertunnel RakNet or NetherNet listener.
+func Wrap(ctx context.Context, next func(server.Config) (server.Listener, error), configure func(*player.Player)) func(server.Config) (server.Listener, error) {
+	return func(conf server.Config) (server.Listener, error) {
+		if next == nil {
+			return nil, fmt.Errorf("dragonfly integration: wrapped listener factory is required")
+		}
+		base, err := next(conf)
+		if err != nil {
+			return nil, fmt.Errorf("dragonfly integration: create wrapped listener: %w", err)
+		}
+		log := conf.Log
+		if log == nil {
+			log = slog.Default()
+		}
+		return newListener(ctx, base, nil, log, configure), nil
+	}
+}
+
+func newListener(ctx context.Context, base server.Listener, raw *minecraft.Listener, log *slog.Logger, configure func(*player.Player)) *listener {
+	l := &listener{base: base, raw: raw, log: log, configure: configure, done: make(chan struct{})}
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = l.Close()
+		case <-l.done:
+		}
+	}()
+	return l
 }
 
 func listenerCompression(compression packet.Compression) packet.Compression {
@@ -82,6 +105,7 @@ func listenerCompression(compression packet.Compression) packet.Compression {
 }
 
 type listener struct {
+	base      server.Listener
 	raw       *minecraft.Listener
 	log       *slog.Logger
 	configure func(*player.Player)
@@ -91,14 +115,29 @@ type listener struct {
 }
 
 func (l *listener) Accept() (session.Conn, error) {
-	raw, err := l.raw.Accept()
-	if err != nil {
-		return nil, err
+	var accepted session.Conn
+	if l.base != nil {
+		conn, err := l.base.Accept()
+		if err != nil {
+			return nil, err
+		}
+		accepted = conn
+	} else {
+		raw, err := l.raw.Accept()
+		if err != nil {
+			return nil, err
+		}
+		conn, ok := raw.(*minecraft.Conn)
+		if !ok {
+			_ = raw.Close()
+			return nil, fmt.Errorf("dragonfly integration: unexpected connection type %T", raw)
+		}
+		accepted = conn
 	}
-	conn, ok := raw.(*minecraft.Conn)
+	conn, ok := accepted.(*minecraft.Conn)
 	if !ok {
-		_ = raw.Close()
-		return nil, fmt.Errorf("dragonfly integration: unexpected connection type %T", raw)
+		_ = accepted.Close()
+		return nil, fmt.Errorf("dragonfly integration: unexpected connection type %T", accepted)
 	}
 	p := player.New(l.log.With(
 		"name", conn.IdentityData().DisplayName,
@@ -121,7 +160,9 @@ func (l *listener) Disconnect(conn session.Conn, reason string) error {
 		return fmt.Errorf("dragonfly integration: unexpected session connection type %T", conn)
 	}
 	var disconnectErr error
-	if raw, ok := c.Conn.(*minecraft.Conn); ok && l.raw != nil {
+	if l.base != nil {
+		disconnectErr = l.base.Disconnect(c.Conn, reason)
+	} else if raw, ok := c.Conn.(*minecraft.Conn); ok && l.raw != nil {
 		disconnectErr = l.raw.Disconnect(raw, reason)
 	}
 	return errors.Join(disconnectErr, c.Close())
@@ -130,7 +171,11 @@ func (l *listener) Disconnect(conn session.Conn, reason string) error {
 func (l *listener) Close() error {
 	l.closeOnce.Do(func() {
 		close(l.done)
-		l.closeErr = l.raw.Close()
+		if l.base != nil {
+			l.closeErr = l.base.Close()
+		} else if l.raw != nil {
+			l.closeErr = l.raw.Close()
+		}
 	})
 	return l.closeErr
 }

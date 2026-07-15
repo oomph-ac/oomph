@@ -455,6 +455,11 @@ func (p *Player) Disconnect(reason string) {
 }
 
 func (p *Player) BlockAddress(duration time.Duration) {
+	// Native integrations may wrap a listener owned by Dragonfly, in which case
+	// Oomph cannot access transport-specific listener state.
+	if p.listener == nil {
+		return
+	}
 	if rkListener, ok := utils.RaknetListener(p.listener); ok {
 		utils.BlockAddress(rkListener, p.RemoteAddr().(*net.UDPAddr).IP, duration)
 	}
