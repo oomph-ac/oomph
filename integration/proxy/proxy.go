@@ -122,9 +122,9 @@ func (p *Proxy) serveClient(ctx context.Context, conn *minecraft.Conn) error {
 		return err
 	}
 	pl := player.New(p.cfg.Log.With("player", conn.IdentityData().DisplayName), player.MonitoringState{CurrentTime: time.Now()}, p.listener)
+	pl.SetConn(conn)
 	component.Register(pl)
 	detection.Register(pl)
-	pl.SetConn(conn)
 	if p.cfg.Configure != nil {
 		p.cfg.Configure(pl)
 	}
