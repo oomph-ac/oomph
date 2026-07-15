@@ -75,14 +75,14 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	if !movement.Flying() && (len(waterBlocks) != 0 || len(lavaBlocks) != 0) {
 		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied in liquid: %v", movement.Vel())
 		if len(waterBlocks) != 0 {
+			if movement.Gliding() {
+				movement.SetGliding(false)
+				movement.SetGlideBoost(0)
+			}
 			applyLiquidFlow(p, movement, waterBlocks)
 			simulateLiquidTravel(p, movement, block.Water{})
 		} else {
 			simulateLiquidTravel(p, movement, block.Lava{})
-		}
-		if movement.Gliding() && movement.OnGround() {
-			movement.SetGliding(false)
-			movement.SetGlideBoost(0)
 		}
 		return
 	}
@@ -317,17 +317,8 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 
 	if jumping {
 		newVel := movement.Vel()
-		jumpUnsupported := false
-		if movement.Swimming() {
-			blockPos := df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.1})))
-			if _, air := liquidMovementBlock(p, blockPos).(block.Air); air {
-				liquidPos := df_cube.Pos(cube.PosFromVec3(movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset - 1.2})))
-				_, supported := liquidAt(p, liquidPos)
-				jumpUnsupported = !supported
-			}
-		}
 		swimTransition := movement.SwimAmount() > 0 && movement.SwimAmount() < 1
-		if jumpUnsupported || swimTransition {
+		if swimTransition {
 			newVel[1] = 0
 		} else {
 			newVel[1] += 0.04
@@ -337,8 +328,12 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 
 	moveRelativeSpeed := movement.LavaMovementSpeed()
 	depthStriderLevel := float32(0)
+	swimSpeedMultiplier := float32(1)
 	if water {
 		moveRelativeSpeed = movement.UnderwaterMovementSpeed()
+		if movement.Swimming() {
+			swimSpeedMultiplier = movement.SwimSpeedMultiplier()
+		}
 		if enchant, ok := p.Inventory().Boots().Enchantment(enchantment.DepthStrider); ok {
 			depthStriderLevel = math32.Min(float32(enchant.Level()), float32(enchantment.DepthStrider.MaxLevel()))
 			if !movement.OnGround() {
@@ -346,8 +341,8 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 			}
 		}
 		depthStriderFraction := depthStriderLevel / float32(enchantment.DepthStrider.MaxLevel())
-		if multiplier := movement.SwimSpeedMultiplier(); multiplier > 1 {
-			moveRelativeSpeed *= (0.7 + depthStriderFraction*0.3) * multiplier
+		if swimSpeedMultiplier > 1 {
+			moveRelativeSpeed *= (0.7 + depthStriderFraction*0.3) * swimSpeedMultiplier
 		} else {
 			moveRelativeSpeed += (movement.MovementSpeed() - moveRelativeSpeed) * depthStriderFraction
 		}
@@ -365,7 +360,7 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 		if movement.Sprinting() {
 			drag = 0.9
 		}
-		if depthStriderLevel > 0 && movement.SwimSpeedMultiplier() <= 1 {
+		if depthStriderLevel > 0 && swimSpeedMultiplier <= 1 {
 			drag += (0.54600006 - drag) * (depthStriderLevel / float32(enchantment.DepthStrider.MaxLevel()))
 		}
 		vel[0] *= drag
