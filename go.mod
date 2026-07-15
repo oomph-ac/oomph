@@ -1,6 +1,6 @@
 module github.com/oomph-ac/oomph
 
-go 1.26.0
+go 1.26.1
 
 replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260714052818-ea2fd40ad95e
 
@@ -14,16 +14,17 @@ require (
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
 	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
 	github.com/zeebo/xxh3 v1.1.0
-	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
+	golang.org/x/exp v0.0.0-20260611194520-c48552f49976
 )
 
 require (
 	github.com/brentp/intintmap v0.0.0-20251106190759-56907b1f8479 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
 	github.com/df-mc/go-nethernet v1.0.17 // indirect
-	github.com/df-mc/go-playfab v1.0.0 // indirect
-	github.com/df-mc/go-xsapi v1.0.1 // indirect
+	github.com/df-mc/go-playfab/v2 v2.0.2-0.20260618232935-6d86fc87875f // indirect
+	github.com/df-mc/go-xsapi/v2 v2.0.2-0.20260618232321-7db98a0b7856 // indirect
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/jsonc v1.0.5 // indirect
 	github.com/df-mc/worldupgrader v1.0.21 // indirect
@@ -51,11 +52,13 @@ require (
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+replace github.com/sandertv/gophertunnel => github.com/HashimTheArab/gophertunnel v1.25.3-0.20260710171453-23b8e112bf20

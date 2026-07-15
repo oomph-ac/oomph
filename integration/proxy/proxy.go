@@ -28,6 +28,9 @@ type Config struct {
 	Listen        minecraft.ListenConfig
 	DialTimeout   time.Duration
 	Configure     func(*player.Player)
+	// EnableBatchForwarding preserves inbound network batches and flushes each processed batch immediately.
+	// It is disabled by default so existing users retain the 50 ms tick-buffered forwarding behaviour.
+	EnableBatchForwarding bool
 
 	// Dial may be set by advanced users to customise backend connections.
 	Dial DialFunc
@@ -52,6 +55,27 @@ type clientConn interface {
 	Close() error
 }
 
+type batchReader interface {
+	ReadBatch() ([]packet.Packet, error)
+}
+
+type immediatePacketWriter interface {
+	WritePacketImmediate(...packet.Packet) error
+}
+
+type batchConnection interface {
+	batchReader
+	immediatePacketWriter
+}
+
+func batchCapabilities(name string, conn any) (batchConnection, error) {
+	batch, ok := conn.(batchConnection)
+	if !ok {
+		return nil, fmt.Errorf("proxy: batch forwarding requires %s %T to implement ReadBatch and WritePacketImmediate", name, conn)
+	}
+	return batch, nil
+}
+
 // Proxy accepts Bedrock clients and keeps them connected while their backend
 // connection is replaced during packet.Transfer handoffs.
 type Proxy struct {
@@ -73,7 +97,10 @@ func Listen(ctx context.Context, cfg Config) (*Proxy, error) {
 		cfg.DialTimeout = 10 * time.Second
 	}
 	if cfg.Dial == nil {
-		cfg.Dial = defaultDial(cfg.DialTimeout)
+		cfg.Dial = defaultDial(cfg.DialTimeout, cfg.EnableBatchForwarding)
+	}
+	if cfg.EnableBatchForwarding {
+		cfg.Listen.EnableBatchReading = true
 	}
 	l, err := cfg.Listen.Listen("raknet", cfg.LocalAddress)
 	if err != nil {
@@ -146,12 +173,13 @@ func (p *Proxy) Close() error {
 	return err
 }
 
-func defaultDial(timeout time.Duration) DialFunc {
+func defaultDial(timeout time.Duration, enableBatchForwarding bool) DialFunc {
 	return func(_ context.Context, address string, identity login.IdentityData, client login.ClientData, _ string) (Backend, error) {
 		return minecraft.Dialer{
-			IdentityData: identity,
-			ClientData:   client,
-			FlushRate:    -1,
+			IdentityData:       identity,
+			ClientData:         client,
+			FlushRate:          -1,
+			EnableBatchReading: enableBatchForwarding,
 		}.DialTimeout("raknet", address, timeout)
 	}
 }

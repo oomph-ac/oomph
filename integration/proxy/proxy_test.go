@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"math"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,19 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+func TestBatchForwardingDefaultsDisabled(t *testing.T) {
+	if (Config{}).EnableBatchForwarding {
+		t.Fatal("batch forwarding must be opt-in")
+	}
+}
+
+func TestBatchForwardingCapabilitiesRejectLegacyBackend(t *testing.T) {
+	_, err := batchCapabilities("backend", &fakeBackend{})
+	if err == nil || !strings.Contains(err.Error(), "batch forwarding requires") {
+		t.Fatalf("batchCapabilities() error = %v, want descriptive capability error", err)
+	}
+}
 
 func TestBackendSwapInvalidatesOldGeneration(t *testing.T) {
 	old := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 1}}
