@@ -71,6 +71,37 @@ go build -o oomph-proxy .
 Start PocketMine-MP before Oomph. Players join the Oomph address on port
 `19132`, not the backend port.
 
+### Lower-latency batch forwarding
+
+The standalone example enables `proxy.Config.EnableBatchForwarding`. In this
+mode, Oomph preserves each inbound network batch, processes its packets in
+order, and flushes the resulting batch to the destination immediately.
+
+Without this option, each proxy forwarding direction may wait 0–50 ms for
+Oomph's next flush tick. Removing both independent waits reduces a typical
+request/response ping by about **50 ms on average**. The observed reduction is
+timing-dependent and ranges from nearly 0 ms to nearly 100 ms depending on
+where the request and response land relative to the two flush ticks.
+
+Immediate batch forwarding can use more CPU and bandwidth because separate
+inbound batches arriving during the same 50 ms window are no longer combined
+by the proxy. Oomph still encodes and compresses once per inbound batch, not
+once per packet. The option is disabled by default; enable it explicitly:
+
+```go
+proxy.Config{
+	EnableBatchForwarding: true,
+}
+```
+
+This option applies only to the standalone proxy. The native Dragonfly
+listener has no second forwarding connection and is not changed by it.
+
+Until the batch-reading gophertunnel change is released upstream, applications
+embedding the standalone proxy must carry the same module replacement as
+[`example/default/go.mod`](../example/default/go.mod). Go does not inherit
+`replace` directives from dependency modules.
+
 ## Dragonfly
 
 Embed Oomph directly in Dragonfly. Do not run the standalone proxy in front of
