@@ -209,16 +209,17 @@ type session struct {
 	generation uint64
 	transferMu sync.Mutex
 
-	clientRuntimeID  uint64
-	clientUniqueID   int64
-	clientDimension  int32
-	backendRuntimeID uint64
-	backendUniqueID  int64
-	chunkRadius      int32
-	identity         login.IdentityData
-	clientData       login.ClientData
-	clientAddress    string
-	state            *backendStateTracker
+	clientRuntimeID      uint64
+	clientUniqueID       int64
+	clientDimension      int32
+	blockNetworkIDHashes bool
+	backendRuntimeID     uint64
+	backendUniqueID      int64
+	chunkRadius          int32
+	identity             login.IdentityData
+	clientData           login.ClientData
+	clientAddress        string
+	state                *backendStateTracker
 }
 
 func newSession(proxy *Proxy, handler Handler, client clientConn, backend Backend, identity login.IdentityData, clientData login.ClientData, clientAddress string) *session {
@@ -226,8 +227,9 @@ func newSession(proxy *Proxy, handler Handler, client clientConn, backend Backen
 	return &session{
 		proxy: proxy, handler: handler, client: client, backend: backend,
 		clientRuntimeID: data.EntityRuntimeID, clientUniqueID: data.EntityUniqueID,
-		clientDimension: data.Dimension, backendRuntimeID: data.EntityRuntimeID,
-		backendUniqueID: data.EntityUniqueID, chunkRadius: data.ChunkRadius,
+		clientDimension: data.Dimension, blockNetworkIDHashes: data.UseBlockNetworkIDHashes,
+		backendRuntimeID: data.EntityRuntimeID,
+		backendUniqueID:  data.EntityUniqueID, chunkRadius: data.ChunkRadius,
 		identity: identity, clientData: clientData, clientAddress: clientAddress,
 		state: newBackendStateTracker(),
 	}
@@ -331,6 +333,11 @@ func (s *session) transfer(ctx context.Context, address string) (bool, error) {
 	backend, err := s.proxy.cfg.Dial(ctx, address, s.identity, s.clientData, s.clientAddress)
 	if err != nil {
 		return false, err
+	}
+	backendUsesHashes := backend.GameData().UseBlockNetworkIDHashes
+	if backendUsesHashes != s.blockNetworkIDHashes {
+		_ = backend.Close()
+		return false, fmt.Errorf("proxy: backend block-hash setting %t does not match session setting %t", backendUsesHashes, s.blockNetworkIDHashes)
 	}
 	if err := backend.DoSpawn(); err != nil {
 		_ = backend.Close()

@@ -286,6 +286,29 @@ func TestTransferUsesHandlerChunkRadius(t *testing.T) {
 	}
 }
 
+func TestTransferRejectsIncompatibleBlockNetworkEncoding(t *testing.T) {
+	initial := &fakeBackend{data: minecraft.GameData{UseBlockNetworkIDHashes: false}}
+	replacement := &fakeBackend{data: minecraft.GameData{UseBlockNetworkIDHashes: true}}
+	s := newSession(
+		&Proxy{cfg: Config{Dial: func(context.Context, string, login.IdentityData, login.ClientData, string) (Backend, error) {
+			return replacement, nil
+		}}},
+		NopHandler{}, &fakeClient{}, initial, login.IdentityData{}, login.ClientData{}, "",
+	)
+
+	committed, err := s.transfer(context.Background(), "127.0.0.1:19133")
+	if err == nil {
+		t.Fatal("transfer accepted a backend with incompatible block-network encoding")
+	}
+	if committed {
+		t.Fatal("incompatible backend transfer was committed")
+	}
+	backend, _ := s.currentBackend()
+	if backend != initial {
+		t.Fatalf("current backend = %#v, want initial backend", backend)
+	}
+}
+
 func TestBackendReadFailureFallsBackToRemoteAddress(t *testing.T) {
 	firstReadErr := errors.New("primary backend closed")
 	secondReadErr := errors.New("fallback backend closed")
