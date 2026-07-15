@@ -73,9 +73,9 @@ Start PocketMine-MP before Oomph. Players join the Oomph address on port
 
 ### Lower-latency batch forwarding
 
-Enable direct batch forwarding to preserve packet order and flush each
-received batch immediately. This removes the proxy's 0–50 ms flush wait in
-each direction, reducing ping by about **50 ms on average**:
+The experimental direct batch forwarding option preserves packet order and
+flushes each received batch immediately. This removes the proxy's 0–50 ms
+flush wait in each direction, reducing ping by about **50 ms on average**:
 
 ```go
 proxy.Config{
@@ -83,10 +83,10 @@ proxy.Config{
 }
 ```
 
-The option is disabled by default. It may use more CPU and bandwidth because
-Oomph no longer combines batches over a 50 ms window, though it still encodes
-and compresses once per batch rather than once per packet. It applies only to
-the standalone proxy, not the native Dragonfly listener.
+The experimental option is disabled by default. It may use more CPU and
+bandwidth because Oomph no longer combines batches over a 50 ms window, though
+it still encodes and compresses once per batch rather than once per packet. It
+applies only to the standalone proxy, not the native Dragonfly listener.
 
 ## Dragonfly
 
