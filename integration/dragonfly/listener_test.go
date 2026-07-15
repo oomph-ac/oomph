@@ -4,10 +4,12 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/df-mc/dragonfly/server"
+	"github.com/df-mc/dragonfly/server/session"
 	"github.com/oomph-ac/oomph/player"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
@@ -39,6 +41,96 @@ func TestListenerFactoryListensOnEphemeralAddress(t *testing.T) {
 	}
 	if err := l.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
+	}
+}
+
+func TestWrapUsesSuppliedListenerFactory(t *testing.T) {
+	base := newStubListener()
+	var gotConfig server.Config
+	factory := Wrap(context.Background(), func(conf server.Config) (server.Listener, error) {
+		gotConfig = conf
+		return base, nil
+	}, nil)
+	wantConfig := server.Config{Log: slog.Default(), Name: "wrapped"}
+
+	l, err := factory(wantConfig)
+	if err != nil {
+		t.Fatalf("Wrap() factory error = %v", err)
+	}
+	if gotConfig.Name != wantConfig.Name {
+		t.Fatalf("factory config name = %q, want %q", gotConfig.Name, wantConfig.Name)
+	}
+	if err := l.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	select {
+	case <-base.closed:
+	default:
+		t.Fatal("Close did not delegate to the supplied listener")
+	}
+}
+
+func TestWrappedListenerDisconnectDelegatesAndClosesOomphPlayer(t *testing.T) {
+	base := newStubListener()
+	l, err := Wrap(context.Background(), func(server.Config) (server.Listener, error) {
+		return base, nil
+	}, nil)(server.Config{Log: slog.Default()})
+	if err != nil {
+		t.Fatalf("Wrap() factory error = %v", err)
+	}
+	raw := newBlockingConn()
+	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	c := newSessionConn(raw, p)
+
+	if err := l.Disconnect(c, "rejected"); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if base.disconnected != raw || base.reason != "rejected" {
+		t.Fatalf("delegated Disconnect() = (%T, %q), want (%T, %q)", base.disconnected, base.reason, raw, "rejected")
+	}
+	select {
+	case <-p.CloseChan:
+	case <-time.After(time.Second):
+		t.Fatal("Disconnect did not close the Oomph player")
+	}
+}
+
+func TestWrappedListenerRejectsAndClosesUnexpectedConnectionType(t *testing.T) {
+	raw := newBlockingConn()
+	base := newStubListener()
+	base.accept = raw
+	l, err := Wrap(context.Background(), func(server.Config) (server.Listener, error) {
+		return base, nil
+	}, nil)(server.Config{Log: slog.Default()})
+	if err != nil {
+		t.Fatalf("Wrap() factory error = %v", err)
+	}
+
+	if _, err := l.Accept(); err == nil {
+		t.Fatal("Accept() accepted a non-minecraft connection")
+	}
+	select {
+	case <-raw.closed:
+	default:
+		t.Fatal("Accept did not close the rejected connection")
+	}
+}
+
+func TestWrappedListenerClosesWhenContextIsCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	base := newStubListener()
+	_, err := Wrap(ctx, func(server.Config) (server.Listener, error) {
+		return base, nil
+	}, nil)(server.Config{Log: slog.Default()})
+	if err != nil {
+		t.Fatalf("Wrap() factory error = %v", err)
+	}
+
+	cancel()
+	select {
+	case <-base.closed:
+	case <-time.After(time.Second):
+		t.Fatal("context cancellation did not close the supplied listener")
 	}
 }
 
@@ -86,4 +178,31 @@ func TestListenerClosesWhenContextIsCancelled(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("context cancellation did not close the listener")
 	}
+}
+
+type stubListener struct {
+	accept       session.Conn
+	acceptErr    error
+	disconnected session.Conn
+	reason       string
+	closed       chan struct{}
+	closeOnce    sync.Once
+}
+
+func newStubListener() *stubListener {
+	return &stubListener{closed: make(chan struct{})}
+}
+
+func (l *stubListener) Accept() (session.Conn, error) {
+	return l.accept, l.acceptErr
+}
+
+func (l *stubListener) Disconnect(conn session.Conn, reason string) error {
+	l.disconnected, l.reason = conn, reason
+	return nil
+}
+
+func (l *stubListener) Close() error {
+	l.closeOnce.Do(func() { close(l.closed) })
+	return nil
 }
