@@ -79,9 +79,10 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 				movement.SetGliding(false)
 				movement.SetGlideBoost(0)
 			}
-			applyLiquidFlow(p, movement, waterBlocks)
+			applyLiquidFlow(p, movement, waterBlocks, block.Water{})
 			simulateLiquidTravel(p, movement, block.Water{})
 		} else {
+			applyLiquidFlow(p, movement, lavaBlocks, block.Lava{})
 			simulateLiquidTravel(p, movement, block.Lava{})
 		}
 		return
@@ -452,6 +453,22 @@ func touchingLiquidBlocks[T world.Liquid](p *player.Player, movement player.Move
 				pos := df_cube.Pos{x, y, z}
 				if liquid, ok := liquidAt(p, pos); ok {
 					if _, matches := liquid.(T); matches {
+						height := liquidHeight(liquid)
+						surface := float32(pos[1]) + height
+						p.Dbg.Notify(
+							player.DebugModeMovementSim,
+							true,
+							"liquid block type=%s pos=%v depth=%d falling=%t height=%.6f surface=%.6f boxY=[%.6f %.6f] immersion=%.6f",
+							liquid.LiquidType(),
+							pos,
+							liquid.LiquidDepth(),
+							liquid.LiquidFalling(),
+							height,
+							surface,
+							box.Min().Y(),
+							box.Max().Y(),
+							surface-box.Min().Y(),
+						)
 						positions = append(positions, pos)
 					}
 				}
@@ -481,6 +498,13 @@ func liquidAt(p *player.Player, pos df_cube.Pos) (world.Liquid, bool) {
 	return liquid, ok
 }
 
+func liquidHeight(liquid world.Liquid) float32 {
+	if liquid.LiquidFalling() {
+		return 1
+	}
+	return float32(liquid.LiquidDepth()+1) / 9
+}
+
 // containsAnyLiquid returns whether the box covers a block containing liquid.
 func containsAnyLiquid(p *player.Player, box cube.BBox) bool {
 	min, max := box.Min(), box.Max()
@@ -498,25 +522,28 @@ func containsAnyLiquid(p *player.Player, box cube.BBox) bool {
 	return false
 }
 
-func applyLiquidFlow(p *player.Player, movement player.MovementComponent, positions []df_cube.Pos) {
+func applyLiquidFlow(p *player.Player, movement player.MovementComponent, positions []df_cube.Pos, liquid world.Liquid) {
 	flow := mgl32.Vec3{}
 	for _, pos := range positions {
-		liquid, ok := liquidAt(p, pos)
-		water, waterOK := liquid.(block.Water)
-		if !ok || !waterOK {
+		current, ok := liquidAt(p, pos)
+		if !ok || current.LiquidType() != liquid.LiquidType() {
 			continue
 		}
-		flow = flow.Add(liquidFlow(p, pos, water))
+		flow = flow.Add(liquidFlow(p, pos, current))
 	}
 	if length := flow.Len(); length >= 1e-4 {
-		vel := movement.Vel().Add(flow.Mul(0.014 / length))
+		strength := float32(0.014)
+		if liquid.LiquidType() == "lava" {
+			strength = 0.0035
+		}
+		vel := movement.Vel().Add(flow.Mul(strength / length))
 		movement.SetVel(vel)
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "water flow applied flow=%v vel=%v", flow, vel)
+		p.Dbg.Notify(player.DebugModeMovementSim, true, "%s flow applied strength=%.6f flow=%v vel=%v", liquid.LiquidType(), strength, flow, vel)
 	}
 }
 
-func liquidFlow(p *player.Player, pos df_cube.Pos, water block.Water) mgl32.Vec3 {
-	currentDecay := liquidDecay(water)
+func liquidFlow(p *player.Player, pos df_cube.Pos, liquid world.Liquid) mgl32.Vec3 {
+	currentDecay := liquidDecay(liquid)
 	flow := mgl32.Vec3{}
 	faces := []struct {
 		delta df_cube.Pos
@@ -530,10 +557,9 @@ func liquidFlow(p *player.Player, pos df_cube.Pos, water block.Water) mgl32.Vec3
 	for _, face := range faces {
 		neighbourPos := df_cube.Pos{pos[0] + face.delta[0], pos[1], pos[2] + face.delta[2]}
 		if neighbour, ok := liquidAt(p, neighbourPos); ok {
-			neighbourWater, same := neighbour.(block.Water)
-			if same {
+			if neighbour.LiquidType() == liquid.LiquidType() {
 				if !liquidFlowSideClosed(p, pos, neighbourPos) && !liquidFlowSideClosed(p, neighbourPos, pos) {
-					flow = flow.Add(face.vec.Mul(float32(liquidDecay(neighbourWater) - currentDecay)))
+					flow = flow.Add(face.vec.Mul(float32(liquidDecay(neighbour) - currentDecay)))
 				}
 				continue
 			}
@@ -543,12 +569,12 @@ func liquidFlow(p *player.Player, pos df_cube.Pos, water block.Water) mgl32.Vec3
 		}
 		below := df_cube.Pos{neighbourPos[0], neighbourPos[1] - 1, neighbourPos[2]}
 		if lower, ok := liquidAt(p, below); ok {
-			if lowerWater, same := lower.(block.Water); same {
-				flow = flow.Add(face.vec.Mul(float32(liquidDecay(lowerWater) - currentDecay + 8)))
+			if lower.LiquidType() == liquid.LiquidType() {
+				flow = flow.Add(face.vec.Mul(float32(liquidDecay(lower) - currentDecay + 8)))
 			}
 		}
 	}
-	if water.LiquidFalling() {
+	if liquid.LiquidFalling() {
 		for _, face := range faces {
 			neighbourPos := df_cube.Pos{pos[0] + face.delta[0], pos[1], pos[2] + face.delta[2]}
 			aboveNeighbour := df_cube.Pos{neighbourPos[0], neighbourPos[1] + 1, neighbourPos[2]}
