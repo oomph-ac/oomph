@@ -65,6 +65,21 @@ func TestDefaultDialPreservesXBLIdentityData(t *testing.T) {
 	}
 }
 
+func TestDefaultDialHonoursContextCancellation(t *testing.T) {
+	conn, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = defaultDial(time.Second)(ctx, conn.LocalAddr().String(), login.IdentityData{}, login.ClientData{}, "")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("defaultDial() error = %v, want context.Canceled", err)
+	}
+}
+
 func TestBackendSwapInvalidatesOldGeneration(t *testing.T) {
 	old := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 1}}
 	next := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 9}}
@@ -249,6 +264,124 @@ func TestTransferDoesNotReportSuccessWhenStateSyncFails(t *testing.T) {
 	}
 }
 
+func TestBackendReadFailureFallsBackToRemoteAddress(t *testing.T) {
+	firstReadErr := errors.New("primary backend closed")
+	secondReadErr := errors.New("fallback backend closed")
+	primary := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		readErr: firstReadErr,
+	}
+	fallback := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 11, EntityUniqueID: 12},
+		readErr: secondReadErr,
+	}
+	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	component.Register(p)
+	p.SetServerConn(primary)
+	client := &fakeClient{addr: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132}}
+	var addresses []string
+	proxy := &Proxy{cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(_ context.Context, address string, _ login.IdentityData, _ login.ClientData, _ string) (Backend, error) {
+			addresses = append(addresses, address)
+			if len(addresses) == 1 {
+				return fallback, nil
+			}
+			return nil, errors.New("fallback unavailable")
+		},
+	}}
+	s := &session{
+		proxy: proxy, player: p, client: client, backend: primary,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		state: newBackendStateTracker(),
+	}
+
+	err := s.backendLoop(context.Background())
+	if !errors.Is(err, secondReadErr) {
+		t.Fatalf("backendLoop() error = %v, want fallback read error %v", err, secondReadErr)
+	}
+	if len(addresses) != 2 {
+		t.Fatalf("fallback dial attempts = %d, want 2", len(addresses))
+	}
+	for _, address := range addresses {
+		if address != proxy.cfg.RemoteAddress {
+			t.Fatalf("fallback address = %q, want %q", address, proxy.cfg.RemoteAddress)
+		}
+	}
+	backend, _ := s.currentBackend()
+	if backend != fallback {
+		t.Fatalf("current backend = %#v, want successful fallback %#v", backend, fallback)
+	}
+}
+
+func TestFallbackPausesClientPacketsWhileDialing(t *testing.T) {
+	primaryWrites := make(chan struct{}, 1)
+	primary := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		readErr: errors.New("primary backend closed"),
+		write: func(packet.Packet) error {
+			primaryWrites <- struct{}{}
+			return errors.New("primary backend closed")
+		},
+	}
+	fallback := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 11, EntityUniqueID: 12},
+		readErr: errors.New("fallback backend closed"),
+	}
+	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	component.Register(p)
+	p.SetServerConn(primary)
+	client := &fakeClient{
+		addr:      &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132},
+		readQueue: make(chan packet.Packet, 1),
+	}
+	dialStarted, releaseDial := make(chan struct{}), make(chan struct{})
+	var attempts int
+	proxy := &Proxy{cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(_ context.Context, _ string, _ login.IdentityData, _ login.ClientData, _ string) (Backend, error) {
+			attempts++
+			if attempts != 1 {
+				return nil, errors.New("fallback unavailable")
+			}
+			close(dialStarted)
+			<-releaseDial
+			return fallback, nil
+		},
+	}}
+	s := &session{
+		proxy: proxy, player: p, client: client, backend: primary,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		state: newBackendStateTracker(),
+	}
+	backendDone := make(chan error, 1)
+	go func() { backendDone <- s.backendLoop(context.Background()) }()
+	<-dialStarted
+	client.readQueue <- &packet.Text{Message: "during fallback"}
+	close(client.readQueue)
+	clientDone := make(chan error, 1)
+	go func() { clientDone <- s.clientLoop() }()
+
+	select {
+	case <-primaryWrites:
+		t.Fatal("client packet was written to dead backend during fallback dial")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseDial)
+	select {
+	case <-backendDone:
+	case <-time.After(time.Second):
+		t.Fatal("backend loop did not finish")
+	}
+	select {
+	case <-clientDone:
+	case <-time.After(time.Second):
+		t.Fatal("client loop did not finish")
+	}
+}
+
 func TestTransferResetSynchronizesWithPlayerTick(t *testing.T) {
 	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
 	component.Register(p)
@@ -269,24 +402,40 @@ func TestTransferResetSynchronizesWithPlayerTick(t *testing.T) {
 type fakeBackend struct {
 	data     minecraft.GameData
 	flushErr error
+	readErr  error
+	write    func(packet.Packet) error
 }
 
-func (f *fakeBackend) GameData() minecraft.GameData     { return f.data }
-func (*fakeBackend) ReadPacket() (packet.Packet, error) { return nil, nil }
-func (*fakeBackend) WritePacket(packet.Packet) error    { return nil }
-func (*fakeBackend) DoSpawn() error                     { return nil }
-func (f *fakeBackend) Flush() error                     { return f.flushErr }
-func (*fakeBackend) Close() error                       { return nil }
+func (f *fakeBackend) GameData() minecraft.GameData       { return f.data }
+func (f *fakeBackend) ReadPacket() (packet.Packet, error) { return nil, f.readErr }
+func (f *fakeBackend) WritePacket(pk packet.Packet) error {
+	if f.write != nil {
+		return f.write(pk)
+	}
+	return nil
+}
+func (*fakeBackend) DoSpawn() error { return nil }
+func (f *fakeBackend) Flush() error { return f.flushErr }
+func (*fakeBackend) Close() error   { return nil }
 
 type fakeClient struct {
-	packets []packet.Packet
+	packets   []packet.Packet
+	addr      net.Addr
+	readQueue chan packet.Packet
 }
 
-func (*fakeClient) ReadPacket() (packet.Packet, error) { return nil, errors.New("unused") }
+func (f *fakeClient) ReadPacket() (packet.Packet, error) {
+	if f.readQueue != nil {
+		if pk, ok := <-f.readQueue; ok {
+			return pk, nil
+		}
+	}
+	return nil, errors.New("unused")
+}
 func (f *fakeClient) WritePacket(pk packet.Packet) error {
 	f.packets = append(f.packets, pk)
 	return nil
 }
 func (*fakeClient) StartGame(minecraft.GameData) error { return nil }
-func (*fakeClient) RemoteAddr() net.Addr               { return nil }
+func (f *fakeClient) RemoteAddr() net.Addr             { return f.addr }
 func (*fakeClient) Close() error                       { return nil }

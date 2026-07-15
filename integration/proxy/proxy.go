@@ -147,13 +147,15 @@ func (p *Proxy) Close() error {
 }
 
 func defaultDial(timeout time.Duration) DialFunc {
-	return func(_ context.Context, address string, identity login.IdentityData, client login.ClientData, _ string) (Backend, error) {
+	return func(ctx context.Context, address string, identity login.IdentityData, client login.ClientData, _ string) (Backend, error) {
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
 		return minecraft.Dialer{
 			IdentityData:        identity,
 			ClientData:          client,
 			KeepXBLIdentityData: true,
 			FlushRate:           -1,
-		}.DialTimeout("raknet", address, timeout)
+		}.DialContext(ctx, "raknet", address)
 	}
 }
 
@@ -238,7 +240,11 @@ func (s *session) backendLoop(ctx context.Context) error {
 		pk, err := backend.ReadPacket()
 		if err != nil {
 			if s.isCurrent(backend, generation) {
-				return err
+				committed, fallbackErr := s.transfer(ctx, s.proxy.cfg.RemoteAddress)
+				if fallbackErr != nil {
+					return fmt.Errorf("proxy: backend read failed: %w; fallback failed after commit %t: %v", err, committed, fallbackErr)
+				}
+				s.proxy.cfg.Log.Warn("backend connection lost; transferred to fallback", "address", s.proxy.cfg.RemoteAddress, "err", err)
 			}
 			continue
 		}
@@ -276,6 +282,8 @@ func (s *session) backendLoop(ctx context.Context) error {
 func (s *session) transfer(ctx context.Context, address string) (bool, error) {
 	s.transferMu.Lock()
 	defer s.transferMu.Unlock()
+	s.routeMu.Lock()
+	defer s.routeMu.Unlock()
 	backend, err := s.proxy.cfg.Dial(ctx, address, s.player.IdentityDat, s.player.ClientDat, s.client.RemoteAddr().String())
 	if err != nil {
 		return false, err
@@ -285,16 +293,13 @@ func (s *session) transfer(ctx context.Context, address string) (bool, error) {
 		return false, err
 	}
 
-	s.routeMu.Lock()
 	state, err := s.player.TransferServerConn(backend)
 	if err != nil {
-		s.routeMu.Unlock()
 		_ = backend.Close()
 		return false, err
 	}
 	old := s.swapBackend(backend)
 	err = s.resetTransferState(state)
-	s.routeMu.Unlock()
 	_ = old.Close()
 	return true, err
 }
