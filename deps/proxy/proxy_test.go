@@ -250,7 +250,7 @@ func TestTransferDoesNotReportSuccessWhenStateSyncFails(t *testing.T) {
 	want := errors.New("flush failed")
 	backend := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10}, flushErr: want}
 	s := &session{
-		handler: nopHandler{}, client: &fakeClient{}, backend: backend,
+		handler: NopHandler{}, client: &fakeClient{}, backend: backend,
 		clientRuntimeID: 1, clientUniqueID: 2,
 		backendRuntimeID: 9, backendUniqueID: 10,
 		state: newBackendStateTracker(),
@@ -285,7 +285,7 @@ func TestBackendReadFailureFallsBackToRemoteAddress(t *testing.T) {
 		},
 	}}
 	s := &session{
-		proxy: proxy, handler: nopHandler{}, client: client, backend: primary,
+		proxy: proxy, handler: NopHandler{}, client: client, backend: primary,
 		clientRuntimeID: 1, clientUniqueID: 2,
 		backendRuntimeID: 9, backendUniqueID: 10,
 		state: newBackendStateTracker(),
@@ -343,7 +343,7 @@ func TestFallbackPausesClientPacketsWhileDialing(t *testing.T) {
 		},
 	}}
 	s := &session{
-		proxy: proxy, handler: nopHandler{}, client: client, backend: primary,
+		proxy: proxy, handler: NopHandler{}, client: client, backend: primary,
 		clientRuntimeID: 1, clientUniqueID: 2,
 		backendRuntimeID: 9, backendUniqueID: 10,
 		state: newBackendStateTracker(),

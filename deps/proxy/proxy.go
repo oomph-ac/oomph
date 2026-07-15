@@ -63,14 +63,16 @@ type Handler interface {
 	Close() error
 }
 
-type nopHandler struct{}
+// NopHandler forwards every packet and accepts every backend lifecycle event. Embed it in handlers
+// that only need to override part of Handler.
+type NopHandler struct{}
 
-func (nopHandler) Start(Backend) error                    { return nil }
-func (nopHandler) HandleClientPacket(*packet.Packet) bool { return true }
-func (nopHandler) HandleServerPacket(*packet.Packet) bool { return true }
-func (nopHandler) TransferBackend(Backend) error          { return nil }
-func (nopHandler) TransferFailed(string, error)           {}
-func (nopHandler) Close() error                           { return nil }
+func (NopHandler) Start(Backend) error                    { return nil }
+func (NopHandler) HandleClientPacket(*packet.Packet) bool { return true }
+func (NopHandler) HandleServerPacket(*packet.Packet) bool { return true }
+func (NopHandler) TransferBackend(Backend) error          { return nil }
+func (NopHandler) TransferFailed(string, error)           {}
+func (NopHandler) Close() error                           { return nil }
 
 type clientConn interface {
 	ReadPacket() (packet.Packet, error)
@@ -149,14 +151,14 @@ func (p *Proxy) serveClient(ctx context.Context, conn *minecraft.Conn) error {
 		_ = p.listener.Disconnect(conn, "Unable to connect to the backend server.")
 		return err
 	}
-	handler := Handler(nopHandler{})
+	handler := Handler(NopHandler{})
 	if p.cfg.NewHandler != nil {
 		handler = p.cfg.NewHandler(HandlerContext{
 			Client: conn, Listener: p.listener,
 			Log: p.cfg.Log.With("player", conn.IdentityData().DisplayName),
 		})
 		if handler == nil {
-			handler = nopHandler{}
+			handler = NopHandler{}
 		}
 	}
 	s := newSession(p, handler, conn, backend, conn.IdentityData(), clientData, conn.RemoteAddr().String())
