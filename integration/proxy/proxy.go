@@ -189,6 +189,8 @@ type session struct {
 	player *player.Player
 	client clientConn
 
+	batchForwarding bool
+
 	routeMu    sync.Mutex
 	backMu     sync.RWMutex
 	backend    Backend
@@ -205,6 +207,7 @@ func newSession(proxy *Proxy, p *player.Player, client clientConn, backend Backe
 	data := backend.GameData()
 	return &session{
 		proxy: proxy, player: p, client: client, backend: backend,
+		batchForwarding: proxy.cfg.EnableBatchForwarding,
 		clientRuntimeID: data.EntityRuntimeID, clientUniqueID: data.EntityUniqueID,
 		clientDimension: data.Dimension,
 		state:           newBackendStateTracker(),
@@ -212,6 +215,14 @@ func newSession(proxy *Proxy, p *player.Player, client clientConn, backend Backe
 }
 
 func (s *session) start() error {
+	if s.batchForwarding {
+		if _, err := batchCapabilities("client", s.client); err != nil {
+			return err
+		}
+		if _, err := batchCapabilities("backend", s.backend); err != nil {
+			return err
+		}
+	}
 	data := s.backend.GameData()
 	data.PlayerMovementSettings.RewindHistorySize = 100
 	errCh := make(chan error, 2)
@@ -240,6 +251,13 @@ func (s *session) run(ctx context.Context) error {
 }
 
 func (s *session) clientLoop() error {
+	if s.batchForwarding {
+		return s.clientBatchLoop()
+	}
+	return s.clientPacketLoop()
+}
+
+func (s *session) clientPacketLoop() error {
 	for {
 		pk, err := s.client.ReadPacket()
 		if err != nil {
@@ -257,6 +275,38 @@ func (s *session) clientLoop() error {
 			return err
 		}
 	}
+}
+
+func (s *session) clientBatchLoop() error {
+	client, err := batchCapabilities("client", s.client)
+	if err != nil {
+		return err
+	}
+	for {
+		packets, err := client.ReadBatch()
+		if err != nil {
+			return err
+		}
+		if err := s.forwardClientBatch(packets); err != nil {
+			return err
+		}
+	}
+}
+
+func (s *session) forwardClientBatch(packets []packet.Packet) error {
+	s.routeMu.Lock()
+	defer s.routeMu.Unlock()
+
+	forwarded := make([]packet.Packet, 0, len(packets))
+	for _, pk := range packets {
+		s.rewriteClientPacket(pk)
+		ctx := playercontext.NewHandlePacketContext(&pk)
+		s.player.HandleClientPacket(ctx)
+		if !ctx.Cancelled() {
+			forwarded = append(forwarded, *ctx.Packet())
+		}
+	}
+	return s.writeBackendImmediate(forwarded...)
 }
 
 func (s *session) backendLoop(ctx context.Context) error {
@@ -411,6 +461,16 @@ func (s *session) writeBackend(pk packet.Packet) error {
 	s.backMu.RLock()
 	defer s.backMu.RUnlock()
 	return s.backend.WritePacket(pk)
+}
+
+func (s *session) writeBackendImmediate(packets ...packet.Packet) error {
+	s.backMu.RLock()
+	defer s.backMu.RUnlock()
+	backend, err := batchCapabilities("backend", s.backend)
+	if err != nil {
+		return err
+	}
+	return backend.WritePacketImmediate(packets...)
 }
 
 func (s *session) close() {

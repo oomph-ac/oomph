@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"math"
 	"net"
@@ -27,6 +28,38 @@ func TestBatchForwardingCapabilitiesRejectLegacyBackend(t *testing.T) {
 	_, err := batchCapabilities("backend", &fakeBackend{})
 	if err == nil || !strings.Contains(err.Error(), "batch forwarding requires") {
 		t.Fatalf("batchCapabilities() error = %v, want descriptive capability error", err)
+	}
+}
+
+func TestClientBatchForwardsPacketsInOrderImmediately(t *testing.T) {
+	backend := newFakeBatchBackend()
+	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	s := &session{player: p, backend: backend}
+	first := &packet.Text{Message: "first"}
+	second := &packet.Text{Message: "second"}
+
+	if err := s.forwardClientBatch([]packet.Packet{first, second}); err != nil {
+		t.Fatalf("forwardClientBatch: %v", err)
+	}
+	if len(backend.immediate) != 1 {
+		t.Fatalf("immediate writes = %d, want 1", len(backend.immediate))
+	}
+	got := backend.immediate[0]
+	if len(got) != 2 || got[0] != first || got[1] != second {
+		t.Fatalf("immediate batch = %#v, want original packet order", got)
+	}
+}
+
+func TestClientBatchFlushesWhenNoPacketsSurvive(t *testing.T) {
+	backend := newFakeBatchBackend()
+	p := player.New(slog.Default(), player.MonitoringState{CurrentTime: time.Now()}, nil)
+	s := &session{player: p, backend: backend}
+
+	if err := s.forwardClientBatch(nil); err != nil {
+		t.Fatalf("forwardClientBatch: %v", err)
+	}
+	if len(backend.immediate) != 1 || len(backend.immediate[0]) != 0 {
+		t.Fatalf("immediate writes = %#v, want one empty flush", backend.immediate)
 	}
 }
 
@@ -242,6 +275,30 @@ func (*fakeBackend) WritePacket(packet.Packet) error    { return nil }
 func (*fakeBackend) DoSpawn() error                     { return nil }
 func (f *fakeBackend) Flush() error                     { return f.flushErr }
 func (*fakeBackend) Close() error                       { return nil }
+
+type fakeBatchBackend struct {
+	*fakeBackend
+	batches   [][]packet.Packet
+	immediate [][]packet.Packet
+}
+
+func newFakeBatchBackend() *fakeBatchBackend {
+	return &fakeBatchBackend{fakeBackend: &fakeBackend{}}
+}
+
+func (f *fakeBatchBackend) ReadBatch() ([]packet.Packet, error) {
+	if len(f.batches) == 0 {
+		return nil, io.EOF
+	}
+	batch := f.batches[0]
+	f.batches = f.batches[1:]
+	return batch, nil
+}
+
+func (f *fakeBatchBackend) WritePacketImmediate(packets ...packet.Packet) error {
+	f.immediate = append(f.immediate, append([]packet.Packet(nil), packets...))
+	return nil
+}
 
 type fakeClient struct {
 	packets []packet.Packet
