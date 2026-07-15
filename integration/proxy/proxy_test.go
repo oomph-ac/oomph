@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"math"
@@ -13,8 +14,56 @@ import (
 	"github.com/oomph-ac/oomph/player/component"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
+
+func TestDefaultDialPreservesXBLIdentityData(t *testing.T) {
+	listener, err := (minecraft.ListenConfig{AuthenticationDisabled: true}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	accepted := make(chan *minecraft.Conn, 1)
+	acceptErr := make(chan error, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			acceptErr <- err
+			return
+		}
+		backend := conn.(*minecraft.Conn)
+		accepted <- backend
+		if err := backend.StartGame(minecraft.GameData{}); err != nil {
+			acceptErr <- err
+		}
+	}()
+
+	want := login.IdentityData{
+		DisplayName: "ProxyPlayer",
+		Identity:    uuid.NewString(),
+		XUID:        "2533274790395904",
+	}
+	backend, err := defaultDial(5*time.Second)(context.Background(), listener.Addr().String(), want, login.ClientData{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer backend.Close()
+
+	select {
+	case err := <-acceptErr:
+		t.Fatal(err)
+	case conn := <-accepted:
+		defer conn.Close()
+		got := conn.IdentityData()
+		if got.XUID != want.XUID {
+			t.Fatalf("backend XUID = %q, want %q", got.XUID, want.XUID)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for backend login")
+	}
+}
 
 func TestBackendSwapInvalidatesOldGeneration(t *testing.T) {
 	old := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 1}}

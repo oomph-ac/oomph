@@ -149,9 +149,10 @@ func (p *Proxy) Close() error {
 func defaultDial(timeout time.Duration) DialFunc {
 	return func(_ context.Context, address string, identity login.IdentityData, client login.ClientData, _ string) (Backend, error) {
 		return minecraft.Dialer{
-			IdentityData: identity,
-			ClientData:   client,
-			FlushRate:    -1,
+			IdentityData:        identity,
+			ClientData:          client,
+			KeepXBLIdentityData: true,
+			FlushRate:           -1,
 		}.DialTimeout("raknet", address, timeout)
 	}
 }
