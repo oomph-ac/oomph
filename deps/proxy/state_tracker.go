@@ -27,7 +27,7 @@ func newBackendStateTracker() *backendStateTracker {
 	}
 }
 
-func (t *backendStateTracker) handle(pk packet.Packet) {
+func (t *backendStateTracker) handle(pk packet.Packet, clientRuntimeID uint64) {
 	switch pk := pk.(type) {
 	case *packet.AddActor:
 		t.entities[pk.EntityUniqueID] = struct{}{}
@@ -46,7 +46,10 @@ func (t *backendStateTracker) handle(pk packet.Packet) {
 			t.bossBars[pk.BossEntityUniqueID] = struct{}{}
 		}
 	case *packet.MobEffect:
-		if pk.Operation == packet.MobEffectAdd {
+		if pk.EntityRuntimeID != clientRuntimeID {
+			break
+		}
+		if pk.Operation == packet.MobEffectAdd || pk.Operation == packet.MobEffectModify {
 			t.effects[pk.EffectType] = struct{}{}
 		} else if pk.Operation == packet.MobEffectRemove {
 			delete(t.effects, pk.EffectType)

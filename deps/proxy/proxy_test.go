@@ -144,13 +144,14 @@ func TestTransferResetsClientWorldAcrossBackendDimensions(t *testing.T) {
 func TestBackendStateTrackerClearsSpectrumTransferState(t *testing.T) {
 	entryID := uuid.New()
 	tracker := newBackendStateTracker()
-	tracker.handle(&packet.AddActor{EntityUniqueID: 11})
-	tracker.handle(&packet.AddItemActor{EntityUniqueID: 12})
-	tracker.handle(&packet.AddPainting{EntityUniqueID: 13})
-	tracker.handle(&packet.BossEvent{BossEntityUniqueID: 14, EventType: packet.BossEventShow})
-	tracker.handle(&packet.MobEffect{EffectType: 15, Operation: packet.MobEffectAdd})
-	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionAdd, Entries: []protocol.PlayerListEntry{{UUID: entryID}}})
-	tracker.handle(&packet.SetDisplayObjective{ObjectiveName: "kills"})
+	tracker.handle(&packet.AddActor{EntityUniqueID: 11}, 27)
+	tracker.handle(&packet.AddItemActor{EntityUniqueID: 12}, 27)
+	tracker.handle(&packet.AddPainting{EntityUniqueID: 13}, 27)
+	tracker.handle(&packet.BossEvent{BossEntityUniqueID: 14, EventType: packet.BossEventShow}, 27)
+	tracker.handle(&packet.MobEffect{EntityRuntimeID: 27, EffectType: 15, Operation: packet.MobEffectModify}, 27)
+	tracker.handle(&packet.MobEffect{EntityRuntimeID: 99, EffectType: 15, Operation: packet.MobEffectRemove}, 27)
+	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionAdd, Entries: []protocol.PlayerListEntry{{UUID: entryID}}}, 27)
+	tracker.handle(&packet.SetDisplayObjective{ObjectiveName: "kills"}, 27)
 
 	packets := tracker.clearPackets(27)
 	var entities, bossBars, effects, players, objectives int
@@ -189,12 +190,12 @@ func TestBackendStateTrackerClearsSpectrumTransferState(t *testing.T) {
 func TestBackendStateTrackerHonoursRemovalPackets(t *testing.T) {
 	entryID := uuid.New()
 	tracker := newBackendStateTracker()
-	tracker.handle(&packet.AddActor{EntityUniqueID: 11})
-	tracker.handle(&packet.RemoveActor{EntityUniqueID: 11})
-	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionAdd, Entries: []protocol.PlayerListEntry{{UUID: entryID}}})
-	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionRemove, Entries: []protocol.PlayerListEntry{{UUID: entryID}}})
-	tracker.handle(&packet.SetDisplayObjective{ObjectiveName: "kills"})
-	tracker.handle(&packet.RemoveObjective{ObjectiveName: "kills"})
+	tracker.handle(&packet.AddActor{EntityUniqueID: 11}, 1)
+	tracker.handle(&packet.RemoveActor{EntityUniqueID: 11}, 1)
+	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionAdd, Entries: []protocol.PlayerListEntry{{UUID: entryID}}}, 1)
+	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionRemove, Entries: []protocol.PlayerListEntry{{UUID: entryID}}}, 1)
+	tracker.handle(&packet.SetDisplayObjective{ObjectiveName: "kills"}, 1)
+	tracker.handle(&packet.RemoveObjective{ObjectiveName: "kills"}, 1)
 	if packets := tracker.clearPackets(1); len(packets) != 0 {
 		t.Fatalf("clear emitted %d packets for removed state", len(packets))
 	}
@@ -257,6 +258,31 @@ func TestTransferDoesNotReportSuccessWhenStateSyncFails(t *testing.T) {
 	}
 	if err := s.resetTransferState(); !errors.Is(err, want) {
 		t.Fatalf("resetTransferState() error = %v, want %v", err, want)
+	}
+}
+
+func TestTransferUsesHandlerChunkRadius(t *testing.T) {
+	var got int32
+	backend := &fakeBackend{
+		data: minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		write: func(pk packet.Packet) error {
+			if request, ok := pk.(*packet.RequestChunkRadius); ok {
+				got = request.ChunkRadius
+			}
+			return nil
+		},
+	}
+	s := &session{
+		handler: radiusHandler{radius: 12}, client: &fakeClient{}, backend: backend,
+		clientRuntimeID: 1, clientUniqueID: 2, chunkRadius: 8,
+		backendRuntimeID: 9, backendUniqueID: 10,
+		state: newBackendStateTracker(),
+	}
+	if err := s.resetTransferState(); err != nil {
+		t.Fatal(err)
+	}
+	if got != 12 {
+		t.Fatalf("transfer chunk radius = %d, want handler radius 12", got)
 	}
 }
 
@@ -380,6 +406,13 @@ type fakeBackend struct {
 	readErr  error
 	write    func(packet.Packet) error
 }
+
+type radiusHandler struct {
+	NopHandler
+	radius int32
+}
+
+func (h radiusHandler) ChunkRadius() int32 { return h.radius }
 
 func (f *fakeBackend) GameData() minecraft.GameData       { return f.data }
 func (f *fakeBackend) ReadPacket() (packet.Packet, error) { return nil, f.readErr }

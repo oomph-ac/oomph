@@ -63,6 +63,12 @@ type Handler interface {
 	Close() error
 }
 
+// ChunkRadiusProvider overrides the client-requested chunk radius used when a transfer asks the
+// replacement backend to begin sending chunks.
+type ChunkRadiusProvider interface {
+	ChunkRadius() int32
+}
+
 // NopHandler forwards every packet and accepts every backend lifecycle event. Embed it in handlers
 // that only need to override part of Handler.
 type NopHandler struct{}
@@ -306,7 +312,7 @@ func (s *session) backendLoop(ctx context.Context) error {
 		s.routeMu.Lock()
 		if s.handler.HandleServerPacket(&pk) {
 			if s.rewriteServerPacket(pk) {
-				s.state.handle(pk)
+				s.state.handle(pk, s.clientRuntimeID)
 				err = s.client.WritePacket(pk)
 			}
 		}
@@ -356,6 +362,9 @@ func (s *session) resetTransferState() error {
 	}
 	s.clientDimension = data.Dimension
 	radius := s.chunkRadius
+	if provider, ok := s.handler.(ChunkRadiusProvider); ok {
+		radius = provider.ChunkRadius()
+	}
 	maxRadius := min(max(radius, 0), 255)
 	if err := s.backend.WritePacket(&packet.RequestChunkRadius{ChunkRadius: radius, MaxChunkRadius: uint8(maxRadius)}); err != nil {
 		return err
