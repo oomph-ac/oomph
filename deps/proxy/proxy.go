@@ -16,6 +16,11 @@ import (
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
+const (
+	initialFallbackRetryDelay = 100 * time.Millisecond
+	maximumFallbackRetryDelay = 2 * time.Second
+)
+
 // Config configures a standalone Bedrock proxy.
 type Config struct {
 	LocalAddress  string
@@ -193,7 +198,6 @@ func defaultDial(timeout time.Duration) DialFunc {
 			IdentityData:        identity,
 			ClientData:          client,
 			KeepXBLIdentityData: true,
-			FlushRate:           -1,
 		}.DialContext(ctx, "raknet", address)
 	}
 }
@@ -283,15 +287,17 @@ func (s *session) clientLoop() error {
 }
 
 func (s *session) backendLoop(ctx context.Context) error {
+	consecutiveReadFailures := 0
 	for {
 		backend, generation := s.currentBackend()
 		pk, err := backend.ReadPacket()
 		if err != nil {
 			if s.isCurrent(backend, generation) {
-				committed, fallbackErr := s.transfer(ctx, s.proxy.cfg.RemoteAddress)
+				committed, fallbackErr := s.recoverFallback(ctx, consecutiveReadFailures)
 				if fallbackErr != nil {
 					return fmt.Errorf("proxy: backend read failed: %w; fallback failed after commit %t: %v", err, committed, fallbackErr)
 				}
+				consecutiveReadFailures++
 				s.proxy.cfg.Log.Warn("backend connection lost; transferred to fallback", "address", s.proxy.cfg.RemoteAddress, "err", err)
 			}
 			continue
@@ -299,6 +305,7 @@ func (s *session) backendLoop(ctx context.Context) error {
 		if !s.isCurrent(backend, generation) {
 			continue
 		}
+		consecutiveReadFailures = 0
 		if transfer, ok := pk.(*packet.Transfer); ok {
 			address := net.JoinHostPort(transfer.Address, fmt.Sprint(transfer.Port))
 			committed, err := s.transfer(ctx, address)
@@ -325,11 +332,47 @@ func (s *session) backendLoop(ctx context.Context) error {
 	}
 }
 
+func fallbackRetryDelay(consecutiveFailures int) time.Duration {
+	delay := initialFallbackRetryDelay
+	for i := 1; i < consecutiveFailures && delay < maximumFallbackRetryDelay; i++ {
+		delay = min(delay*2, maximumFallbackRetryDelay)
+	}
+	return delay
+}
+
+func waitForFallbackRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 func (s *session) transfer(ctx context.Context, address string) (bool, error) {
 	s.transferMu.Lock()
 	defer s.transferMu.Unlock()
 	s.routeMu.Lock()
 	defer s.routeMu.Unlock()
+	return s.transferLocked(ctx, address)
+}
+
+func (s *session) recoverFallback(ctx context.Context, consecutiveFailures int) (bool, error) {
+	s.transferMu.Lock()
+	defer s.transferMu.Unlock()
+	s.routeMu.Lock()
+	defer s.routeMu.Unlock()
+	if consecutiveFailures > 0 {
+		if err := waitForFallbackRetry(ctx, fallbackRetryDelay(consecutiveFailures)); err != nil {
+			return false, err
+		}
+	}
+	return s.transferLocked(ctx, s.proxy.cfg.RemoteAddress)
+}
+
+func (s *session) transferLocked(ctx context.Context, address string) (bool, error) {
 	backend, err := s.proxy.cfg.Dial(ctx, address, s.identity, s.clientData, s.clientAddress)
 	if err != nil {
 		return false, err
@@ -372,8 +415,8 @@ func (s *session) resetTransferState() error {
 	if provider, ok := s.handler.(ChunkRadiusProvider); ok {
 		radius = provider.ChunkRadius()
 	}
-	maxRadius := min(max(radius, 0), 255)
-	if err := s.backend.WritePacket(&packet.RequestChunkRadius{ChunkRadius: radius, MaxChunkRadius: uint8(maxRadius)}); err != nil {
+	radius = min(max(radius, 1), 255)
+	if err := s.backend.WritePacket(&packet.RequestChunkRadius{ChunkRadius: radius, MaxChunkRadius: uint8(radius)}); err != nil {
 		return err
 	}
 	return s.backend.Flush()

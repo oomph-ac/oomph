@@ -78,6 +78,55 @@ func TestDefaultDialHonoursContextCancellation(t *testing.T) {
 	}
 }
 
+func TestDefaultDialAutomaticallyFlushesPackets(t *testing.T) {
+	listener, err := (minecraft.ListenConfig{AuthenticationDisabled: true}).Listen("raknet", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	accepted := make(chan *minecraft.Conn, 1)
+	startErr := make(chan error, 1)
+	go func() {
+		raw, err := listener.Accept()
+		if err != nil {
+			startErr <- err
+			return
+		}
+		server := raw.(*minecraft.Conn)
+		accepted <- server
+		startErr <- server.StartGame(minecraft.GameData{EntityRuntimeID: 1, EntityUniqueID: 2})
+	}()
+
+	backend, err := defaultDial(5*time.Second)(context.Background(), listener.Addr().String(), login.IdentityData{}, login.ClientData{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer backend.Close()
+	server := <-accepted
+	defer server.Close()
+	if err := backend.DoSpawn(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-startErr; err != nil {
+		t.Fatal(err)
+	}
+	if err := server.SetReadDeadline(time.Now().Add(250 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.WritePacket(&packet.Text{Message: "automatically flushed"}); err != nil {
+		t.Fatal(err)
+	}
+	pk, err := server.ReadPacket()
+	if err != nil {
+		t.Fatalf("server did not receive packet without an explicit flush: %v", err)
+	}
+	text, ok := pk.(*packet.Text)
+	if !ok || text.Message != "automatically flushed" {
+		t.Fatalf("server received %#v, want the forwarded text packet", pk)
+	}
+}
+
 func TestBackendSwapInvalidatesOldGeneration(t *testing.T) {
 	old := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 1}}
 	next := &fakeBackend{data: minecraft.GameData{EntityRuntimeID: 9}}
@@ -286,6 +335,45 @@ func TestTransferUsesHandlerChunkRadius(t *testing.T) {
 	}
 }
 
+func TestTransferClampsChunkRadius(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		radius int32
+		want   int32
+	}{
+		{name: "negative", radius: -4, want: 1},
+		{name: "above protocol maximum", radius: 300, want: 255},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var got *packet.RequestChunkRadius
+			backend := &fakeBackend{
+				data: minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+				write: func(pk packet.Packet) error {
+					if request, ok := pk.(*packet.RequestChunkRadius); ok {
+						got = request
+					}
+					return nil
+				},
+			}
+			s := &session{
+				handler: radiusHandler{radius: test.radius}, client: &fakeClient{}, backend: backend,
+				clientRuntimeID: 1, clientUniqueID: 2,
+				backendRuntimeID: 9, backendUniqueID: 10,
+				state: newBackendStateTracker(),
+			}
+			if err := s.resetTransferState(); err != nil {
+				t.Fatal(err)
+			}
+			if got == nil {
+				t.Fatal("backend did not receive RequestChunkRadius")
+			}
+			if got.ChunkRadius != test.want || got.MaxChunkRadius != uint8(test.want) {
+				t.Fatalf("chunk radius = %d/%d, want %d/%d", got.ChunkRadius, got.MaxChunkRadius, test.want, test.want)
+			}
+		})
+	}
+}
+
 func TestTransferRejectsIncompatibleBlockNetworkEncoding(t *testing.T) {
 	initial := &fakeBackend{data: minecraft.GameData{UseBlockNetworkIDHashes: false}}
 	replacement := &fakeBackend{data: minecraft.GameData{UseBlockNetworkIDHashes: true}}
@@ -358,6 +446,46 @@ func TestBackendReadFailureFallsBackToRemoteAddress(t *testing.T) {
 	}
 }
 
+func TestBackendReadFailureBacksOffConsecutiveFallbacks(t *testing.T) {
+	primary := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		readErr: errors.New("primary backend closed"),
+	}
+	fallback := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 11, EntityUniqueID: 12},
+		readErr: errors.New("fallback backend closed"),
+	}
+	client := &fakeClient{addr: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132}}
+	var attempts []time.Time
+	proxy := &Proxy{cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(context.Context, string, login.IdentityData, login.ClientData, string) (Backend, error) {
+			attempts = append(attempts, time.Now())
+			if len(attempts) == 1 {
+				return fallback, nil
+			}
+			return nil, errors.New("fallback unavailable")
+		},
+	}}
+	s := &session{
+		proxy: proxy, handler: NopHandler{}, client: client, backend: primary,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 9, backendUniqueID: 10,
+		state: newBackendStateTracker(),
+	}
+
+	if err := s.backendLoop(context.Background()); err == nil {
+		t.Fatal("backendLoop() succeeded after fallback became unavailable")
+	}
+	if len(attempts) != 2 {
+		t.Fatalf("fallback dial attempts = %d, want 2", len(attempts))
+	}
+	if elapsed := attempts[1].Sub(attempts[0]); elapsed < 50*time.Millisecond {
+		t.Fatalf("consecutive fallback attempts were %v apart, want a backoff", elapsed)
+	}
+}
+
 func TestFallbackPausesClientPacketsWhileDialing(t *testing.T) {
 	primaryWrites := make(chan struct{}, 1)
 	primary := &fakeBackend{
@@ -415,6 +543,68 @@ func TestFallbackPausesClientPacketsWhileDialing(t *testing.T) {
 	case <-backendDone:
 	case <-time.After(time.Second):
 		t.Fatal("backend loop did not finish")
+	}
+	select {
+	case <-clientDone:
+	case <-time.After(time.Second):
+		t.Fatal("client loop did not finish")
+	}
+}
+
+func TestFallbackPausesClientPacketsDuringRetryBackoff(t *testing.T) {
+	deadBackendWrites := make(chan struct{}, 1)
+	fallback := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 11, EntityUniqueID: 12},
+		readErr: errors.New("fallback backend closed"),
+		write: func(packet.Packet) error {
+			deadBackendWrites <- struct{}{}
+			return errors.New("fallback backend closed")
+		},
+	}
+	client := &fakeClient{
+		addr:      &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132},
+		readQueue: make(chan packet.Packet, 1),
+	}
+	proxy := &Proxy{cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(context.Context, string, login.IdentityData, login.ClientData, string) (Backend, error) {
+			return nil, errors.New("fallback unavailable")
+		},
+	}}
+	s := &session{
+		proxy: proxy, handler: NopHandler{}, client: client, backend: fallback,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 11, backendUniqueID: 12,
+		state: newBackendStateTracker(),
+	}
+	recoveryDone := make(chan error, 1)
+	go func() {
+		_, err := s.recoverFallback(context.Background(), 1)
+		recoveryDone <- err
+	}()
+	deadline := time.Now().Add(time.Second)
+	for s.routeMu.TryLock() {
+		s.routeMu.Unlock()
+		if time.Now().After(deadline) {
+			t.Fatal("fallback recovery did not pause client routing")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	client.readQueue <- &packet.Text{Message: "during retry backoff"}
+	close(client.readQueue)
+	clientDone := make(chan error, 1)
+	go func() { clientDone <- s.clientLoop() }()
+
+	select {
+	case <-deadBackendWrites:
+		t.Fatal("client packet was written to dead backend during retry backoff")
+	case <-time.After(50 * time.Millisecond):
+	}
+	select {
+	case <-recoveryDone:
+	case <-time.After(time.Second):
+		t.Fatal("fallback recovery did not finish")
 	}
 	select {
 	case <-clientDone:
