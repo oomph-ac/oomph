@@ -116,6 +116,9 @@ func Listen(ctx context.Context, cfg Config) (*Proxy, error) {
 	if cfg.Dial == nil {
 		cfg.Dial = defaultDial(cfg.DialTimeout)
 	}
+	if cfg.Listen.Compression == nil {
+		cfg.Listen.Compression = packet.SnappyCompression
+	}
 	l, err := cfg.Listen.Listen("raknet", cfg.LocalAddress)
 	if err != nil {
 		return nil, fmt.Errorf("proxy: listen: %w", err)
