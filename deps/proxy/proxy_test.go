@@ -613,11 +613,130 @@ func TestFallbackPausesClientPacketsDuringRetryBackoff(t *testing.T) {
 	}
 }
 
+func TestBackendDisconnectMessageExtractsPreLoginRejection(t *testing.T) {
+	want := "You are not whitelisted on this server"
+	kick := &net.OpError{
+		Op:  "dial",
+		Net: "minecraft",
+		Err: &net.OpError{Op: want, Net: "minecraft", Err: net.ErrClosed},
+	}
+	err := errors.Join(errors.New("backup unavailable"), kick)
+	got, ok := backendDisconnectMessage(err)
+	if !ok || got != want {
+		t.Fatalf("backendDisconnectMessage() = (%q, %t), want (%q, true)", got, ok, want)
+	}
+}
+
+func TestBackendDisconnectMessageRejectsTransportFailure(t *testing.T) {
+	err := &net.OpError{Op: "dial", Net: "minecraft", Err: net.ErrClosed}
+	if got, ok := backendDisconnectMessage(err); ok {
+		t.Fatalf("backendDisconnectMessage() = (%q, true), want no player-facing reason", got)
+	}
+}
+
+func TestBackendRejectionDisconnectsClientWithoutFallback(t *testing.T) {
+	const reason = "You are not whitelisted on this server"
+	backend := &fakeBackend{
+		data: minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		readErr: &net.OpError{
+			Op:  "read packet",
+			Net: "minecraft",
+			Err: &net.OpError{Op: reason, Net: "minecraft", Err: net.ErrClosed},
+		},
+	}
+	client := &fakeClient{addr: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132}}
+	dialed := false
+	proxy := &Proxy{cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(context.Context, string, login.IdentityData, login.ClientData, string) (Backend, error) {
+			dialed = true
+			return nil, errors.New("unexpected fallback")
+		},
+	}}
+	s := &session{
+		proxy: proxy, handler: NopHandler{}, client: client, backend: backend,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 9, backendUniqueID: 10,
+		state: newBackendStateTracker(),
+	}
+
+	if err := s.backendLoop(context.Background()); !errors.Is(err, backend.readErr) {
+		t.Fatalf("backendLoop() error = %v, want backend rejection %v", err, backend.readErr)
+	}
+	if dialed {
+		t.Fatal("backend rejection triggered fallback dialing")
+	}
+	if len(client.packets) != 1 {
+		t.Fatalf("client packets = %d, want one disconnect", len(client.packets))
+	}
+	disconnect, ok := client.packets[0].(*packet.Disconnect)
+	if !ok || disconnect.Message != reason {
+		t.Fatalf("client packet = %#v, want disconnect message %q", client.packets[0], reason)
+	}
+}
+
+func TestRunDoesNotReconnectAfterClientDisconnect(t *testing.T) {
+	readStarted := make(chan struct{})
+	releaseRead := make(chan struct{})
+	backend := &blockingReadBackend{
+		fakeBackend: fakeBackend{data: minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10}},
+		started:     readStarted,
+		release:     releaseRead,
+	}
+	client := &fakeClient{
+		addr:      &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 19132},
+		readQueue: make(chan packet.Packet),
+	}
+	dialed := make(chan struct{}, 1)
+	proxy := &Proxy{cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(context.Context, string, login.IdentityData, login.ClientData, string) (Backend, error) {
+			dialed <- struct{}{}
+			return nil, errors.New("unexpected reconnect")
+		},
+	}}
+	s := &session{
+		proxy: proxy, handler: NopHandler{}, client: client, backend: backend,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 9, backendUniqueID: 10,
+		state: newBackendStateTracker(),
+	}
+	runDone := make(chan error, 1)
+	go func() { runDone <- s.run(context.Background()) }()
+	<-readStarted
+	close(client.readQueue)
+	select {
+	case <-runDone:
+	case <-time.After(time.Second):
+		t.Fatal("session did not stop after the client disconnected")
+	}
+	close(releaseRead)
+	select {
+	case <-dialed:
+		t.Fatal("session reconnected to the fallback after the client disconnected")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 type fakeBackend struct {
 	data     minecraft.GameData
 	flushErr error
 	readErr  error
 	write    func(packet.Packet) error
+}
+
+type blockingReadBackend struct {
+	fakeBackend
+	started chan struct{}
+	release chan struct{}
+}
+
+func (b *blockingReadBackend) ReadPacket() (packet.Packet, error) {
+	close(b.started)
+	<-b.release
+	return nil, errors.New("backend closed")
 }
 
 type radiusHandler struct {

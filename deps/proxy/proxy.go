@@ -3,6 +3,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -162,7 +163,11 @@ func (p *Proxy) serveClient(ctx context.Context, conn *minecraft.Conn) error {
 	clientData.ThirdPartyName = conn.IdentityData().DisplayName
 	backend, err := p.cfg.Dial(ctx, p.cfg.RemoteAddress, conn.IdentityData(), clientData, conn.RemoteAddr().String())
 	if err != nil {
-		_ = p.listener.Disconnect(conn, "Unable to connect to the backend server.")
+		reason := "Unable to connect to the backend server."
+		if backendReason, ok := backendDisconnectMessage(err); ok {
+			reason = backendReason
+		}
+		_ = p.listener.Disconnect(conn, reason)
 		return err
 	}
 	handler := Handler(NopHandler{})
@@ -181,6 +186,43 @@ func (p *Proxy) serveClient(ctx context.Context, conn *minecraft.Conn) error {
 		return err
 	}
 	return s.run(ctx)
+}
+
+func backendDisconnectMessage(err error) (string, bool) {
+	var disconnect minecraft.DisconnectError
+	if errors.As(err, &disconnect) && disconnect != "" {
+		return disconnect.Error(), true
+	}
+	return legacyBackendDisconnectMessage(err)
+}
+
+func legacyBackendDisconnectMessage(err error) (string, bool) {
+	if opErr, ok := err.(*net.OpError); ok {
+		if cause, ok := opErr.Err.(*net.OpError); ok && errors.Is(cause.Err, net.ErrClosed) && playerFacingDisconnectOperation(cause.Op) {
+			return cause.Op, true
+		}
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, cause := range joined.Unwrap() {
+			if message, ok := legacyBackendDisconnectMessage(cause); ok {
+				return message, true
+			}
+		}
+		return "", false
+	}
+	if cause := errors.Unwrap(err); cause != nil {
+		return legacyBackendDisconnectMessage(cause)
+	}
+	return "", false
+}
+
+func playerFacingDisconnectOperation(operation string) bool {
+	switch operation {
+	case "", "accept", "close", "dial", "do spawn", "flush", "read", "read packet", "start game", "write", "write packet":
+		return false
+	default:
+		return true
+	}
 }
 
 // Close stops accepting new clients.
@@ -257,6 +299,8 @@ func (s *session) start() error {
 }
 
 func (s *session) run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	errCh := make(chan error, 2)
 	go func() { errCh <- s.clientLoop() }()
 	go func() { errCh <- s.backendLoop(ctx) }()
@@ -296,6 +340,12 @@ func (s *session) backendLoop(ctx context.Context) error {
 		pk, err := backend.ReadPacket()
 		if err != nil {
 			if s.isCurrent(backend, generation) {
+				if reason, rejected := backendDisconnectMessage(err); rejected {
+					if writeErr := s.client.WritePacket(&packet.Disconnect{Message: reason, FilteredMessage: reason}); writeErr != nil {
+						return fmt.Errorf("proxy: forward backend disconnect: %w", writeErr)
+					}
+					return err
+				}
 				committed, fallbackErr := s.recoverFallback(ctx, consecutiveReadFailures)
 				if fallbackErr != nil {
 					return fmt.Errorf("proxy: backend read failed: %w; fallback failed after commit %t: %v", err, committed, fallbackErr)
@@ -376,6 +426,9 @@ func (s *session) recoverFallback(ctx context.Context, consecutiveFailures int) 
 }
 
 func (s *session) transferLocked(ctx context.Context, address string) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	backend, err := s.proxy.cfg.Dial(ctx, address, s.identity, s.clientData, s.clientAddress)
 	if err != nil {
 		return false, err
