@@ -24,6 +24,8 @@ Choose the integration that matches your server software:
 See the [complete setup guide](./docs/setup.md) for network topology,
 configuration, startup order, and verification steps.
 
+The [standalone proxy module](./deps/proxy) may also be used without Oomph when only connection forwarding, instant transfers, backend fallback, and transfer-state cleanup are needed.
+
 ## Server Authoritative Movement
 Similar to what is implemented in BDS, Oomph attempts to replicate the movement of players and send any corrections if deemed neccessary. Unlike BDS, Oomph accounts for latency, making it much smoother than the current vanilla system. As of now, Oomph has known issues with the following:
 * Liquids, the client is fully exempted in this scenario.

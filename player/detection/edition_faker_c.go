@@ -21,7 +21,6 @@ type EditionFakerC struct {
 	metadata *player.DetectionMetadata
 
 	inputMode uint32
-	isMobile  bool
 }
 
 func New_EditionFakerC(p *player.Player) *EditionFakerC {
@@ -34,9 +33,6 @@ func New_EditionFakerC(p *player.Player) *EditionFakerC {
 			MaxViolations: 1,
 		},
 		inputMode: noInputModeSet,
-		isMobile: p.ClientDat.DeviceOS == protocol.DeviceAndroid ||
-			p.ClientDat.DeviceOS == protocol.DeviceIOS ||
-			p.ClientDat.DeviceOS == protocol.DeviceFireOS,
 	}
 }
 
@@ -77,7 +73,9 @@ func (d *EditionFakerC) Detect(pk packet.Packet) {
 			_ = utils.Device(d.mPlayer.ClientDat.DeviceOS) // existing behavior didn't flag; keeping noop
 		}
 
-		if !d.mPlayer.Opts().Combat.AllowNonMobileTouch && !d.isMobile && i.InputMode == packet.InputModeTouch {
+		deviceOS := d.mPlayer.ClientDat.DeviceOS
+		isMobile := deviceOS == protocol.DeviceAndroid || deviceOS == protocol.DeviceIOS || deviceOS == protocol.DeviceFireOS
+		if !d.mPlayer.Opts().Combat.AllowNonMobileTouch && !isMobile && i.InputMode == packet.InputModeTouch {
 			d.mPlayer.Disconnect("Sorry! Using touch on non-mobile devices is not allowed by this server.")
 		} /* else if !d.mPlayer.Opts().Combat.AllowSwitchInputMode && d.inputMode != noInputModeSet && d.inputMode != i.InputMode {
 			d.mPlayer.Disconnect("Sorry! Switching your input mode is not allowed by this server.")
