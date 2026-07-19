@@ -6,6 +6,7 @@ import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/item/enchantment"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -432,8 +433,6 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		// FFS???
 		return 1
 	} */
-	p.Dbg.Notify(DebugModeBlockBreaking, true, "itemInHand=%v", held)
-
 	// FIXME: It seems like Dragonfly doesn't have the item runtime IDs for Netherite tools set properly. This is a temporary
 	// hack to allow netherite tools to work. However, it introduces a bypass where any nethite tool will be able to break
 	// blocks instantly.
@@ -461,21 +460,57 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		return 1
 	}
 
-	breakContext := block.BreakContext{}
-	if effect, ok := p.effects.Get(packet.EffectHaste); ok {
-		breakContext.HasteLevel = int(effect.Amplifier)
-	}
-	if effect, ok := p.effects.Get(packet.EffectConduitPower); ok {
-		breakContext.ConduitPowerLevel = int(effect.Amplifier)
-	}
-	if effect, ok := p.effects.Get(packet.EffectMiningFatigue); ok {
-		breakContext.MiningFatigueLevel = int(effect.Amplifier)
-	}
+	breakContext := p.breakContext()
 	breakTime := float32(block.BreakDuration(b, held, breakContext).Milliseconds())
 	// On versions below 1.21.50, the block break time for wool is shorter by ~25% See https://github.com/oomph-ac/oomph/issues/107
 	if _, isWool := b.(block.Wool); isWool && p.Version < GameVersion1_21_50 {
 		breakTime *= 0.75
 	}
+	p.Dbg.Notify(
+		DebugModeBlockBreaking,
+		true,
+		"block=%s itemInHand=%v breakContext=%+v expectedTicks=%.4f",
+		utils.BlockName(b),
+		held,
+		breakContext,
+		breakTime/50,
+	)
 
 	return float32(breakTime / 50)
+}
+
+func (p *Player) breakContext() block.BreakContext {
+	_, aquaAffinity := p.inventory.Helmet().Enchantment(enchantment.AquaAffinity)
+	ctx := block.BreakContext{
+		Underwater:   p.insideOfWater(),
+		AquaAffinity: aquaAffinity,
+		Airborne:     !p.movement.OnGround(),
+	}
+	if effect, ok := p.effects.Get(packet.EffectHaste); ok {
+		ctx.HasteLevel = int(effect.Amplifier)
+	}
+	if effect, ok := p.effects.Get(packet.EffectConduitPower); ok {
+		ctx.ConduitPowerLevel = int(effect.Amplifier)
+	}
+	if effect, ok := p.effects.Get(packet.EffectMiningFatigue); ok {
+		ctx.MiningFatigueLevel = int(effect.Amplifier)
+	}
+	return ctx
+}
+
+func (p *Player) insideOfWater() bool {
+	const breathingDistanceBelowEyes = float32(0.11111111)
+
+	eyePos := p.movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset})
+	blockPos := df_cube.Pos(cube.PosFromVec3(eyePos))
+	water, ok := p.World().Block(blockPos).(block.Water)
+	if !ok {
+		return false
+	}
+	depth := float32(water.SpreadDecay() + 1)
+	if water.LiquidFalling() {
+		depth = 1
+	}
+	surface := float32(blockPos[1]+1) - (depth/9 - breathingDistanceBelowEyes)
+	return p.movement.Pos().Y() < surface
 }
