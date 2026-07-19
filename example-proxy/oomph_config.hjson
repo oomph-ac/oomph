@@ -1,0 +1,447 @@
+{
+    # The version of the config file. This is used to ensure that the config file is compatible with the current version of Oomph.
+    # DO NOT MODIFY THIS VALUE.
+    version: 7
+
+    # The prefix to be used for Oomph.
+    prefix: §l§6o§eo§bm§ep§6h§7§r »
+
+    # The name of the command used access anti-cheat commands on the proxy. The default is 'ac' which will make the anti-cheat command '/ac'.
+    command_name: ac
+
+    # The description of the command used access anti-cheat commands on the proxy.
+    command_description: The command for anti-cheat functionality.
+
+    # Golang's garbage collection percentage. If set to -1 (the default value), the proxy will only run garbage collection when reaching the memory soft limit.
+    # We recommend NOT changing this value unless you know what you're doing.
+    gc_percent: -1
+
+    # A soft-limit for how much memory the Oomph proxy should use in megabytes. The default value is 1GB (1024MB).
+    # If you are running Oomph on a container, we recommend setting this to roughly ~500MB lower to avoid OOM errors.
+    # Increase this as neccessary to reduce garbage collection cycles.
+    mem_threshold: 1024
+
+    # The address the proxy listens on for incoming connections. For the most part, just using a colon followed by the port is fine.
+    local_addr: ":19132"
+
+    # The address the proxy first connects to for the remote server.
+    remote_addr: ":20000"
+
+    # The address the proxy will connect to if the initial connection to the remote address fails.
+    backup_addr: ""
+
+    # The message players are disconnected with when the proxy is shut down and there is no available reconnect address.
+    shutdown_message: §cServer is restarting.
+
+    # The IP address players connected to the proxy are transferred to in the event of a shutdown.
+    # If this option is empty, players will be disconnected instead.
+    reconnect_ip: ""
+
+    # The port players connected to the proxy are transferred to in the event of a shutdown.
+    # If this option is empty, players will be disconnected instead.
+    reconnect_port: 0
+
+    # This option signifies wether the proxy should use the legacy event system to allow the remote server to handle punishments/flags.
+    # This option is recommended to be set to false as the system will be removed in the future.
+    use_legacy_events: false
+
+    # Options for your resource packs.
+    resource_opts:
+    {
+        # The folder where resource packs are stored. If your resource pack requires a content key, list them in a JSON file with a map of the pack UUID to the content key.
+        resource_folder: ""
+
+        # Set to true if you require players to download the resource packs stored on the proxy.
+        require_packs: false
+    }
+
+    # Options for configuring the network settings for Oomph.
+    network_opts:
+    {
+        # If enabled, Oomph will attempt to fix chunks sent by the server to prevent invisible blocks on the client-side.
+        # It is recommended to only enable this option when experiencing issues with invisible blocks, as it will cause the proxy to re-encode chunk packets sent by the server.
+        attempt_fix_chunks: false
+
+        # If enabled, Oomph will automatically upgrade chunks sent by the server to use the Minecraft sub-chunk caching system.
+        # This system allows for your players to use less bandwidth and a slight increase in FPS. It is recommended to keep this option enabled.
+        upgrade_chunks_to_blobs: false
+
+        # The maximum amount of latency deviation in ticks Oomph will allow for before applying certain updates instantly without lag compensation.
+        # Set to -1 to disable.
+        global_movement_cutoff_threshold: -1
+
+        # The maximum amount of ghost blocks are allowed to be placed against each other until Oomph will discard them.
+        # You may set this to -1 to disable and allow unlimited ghost blocks, although it is NOT recommended and can be abused
+        # by cheaters to give the illusion of flight (since other players cannot see ghost blocks they place).
+        max_ghost_block_chain: -1
+
+        # The maximum amount of seconds Oomph will allow for no ACKs to be received before disconnecting the player.
+        # Valid values are between 10 and 120 seconds.
+        max_ack_timeout: 60
+
+        # The maximum amount of ticked positions Oomph should store for each entity for combat rewind and simulation.
+        # This value is capped at 20 ticks (1000ms).
+        # This option is not applied if Combat.FullAuthoritative is set to false. Set to -1 to disable.
+        max_entity_rewind: 6
+
+        # The maximum amount of player movements Oomph will accept before applying knockback forcefully.
+        # Set to -1 to disable.
+        max_kb_delay: 10
+
+        # The maximum amount of player movements Oomph will allow the client's world state to be out of sync with the server until
+        # forcing a block update.
+        # Set to -1 to disable.
+        max_block_update_delay: -1
+    }
+
+    # Options for configuring movement policies and strictness for Oomph.
+    movement_opts:
+    {
+        # The amount of blocks between the client and Oomph's prediction required to trigger a correction. It is recommended to keep this option at around 0.2-0.5 blocks to avoid large noticable corrections.
+        correction_threshold: 0.30000001192092896
+
+        # The amount of block per tick Oomph's position moves towards the client's position. Note that the persuasion is not applied on the Y-axis.
+        # Increasing this value above the default option will result in slight movement bypasses.
+        persuasion_threshold: 0.0020000000949949026
+
+        # Should Oomph accept the client's position completely if it's within the PositionAcceptanceThreshold?
+        # Enabling this option will result in small movement bypasses.
+        accept_client_position: false
+
+        # The distance between the client and Oomph's position (in blocks) required for Oomph to accept the client's position. This option is only applied if AcceptClientPosition is set to true.
+        position_acception_threshold: 0.09000000357627869
+
+        # Should Oomph accept the client's velocity completely if it's within the VelocityAcceptanceThreshold?
+        # May result in small movement bypasses.
+        accept_client_velocity: false
+
+        # The difference between the client and Oomph's velocity (in blocks) required for Oomph to accept the client's velocity.
+        # NOTE: Increasing this above 0.07 may result in movement bypasses.
+        velocity_acception_threshold: 0.029999999329447746
+
+        # Should Oomph limit the prediction velocity to a certain limit? This prevents exploiters from setting a large velocity value when exempted to cause crashes or lag.
+        limit_all_velocity: true
+
+        # The maximum allowed velocity in blocks per tick for all players. This is checked per-axis and not the overall velocity.
+        limit_all_velocity_threshold: 10
+    }
+
+    # Options for configuring combat policies and strictness for Oomph.
+    combat_opts:
+    {
+        # The maximum amount of CPS that Oomph will allow for the left click.
+        left_cps_limit: 20
+
+        # The maximum amount of CPS that Oomph will allow for the right click.
+        right_cps_limit: 20
+
+        # The maximum amount of CPS that Oomph will allow for the left click on mobile devices.
+        left_cps_limit_mobile: 16
+
+        # The maximum amount of CPS that Oomph will allow for the right click on mobile devices.
+        right_cps_limit_mobile: 15
+
+        # The maximum angle in degrees that Oomph will allow for an attack to be considered valid.
+        maximum_attack_angle: 85
+
+        # This option is used to enable Oomph's client-sided entity tracking to perfectly lag compensate for the client view of entities. If you want to enable reach detections, this should be enabled.
+        enable_client_entity_tracking: true
+
+        # Should Oomph allow non-mobile players to use the touch input mode? It is recommended to keep this option disabled as it may allow for
+        # tiny combat gains from players spoofing their input mode to touch.
+        allow_non_mobile_touch: false
+
+        # Should Oomph allow players to switch their input mode?
+        # It is recommended to keep this option disabled as it may allow for tiny combat gains from players switching their input mode to touch.
+        allow_switch_input_mode: false
+    }
+
+    # The configuration for each detection used by the proxy.
+    # The allowed punishment types are:
+    # - none: No punishment will be applied to the player.
+    # - kick: The player will be kicked when they reach the maximum amount of violations allowed by the detection.
+    # - ban: The player will be banned when the maximum amount of violations is reached. A ban provider is required for this option to be applied.
+    # The tags that can be applied in the flag message are:
+    # - {player}: The player's username.
+    # - {xuid}: The player's XBOX Live ID.
+    # - {violations}: The amount of violations that have been reached on the detection.
+    # - {prefix}: The prefix defined in the Oomph configuration.
+    detections:
+    {
+        Aim_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 5
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6rotated suspiciously §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: kick
+        }
+        Autoclicker_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 25
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is clicking too quickly §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: kick
+        }
+        BadPacket_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6sent an invalid packet"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        BadPacket_B:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6tried to attack themselves"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        BadPacket_C:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6tried to break blocks with an invalid packet"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        BadPacket_D:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6executed creative action in survival"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        BadPacket_E:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6sent an invalid movement"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        BadPacket_F:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6sent an invalid inventory action"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Cloud_Aim:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 0
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is aiming suspiciously §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Cloud_Combat:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 0
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is fighting suspiciously §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Cloud_Proxy:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 0
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is using a game proxy §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Cloud_Scaffold:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 0
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is building suspiciously §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        EditionFaker_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6attempted to spoof their device information"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        EditionFaker_B:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6attempted to spoof their device information"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        EditionFaker_C:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6attempted to spoof their device information"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Hitbox_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 20
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §7| §6Hitbox §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        InvMove_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6moving whilst in inventory"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Killaura_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 5
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §7| §6Killaura §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Nuker_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6tried to break blocks using an invalid packet §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Proxy_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 10
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is likely using a game proxy"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: kick
+        }
+        Proxy_B:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is connected with a game proxy"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Reach_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 10
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §7| §6Reach §8(Raycast) §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Reach_B:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 30
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §7| §6Reach §8(Raw) §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Scaffold_A:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 1
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6sent invalid action to place blocks §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+        Scaffold_B:
+        {
+            # The maximum amount of violations that Oomph will allow before taking action for this detection.
+            max_violations: 25
+
+            # The message that will be sent to authorized staff when a player fails this detection.
+            flag_message: "{prefix} §e{player} §6is placing with an invalid direction §7[§cx{violations}§7]"
+
+            # The type of punishment to be applied when a player reaches the maximum amount of violations for this detection.
+            punishment_type: ban
+        }
+    }
+}
