@@ -1,0 +1,7 @@
+version: "2"
+
+linters:
+  exclusions:
+    rules:
+      - path: proxy_test\.go
+        linters: [errcheck]
