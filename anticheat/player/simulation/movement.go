@@ -72,18 +72,19 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 		len(lavaBlocks),
 		movement.Swimming(),
 	)
-	if !movement.Flying() && (len(waterBlocks) != 0 || len(lavaBlocks) != 0) {
+	waterTravel := len(waterBlocks) != 0 || movement.Swimming()
+	if !movement.Flying() && (waterTravel || len(lavaBlocks) != 0) {
 		p.Dbg.Notify(player.DebugModeMovementSim, attemptKnockback(movement), "knockback applied in liquid: %v", movement.Vel())
-		if len(waterBlocks) != 0 {
+		if waterTravel {
 			if movement.Gliding() {
 				movement.SetGliding(false)
 				movement.SetGlideBoost(0)
 			}
 			applyLiquidFlow(p, movement, waterBlocks, block.Water{})
-			simulateLiquidTravel(p, movement, block.Water{})
+			simulateLiquidTravel(p, movement, block.Water{}, len(waterBlocks) != 0)
 		} else {
 			applyLiquidFlow(p, movement, lavaBlocks, block.Lava{})
-			simulateLiquidTravel(p, movement, block.Lava{})
+			simulateLiquidTravel(p, movement, block.Lava{}, true)
 		}
 		return
 	}
@@ -303,7 +304,7 @@ func simulationIsReliable(p *player.Player, movement player.MovementComponent) b
 		!(movement.Flying() || movement.JustDisabledFlight() || movement.NoClip() || !p.Alive)
 }
 
-func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, liquid world.Liquid) {
+func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, liquid world.Liquid, touchingLiquid bool) {
 	initialY := movement.Pos().Y()
 	_, water := liquid.(block.Water)
 	jumping := movement.EffectiveJumping()
@@ -319,7 +320,7 @@ func simulateLiquidTravel(p *player.Player, movement player.MovementComponent, l
 	if jumping {
 		newVel := movement.Vel()
 		swimTransition := movement.SwimAmount() > 0 && movement.SwimAmount() < 1
-		if swimTransition {
+		if swimTransition || water && movement.Swimming() && !touchingLiquid {
 			newVel[1] = 0
 		} else {
 			newVel[1] += 0.04
