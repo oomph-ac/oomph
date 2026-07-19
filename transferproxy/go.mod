@@ -1,10 +1,10 @@
-module github.com/oomph-ac/oomph/anticheat/deps/proxy
+module github.com/oomph-ac/oomph/transferproxy
 
 go 1.26.0
 
-replace github.com/sandertv/go-raknet => ../../../go-raknet
+replace github.com/sandertv/go-raknet => ../go-raknet
 
-replace github.com/sandertv/gophertunnel => ../../../gophertunnel
+replace github.com/sandertv/gophertunnel => ../gophertunnel
 
 require (
 	github.com/google/uuid v1.6.0

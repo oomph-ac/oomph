@@ -28,7 +28,7 @@ require (
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
-	github.com/oomph-ac/oomph/anticheat/deps/proxy v0.1.2 // indirect
+	github.com/oomph-ac/oomph/transferproxy v0.1.2 // indirect
 	github.com/pion/datachannel v1.6.0 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect
 	github.com/pion/ice/v4 v4.2.1 // indirect
@@ -60,7 +60,7 @@ require (
 
 replace github.com/oomph-ac/oomph/anticheat => ../..
 
-replace github.com/oomph-ac/oomph/anticheat/deps/proxy => ../../deps/proxy
+replace github.com/oomph-ac/oomph/transferproxy => ../../../transferproxy
 
 replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260719182426-f1fdb4d3c00c
 

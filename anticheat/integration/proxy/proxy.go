@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	proxycore "github.com/oomph-ac/oomph/anticheat/deps/proxy"
+	proxycore "github.com/oomph-ac/oomph/transferproxy"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/player/component"
 	playercontext "github.com/oomph-ac/oomph/anticheat/player/context"

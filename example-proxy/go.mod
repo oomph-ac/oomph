@@ -4,7 +4,7 @@ go 1.26.0
 
 replace github.com/oomph-ac/oomph/anticheat => ../anticheat
 
-replace github.com/oomph-ac/oomph/anticheat/deps/proxy => ../anticheat/deps/proxy
+replace github.com/oomph-ac/oomph/transferproxy => ../transferproxy
 
 replace github.com/sandertv/go-raknet => ../go-raknet
 
@@ -38,7 +38,7 @@ require (
 	github.com/hjson/hjson-go/v4 v4.6.0 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-	github.com/oomph-ac/oomph/anticheat/deps/proxy v0.1.2 // indirect
+	github.com/oomph-ac/oomph/transferproxy v0.1.2 // indirect
 	github.com/pion/datachannel v1.6.0 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect
 	github.com/pion/ice/v4 v4.2.1 // indirect

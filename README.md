@@ -24,7 +24,7 @@ Choose the integration that matches your server software:
 See the [complete setup guide](./anticheat/docs/setup.md) for network topology,
 configuration, startup order, and verification steps.
 
-The [standalone proxy module](./anticheat/deps/proxy) may also be used without Oomph when only connection forwarding, instant transfers, backend fallback, and transfer-state cleanup are needed.
+The [standalone transfer proxy module](./transferproxy) may also be used without Oomph when only connection forwarding, instant transfers, backend fallback, and transfer-state cleanup are needed.
 
 For a ready-to-run proxy with Oomph wired in, see [example-proxy](./example-proxy).
 
