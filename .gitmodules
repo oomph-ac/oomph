@@ -1,0 +1,6 @@
+[submodule "go-raknet"]
+	path = go-raknet
+	url = https://github.com/oomph-ac/go-raknet.git
+[submodule "gophertunnel"]
+	path = gophertunnel
+	url = https://github.com/oomph-ac/gophertunnel.git
