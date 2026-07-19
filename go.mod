@@ -2,7 +2,7 @@ module github.com/oomph-ac/oomph
 
 go 1.26.0
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260714052818-ea2fd40ad95e
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260719182426-f1fdb4d3c00c
 
 require (
 	github.com/chewxy/math32 v1.11.1
