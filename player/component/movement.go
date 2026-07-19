@@ -319,7 +319,7 @@ func (mc *AuthoritativeMovementComponent) PressingSprint() bool {
 
 // Jumping returns true if the movement component is expecting a jump in the current frame.
 func (mc *AuthoritativeMovementComponent) Jumping() bool {
-	return mc.jumping
+	return mc.jumping || mc.pressingJump
 }
 
 // PressingJump returns true if the movement component is holding down the key bound to the jump action.
