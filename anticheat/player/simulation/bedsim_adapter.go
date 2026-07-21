@@ -5,8 +5,8 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
-	float_cube "github.com/ethaniccc/float32-cube/cube"
 	"github.com/oomph-ac/bedsim"
+	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/utils"
 	oworld "github.com/oomph-ac/oomph/anticheat/world"
@@ -64,7 +64,7 @@ func movementStateFromComponent(p *player.Player, movement player.MovementCompon
 		Size:         movement.Size(),
 
 		// Supporting block is tracked separately from collision booleans for edge-case jump logic.
-		SupportingBlockPos: toDFPosPtr(movement.SupportingBlockPos()),
+		SupportingBlockPos: cloneBlockPos(movement.SupportingBlockPos()),
 
 		Gravity:      movement.Gravity(),
 		JumpHeight:   movement.JumpHeight(),
@@ -149,7 +149,7 @@ func applyBedsimState(movement player.MovementComponent, state *bedsim.MovementS
 	}
 
 	movement.SetSlideOffset(state.SlideOffset)
-	movement.SetSupportingBlockPos(toFloatPosPtr(state.SupportingBlockPos))
+	movement.SetSupportingBlockPos(cloneBlockPos(state.SupportingBlockPos))
 
 	// Preserve Oomph's last/current snapshots in the same order as the legacy movement path.
 	movement.SetPos(state.LastPos)
@@ -175,7 +175,7 @@ func intersectingLiquid(p *player.Player, movement player.MovementComponent) boo
 		if _, isLiquid := result.Block.(world.Liquid); !isLiquid {
 			continue
 		}
-		blockBB := float_cube.Box(0, 0, 0, 1, 1, 1).Translate(result.Position.Vec3())
+		blockBB := df_cube.Box32(0, 0, 0, 1, 1, 1).Translate(game.BlockPosVec3(result.Position))
 		if stateBB.IntersectsWith(blockBB) {
 			return true
 		}
@@ -194,23 +194,22 @@ func (wp bedsimWorldProvider) Block(pos df_cube.Pos) world.Block {
 	return wp.w.Block(pos)
 }
 
-func (wp bedsimWorldProvider) BlockCollisions(pos df_cube.Pos) []float_cube.BBox {
+func (wp bedsimWorldProvider) BlockCollisions(pos df_cube.Pos) []df_cube.BBox32 {
 	if wp.w == nil {
 		return nil
 	}
 	b := wp.w.Block(pos)
-	pos32 := float_cube.Pos{pos[0], pos[1], pos[2]}
-	return utils.BlockCollisions(b, pos32, wp.w)
+	return utils.BlockCollisions(b, pos, wp.w)
 }
 
-func (wp bedsimWorldProvider) GetNearbyBBoxes(aabb float_cube.BBox) []float_cube.BBox {
+func (wp bedsimWorldProvider) GetNearbyBBoxes(aabb df_cube.BBox32) []df_cube.BBox32 {
 	if wp.w == nil {
 		return nil
 	}
 	return utils.NearbyBBoxes(aabb, wp.w)
 }
 
-func (wp bedsimWorldProvider) HasNearbyBBoxes(aabb float_cube.BBox) bool {
+func (wp bedsimWorldProvider) HasNearbyBBoxes(aabb df_cube.BBox32) bool {
 	if wp.w == nil {
 		return false
 	}
@@ -273,18 +272,10 @@ func (ip bedsimInventoryProvider) HasElytra() bool {
 	return ok
 }
 
-func toDFPosPtr(pos *float_cube.Pos) *df_cube.Pos {
+func cloneBlockPos(pos *df_cube.Pos) *df_cube.Pos {
 	if pos == nil {
 		return nil
 	}
-	dfPos := df_cube.Pos{pos[0], pos[1], pos[2]}
-	return &dfPos
-}
-
-func toFloatPosPtr(pos *df_cube.Pos) *float_cube.Pos {
-	if pos == nil {
-		return nil
-	}
-	floatPos := float_cube.Pos{pos[0], pos[1], pos[2]}
-	return &floatPos
+	cloned := *pos
+	return &cloned
 }

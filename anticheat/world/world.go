@@ -6,7 +6,6 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
-	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/zeebo/xxh3"
 
@@ -85,15 +84,14 @@ func (w *World) Chunk(pos protocol.ChunkPos) *chunk.Chunk {
 
 // Block returns the block at the position passed.
 func (w *World) Block(pos df_cube.Pos) world.Block {
-	blockPos := cube.Pos(pos)
-	if blockPos.OutOfBounds(cube.Range(world.Overworld.Range())) {
+	if pos.OutOfBounds(df_cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
 
-	chunkPos := protocol.ChunkPos{int32(blockPos[0]) >> 4, int32(blockPos[2]) >> 4}
+	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
 	blockUpdates, found := w.blockUpdates[chunkPos]
 	if found {
-		if b, ok := blockUpdates[df_cube.Pos(blockPos)]; ok {
+		if b, ok := blockUpdates[pos]; ok {
 			return b
 		}
 	} else {
@@ -106,7 +104,7 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 	}
 
 	// TODO: Implement and account for multi-layer blocks.
-	rid := c.Block(uint8(blockPos[0]), int16(blockPos[1]), uint8(blockPos[2]), 0)
+	rid := c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
 	if b, ok := world.BlockByRuntimeID(rid); ok {
 		return b
 	}
@@ -115,7 +113,7 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 
 // SetBlock sets the block at the position passed.
 func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
-	if cube.Pos(pos).OutOfBounds(cube.Range(world.Overworld.Range())) {
+	if pos.OutOfBounds(df_cube.Range(world.Overworld.Range())) {
 		return
 	}
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}

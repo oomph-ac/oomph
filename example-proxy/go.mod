@@ -1,6 +1,6 @@
 module github.com/oomph-ac/oomph/example-proxy
 
-go 1.26.0
+go 1.26.1
 
 replace github.com/oomph-ac/oomph/anticheat => ../anticheat
 
@@ -12,13 +12,13 @@ replace github.com/sandertv/go-raknet => ../go-raknet
 
 replace github.com/sandertv/gophertunnel => ../gophertunnel
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260719182426-f1fdb4d3c00c
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260721043252-382003f5a7cd
 
 require (
 	github.com/df-mc/dragonfly v0.10.14-0.20260508142332-b4a4d55303f9
 	github.com/getsentry/sentry-go v0.35.3
 	github.com/oomph-ac/oomph/anticheat v0.0.0-20260716201756-d5e22ec6b233
-	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
+	github.com/sandertv/gophertunnel v1.57.2-0.20260720171832-1706d533aa80
 )
 
 require (
@@ -32,7 +32,6 @@ require (
 	github.com/df-mc/goleveldb v1.1.9 // indirect
 	github.com/df-mc/jsonc v1.0.5 // indirect
 	github.com/df-mc/worldupgrader v1.0.21 // indirect
-	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12 // indirect
 	github.com/go-gl/mathgl v1.2.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
@@ -62,11 +61,11 @@ require (
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
-	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/exp v0.0.0-20260611194520-c48552f49976 // indirect
+	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 )

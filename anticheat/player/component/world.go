@@ -8,8 +8,6 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
-	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/player/component/acknowledgement"
@@ -156,10 +154,10 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	closestDistance := float32(math.MaxFloat32 - 1)
 	blockBBoxes := utils.BlockCollisions(replacingBlock, clickedBlockPos, c.mPlayer.World())
 	if len(blockBBoxes) == 0 {
-		blockBBoxes = []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
+		blockBBoxes = []df_cube.BBox32{df_cube.Box32(0, 0, 0, 1, 1, 1)}
 	}
 	for _, bb := range blockBBoxes {
-		bb = bb.Translate(clickedBlockPos.Vec3())
+		bb = bb.Translate(game.BlockPosVec3(clickedBlockPos))
 		closestOrigin := game.ClosestPointInLineToPoint(prevPos, currPos, game.BBoxCenter(bb))
 		if dist := game.ClosestPointToBBox(closestOrigin, bb).Sub(closestOrigin).Len(); dist < closestDistance {
 			closestDistance = dist
@@ -194,7 +192,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 			// If the block at the position is not replacable, we want to place the block on the side of the block.
 			replaceBlockPos := clickedBlockPos
 			if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(b) {
-				replaceBlockPos = clickedBlockPos.Side(cube.Face(dat.BlockFace))
+				replaceBlockPos = clickedBlockPos.Side(df_cube.Face(dat.BlockFace))
 			}
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "using client-authoritative block in hand: %T", b)
 			c.mPlayer.PlaceBlock(df_cube.Pos(clickedBlockPos), df_cube.Pos(replaceBlockPos), df_cube.Face(dat.BlockFace), b)
@@ -232,7 +230,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		// If the block at the position is not replacable, we want to place the block on the side of the block.
 		replaceBlockPos := clickedBlockPos
 		if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(heldItem) {
-			replaceBlockPos = clickedBlockPos.Side(cube.Face(dat.BlockFace))
+			replaceBlockPos = clickedBlockPos.Side(df_cube.Face(dat.BlockFace))
 		}
 		c.mPlayer.PlaceBlock(df_cube.Pos(clickedBlockPos), df_cube.Pos(replaceBlockPos), df_cube.Face(dat.BlockFace), heldItem)
 	default:
@@ -258,8 +256,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 		return true
 	}
 
-	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
-	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
+	blockPos := df_cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
+	interactPos := game.BlockPosVec3(blockPos).Add(dat.ClickedPosition)
 	interactedBlock := c.mPlayer.World().Block(df_cube.Pos(blockPos))
 
 	if _, isActivatable := interactedBlock.(block.Activatable); !isActivatable {
@@ -309,7 +307,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			continue
 		}
 
-		iBBs := utils.BlockCollisions(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World())
+		iBBs := utils.BlockCollisions(intersectingBlock, flooredPos, c.mPlayer.World())
 		if len(iBBs) == 0 {
 			continue
 		}
@@ -319,7 +317,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			iBB = iBB.Translate(intersectingBlockPos)
 
 			// If there is an intersection, the interaction is invalid.
-			if _, ok := trace.BBoxIntercept(iBB, closestEyePos, interactPos); ok {
+			if _, ok := game.BBoxIntercept(iBB, closestEyePos, interactPos); ok {
 				//c.mPlayer.NMessage("<red>Interaction denied: block obstructs path.</red>")
 				c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "Interaction denied: block obstructs path.")
 				c.initalInteractionAccepted = false

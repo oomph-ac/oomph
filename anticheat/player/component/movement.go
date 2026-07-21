@@ -3,7 +3,7 @@ package component
 import (
 	"fmt"
 
-	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/entity"
 	"github.com/oomph-ac/oomph/anticheat/game"
@@ -463,7 +463,7 @@ func (mc *AuthoritativeMovementComponent) SetSize(newSize mgl32.Vec3) {
 }
 
 // BoundingBox returns the bounding box of the movement component translated to it's current position.
-func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
+func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox32 {
 	scale := mc.size[2]
 	width := (mc.size[0] * 0.5) * scale
 	height := mc.size[1] * scale
@@ -472,7 +472,7 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 		yOffset = mc.slideOffset.Y()
 	}
 
-	return cube.Box(
+	return cube.Box32(
 		mc.pos[0]-width,
 		(mc.pos[1] + yOffset),
 		mc.pos[2]-width,
@@ -483,14 +483,14 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 }
 
 // ClientBoundingBox returns the bounding box of the movement component translated to the client's position.
-func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox {
+func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox32 {
 	width := mc.size[0] / 2
 	var yOffset float32
 	if mc.mPlayer.VersionInRange(-1, player.GameVersion1_20_60) {
 		yOffset = mc.slideOffset.Y()
 	}
 
-	return cube.Box(
+	return cube.Box32(
 		mc.nonAuthoritative.pos[0]-width,
 		mc.nonAuthoritative.pos[1]+yOffset,
 		mc.nonAuthoritative.pos[2]-width,

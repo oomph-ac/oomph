@@ -5,8 +5,6 @@ import (
 
 	"github.com/chewxy/math32"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/entity"
 	"github.com/oomph-ac/oomph/anticheat/game"
@@ -39,7 +37,7 @@ type AuthoritativeCombatComponent struct {
 
 	targetedEntity         *entity.Entity
 	targetedRuntimeID      uint64
-	entityBB               cube.BBox
+	entityBB               df_cube.BBox32
 	uniqueAttackedEntities map[uint64]*entity.Entity
 
 	swingTick int64
@@ -207,7 +205,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 	}
 
 	var (
-		closestHitResult trace.BBoxResult
+		closestHitResult game.BBoxResult
 		lerpedAtClosest  lerpedResult
 
 		closestRaycastDist float32 = 1_000_000
@@ -301,7 +299,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			closestAngle = angle
 		}
 
-		if hitResult, ok := trace.BBoxIntercept(entityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
+		if hitResult, ok := game.BBoxIntercept(entityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
 			raycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
 			hitValid = hitValid || raycastDist <= raycastReach
 			c.raycastResults = append(c.raycastResults, raycastDist)
@@ -328,7 +326,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 				closestAngle = altAngle
 			}
 
-			if hitResult, ok := trace.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
+			if hitResult, ok := game.BBoxIntercept(altEntityBB, lerpedResult.attackPos, lerpedResult.attackPos.Add(dV.Mul(7.0))); ok {
 				altRaycastDist := lerpedResult.attackPos.Sub(hitResult.Position()).Len()
 				hitValid = hitValid || altRaycastDist <= raycastReach
 				c.raycastResults = append(c.raycastResults, altRaycastDist)
@@ -374,7 +372,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			lerpedAtClosest.attackPos = c.endAttackPos
 			lerpedAtClosest.entityPos = c.startEntityPos
 			lerpedAtClosest.rotation = c.endRotation
-			utils.ModifyBBoxResult(&closestHitResult, c.entityBB, closestRawPos, 0)
+			closestHitResult = game.NewBBoxResult(c.entityBB, closestRawPos, 0)
 			raycastHit = true
 		}
 	}
@@ -385,8 +383,8 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 		start, end := lerpedAtClosest.attackPos, closestHitResult.Position()
 	check_blocks_between_ray:
 		for blockPos := range game.BlocksBetween(start, end, 50) {
-			flooredBlockPos := cube.PosFromVec3(blockPos)
-			blockInWay := c.mPlayer.World().Block(df_cube.Pos(flooredBlockPos))
+			flooredBlockPos := game.BlockPosFromVec3(blockPos)
+			blockInWay := c.mPlayer.World().Block(flooredBlockPos)
 			if utils.IsBlockPassInteraction(blockInWay) {
 				continue
 			}
@@ -394,7 +392,7 @@ func (c *AuthoritativeCombatComponent) Calculate() bool {
 			// Iterate through each block's bounding boxes and check if it is in the way of the ray.
 			for _, blockBB := range utils.BlockCollisions(blockInWay, flooredBlockPos, c.mPlayer.World()) {
 				blockBB = blockBB.Translate(blockPos)
-				if _, ok := trace.BBoxIntercept(blockBB, start, end); ok {
+				if _, ok := game.BBoxIntercept(blockBB, start, end); ok {
 					hitValid = false
 					c.mPlayer.Dbg.Notify(player.DebugModeCombat, true, "hit was invalidated due to %s blocking attack ray", utils.BlockName(blockInWay))
 					break check_blocks_between_ray

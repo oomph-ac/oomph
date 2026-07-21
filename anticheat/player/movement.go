@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/utils"
@@ -146,10 +146,10 @@ type MovementComponent interface {
 	SetSize(size mgl32.Vec3)
 	// BoundingBox returns the bounding box of the movement component translated to
 	// it's current position.
-	BoundingBox() cube.BBox
+	BoundingBox() cube.BBox32
 	// ClientBoundingBox returns the bounding box of the movement component translated to
 	// the client's current position.
-	ClientBoundingBox() cube.BBox
+	ClientBoundingBox() cube.BBox32
 
 	// Gravity returns the gravity of the movement component.
 	Gravity() float32

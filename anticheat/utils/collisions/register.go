@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/oomph-ac/oomph/anticheat/oerror"
 
 	_ "embed"
@@ -20,9 +20,9 @@ var (
 	blockStateData []byte
 
 	// blockName -> blockState (check HashBlockProperties) -> bounding boxes
-	collisionRegistry map[string]map[string][]cube.BBox
+	collisionRegistry map[string]map[string][]cube.BBox32
 	// blockName -> bounding boxes
-	staticCollisions map[string][]cube.BBox
+	staticCollisions map[string][]cube.BBox32
 )
 
 func init() {
@@ -61,12 +61,12 @@ func init() {
 		}
 		return newDat
 	}
-	encodedCollisionToBBox := func(encodedBoxes [][6]float32) []cube.BBox {
-		boxes := make([]cube.BBox, 0, len(encodedBoxes))
+	encodedCollisionToBBox := func(encodedBoxes [][6]float32) []cube.BBox32 {
+		boxes := make([]cube.BBox32, 0, len(encodedBoxes))
 		for _, boxDat := range encodedBoxes {
 			originX, originY, originZ := boxDat[0], boxDat[1], boxDat[2]
 			halfSizeX, halfSizeY, halfSizeZ := boxDat[3]*0.5, boxDat[4]*0.5, boxDat[5]*0.5
-			boxes = append(boxes, cube.Box(
+			boxes = append(boxes, cube.Box32(
 				originX-halfSizeX, originY-halfSizeY, originZ-halfSizeZ,
 				originX+halfSizeX, originY+halfSizeY, originZ+halfSizeZ,
 			))
@@ -87,7 +87,7 @@ func init() {
 		panic(err)
 	}
 
-	collisionRegistry = make(map[string]map[string][]cube.BBox)
+	collisionRegistry = make(map[string]map[string][]cube.BBox32)
 	for _, blockData := range blockStateList {
 		state := encodedStateToMap(blockData.State)
 		stateHash := hashBlockProperties(state)
@@ -99,14 +99,14 @@ func init() {
 		prefixedName := "minecraft:" + blockData.Name
 		blockReg, ok := collisionRegistry[prefixedName]
 		if !ok {
-			collisionRegistry[prefixedName] = make(map[string][]cube.BBox)
+			collisionRegistry[prefixedName] = make(map[string][]cube.BBox32)
 			blockReg = collisionRegistry[prefixedName]
 		}
 		blockReg[stateHash] = encodedCollisionToBBox(collisionList.Shapes[coll])
 		blockStateCounter[blockData.Name]++
 	}
 
-	staticCollisions = make(map[string][]cube.BBox)
+	staticCollisions = make(map[string][]cube.BBox32)
 	// Iterate through all states to see if all are equal and therefore would not require us to hash block properties to find the correct bounding boxes.
 check_loop:
 	for blockName, states := range collisionRegistry {
@@ -119,7 +119,7 @@ check_loop:
 			continue
 		}
 
-		var lastSeenBBList []cube.BBox
+		var lastSeenBBList []cube.BBox32
 		for _, bbList := range states {
 			if lastSeenBBList == nil {
 				lastSeenBBList = bbList

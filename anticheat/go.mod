@@ -1,8 +1,8 @@
 module github.com/oomph-ac/oomph/anticheat
 
-go 1.26.0
+go 1.26.1
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260719182426-f1fdb4d3c00c
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260721043252-382003f5a7cd
 
 replace github.com/oomph-ac/bedsim => ../bedsim
 
@@ -15,15 +15,14 @@ replace github.com/sandertv/gophertunnel => ../gophertunnel
 require (
 	github.com/chewxy/math32 v1.11.1
 	github.com/df-mc/dragonfly v0.10.14-0.20260508142332-b4a4d55303f9
-	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/go-gl/mathgl v1.2.0
 	github.com/hjson/hjson-go/v4 v4.6.0
 	github.com/oomph-ac/bedsim v0.1.3
 	github.com/oomph-ac/oomph/transferproxy v0.1.2
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
-	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
+	github.com/sandertv/gophertunnel v1.57.2-0.20260720171832-1706d533aa80
 	github.com/zeebo/xxh3 v1.1.0
-	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
+	golang.org/x/exp v0.0.0-20260611194520-c48552f49976
 )
 
 require (
@@ -60,12 +59,12 @@ require (
 	github.com/pion/webrtc/v4 v4.2.10-0.20260224155637-aa3b95c72dd2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

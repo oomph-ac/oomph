@@ -3,8 +3,6 @@ package game
 import (
 	"github.com/chewxy/math32"
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
-	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/go-gl/mathgl/mgl32"
 )
 
@@ -26,7 +24,7 @@ func ClosestPointInLineToPoint(origin, end mgl32.Vec3, point mgl32.Vec3) mgl32.V
 }
 
 // ClosestPointToBBox returns the shortest point from a given origin to a given bounding box.
-func ClosestPointToBBox(origin mgl32.Vec3, bb cube.BBox) mgl32.Vec3 {
+func ClosestPointToBBox(origin mgl32.Vec3, bb df_cube.BBox32) mgl32.Vec3 {
 	var shortest mgl32.Vec3
 
 	if origin.X() < bb.Min().X() {
@@ -57,18 +55,18 @@ func ClosestPointToBBox(origin mgl32.Vec3, bb cube.BBox) mgl32.Vec3 {
 }
 
 // ClosestPointToBBoxDirectional returns the shortest point from a given origin to a given bounding box, in a given direction.
-func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb cube.BBox, distance float32) (mgl32.Vec3, bool) {
+func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb df_cube.BBox32, distance float32) (mgl32.Vec3, bool) {
 	point1 := origin.Add(startLook.Mul(distance))
 	point2 := origin.Add(endLook.Mul(distance))
 
-	rayResult1, hit1 := trace.BBoxIntercept(bb, origin, point1)
+	rayResult1, hit1 := BBoxIntercept(bb, origin, point1)
 	if hit1 {
 		point1 = rayResult1.Position()
 	} else {
 		point1 = ClosestPointToBBox(point1, bb)
 	}
 
-	rayResult2, hit2 := trace.BBoxIntercept(bb, origin, point2)
+	rayResult2, hit2 := BBoxIntercept(bb, origin, point2)
 	if hit2 {
 		point2 = rayResult2.Position()
 	} else {
@@ -86,20 +84,20 @@ func ClosestPointToBBoxDirectional(origin, startLook, endLook mgl32.Vec3, bb cub
 		return point1, true
 	}
 
-	possibleBB := cube.Box(point1.X(), point1.Y(), point1.Z(), point2.X(), point2.Y(), point2.Z())
+	possibleBB := df_cube.Box32(point1.X(), point1.Y(), point1.Z(), point2.X(), point2.Y(), point2.Z())
 	return ClosestPointToBBox(origin, possibleBB), true
 }
 
-// AABBFromDFBox converts a dragonfly bounding box to a float32-cube bounding box.
-func DFBoxToCubeBox(b df_cube.BBox) cube.BBox {
-	return cube.Box(
+// BBox32FromBBox returns the float32 representation of a bounding box.
+func BBox32FromBBox(b df_cube.BBox) df_cube.BBox32 {
+	return df_cube.Box32(
 		float32(b.Min().X()), float32(b.Min().Y()), float32(b.Min().Z()),
 		float32(b.Max().X()), float32(b.Max().Y()), float32(b.Max().Z()),
 	)
 }
 
-// CubeBoxToDFBox converts a float32-cube bounding box to a dragonfly bounding box.
-func CubeBoxToDFBox(b cube.BBox) df_cube.BBox {
+// BBoxFromBBox32 returns the float64 representation of a bounding box.
+func BBoxFromBBox32(b df_cube.BBox32) df_cube.BBox {
 	return df_cube.Box(
 		float64(b.Min().X()), float64(b.Min().Y()), float64(b.Min().Z()),
 		float64(b.Max().X()), float64(b.Max().Y()), float64(b.Max().Z()),
@@ -107,16 +105,16 @@ func CubeBoxToDFBox(b cube.BBox) df_cube.BBox {
 }
 
 // AABBFromDimensions returns a bounding box from the given dimensions.
-func AABBFromDimensions(width, height float32) cube.BBox {
+func AABBFromDimensions(width, height float32) df_cube.BBox32 {
 	h := width / 2
-	return cube.Box(
+	return df_cube.Box32(
 		-h, 0, -h,
 		h, height, h,
 	)
 }
 
 // AABBVectorDistance calculates the distance between an AABB and a vector.
-func AABBVectorDistance(a cube.BBox, v mgl32.Vec3) float32 {
+func AABBVectorDistance(a df_cube.BBox32, v mgl32.Vec3) float32 {
 	x := math32.Max(a.Min().X()-v.X(), math32.Max(0, v.X()-a.Max().X()))
 	y := math32.Max(a.Min().Y()-v.Y(), math32.Max(0, v.Y()-a.Max().Y()))
 	z := math32.Max(a.Min().Z()-v.Z(), math32.Max(0, v.Z()-a.Max().Z()))
@@ -130,12 +128,12 @@ func AABBVectorDistance(a cube.BBox, v mgl32.Vec3) float32 {
 }
 
 // BBoxCenter gets the center of a bounding box.
-func BBoxCenter(bb cube.BBox) mgl32.Vec3 {
+func BBoxCenter(bb df_cube.BBox32) mgl32.Vec3 {
 	return bb.Min().Add(bb.Max()).Mul(0.5)
 }
 
 // BBoxPoints returns all the side points of a given bounding box.
-func BBoxPoints(bb cube.BBox) []mgl32.Vec3 {
+func BBoxPoints(bb df_cube.BBox32) []mgl32.Vec3 {
 	min := bb.Min()
 	max := bb.Max()
 

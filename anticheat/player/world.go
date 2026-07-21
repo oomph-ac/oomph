@@ -8,7 +8,6 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item/enchantment"
 	"github.com/df-mc/dragonfly/server/world"
-	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/utils"
@@ -144,14 +143,14 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 	}
 
 	// Make a list of BBoxes the block will occupy.
-	boxes := utils.BlockCollisions(b, cube.Pos(replaceBlockPos), p.World())
+	boxes := utils.BlockCollisions(b, replaceBlockPos, p.World())
 	for index, blockBox := range boxes {
-		boxes[index] = blockBox.Translate(cube.Pos(replaceBlockPos).Vec3())
+		boxes[index] = blockBox.Translate(game.BlockPosVec3(replaceBlockPos))
 	}
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-	if cube.AnyIntersections(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
+	if df_cube.AnyIntersections32(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
 		p.SyncBlock(replaceBlockPos)
 		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", replaceBlockPos)
@@ -162,14 +161,14 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 	entityIntersecting := false
 	if p.Opts().Combat.EnableClientEntityTracking {
 		for _, e := range p.ClientEntityTracker().All() {
-			if cube.AnyIntersections(boxes, e.Box(e.Position)) {
+			if df_cube.AnyIntersections32(boxes, e.Box(e.Position)) {
 				entityIntersecting = true
 				break
 			}
 		}
 	} else {
 		for _, e := range p.EntityTracker().All() {
-			if rew, ok := e.Rewind(p.ClientTick); ok && cube.AnyIntersections(boxes, e.Box(rew.Position)) {
+			if rew, ok := e.Rewind(p.ClientTick); ok && df_cube.AnyIntersections32(boxes, e.Box(rew.Position)) {
 				entityIntersecting = true
 				break
 			}
@@ -239,7 +238,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				if !p.tryBreakBlock(cube.Face(action.Face)) {
+				if !p.tryBreakBlock(df_cube.Face(action.Face)) {
 					continue
 				}
 				p.blockBreakProgress = 0.0
@@ -302,7 +301,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				if !p.tryBreakBlock(cube.Face(action.Face)) {
+				if !p.tryBreakBlock(df_cube.Face(action.Face)) {
 					continue
 				}
 				p.blockBreakProgress = 0.0
@@ -334,14 +333,14 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	} */
 }
 
-func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bool {
+func (p *Player) blockInteractable(blockPos df_cube.Pos, interactFace df_cube.Face) bool {
 	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
 		return true
 	}
 
-	interactableFaces := make(map[cube.Face]struct{}, 6)
-	prevPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
-	currPos := cube.PosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
+	interactableFaces := make(map[df_cube.Face]struct{}, 6)
+	prevPos := game.BlockPosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
+	currPos := game.BlockPosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
 	blockX, blockY, blockZ := blockPos[0], blockPos[1], blockPos[2]
 
 	// If the player's head is inside the block they are breaking, allow them to break it.
@@ -352,22 +351,22 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 	belowBlock := currPos[1] < blockY || prevPos[1] < blockY
 	aboveBlock := currPos[1] > blockY || prevPos[1] > blockY
 	if belowBlock {
-		interactableFaces[cube.FaceDown] = struct{}{}
+		interactableFaces[df_cube.FaceDown] = struct{}{}
 	}
 	if aboveBlock {
-		interactableFaces[cube.FaceUp] = struct{}{}
+		interactableFaces[df_cube.FaceUp] = struct{}{}
 	}
 	if currPos[0] < blockX || prevPos[0] < blockX {
-		interactableFaces[cube.FaceWest] = struct{}{}
+		interactableFaces[df_cube.FaceWest] = struct{}{}
 	}
 	if currPos[0] > blockX || prevPos[0] > blockX {
-		interactableFaces[cube.FaceEast] = struct{}{}
+		interactableFaces[df_cube.FaceEast] = struct{}{}
 	}
 	if currPos[2] < blockZ || prevPos[2] < blockZ {
-		interactableFaces[cube.FaceNorth] = struct{}{}
+		interactableFaces[df_cube.FaceNorth] = struct{}{}
 	}
 	if currPos[2] > blockZ || prevPos[2] > blockZ {
-		interactableFaces[cube.FaceSouth] = struct{}{}
+		interactableFaces[df_cube.FaceSouth] = struct{}{}
 	}
 
 	if _, ok := interactableFaces[interactFace]; !ok {
@@ -397,7 +396,7 @@ func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bo
 	return false
 }
 
-func (p *Player) tryBreakBlock(interactFace cube.Face) bool {
+func (p *Player) tryBreakBlock(interactFace df_cube.Face) bool {
 	breakPosPtr := p.worldUpdater.BlockBreakPos()
 	if breakPosPtr == nil {
 		p.Dbg.Notify(DebugModeBlockBreaking, true, "ignored PlayerActionStopBreak (blockBreakPos is nil)")
@@ -414,7 +413,7 @@ func (p *Player) tryBreakBlock(interactFace cube.Face) bool {
 		p.blockBreakProgress = 0.0
 		return false
 	}
-	if !p.blockInteractable(cube.Pos{int(breakPos[0]), int(breakPos[1]), int(breakPos[2])}, interactFace) {
+	if !p.blockInteractable(df_cube.Pos{int(breakPos[0]), int(breakPos[1]), int(breakPos[2])}, interactFace) {
 		p.SendBlockUpdates([]protocol.BlockPos{breakPos})
 		p.Popup("<red>Cannot break this block!</red>")
 		p.blockBreakProgress = 0.0
@@ -502,7 +501,7 @@ func (p *Player) insideOfWater() bool {
 	const breathingDistanceBelowEyes = float32(0.11111111)
 
 	eyePos := p.movement.Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset})
-	blockPos := df_cube.Pos(cube.PosFromVec3(eyePos))
+	blockPos := game.BlockPosFromVec3(eyePos)
 	water, ok := p.World().Block(blockPos).(block.Water)
 	if !ok {
 		return false
