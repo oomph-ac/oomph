@@ -8,6 +8,7 @@ import (
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/bedsim"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/player/component/acknowledgement"
@@ -219,7 +220,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		})
 	case df_world.Block:
 		if _, isGlowstone := heldItem.(block.Glowstone); isGlowstone {
-			if utils.BlockName(c.mPlayer.World().Block(cube.Pos(clickedBlockPos))) == "minecraft:respawn_anchor" {
+			if bedsim.BlockName(c.mPlayer.World().Block(cube.Pos(clickedBlockPos))) == "minecraft:respawn_anchor" {
 				c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "charging respawn anchor with glowstone")
 				return true
 			}

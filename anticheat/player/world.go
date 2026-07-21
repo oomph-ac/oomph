@@ -9,6 +9,7 @@ import (
 	"github.com/df-mc/dragonfly/server/item/enchantment"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/oomph-ac/bedsim"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/utils"
 	oworld "github.com/oomph-ac/oomph/anticheat/world"
@@ -460,11 +461,11 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 	if _, isAir := b.(block.Air); isAir {
 		// Let the player send a break action for air, it won't affect anything in-game.
 		return 0
-	} else if utils.BlockName(b) == "minecraft:web" {
+	} else if bedsim.BlockName(b) == "minecraft:web" {
 		// Cobwebs are not implemented in Dragonfly, and therefore the break time duration won't be accurate.
 		// Just return 1 and accept when the client does break the cobweb.
 		return 1
-	} else if utils.BlockName(b) == "minecraft:bed" {
+	} else if bedsim.BlockName(b) == "minecraft:bed" {
 		return 1
 	}
 
@@ -478,7 +479,7 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		DebugModeBlockBreaking,
 		true,
 		"block=%s itemInHand=%v breakContext=%+v expectedTicks=%.4f",
-		utils.BlockName(b),
+		bedsim.BlockName(b),
 		held,
 		breakContext,
 		breakTime/50,

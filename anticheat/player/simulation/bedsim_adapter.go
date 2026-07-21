@@ -226,7 +226,7 @@ func (wp bedsimWorldProvider) IsChunkLoaded(chunkX, chunkZ int32) bool {
 type bedsimBlockSemantics struct{}
 
 func (bedsimBlockSemantics) BlockName(b world.Block) string {
-	return utils.BlockName(b)
+	return bedsim.BlockName(b)
 }
 
 func (bedsimBlockSemantics) BlockFriction(b world.Block) float32 {

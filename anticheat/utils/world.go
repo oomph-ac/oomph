@@ -21,18 +21,13 @@ type BlockSearchResult struct {
 	Position cube.Pos
 }
 
-// BlockName returns the name of the block.
-func BlockName(b world.Block) string {
-	return bedsim.BlockName(b)
-}
-
 // BlockFriction returns the friction of the block.
 func BlockFriction(b world.Block) float32 {
 	if f, ok := b.(block.Frictional); ok {
 		return float32(f.Friction())
 	}
 
-	switch BlockName(b) {
+	switch bedsim.BlockName(b) {
 	case "minecraft:slime":
 		return 0.8
 	case "minecraft:ice", "minecraft:packed_ice":
@@ -46,7 +41,7 @@ func BlockFriction(b world.Block) float32 {
 
 // CanPassBlock returns true if an entity can pass through the given block.
 func CanPassBlock(b world.Block) bool {
-	switch BlockName(b) {
+	switch bedsim.BlockName(b) {
 	case "minecraft:web", "minecraft:water", "minecraft:lava":
 		return true
 	default:
@@ -229,7 +224,7 @@ func BlockClimbable(b world.Block) bool {
 		return true
 	}
 
-	switch BlockName(b) {
+	switch bedsim.BlockName(b) {
 	case "minecraft:vine", "minecraft:cave_vines", "minecraft:cave_vines_body_with_berries", "minecraft:cave_vines_head_with_berries",
 		"minecraft:twisting_vines", "minecraft:weeping_vines":
 		return true
@@ -263,7 +258,7 @@ func IsWall(b world.Block) bool {
 // IsBlockPassInteraction returns true if the block allows interactions although it has a solid
 // collision bounding box.
 func IsBlockPassInteraction(b world.Block) bool {
-	switch BlockName(b) {
+	switch bedsim.BlockName(b) {
 	case "minecraft:barrier", "minecraft:invisible_bedrock":
 		return true
 	default:
