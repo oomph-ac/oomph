@@ -88,6 +88,22 @@ type MovementComponent interface {
 	JumpDelay() uint64
 	// SetJumpDelay sets the number of ticks until the movement component can make another jump.
 	SetJumpDelay(ticks uint64)
+	// Swimming returns whether the movement component is swimming.
+	Swimming() bool
+	// SwimAmount returns the interpolated swimming transition amount.
+	SwimAmount() float32
+	// AutoJumpingInWater returns whether automatic water jumping is active this tick.
+	AutoJumpingInWater() bool
+	// WantDown returns whether the player wants to descend in liquid this tick.
+	WantDown() bool
+	// WantDownSlow returns whether the player wants to descend slowly in liquid this tick.
+	WantDownSlow() bool
+	// AscendBlock returns whether the player wants to ascend a climbable block this tick.
+	AscendBlock() bool
+	// SwimWaterGraceTicks returns the retained water-contact grace ticks.
+	SwimWaterGraceTicks() int64
+	// SetSwimWaterGraceTicks sets the retained water-contact grace ticks.
+	SetSwimWaterGraceTicks(ticks int64)
 
 	// Sneaking returns true if the movement component is currently sneaking.
 	Sneaking() bool

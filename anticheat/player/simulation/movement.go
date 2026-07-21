@@ -19,15 +19,6 @@ func SimulatePlayerMovement(p *player.Player, movement player.MovementComponent)
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "mF=%.4f, mS=%.4f", movement.Impulse().Y(), movement.Impulse().X())
 	p.Dbg.Notify(player.DebugModeMovementSim, true, "yaw=%.4f, pitch=%.4f", movement.Rotation().Z(), movement.Rotation().X())
 
-	// Preserve Oomph's liquid exemption until swimming / second-layer liquid state is wired into
-	// the bedsim adapter. bedsim itself can simulate liquids, but doing so without that state
-	// would diverge from current authoritative behavior. Teleports still run through bedsim.
-	if !movement.HasTeleport() && movement.RemainingTeleportTicks() <= 0 && intersectingLiquid(p, movement) {
-		p.Dbg.Notify(player.DebugModeMovementSim, true, "no movement sim for frame %d: unsupported scenario", p.SimulationFrame)
-		movement.Reset()
-		return
-	}
-
 	result := simulateWithBedsim(p, movement)
 	switch result.Outcome {
 	case bedsim.SimulationOutcomeTeleport:

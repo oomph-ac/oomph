@@ -72,11 +72,14 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 // HandleUpdateBlock handles an UpdateBlock packet from the server.
 func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	pos := cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
-	if pk.Layer != 0 {
+	switch pk.Layer {
+	case 0:
+		c.AddPendingUpdate(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
+	case 1:
+		c.batchedBlockUpdates.SetAdditionalBlock(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
+	default:
 		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", pk.NewBlockRuntimeID, "pos", pos)
-		return
 	}
-	c.AddPendingUpdate(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -88,7 +91,10 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 		c.AddPendingUpdate(cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
 	}
 	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
+		c.batchedBlockUpdates.SetAdditionalBlock(
+			cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())},
+			c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID),
+		)
 	}
 }
 

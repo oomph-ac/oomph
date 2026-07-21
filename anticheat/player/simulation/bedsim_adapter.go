@@ -6,7 +6,6 @@ import (
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/bedsim"
-	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/utils"
 	oworld "github.com/oomph-ac/oomph/anticheat/world"
@@ -14,6 +13,7 @@ import (
 )
 
 func simulateWithBedsim(p *player.Player, movement player.MovementComponent) bedsim.SimulationResult {
+	previousOnGround := movement.OnGround()
 	state := movementStateFromComponent(p, movement)
 	sim := bedsim.Simulator{
 		World:          bedsimWorldProvider{w: p.World()},
@@ -21,6 +21,7 @@ func simulateWithBedsim(p *player.Player, movement player.MovementComponent) bed
 		Effects:        bedsimEffectsProvider{p: p},
 		Inventory:      bedsimInventoryProvider{p: p},
 		Options: bedsim.SimulationOptions{
+			RequireLiquidLayer:          true,
 			UseSlideOffset:              p.VersionInRange(-1, player.GameVersion1_20_60),
 			PositionCorrectionThreshold: p.Opts().Movement.CorrectionThreshold,
 			LimitAllVelocity:            p.Opts().Movement.LimitAllVelocity,
@@ -32,6 +33,9 @@ func simulateWithBedsim(p *player.Player, movement player.MovementComponent) bed
 	}
 
 	result := sim.SimulateState(&state)
+	if result.Outcome == bedsim.SimulationOutcomeUnreliable && !movement.Flying() {
+		state.OnGround = previousOnGround
+	}
 	applyBedsimState(movement, &state)
 	return result
 }
@@ -90,11 +94,16 @@ func movementStateFromComponent(p *player.Player, movement player.MovementCompon
 		Sneaking:      movement.Sneaking(),
 		PressingSneak: movement.PressingSneak(),
 
-		Jumping:      movement.Jumping(),
-		PressingJump: movement.PressingJump(),
-		// Climbing uses EffectiveJumping; Oomph currently only exposes the held jump key.
-		EffectiveJumping: movement.PressingJump(),
-		JumpDelay:        movement.JumpDelay(),
+		Jumping:             movement.Jumping(),
+		PressingJump:        movement.PressingJump(),
+		EffectiveJumping:    movement.PressingJump() || movement.AutoJumpingInWater() || movement.AscendBlock(),
+		JumpDelay:           movement.JumpDelay(),
+		Swimming:            movement.Swimming(),
+		SwimAmount:          movement.SwimAmount(),
+		SwimWaterGraceTicks: movement.SwimWaterGraceTicks(),
+		AutoJumpingInWater:  movement.AutoJumpingInWater(),
+		WantDown:            movement.WantDown(),
+		WantDownSlow:        movement.WantDownSlow(),
 
 		CollideX: movement.XCollision(),
 		CollideY: movement.YCollision(),
@@ -165,22 +174,7 @@ func applyBedsimState(movement player.MovementComponent, state *bedsim.MovementS
 	movement.SetStuckInCollider(state.StuckInCollider)
 	movement.SetJumpDelay(state.JumpDelay)
 	movement.SetGliding(state.Gliding)
-}
-
-// intersectingLiquid reports whether the movement bounding box currently intersects a liquid block.
-// Oomph still exempts liquid scenarios until swimming/liquid-layer state is wired through to bedsim.
-func intersectingLiquid(p *player.Player, movement player.MovementComponent) bool {
-	stateBB := movement.BoundingBox()
-	for result := range utils.NearbyBlocks(stateBB.Grow(1), false, true, p.World()) {
-		if _, isLiquid := result.Block.(world.Liquid); !isLiquid {
-			continue
-		}
-		blockBB := cube.Box32(0, 0, 0, 1, 1, 1).Translate(game.BlockPosVec3(result.Position))
-		if stateBB.IntersectsWith(blockBB) {
-			return true
-		}
-	}
-	return false
+	movement.SetSwimWaterGraceTicks(state.SwimWaterGraceTicks)
 }
 
 type bedsimWorldProvider struct {
@@ -221,6 +215,13 @@ func (wp bedsimWorldProvider) IsChunkLoaded(chunkX, chunkZ int32) bool {
 		return false
 	}
 	return wp.w.Chunk(protocol.ChunkPos{chunkX, chunkZ}) != nil
+}
+
+func (wp bedsimWorldProvider) Liquid(pos cube.Pos) (world.Liquid, bool) {
+	if wp.w == nil {
+		return nil, false
+	}
+	return wp.w.Liquid(pos)
 }
 
 type bedsimBlockSemantics struct{}

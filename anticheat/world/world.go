@@ -26,8 +26,9 @@ type World struct {
 	chunks    map[protocol.ChunkPos]ChunkInfo
 	subChunks map[protocol.ChunkPos][]xxh3.Uint128
 
-	exemptedChunks map[protocol.ChunkPos]struct{}
-	blockUpdates   map[protocol.ChunkPos]map[cube.Pos]world.Block
+	exemptedChunks         map[protocol.ChunkPos]struct{}
+	blockUpdates           map[protocol.ChunkPos]map[cube.Pos]world.Block
+	additionalBlockUpdates map[protocol.ChunkPos]map[cube.Pos]world.Block
 
 	debugFn func(string, ...any)
 
@@ -39,8 +40,9 @@ func New(debugFn func(string, ...any)) *World {
 		chunks:    make(map[protocol.ChunkPos]ChunkInfo),
 		subChunks: make(map[protocol.ChunkPos][]xxh3.Uint128),
 
-		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
-		blockUpdates:   make(map[protocol.ChunkPos]map[cube.Pos]world.Block),
+		exemptedChunks:         make(map[protocol.ChunkPos]struct{}),
+		blockUpdates:           make(map[protocol.ChunkPos]map[cube.Pos]world.Block),
+		additionalBlockUpdates: make(map[protocol.ChunkPos]map[cube.Pos]world.Block),
 
 		debugFn: debugFn,
 	}
@@ -103,12 +105,48 @@ func (w *World) Block(pos cube.Pos) world.Block {
 		return block.Air{}
 	}
 
-	// TODO: Implement and account for multi-layer blocks.
+	// Block reads the primary layer; Liquid exposes the secondary layer separately.
 	rid := c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 0)
 	if b, ok := world.BlockByRuntimeID(rid); ok {
 		return b
 	}
 	return block.Air{}
+}
+
+// Liquid returns the liquid stored on the second block layer at pos.
+func (w *World) Liquid(pos cube.Pos) (world.Liquid, bool) {
+	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
+		return nil, false
+	}
+	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
+	if updates := w.additionalBlockUpdates[chunkPos]; updates != nil {
+		if b, ok := updates[pos]; ok {
+			liquid, ok := b.(world.Liquid)
+			return liquid, ok
+		}
+	}
+	c := w.Chunk(chunkPos)
+	if c == nil {
+		return nil, false
+	}
+	b, ok := BlockRegistry.BlockByRuntimeID(c.Block(uint8(pos[0]), int16(pos[1]), uint8(pos[2]), 1))
+	if !ok {
+		return nil, false
+	}
+	liquid, ok := b.(world.Liquid)
+	return liquid, ok
+}
+
+// SetAdditionalBlock records a block update on the second block layer.
+func (w *World) SetAdditionalBlock(pos cube.Pos, b world.Block) {
+	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
+		return
+	}
+	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
+	if w.additionalBlockUpdates[chunkPos] == nil {
+		w.additionalBlockUpdates[chunkPos] = make(map[cube.Pos]world.Block)
+	}
+	w.additionalBlockUpdates[chunkPos][pos] = b
 }
 
 // SetBlock sets the block at the position passed.
@@ -176,6 +214,7 @@ func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {
 	delete(w.subChunks, chunkPos)
 	delete(w.chunks, chunkPos)
 	delete(w.blockUpdates, chunkPos)
+	delete(w.additionalBlockUpdates, chunkPos)
 }
 
 // chunkInRange returns true if the chunk position is within the given radius of the chunk position.

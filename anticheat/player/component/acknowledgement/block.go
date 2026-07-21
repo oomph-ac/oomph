@@ -8,15 +8,21 @@ import (
 )
 
 type UpdateBlockBatch struct {
-	mPlayer *player.Player
-	updates map[cube.Pos]uint32
+	mPlayer          *player.Player
+	updates          map[cube.Pos]uint32
+	additionalBlocks map[cube.Pos]uint32
 
 	expiresIn int64
 	valid     bool
 }
 
 func NewUpdateBlockBatchACK(p *player.Player) *UpdateBlockBatch {
-	return &UpdateBlockBatch{mPlayer: p, updates: make(map[cube.Pos]uint32), valid: true}
+	return &UpdateBlockBatch{
+		mPlayer:          p,
+		updates:          make(map[cube.Pos]uint32),
+		additionalBlocks: make(map[cube.Pos]uint32),
+		valid:            true,
+	}
 }
 
 func (ack *UpdateBlockBatch) Blocks() map[cube.Pos]uint32 {
@@ -25,6 +31,16 @@ func (ack *UpdateBlockBatch) Blocks() map[cube.Pos]uint32 {
 
 func (ack *UpdateBlockBatch) SetBlock(pos cube.Pos, b uint32) {
 	ack.updates[pos] = b
+}
+
+// AdditionalBlocks returns the second-layer block updates in the batch.
+func (ack *UpdateBlockBatch) AdditionalBlocks() map[cube.Pos]uint32 {
+	return ack.additionalBlocks
+}
+
+// SetAdditionalBlock adds a second-layer block update to the batch.
+func (ack *UpdateBlockBatch) SetAdditionalBlock(pos cube.Pos, runtimeID uint32) {
+	ack.additionalBlocks[pos] = runtimeID
 }
 
 func (ack *UpdateBlockBatch) RemoveBlock(pos cube.Pos) {
@@ -36,7 +52,7 @@ func (ack *UpdateBlockBatch) SetExpiry(expiresIn int64) {
 }
 
 func (ack *UpdateBlockBatch) HasUpdates() bool {
-	return len(ack.updates) > 0
+	return len(ack.updates) > 0 || len(ack.additionalBlocks) > 0
 }
 
 func (ack *UpdateBlockBatch) Run() {
@@ -53,7 +69,16 @@ func (ack *UpdateBlockBatch) Run() {
 		ack.mPlayer.World().SetBlock(pos, b, nil)
 		ack.mPlayer.WorldUpdater().RemovePendingUpdate(pos, bRuntimeID)
 	}
+	for pos, bRuntimeID := range ack.additionalBlocks {
+		b, ok := world.BlockByRuntimeID(bRuntimeID)
+		if !ok {
+			ack.mPlayer.Log().Warn("unable to find additional block with runtime ID", "blockRuntimeID", bRuntimeID)
+			b = block.Air{}
+		}
+		ack.mPlayer.World().SetAdditionalBlock(pos, b)
+	}
 	ack.updates = nil
+	ack.additionalBlocks = nil
 }
 
 func (ack *UpdateBlockBatch) Tick() {
