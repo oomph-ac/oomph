@@ -2,7 +2,7 @@ package simulation
 
 import (
 	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/bedsim"
@@ -175,7 +175,7 @@ func intersectingLiquid(p *player.Player, movement player.MovementComponent) boo
 		if _, isLiquid := result.Block.(world.Liquid); !isLiquid {
 			continue
 		}
-		blockBB := df_cube.Box32(0, 0, 0, 1, 1, 1).Translate(game.BlockPosVec3(result.Position))
+		blockBB := cube.Box32(0, 0, 0, 1, 1, 1).Translate(game.BlockPosVec3(result.Position))
 		if stateBB.IntersectsWith(blockBB) {
 			return true
 		}
@@ -187,14 +187,14 @@ type bedsimWorldProvider struct {
 	w *oworld.World
 }
 
-func (wp bedsimWorldProvider) Block(pos df_cube.Pos) world.Block {
+func (wp bedsimWorldProvider) Block(pos cube.Pos) world.Block {
 	if wp.w == nil {
 		return block.Air{}
 	}
 	return wp.w.Block(pos)
 }
 
-func (wp bedsimWorldProvider) BlockCollisions(pos df_cube.Pos) []df_cube.BBox32 {
+func (wp bedsimWorldProvider) BlockCollisions(pos cube.Pos) []cube.BBox32 {
 	if wp.w == nil {
 		return nil
 	}
@@ -202,14 +202,14 @@ func (wp bedsimWorldProvider) BlockCollisions(pos df_cube.Pos) []df_cube.BBox32 
 	return utils.BlockCollisions(b, pos, wp.w)
 }
 
-func (wp bedsimWorldProvider) GetNearbyBBoxes(aabb df_cube.BBox32) []df_cube.BBox32 {
+func (wp bedsimWorldProvider) GetNearbyBBoxes(aabb cube.BBox32) []cube.BBox32 {
 	if wp.w == nil {
 		return nil
 	}
 	return utils.NearbyBBoxes(aabb, wp.w)
 }
 
-func (wp bedsimWorldProvider) HasNearbyBBoxes(aabb df_cube.BBox32) bool {
+func (wp bedsimWorldProvider) HasNearbyBBoxes(aabb cube.BBox32) bool {
 	if wp.w == nil {
 		return false
 	}
@@ -272,7 +272,7 @@ func (ip bedsimInventoryProvider) HasElytra() bool {
 	return ok
 }
 
-func cloneBlockPos(pos *df_cube.Pos) *df_cube.Pos {
+func cloneBlockPos(pos *cube.Pos) *cube.Pos {
 	if pos == nil {
 		return nil
 	}

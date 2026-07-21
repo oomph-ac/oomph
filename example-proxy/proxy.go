@@ -68,8 +68,6 @@ func main() {
 		return
 	}
 	packs := loadResourcePacks()
-	utils.InitializeBlockNameMapping()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	p, err := proxy.Listen(ctx, proxy.Config{

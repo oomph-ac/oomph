@@ -8,7 +8,6 @@ import (
 	"os/signal"
 
 	"github.com/oomph-ac/oomph/anticheat/integration/proxy"
-	"github.com/oomph-ac/oomph/anticheat/utils"
 	"github.com/sandertv/gophertunnel/minecraft"
 )
 
@@ -24,7 +23,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	utils.InitializeBlockNameMapping()
 	p, err := proxy.Listen(ctx, proxy.Config{
 		LocalAddress:  os.Args[1],
 		RemoteAddress: os.Args[2],

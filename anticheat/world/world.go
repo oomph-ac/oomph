@@ -3,7 +3,7 @@ package world
 import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -27,7 +27,7 @@ type World struct {
 	subChunks map[protocol.ChunkPos][]xxh3.Uint128
 
 	exemptedChunks map[protocol.ChunkPos]struct{}
-	blockUpdates   map[protocol.ChunkPos]map[df_cube.Pos]world.Block
+	blockUpdates   map[protocol.ChunkPos]map[cube.Pos]world.Block
 
 	debugFn func(string, ...any)
 
@@ -40,7 +40,7 @@ func New(debugFn func(string, ...any)) *World {
 		subChunks: make(map[protocol.ChunkPos][]xxh3.Uint128),
 
 		exemptedChunks: make(map[protocol.ChunkPos]struct{}),
-		blockUpdates:   make(map[protocol.ChunkPos]map[df_cube.Pos]world.Block),
+		blockUpdates:   make(map[protocol.ChunkPos]map[cube.Pos]world.Block),
 
 		debugFn: debugFn,
 	}
@@ -83,8 +83,8 @@ func (w *World) Chunk(pos protocol.ChunkPos) *chunk.Chunk {
 }
 
 // Block returns the block at the position passed.
-func (w *World) Block(pos df_cube.Pos) world.Block {
-	if pos.OutOfBounds(df_cube.Range(world.Overworld.Range())) {
+func (w *World) Block(pos cube.Pos) world.Block {
+	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return block.Air{}
 	}
 
@@ -95,7 +95,7 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 			return b
 		}
 	} else {
-		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
+		w.blockUpdates[chunkPos] = make(map[cube.Pos]world.Block)
 	}
 
 	c := w.Chunk(chunkPos)
@@ -112,13 +112,13 @@ func (w *World) Block(pos df_cube.Pos) world.Block {
 }
 
 // SetBlock sets the block at the position passed.
-func (w *World) SetBlock(pos df_cube.Pos, b world.Block, _ *world.SetOpts) {
-	if pos.OutOfBounds(df_cube.Range(world.Overworld.Range())) {
+func (w *World) SetBlock(pos cube.Pos, b world.Block, _ *world.SetOpts) {
+	if pos.OutOfBounds(cube.Range(world.Overworld.Range())) {
 		return
 	}
 	chunkPos := protocol.ChunkPos{int32(pos[0]) >> 4, int32(pos[2]) >> 4}
 	if w.blockUpdates[chunkPos] == nil {
-		w.blockUpdates[chunkPos] = make(map[df_cube.Pos]world.Block)
+		w.blockUpdates[chunkPos] = make(map[cube.Pos]world.Block)
 	}
 	w.blockUpdates[chunkPos][pos] = b
 }

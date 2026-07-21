@@ -2,32 +2,32 @@ package acknowledgement
 
 import (
 	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/anticheat/player"
 )
 
 type UpdateBlockBatch struct {
 	mPlayer *player.Player
-	updates map[df_cube.Pos]uint32
+	updates map[cube.Pos]uint32
 
 	expiresIn int64
 	valid     bool
 }
 
 func NewUpdateBlockBatchACK(p *player.Player) *UpdateBlockBatch {
-	return &UpdateBlockBatch{mPlayer: p, updates: make(map[df_cube.Pos]uint32), valid: true}
+	return &UpdateBlockBatch{mPlayer: p, updates: make(map[cube.Pos]uint32), valid: true}
 }
 
-func (ack *UpdateBlockBatch) Blocks() map[df_cube.Pos]uint32 {
+func (ack *UpdateBlockBatch) Blocks() map[cube.Pos]uint32 {
 	return ack.updates
 }
 
-func (ack *UpdateBlockBatch) SetBlock(pos df_cube.Pos, b uint32) {
+func (ack *UpdateBlockBatch) SetBlock(pos cube.Pos, b uint32) {
 	ack.updates[pos] = b
 }
 
-func (ack *UpdateBlockBatch) RemoveBlock(pos df_cube.Pos) {
+func (ack *UpdateBlockBatch) RemoveBlock(pos cube.Pos) {
 	delete(ack.updates, pos)
 }
 

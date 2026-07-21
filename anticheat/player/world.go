@@ -5,7 +5,7 @@ import (
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item/enchantment"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl32"
@@ -46,13 +46,13 @@ type WorldUpdaterComponent interface {
 	BlockBreakPos() *protocol.BlockPos
 
 	// QueueBlockPlacement queues a block placement.
-	QueueBlockPlacement(clickedBlockPos, placedBlockPos df_cube.Pos, face df_cube.Face)
+	QueueBlockPlacement(clickedBlockPos, placedBlockPos cube.Pos, face cube.Face)
 	// AddPendingUpdate adds a pending block update.
-	AddPendingUpdate(pos df_cube.Pos, blockRuntimeID uint32)
+	AddPendingUpdate(pos cube.Pos, blockRuntimeID uint32)
 	// HasPendingUpdate checks if a block update is pending at the given block position.
-	HasPendingUpdate(pos df_cube.Pos) bool
+	HasPendingUpdate(pos cube.Pos) bool
 	// RemovePendingUpdate removes a pending block update.
-	RemovePendingUpdate(pos df_cube.Pos, blockRuntimeID uint32)
+	RemovePendingUpdate(pos cube.Pos, blockRuntimeID uint32)
 
 	// Tick ticks the world updater component.
 	Tick()
@@ -109,13 +109,13 @@ func (p *Player) SyncWorld() {
 	for x := int(math32.Floor(pos[0] - 0.05)); x <= int(pos[0]+0.05); x++ {
 		for y := int(math32.Floor(pos[1] - 0.05)); y <= int(pos[1]+0.05); y++ {
 			for z := int(math32.Floor(pos[2] - 0.05)); z <= int(pos[2]+0.05); z++ {
-				p.SyncBlock(df_cube.Pos{x, y, z})
+				p.SyncBlock(cube.Pos{x, y, z})
 			}
 		}
 	}
 }
 
-func (p *Player) SyncBlock(pos df_cube.Pos) {
+func (p *Player) SyncBlock(pos cube.Pos) {
 	// Avoid syncing blocks when there is a pending update already for that block - it can cause a desync.
 	if p.WorldUpdater().HasPendingUpdate(pos) {
 		return
@@ -135,7 +135,7 @@ func (p *Player) SyncBlock(pos df_cube.Pos) {
 	_ = p.SendPacketToClient(pk)
 }
 
-func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face df_cube.Face, b world.Block) {
+func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos cube.Pos, face cube.Face, b world.Block) {
 	replacingBlock := p.World().Block(replaceBlockPos)
 	if _, isReplaceable := replacingBlock.(block.Replaceable); !isReplaceable {
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "block at %v (%T) is not replaceable", replaceBlockPos, replacingBlock)
@@ -150,7 +150,7 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 
 	// Get the player's AABB and translate it to the position of the player. Then check if it intersects
 	// with any of the boxes the block will occupy. If it does, we don't want to place the block.
-	if df_cube.AnyIntersections32(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
+	if cube.AnyIntersections32(boxes, p.Movement().BoundingBox()) && !utils.CanPassBlock(b) {
 		p.SyncBlock(replaceBlockPos)
 		p.Inventory().ForceSync()
 		p.Dbg.Notify(DebugModeBlockPlacement, true, "player AABB intersects with block at %v", replaceBlockPos)
@@ -161,14 +161,14 @@ func (p *Player) PlaceBlock(clickedBlockPos, replaceBlockPos df_cube.Pos, face d
 	entityIntersecting := false
 	if p.Opts().Combat.EnableClientEntityTracking {
 		for _, e := range p.ClientEntityTracker().All() {
-			if df_cube.AnyIntersections32(boxes, e.Box(e.Position)) {
+			if cube.AnyIntersections32(boxes, e.Box(e.Position)) {
 				entityIntersecting = true
 				break
 			}
 		}
 	} else {
 		for _, e := range p.EntityTracker().All() {
-			if rew, ok := e.Rewind(p.ClientTick); ok && df_cube.AnyIntersections32(boxes, e.Box(rew.Position)) {
+			if rew, ok := e.Rewind(p.ClientTick); ok && cube.AnyIntersections32(boxes, e.Box(rew.Position)) {
 				entityIntersecting = true
 				break
 			}
@@ -194,7 +194,7 @@ func (p *Player) SendBlockUpdates(positions []protocol.BlockPos) {
 	for _, pos := range positions {
 		p.SendPacketToClient(&packet.UpdateBlock{
 			Position: pos,
-			NewBlockRuntimeID: p.EncodeBlockRuntimeID(world.BlockRuntimeID(p.World().Block(df_cube.Pos{
+			NewBlockRuntimeID: p.EncodeBlockRuntimeID(world.BlockRuntimeID(p.World().Block(cube.Pos{
 				int(pos.X()),
 				int(pos.Y()),
 				int(pos.Z()),
@@ -238,12 +238,12 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				if !p.tryBreakBlock(df_cube.Face(action.Face)) {
+				if !p.tryBreakBlock(cube.Face(action.Face)) {
 					continue
 				}
 				p.blockBreakProgress = 0.0
 				p.blockBreakInProgress = false
-				p.World().SetBlock(df_cube.Pos{
+				p.World().SetBlock(cube.Pos{
 					int(action.BlockPos.X()),
 					int(action.BlockPos.Y()),
 					int(action.BlockPos.Z()),
@@ -301,12 +301,12 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 					continue
 				}
 
-				if !p.tryBreakBlock(df_cube.Face(action.Face)) {
+				if !p.tryBreakBlock(cube.Face(action.Face)) {
 					continue
 				}
 				p.blockBreakProgress = 0.0
 				p.blockBreakInProgress = false
-				p.World().SetBlock(df_cube.Pos{
+				p.World().SetBlock(cube.Pos{
 					int(p.worldUpdater.BlockBreakPos().X()),
 					int(p.worldUpdater.BlockBreakPos().Y()),
 					int(p.worldUpdater.BlockBreakPos().Z()),
@@ -338,17 +338,17 @@ type positionHistory interface {
 	LastPos() mgl32.Vec3
 }
 
-func interactionBlockPositions(movement positionHistory) (previous, current df_cube.Pos) {
+func interactionBlockPositions(movement positionHistory) (previous, current cube.Pos) {
 	heightOffset := mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}
 	return game.BlockPosFromVec3(movement.LastPos().Add(heightOffset)), game.BlockPosFromVec3(movement.Pos().Add(heightOffset))
 }
 
-func (p *Player) blockInteractable(blockPos df_cube.Pos, interactFace df_cube.Face) bool {
+func (p *Player) blockInteractable(blockPos cube.Pos, interactFace cube.Face) bool {
 	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
 		return true
 	}
 
-	interactableFaces := make(map[df_cube.Face]struct{}, 6)
+	interactableFaces := make(map[cube.Face]struct{}, 6)
 	prevPos, currPos := interactionBlockPositions(p.Movement())
 	blockX, blockY, blockZ := blockPos[0], blockPos[1], blockPos[2]
 
@@ -360,22 +360,22 @@ func (p *Player) blockInteractable(blockPos df_cube.Pos, interactFace df_cube.Fa
 	belowBlock := currPos[1] < blockY || prevPos[1] < blockY
 	aboveBlock := currPos[1] > blockY || prevPos[1] > blockY
 	if belowBlock {
-		interactableFaces[df_cube.FaceDown] = struct{}{}
+		interactableFaces[cube.FaceDown] = struct{}{}
 	}
 	if aboveBlock {
-		interactableFaces[df_cube.FaceUp] = struct{}{}
+		interactableFaces[cube.FaceUp] = struct{}{}
 	}
 	if currPos[0] < blockX || prevPos[0] < blockX {
-		interactableFaces[df_cube.FaceWest] = struct{}{}
+		interactableFaces[cube.FaceWest] = struct{}{}
 	}
 	if currPos[0] > blockX || prevPos[0] > blockX {
-		interactableFaces[df_cube.FaceEast] = struct{}{}
+		interactableFaces[cube.FaceEast] = struct{}{}
 	}
 	if currPos[2] < blockZ || prevPos[2] < blockZ {
-		interactableFaces[df_cube.FaceNorth] = struct{}{}
+		interactableFaces[cube.FaceNorth] = struct{}{}
 	}
 	if currPos[2] > blockZ || prevPos[2] > blockZ {
-		interactableFaces[df_cube.FaceSouth] = struct{}{}
+		interactableFaces[cube.FaceSouth] = struct{}{}
 	}
 
 	if _, ok := interactableFaces[interactFace]; !ok {
@@ -405,7 +405,7 @@ func (p *Player) blockInteractable(blockPos df_cube.Pos, interactFace df_cube.Fa
 	return false
 }
 
-func (p *Player) tryBreakBlock(interactFace df_cube.Face) bool {
+func (p *Player) tryBreakBlock(interactFace cube.Face) bool {
 	breakPosPtr := p.worldUpdater.BlockBreakPos()
 	if breakPosPtr == nil {
 		p.Dbg.Notify(DebugModeBlockBreaking, true, "ignored PlayerActionStopBreak (blockBreakPos is nil)")
@@ -422,7 +422,7 @@ func (p *Player) tryBreakBlock(interactFace df_cube.Face) bool {
 		p.blockBreakProgress = 0.0
 		return false
 	}
-	if !p.blockInteractable(df_cube.Pos{int(breakPos[0]), int(breakPos[1]), int(breakPos[2])}, interactFace) {
+	if !p.blockInteractable(cube.Pos{int(breakPos[0]), int(breakPos[1]), int(breakPos[2])}, interactFace) {
 		p.SendBlockUpdates([]protocol.BlockPos{breakPos})
 		p.Popup("<red>Cannot break this block!</red>")
 		p.blockBreakProgress = 0.0
@@ -449,7 +449,7 @@ func (p *Player) expectedBlockBreakTime(pos protocol.BlockPos) float32 {
 		return 0
 	} */
 
-	b := p.World().Block(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
+	b := p.World().Block(cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())})
 	if hash1, hash2 := b.Hash(); hash1 == 0 && hash2 == math.MaxUint64 {
 		// If the block hash is MaxUint64, then the block is unknown to dragonfly. In the future,
 		// we should implement more blocks to avoid this condition allowing clients to break those

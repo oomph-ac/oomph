@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/chewxy/math32"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/entity"
 	"github.com/oomph-ac/oomph/anticheat/game"
@@ -37,7 +37,7 @@ type AuthoritativeCombatComponent struct {
 
 	targetedEntity         *entity.Entity
 	targetedRuntimeID      uint64
-	entityBB               df_cube.BBox32
+	entityBB               cube.BBox32
 	uniqueAttackedEntities map[uint64]*entity.Entity
 
 	swingTick int64
