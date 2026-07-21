@@ -4,3 +4,6 @@
 [submodule "gophertunnel"]
 	path = gophertunnel
 	url = https://github.com/oomph-ac/gophertunnel.git
+[submodule "bedsim"]
+	path = bedsim
+	url = https://github.com/oomph-ac/bedsim.git

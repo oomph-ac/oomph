@@ -1,0 +1,18 @@
+version: "2"
+
+linters:
+  default: none
+  enable: [govet, staticcheck, ineffassign]
+  settings:
+    staticcheck:
+      checks: [all, -S*, -ST*, -QF*]
+  exclusions:
+    rules:
+      - path: proxy_test\.go
+        linters: [errcheck]
+
+formatters:
+  enable: [gofmt]
+  settings:
+    gofmt:
+      simplify: false

@@ -3,7 +3,7 @@ package component
 import (
 	"fmt"
 
-	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/entity"
 	"github.com/oomph-ac/oomph/anticheat/game"
@@ -11,6 +11,7 @@ import (
 	"github.com/oomph-ac/oomph/anticheat/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/anticheat/player/simulation"
 	"github.com/oomph-ac/oomph/anticheat/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -112,6 +113,13 @@ type AuthoritativeMovementComponent struct {
 
 	jumping, pressingJump bool
 	jumpDelay             uint64
+	swimming              bool
+	swimAmount            float32
+	autoJumpingInWater    bool
+	wantDown              bool
+	wantDownSlow          bool
+	ascendBlock           bool
+	swimWaterGraceTicks   int64
 
 	collideX, collideY, collideZ bool
 	onGround                     bool
@@ -337,6 +345,65 @@ func (mc *AuthoritativeMovementComponent) SetJumpDelay(ticks uint64) {
 	mc.jumpDelay = ticks
 }
 
+// Swimming returns whether the movement component is swimming.
+func (mc *AuthoritativeMovementComponent) Swimming() bool {
+	return mc.swimming
+}
+
+// SwimAmount returns the interpolated swimming transition amount.
+func (mc *AuthoritativeMovementComponent) SwimAmount() float32 {
+	return mc.swimAmount
+}
+
+// AutoJumpingInWater returns whether automatic water jumping is active this tick.
+func (mc *AuthoritativeMovementComponent) AutoJumpingInWater() bool {
+	return mc.autoJumpingInWater
+}
+
+// WantDown returns whether the player wants to descend in liquid this tick.
+func (mc *AuthoritativeMovementComponent) WantDown() bool {
+	return mc.wantDown
+}
+
+// WantDownSlow returns whether the player wants to descend slowly in liquid this tick.
+func (mc *AuthoritativeMovementComponent) WantDownSlow() bool {
+	return mc.wantDownSlow
+}
+
+// AscendBlock returns whether the player wants to ascend a climbable block this tick.
+func (mc *AuthoritativeMovementComponent) AscendBlock() bool {
+	return mc.ascendBlock
+}
+
+// SwimWaterGraceTicks returns the retained water-contact grace ticks.
+func (mc *AuthoritativeMovementComponent) SwimWaterGraceTicks() int64 {
+	return mc.swimWaterGraceTicks
+}
+
+// SetSwimWaterGraceTicks sets the retained water-contact grace ticks.
+func (mc *AuthoritativeMovementComponent) SetSwimWaterGraceTicks(ticks int64) {
+	mc.swimWaterGraceTicks = ticks
+}
+
+func (mc *AuthoritativeMovementComponent) updateLiquidInput(input protocol.Bitset) {
+	wasSwimming := mc.swimming
+	if input.Load(packet.InputFlagStopSwimming) {
+		mc.swimming = false
+	} else if input.Load(packet.InputFlagStartSwimming) {
+		mc.swimming = true
+		mc.sneaking = false
+	}
+	if wasSwimming {
+		mc.swimAmount = game.ClampFloat(mc.swimAmount+0.1, 0, 1)
+	} else {
+		mc.swimAmount = game.ClampFloat(mc.swimAmount-0.1, 0, 1)
+	}
+	mc.autoJumpingInWater = input.Load(packet.InputFlagAutoJumpingInWater)
+	mc.wantDown = input.Load(packet.InputFlagWantDown)
+	mc.wantDownSlow = input.Load(packet.InputFlagWantDownSlow)
+	mc.ascendBlock = input.Load(packet.InputFlagAscendBlock)
+}
+
 // Sneaking returns true if the movement component is currently sneaking.
 func (mc *AuthoritativeMovementComponent) Sneaking() bool {
 	return mc.sneaking
@@ -463,7 +530,7 @@ func (mc *AuthoritativeMovementComponent) SetSize(newSize mgl32.Vec3) {
 }
 
 // BoundingBox returns the bounding box of the movement component translated to it's current position.
-func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
+func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox32 {
 	scale := mc.size[2]
 	width := (mc.size[0] * 0.5) * scale
 	height := mc.size[1] * scale
@@ -472,7 +539,7 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 		yOffset = mc.slideOffset.Y()
 	}
 
-	return cube.Box(
+	return cube.Box32(
 		mc.pos[0]-width,
 		(mc.pos[1] + yOffset),
 		mc.pos[2]-width,
@@ -483,14 +550,14 @@ func (mc *AuthoritativeMovementComponent) BoundingBox() cube.BBox {
 }
 
 // ClientBoundingBox returns the bounding box of the movement component translated to the client's position.
-func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox {
+func (mc *AuthoritativeMovementComponent) ClientBoundingBox() cube.BBox32 {
 	width := mc.size[0] / 2
 	var yOffset float32
 	if mc.mPlayer.VersionInRange(-1, player.GameVersion1_20_60) {
 		yOffset = mc.slideOffset.Y()
 	}
 
-	return cube.Box(
+	return cube.Box32(
 		mc.nonAuthoritative.pos[0]-width,
 		mc.nonAuthoritative.pos[1]+yOffset,
 		mc.nonAuthoritative.pos[2]-width,
@@ -790,6 +857,7 @@ func (mc *AuthoritativeMovementComponent) Update(pk *packet.PlayerAuthInput) {
 	} else {
 		mc.sneaking = pk.InputData.Load(packet.InputFlagSneakDown)
 	}
+	mc.updateLiquidInput(pk.InputData)
 
 	mc.mPlayer.Dbg.Notify(
 		player.DebugModeMovementSim,
@@ -1095,6 +1163,13 @@ func (mc *AuthoritativeMovementComponent) ResetTransferState(pos mgl32.Vec3) {
 	mc.jumping = false
 	mc.pressingJump = false
 	mc.jumpDelay = 0
+	mc.swimming = false
+	mc.swimAmount = 0
+	mc.autoJumpingInWater = false
+	mc.wantDown = false
+	mc.wantDownSlow = false
+	mc.ascendBlock = false
+	mc.swimWaterGraceTicks = 0
 
 	mc.collideX = false
 	mc.collideY = false

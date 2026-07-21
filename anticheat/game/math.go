@@ -115,11 +115,6 @@ func AbsVec32(vec mgl32.Vec3) mgl32.Vec3 {
 	return mgl32.Vec3{math32.Abs(vec.X()), math32.Abs(vec.Y()), math32.Abs(vec.Z())}
 }
 
-// Vec3HzDistSqr returns the squared horizontal distance in a vector.
-func Vec3HzDistSqr(vec3 mgl32.Vec3) float32 {
-	return vec3.X()*vec3.X() + vec3.Z()*vec3.Z()
-}
-
 func MinVec3(vecs []mgl32.Vec3) mgl32.Vec3 {
 	min := mgl32.Vec3{math32.MaxFloat32, math32.MaxFloat32, math32.MaxFloat32}
 	for _, v := range vecs {

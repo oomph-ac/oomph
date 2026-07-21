@@ -3,7 +3,7 @@ package entity
 import (
 	"log/slog"
 
-	"github.com/ethaniccc/float32-cube/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/utils"
 )
@@ -121,9 +121,9 @@ func (e *Entity) UpdateVelocity(vel mgl32.Vec3) {
 }
 
 // Box returns the entity's bounding box.
-func (e *Entity) Box(pos mgl32.Vec3) cube.BBox {
+func (e *Entity) Box(pos mgl32.Vec3) cube.BBox32 {
 	w := (e.Width * e.Scale) / 2
-	return cube.Box(
+	return cube.Box32(
 		-w,
 		0,
 		-w,

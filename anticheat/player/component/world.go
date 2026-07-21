@@ -5,11 +5,10 @@ import (
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
-	df_cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
-	"github.com/ethaniccc/float32-cube/cube"
-	"github.com/ethaniccc/float32-cube/cube/trace"
+	"github.com/oomph-ac/bedsim"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/player/component/acknowledgement"
@@ -25,8 +24,8 @@ type WorldUpdaterComponent struct {
 	chunkRadius       int32
 	serverChunkRadius int32
 
-	clientPlacedBlocks  map[df_cube.Pos]*chainedBlockPlacement
-	pendingBlockUpdates map[df_cube.Pos]uint32
+	clientPlacedBlocks  map[cube.Pos]*chainedBlockPlacement
+	pendingBlockUpdates map[cube.Pos]uint32
 	batchedBlockUpdates *acknowledgement.UpdateBlockBatch
 
 	breakingBlockPos *protocol.BlockPos
@@ -40,8 +39,8 @@ func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 		mPlayer:     p,
 		chunkRadius: 1_000_000_000,
 
-		clientPlacedBlocks:  make(map[df_cube.Pos]*chainedBlockPlacement),
-		pendingBlockUpdates: make(map[df_cube.Pos]uint32),
+		clientPlacedBlocks:  make(map[cube.Pos]*chainedBlockPlacement),
+		pendingBlockUpdates: make(map[cube.Pos]uint32),
 		batchedBlockUpdates: acknowledgement.NewUpdateBlockBatchACK(p),
 
 		initalInteractionAccepted: true,
@@ -72,12 +71,15 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 
 // HandleUpdateBlock handles an UpdateBlock packet from the server.
 func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
-	pos := df_cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
-	if pk.Layer != 0 {
+	pos := cube.Pos{int(pk.Position.X()), int(pk.Position.Y()), int(pk.Position.Z())}
+	switch pk.Layer {
+	case 0:
+		c.AddPendingUpdate(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
+	case 1:
+		c.batchedBlockUpdates.SetAdditionalBlock(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
+	default:
 		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", pk.NewBlockRuntimeID, "pos", pos)
-		return
 	}
-	c.AddPendingUpdate(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -86,10 +88,13 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
 	for _, entry := range pk.Blocks {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
+		c.AddPendingUpdate(cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
 	}
 	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
+		c.batchedBlockUpdates.SetAdditionalBlock(
+			cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())},
+			c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID),
+		)
 	}
 }
 
@@ -119,7 +124,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	}
 
 	clickedBlockPos := utils.BlockToCubePos(dat.BlockPosition)
-	dfClickedBlockPos := df_cube.Pos(clickedBlockPos)
+	dfClickedBlockPos := cube.Pos(clickedBlockPos)
 	replacingBlock := c.mPlayer.World().Block(dfClickedBlockPos)
 
 	// It is impossible for the replacing block to be air, as the client would send UseItemActionClickAir instead of UseItemActionClickBlock.
@@ -127,7 +132,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	if isAir {
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction denied: clicked block at %v is air", dfClickedBlockPos)
 		c.mPlayer.SyncBlock(dfClickedBlockPos)
-		c.mPlayer.SyncBlock(dfClickedBlockPos.Side(df_cube.Face(dat.BlockFace)))
+		c.mPlayer.SyncBlock(dfClickedBlockPos.Side(cube.Face(dat.BlockFace)))
 		c.mPlayer.Inventory().ForceSync()
 		return false
 	} else if placement, hasPlacement := c.clientPlacedBlocks[dfClickedBlockPos]; hasPlacement && c.mPlayer.Opts().Network.MaxGhostBlockChain >= 0 {
@@ -137,7 +142,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction denied: clicked block is in ghost block chain that exceeds limit")
 			c.mPlayer.Popup("<red>Ghost block(s) cancelled</red>")
 			c.mPlayer.SyncBlock(dfClickedBlockPos)
-			c.mPlayer.SyncBlock(dfClickedBlockPos.Side(df_cube.Face(dat.BlockFace)))
+			c.mPlayer.SyncBlock(dfClickedBlockPos.Side(cube.Face(dat.BlockFace)))
 			c.mPlayer.Inventory().ForceSync()
 			return false
 		}
@@ -156,10 +161,10 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 	closestDistance := float32(math.MaxFloat32 - 1)
 	blockBBoxes := utils.BlockCollisions(replacingBlock, clickedBlockPos, c.mPlayer.World())
 	if len(blockBBoxes) == 0 {
-		blockBBoxes = []cube.BBox{cube.Box(0, 0, 0, 1, 1, 1)}
+		blockBBoxes = []cube.BBox32{cube.Box32(0, 0, 0, 1, 1, 1)}
 	}
 	for _, bb := range blockBBoxes {
-		bb = bb.Translate(clickedBlockPos.Vec3())
+		bb = bb.Translate(game.BlockPosVec3(clickedBlockPos))
 		closestOrigin := game.ClosestPointInLineToPoint(prevPos, currPos, game.BBoxCenter(bb))
 		if dist := game.ClosestPointToBBox(closestOrigin, bb).Sub(closestOrigin).Len(); dist < closestDistance {
 			closestDistance = dist
@@ -171,13 +176,13 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "interaction too far away (%.4f blocks)", closestDistance)
 		c.mPlayer.Popup("<red>Interaction too far away (%.2f blocks)</red>", closestDistance)
 		c.mPlayer.SyncBlock(dfClickedBlockPos)
-		c.mPlayer.SyncBlock(dfClickedBlockPos.Side(df_cube.Face(dat.BlockFace)))
+		c.mPlayer.SyncBlock(dfClickedBlockPos.Side(cube.Face(dat.BlockFace)))
 		c.mPlayer.Inventory().ForceSync()
 		return false
 	}
 
 	if act, ok := replacingBlock.(block.Activatable); ok && (!c.mPlayer.Movement().PressingSneak() || holding.Empty()) {
-		utils.ActivateBlock(c.mPlayer, act, df_cube.Pos(clickedBlockPos), c.mPlayer.World())
+		utils.ActivateBlock(c.mPlayer, act, cube.Pos(clickedBlockPos), c.mPlayer.World())
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "called utils.ActivateBlock: clicked block is activatable")
 		return true
 	}
@@ -197,7 +202,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 				replaceBlockPos = clickedBlockPos.Side(cube.Face(dat.BlockFace))
 			}
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "using client-authoritative block in hand: %T", b)
-			c.mPlayer.PlaceBlock(df_cube.Pos(clickedBlockPos), df_cube.Pos(replaceBlockPos), df_cube.Face(dat.BlockFace), b)
+			c.mPlayer.PlaceBlock(cube.Pos(clickedBlockPos), cube.Pos(replaceBlockPos), cube.Face(dat.BlockFace), b)
 		} else {
 			c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "unable to find block with runtime ID: %d", dat.HeldItem.Stack.BlockRuntimeID)
 		}
@@ -213,15 +218,15 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		utils.UseOnBlock(utils.UseOnBlockOpts{
 			Placer:          c.mPlayer,
 			UseableOnBlock:  heldItem,
-			ClickedBlockPos: df_cube.Pos(clickedBlockPos),
-			ReplaceBlockPos: df_cube.Pos(clickedBlockPos),
+			ClickedBlockPos: cube.Pos(clickedBlockPos),
+			ReplaceBlockPos: cube.Pos(clickedBlockPos),
 			ClickPos:        game.Vec32To64(dat.ClickedPosition),
-			Face:            df_cube.Face(dat.BlockFace),
+			Face:            cube.Face(dat.BlockFace),
 			Src:             c.mPlayer.World(),
 		})
 	case df_world.Block:
 		if _, isGlowstone := heldItem.(block.Glowstone); isGlowstone {
-			if utils.BlockName(c.mPlayer.World().Block(df_cube.Pos(clickedBlockPos))) == "minecraft:respawn_anchor" {
+			if bedsim.BlockName(c.mPlayer.World().Block(cube.Pos(clickedBlockPos))) == "minecraft:respawn_anchor" {
 				c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "charging respawn anchor with glowstone")
 				return true
 			}
@@ -234,7 +239,7 @@ func (c *WorldUpdaterComponent) AttemptItemInteractionWithBlock(pk *packet.Inven
 		if replaceable, ok := replacingBlock.(block.Replaceable); !ok || !replaceable.ReplaceableBy(heldItem) {
 			replaceBlockPos = clickedBlockPos.Side(cube.Face(dat.BlockFace))
 		}
-		c.mPlayer.PlaceBlock(df_cube.Pos(clickedBlockPos), df_cube.Pos(replaceBlockPos), df_cube.Face(dat.BlockFace), heldItem)
+		c.mPlayer.PlaceBlock(cube.Pos(clickedBlockPos), cube.Pos(replaceBlockPos), cube.Face(dat.BlockFace), heldItem)
 	default:
 		c.mPlayer.Dbg.Notify(player.DebugModeBlockPlacement, true, "unsupported item type for block placement: %T", heldItem)
 	}
@@ -259,8 +264,8 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 	}
 
 	blockPos := cube.Pos{int(dat.BlockPosition.X()), int(dat.BlockPosition.Y()), int(dat.BlockPosition.Z())}
-	interactPos := blockPos.Vec3().Add(dat.ClickedPosition)
-	interactedBlock := c.mPlayer.World().Block(df_cube.Pos(blockPos))
+	interactPos := game.BlockPosVec3(blockPos).Add(dat.ClickedPosition)
+	interactedBlock := c.mPlayer.World().Block(cube.Pos(blockPos))
 
 	if _, isActivatable := interactedBlock.(block.Activatable); !isActivatable {
 		return true
@@ -289,10 +294,10 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 
 	// Check for all the blocks in between the interaction position and the player's eye position. If any blocks intersect
 	// with the line between the player's eye position and the interaction position, the interaction is cancelled.
-	checkedPositions := make(map[df_cube.Pos]struct{})
+	checkedPositions := make(map[cube.Pos]struct{})
 	for intersectingBlockPos := range game.BlocksBetween(closestEyePos, interactPos, 49) {
-		flooredPos := df_cube.Pos{int(intersectingBlockPos[0]), int(intersectingBlockPos[1]), int(intersectingBlockPos[2])}
-		if flooredPos == df_cube.Pos(blockPos) {
+		flooredPos := cube.Pos{int(intersectingBlockPos[0]), int(intersectingBlockPos[1]), int(intersectingBlockPos[2])}
+		if flooredPos == cube.Pos(blockPos) {
 			continue
 		}
 
@@ -309,7 +314,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			continue
 		}
 
-		iBBs := utils.BlockCollisions(intersectingBlock, cube.Pos(flooredPos), c.mPlayer.World())
+		iBBs := utils.BlockCollisions(intersectingBlock, flooredPos, c.mPlayer.World())
 		if len(iBBs) == 0 {
 			continue
 		}
@@ -319,7 +324,7 @@ func (c *WorldUpdaterComponent) ValidateInteraction(pk *packet.InventoryTransact
 			iBB = iBB.Translate(intersectingBlockPos)
 
 			// If there is an intersection, the interaction is invalid.
-			if _, ok := trace.BBoxIntercept(iBB, closestEyePos, interactPos); ok {
+			if _, ok := game.BBoxIntercept(iBB, closestEyePos, interactPos); ok {
 				//c.mPlayer.NMessage("<red>Interaction denied: block obstructs path.</red>")
 				c.mPlayer.Dbg.Notify(player.DebugModeBlockInteraction, true, "Interaction denied: block obstructs path.")
 				c.initalInteractionAccepted = false
@@ -361,7 +366,7 @@ func (c *WorldUpdaterComponent) BlockBreakPos() *protocol.BlockPos {
 	return c.breakingBlockPos
 }
 
-func (c *WorldUpdaterComponent) QueueBlockPlacement(clickedBlockPos, placedBlockPos df_cube.Pos, parentFace df_cube.Face) {
+func (c *WorldUpdaterComponent) QueueBlockPlacement(clickedBlockPos, placedBlockPos cube.Pos, parentFace cube.Face) {
 	// Any number of ghost blocks allowed when MaxGhostBlockChain is less than zero - so we should skip handling to save resources.
 	if c.mPlayer.Opts().Network.MaxGhostBlockChain < 0 {
 		return
@@ -374,17 +379,17 @@ func (c *WorldUpdaterComponent) QueueBlockPlacement(clickedBlockPos, placedBlock
 	)
 }
 
-func (c *WorldUpdaterComponent) AddPendingUpdate(pos df_cube.Pos, blockRuntimeID uint32) {
+func (c *WorldUpdaterComponent) AddPendingUpdate(pos cube.Pos, blockRuntimeID uint32) {
 	c.batchedBlockUpdates.SetBlock(pos, blockRuntimeID)
 	c.pendingBlockUpdates[pos] = blockRuntimeID
 }
 
-func (c *WorldUpdaterComponent) HasPendingUpdate(pos df_cube.Pos) bool {
+func (c *WorldUpdaterComponent) HasPendingUpdate(pos cube.Pos) bool {
 	_, ok := c.pendingBlockUpdates[pos]
 	return ok
 }
 
-func (c *WorldUpdaterComponent) RemovePendingUpdate(pos df_cube.Pos, blockRuntimeID uint32) {
+func (c *WorldUpdaterComponent) RemovePendingUpdate(pos cube.Pos, blockRuntimeID uint32) {
 	if pendingBlockRuntimeID, ok := c.pendingBlockUpdates[pos]; ok && pendingBlockRuntimeID == blockRuntimeID {
 		delete(c.pendingBlockUpdates, pos)
 	}
@@ -471,13 +476,13 @@ type chainedBlockPlacement struct {
 	placementConfirmed bool
 	remainingTicks     uint16
 	prePlacedBlockRID  uint32
-	parentFace         df_cube.Face
+	parentFace         cube.Face
 	connections        [6]*chainedBlockPlacement
 }
 
 func newChainedBlockPlacement(
 	prePlacedBlockRID uint32,
-	face df_cube.Face,
+	face cube.Face,
 	parent *chainedBlockPlacement,
 ) *chainedBlockPlacement {
 	pl := &chainedBlockPlacement{
@@ -554,7 +559,7 @@ func (pl *chainedBlockPlacement) setPlacementAllowed(allowed bool) {
 		n.placementAllowed = allowed
 		n.placementConfirmed = true
 
-		for _, face := range df_cube.Faces() {
+		for _, face := range cube.Faces() {
 			if face == n.parentFace {
 				continue
 			}
@@ -567,7 +572,7 @@ func (pl *chainedBlockPlacement) setPlacementAllowed(allowed bool) {
 }
 
 func (pl *chainedBlockPlacement) destroy() {
-	for _, face := range df_cube.Faces() {
+	for _, face := range cube.Faces() {
 		child := pl.connections[face]
 		if child != nil {
 			child.connections[face.Opposite()] = nil
