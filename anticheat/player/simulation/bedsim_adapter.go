@@ -6,10 +6,7 @@ import (
 	"github.com/df-mc/dragonfly/server/item"
 	"github.com/df-mc/dragonfly/server/world"
 	float_cube "github.com/ethaniccc/float32-cube/cube"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/oomph-ac/bedsim"
-	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/utils"
 	oworld "github.com/oomph-ac/oomph/anticheat/world"
@@ -25,9 +22,9 @@ func simulateWithBedsim(p *player.Player, movement player.MovementComponent) bed
 		Inventory:      bedsimInventoryProvider{p: p},
 		Options: bedsim.SimulationOptions{
 			UseSlideOffset:              p.VersionInRange(-1, player.GameVersion1_20_60),
-			PositionCorrectionThreshold: float64(p.Opts().Movement.CorrectionThreshold),
+			PositionCorrectionThreshold: p.Opts().Movement.CorrectionThreshold,
 			LimitAllVelocity:            p.Opts().Movement.LimitAllVelocity,
-			LimitAllVelocityThreshold:   float64(p.Opts().Movement.LimitAllVelocityThreshold),
+			LimitAllVelocityThreshold:   p.Opts().Movement.LimitAllVelocityThreshold,
 			Debugf: func(format string, args ...any) {
 				p.Dbg.Notify(player.DebugModeMovementSim, true, format, args...)
 			},
@@ -44,45 +41,45 @@ func movementStateFromComponent(p *player.Player, movement player.MovementCompon
 	state := bedsim.MovementState{
 		// Client mirrors raw non-authoritative values used for correction deltas and tie-breaks.
 		Client: bedsim.ClientState{
-			Pos:                 vec32To64(client.Pos()),
-			LastPos:             vec32To64(client.LastPos()),
-			Vel:                 vec32To64(client.Vel()),
-			LastVel:             vec32To64(client.LastVel()),
-			Mov:                 vec32To64(client.Mov()),
-			LastMov:             vec32To64(client.LastMov()),
+			Pos:                 client.Pos(),
+			LastPos:             client.LastPos(),
+			Vel:                 client.Vel(),
+			LastVel:             client.LastVel(),
+			Mov:                 client.Mov(),
+			LastMov:             client.LastMov(),
 			HorizontalCollision: client.HorizontalCollision(),
 			VerticalCollision:   client.VerticalCollision(),
 			ToggledFly:          client.ToggledFly(),
 		},
-		Pos:          vec32To64(movement.Pos()),
-		LastPos:      vec32To64(movement.LastPos()),
-		Vel:          vec32To64(movement.Vel()),
-		LastVel:      vec32To64(movement.LastVel()),
-		Mov:          vec32To64(movement.Mov()),
-		LastMov:      vec32To64(movement.LastMov()),
-		Rotation:     vec32To64(movement.Rotation()),
-		LastRotation: vec32To64(movement.LastRotation()),
-		SlideOffset:  vec2_32To64(movement.SlideOffset()),
-		Impulse:      vec2_32To64(movement.Impulse()),
-		Size:         vec32To64(movement.Size()),
+		Pos:          movement.Pos(),
+		LastPos:      movement.LastPos(),
+		Vel:          movement.Vel(),
+		LastVel:      movement.LastVel(),
+		Mov:          movement.Mov(),
+		LastMov:      movement.LastMov(),
+		Rotation:     movement.Rotation(),
+		LastRotation: movement.LastRotation(),
+		SlideOffset:  movement.SlideOffset(),
+		Impulse:      movement.Impulse(),
+		Size:         movement.Size(),
 
 		// Supporting block is tracked separately from collision booleans for edge-case jump logic.
 		SupportingBlockPos: toDFPosPtr(movement.SupportingBlockPos()),
 
-		Gravity:      float64(movement.Gravity()),
-		JumpHeight:   float64(movement.JumpHeight()),
-		FallDistance: float64(movement.FallDistance()),
+		Gravity:      movement.Gravity(),
+		JumpHeight:   movement.JumpHeight(),
+		FallDistance: movement.FallDistance(),
 
-		MovementSpeed:        float64(movement.MovementSpeed()),
-		DefaultMovementSpeed: float64(movement.DefaultMovementSpeed()),
-		AirSpeed:             float64(movement.AirSpeed()),
+		MovementSpeed:        movement.MovementSpeed(),
+		DefaultMovementSpeed: movement.DefaultMovementSpeed(),
+		AirSpeed:             movement.AirSpeed(),
 
-		Knockback: vec32To64(movement.Knockback()),
+		Knockback: movement.Knockback(),
 
-		PendingTeleportPos: vec32To64(movement.PendingTeleportPos()),
+		PendingTeleportPos: movement.PendingTeleportPos(),
 		PendingTeleports:   movement.PendingTeleports(),
 
-		TeleportPos:        vec32To64(movement.TeleportPos()),
+		TeleportPos:        movement.TeleportPos(),
 		TicksSinceTeleport: movement.TicksSinceTeleport(),
 		TeleportIsSmoothed: movement.TeleportSmoothed(),
 
@@ -151,16 +148,16 @@ func applyBedsimState(movement player.MovementComponent, state *bedsim.MovementS
 		return
 	}
 
-	movement.SetSlideOffset(vec2_64To32(state.SlideOffset))
+	movement.SetSlideOffset(state.SlideOffset)
 	movement.SetSupportingBlockPos(toFloatPosPtr(state.SupportingBlockPos))
 
 	// Preserve Oomph's last/current snapshots in the same order as the legacy movement path.
-	movement.SetPos(vec64To32(state.LastPos))
-	movement.SetPos(vec64To32(state.Pos))
-	movement.SetVel(vec64To32(state.LastVel))
-	movement.SetVel(vec64To32(state.Vel))
-	movement.SetMov(vec64To32(state.LastMov))
-	movement.SetMov(vec64To32(state.Mov))
+	movement.SetPos(state.LastPos)
+	movement.SetPos(state.Pos)
+	movement.SetVel(state.LastVel)
+	movement.SetVel(state.Vel)
+	movement.SetMov(state.LastMov)
+	movement.SetMov(state.Mov)
 
 	movement.SetCollisions(state.CollideX, state.CollideY, state.CollideZ)
 	movement.SetOnGround(state.OnGround)
@@ -197,39 +194,27 @@ func (wp bedsimWorldProvider) Block(pos df_cube.Pos) world.Block {
 	return wp.w.Block(pos)
 }
 
-func (wp bedsimWorldProvider) BlockCollisions(pos df_cube.Pos) []df_cube.BBox {
+func (wp bedsimWorldProvider) BlockCollisions(pos df_cube.Pos) []float_cube.BBox {
 	if wp.w == nil {
 		return nil
 	}
 	b := wp.w.Block(pos)
 	pos32 := float_cube.Pos{pos[0], pos[1], pos[2]}
-	boxes32 := utils.BlockCollisions(b, pos32, wp.w)
-
-	boxes := make([]df_cube.BBox, len(boxes32))
-	for i, bb := range boxes32 {
-		boxes[i] = game.CubeBoxToDFBox(bb)
-	}
-	return boxes
+	return utils.BlockCollisions(b, pos32, wp.w)
 }
 
-func (wp bedsimWorldProvider) GetNearbyBBoxes(aabb df_cube.BBox) []df_cube.BBox {
+func (wp bedsimWorldProvider) GetNearbyBBoxes(aabb float_cube.BBox) []float_cube.BBox {
 	if wp.w == nil {
 		return nil
 	}
-	boxes32 := utils.NearbyBBoxes(game.DFBoxToCubeBox(aabb), wp.w)
-
-	boxes := make([]df_cube.BBox, len(boxes32))
-	for i, bb := range boxes32 {
-		boxes[i] = game.CubeBoxToDFBox(bb)
-	}
-	return boxes
+	return utils.NearbyBBoxes(aabb, wp.w)
 }
 
-func (wp bedsimWorldProvider) HasNearbyBBoxes(aabb df_cube.BBox) bool {
+func (wp bedsimWorldProvider) HasNearbyBBoxes(aabb float_cube.BBox) bool {
 	if wp.w == nil {
 		return false
 	}
-	return utils.HasNearbyBBoxes(game.DFBoxToCubeBox(aabb), wp.w)
+	return utils.HasNearbyBBoxes(aabb, wp.w)
 }
 
 func (wp bedsimWorldProvider) IsChunkLoaded(chunkX, chunkZ int32) bool {
@@ -245,8 +230,8 @@ func (bedsimBlockSemantics) BlockName(b world.Block) string {
 	return utils.BlockName(b)
 }
 
-func (bedsimBlockSemantics) BlockFriction(b world.Block) float64 {
-	return float64(utils.BlockFriction(b))
+func (bedsimBlockSemantics) BlockFriction(b world.Block) float32 {
+	return utils.BlockFriction(b)
 }
 
 func (bedsimBlockSemantics) BlockClimbable(b world.Block) bool {
@@ -302,20 +287,4 @@ func toFloatPosPtr(pos *df_cube.Pos) *float_cube.Pos {
 	}
 	floatPos := float_cube.Pos{pos[0], pos[1], pos[2]}
 	return &floatPos
-}
-
-func vec32To64(v mgl32.Vec3) mgl64.Vec3 {
-	return mgl64.Vec3{float64(v[0]), float64(v[1]), float64(v[2])}
-}
-
-func vec64To32(v mgl64.Vec3) mgl32.Vec3 {
-	return mgl32.Vec3{float32(v[0]), float32(v[1]), float32(v[2])}
-}
-
-func vec2_32To64(v mgl32.Vec2) mgl64.Vec2 {
-	return mgl64.Vec2{float64(v[0]), float64(v[1])}
-}
-
-func vec2_64To32(v mgl64.Vec2) mgl32.Vec2 {
-	return mgl32.Vec2{float32(v[0]), float32(v[1])}
 }
