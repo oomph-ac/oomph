@@ -2,7 +2,7 @@ package game
 
 import (
 	"github.com/chewxy/math32"
-	cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/go-gl/mathgl/mgl32"
 )
 

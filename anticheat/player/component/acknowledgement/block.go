@@ -2,7 +2,7 @@ package acknowledgement
 
 import (
 	"github.com/df-mc/dragonfly/server/block"
-	cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/anticheat/player"
 )

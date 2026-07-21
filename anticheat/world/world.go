@@ -3,7 +3,7 @@ package world
 import (
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
-	cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"

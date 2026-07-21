@@ -5,7 +5,7 @@ import (
 	_ "unsafe"
 
 	"github.com/df-mc/dragonfly/server/block"
-	cube "github.com/df-mc/dragonfly/server/block/cube"
+	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/anticheat/game"
