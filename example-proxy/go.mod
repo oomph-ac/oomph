@@ -6,6 +6,8 @@ replace github.com/oomph-ac/oomph/anticheat => ../anticheat
 
 replace github.com/oomph-ac/oomph/transferproxy => ../transferproxy
 
+replace github.com/oomph-ac/bedsim => ../bedsim
+
 replace github.com/sandertv/go-raknet => ../go-raknet
 
 replace github.com/sandertv/gophertunnel => ../gophertunnel
@@ -38,6 +40,7 @@ require (
 	github.com/hjson/hjson-go/v4 v4.6.0 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/oomph-ac/bedsim v0.1.3 // indirect
 	github.com/oomph-ac/oomph/transferproxy v0.1.2 // indirect
 	github.com/pion/datachannel v1.6.0 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect

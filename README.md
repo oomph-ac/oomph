@@ -8,6 +8,7 @@ Oomph implements a server authoritative system for movement and combat, allowing
 
 ## Dependencies
 - [Dragonfly](https://github.com/oomph-ac/dragonfly)
+- [bedsim](https://github.com/oomph-ac/bedsim) (movement simulation; vendored as a git submodule)
 - [OConfig](./anticheat/oconfig)
 The multi-version will not be going public at the moment, you may remove the dependency from `go.mod`.
 
@@ -30,7 +31,7 @@ For a ready-to-run proxy with Oomph wired in, see [example-proxy](./example-prox
 
 ## Server Authoritative Movement
 Similar to what is implemented in BDS, Oomph attempts to replicate the movement of players and send any corrections if deemed neccessary. Unlike BDS, Oomph accounts for latency, making it much smoother than the current vanilla system. As of now, Oomph has known issues with the following:
-* Liquids, the client is fully exempted in this scenario.
+* Liquids, the client is fully exempted in this scenario. `bedsim` already contains liquid simulation, but Oomph still keeps the exemption until swimming / second-layer liquid state is wired through the adapter.
 * Collisions
     - if there is any small position difference between Oomph's authoritative position and the clients. Attempts have been made to reduce this issue by slowly drifting to the position of the client in certain scenarios.
     - if a block's bounding box is not implemented by Dragonfly
@@ -43,6 +44,8 @@ Movement logic and processing can be found in the following files:
 * `anticheat/player/component/movement.go`
 * `anticheat/player/component/acknowledgment/movement.go`
 * `anticheat/player/simulation/movement.go`
+* `anticheat/player/simulation/bedsim_adapter.go`
+* [`bedsim`](https://github.com/oomph-ac/bedsim) (physics implementation)
 
 There are currently no alerts for when a movement mitigation is triggered.
 

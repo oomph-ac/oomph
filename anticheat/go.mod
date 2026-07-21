@@ -4,6 +4,8 @@ go 1.26.0
 
 replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260719182426-f1fdb4d3c00c
 
+replace github.com/oomph-ac/bedsim => ../bedsim
+
 replace github.com/oomph-ac/oomph/transferproxy => ../transferproxy
 
 replace github.com/sandertv/go-raknet => ../go-raknet
@@ -16,6 +18,7 @@ require (
 	github.com/ethaniccc/float32-cube v0.0.0-20250511224129-7af1f8c4ee12
 	github.com/go-gl/mathgl v1.2.0
 	github.com/hjson/hjson-go/v4 v4.6.0
+	github.com/oomph-ac/bedsim v0.1.3
 	github.com/oomph-ac/oomph/transferproxy v0.1.2
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
 	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
