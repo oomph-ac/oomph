@@ -333,14 +333,23 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	} */
 }
 
+type positionHistory interface {
+	Pos() mgl32.Vec3
+	LastPos() mgl32.Vec3
+}
+
+func interactionBlockPositions(movement positionHistory) (previous, current df_cube.Pos) {
+	heightOffset := mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}
+	return game.BlockPosFromVec3(movement.LastPos().Add(heightOffset)), game.BlockPosFromVec3(movement.Pos().Add(heightOffset))
+}
+
 func (p *Player) blockInteractable(blockPos df_cube.Pos, interactFace df_cube.Face) bool {
 	if p.GameMode != packet.GameTypeSurvival && p.GameMode != packet.GameTypeAdventure {
 		return true
 	}
 
 	interactableFaces := make(map[df_cube.Face]struct{}, 6)
-	prevPos := game.BlockPosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
-	currPos := game.BlockPosFromVec3(p.Movement().Pos().Add(mgl32.Vec3{0, game.DefaultPlayerHeightOffset, 0}))
+	prevPos, currPos := interactionBlockPositions(p.Movement())
 	blockX, blockY, blockZ := blockPos[0], blockPos[1], blockPos[2]
 
 	// If the player's head is inside the block they are breaking, allow them to break it.
