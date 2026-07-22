@@ -21,7 +21,7 @@ func TestDefaultDialPreservesXBLIdentityData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	accepted := make(chan *minecraft.Conn, 1)
 	acceptErr := make(chan error, 1)
@@ -47,13 +47,13 @@ func TestDefaultDialPreservesXBLIdentityData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	select {
 	case err := <-acceptErr:
 		t.Fatal(err)
 	case conn := <-accepted:
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		got := conn.IdentityData()
 		if got.XUID != want.XUID {
 			t.Fatalf("backend XUID = %q, want %q", got.XUID, want.XUID)
@@ -68,7 +68,7 @@ func TestDefaultDialHonoursContextCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -83,7 +83,7 @@ func TestDefaultDialAutomaticallyFlushesPackets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	accepted := make(chan *minecraft.Conn, 1)
 	startErr := make(chan error, 1)
@@ -102,9 +102,9 @@ func TestDefaultDialAutomaticallyFlushesPackets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 	server := <-accepted
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 	if err := backend.DoSpawn(); err != nil {
 		t.Fatal(err)
 	}

@@ -49,9 +49,10 @@ func (t *backendStateTracker) handle(pk packet.Packet, clientRuntimeID uint64) {
 		if pk.EntityRuntimeID != clientRuntimeID {
 			break
 		}
-		if pk.Operation == packet.MobEffectAdd || pk.Operation == packet.MobEffectModify {
+		switch pk.Operation {
+		case packet.MobEffectAdd, packet.MobEffectModify:
 			t.effects[pk.EffectType] = struct{}{}
-		} else if pk.Operation == packet.MobEffectRemove {
+		case packet.MobEffectRemove:
 			delete(t.effects, pk.EffectType)
 		}
 	case *packet.PlayerList:
