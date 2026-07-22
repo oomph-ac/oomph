@@ -572,16 +572,18 @@ func (s *session) rewriteClientPacket(pk packet.Packet) {
 			pk.EntityRuntimeID = to
 		}
 	case *packet.Interact:
-		if pk.TargetEntityRuntimeID == math.MaxInt64 {
+		switch pk.TargetEntityRuntimeID {
+		case math.MaxInt64:
 			pk.TargetEntityRuntimeID = from
-		} else if pk.TargetEntityRuntimeID == from {
+		case from:
 			pk.TargetEntityRuntimeID = to
 		}
 	case *packet.InventoryTransaction:
 		if tx, ok := pk.TransactionData.(*protocol.UseItemOnEntityTransactionData); ok {
-			if tx.TargetEntityRuntimeID == math.MaxInt64 {
+			switch tx.TargetEntityRuntimeID {
+			case math.MaxInt64:
 				tx.TargetEntityRuntimeID = from
-			} else if tx.TargetEntityRuntimeID == from {
+			case from:
 				tx.TargetEntityRuntimeID = to
 			}
 		}
