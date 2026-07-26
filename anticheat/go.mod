@@ -6,7 +6,7 @@ replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260
 
 replace github.com/oomph-ac/bedsim => ../bedsim
 
-replace github.com/oomph-ac/oomph/transferproxy => ../transferproxy
+replace github.com/oomph-ac/oomph/proxy => ../proxy
 
 replace github.com/sandertv/go-raknet => ../go-raknet
 
@@ -18,7 +18,7 @@ require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/hjson/hjson-go/v4 v4.6.0
 	github.com/oomph-ac/bedsim v0.1.3
-	github.com/oomph-ac/oomph/transferproxy v0.1.2
+	github.com/oomph-ac/oomph/proxy v0.1.2
 	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
 	github.com/sandertv/gophertunnel v1.57.2-0.20260720171832-1706d533aa80
 	github.com/zeebo/xxh3 v1.1.0

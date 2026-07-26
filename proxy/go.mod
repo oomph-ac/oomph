@@ -1,4 +1,4 @@
-module github.com/oomph-ac/oomph/transferproxy
+module github.com/oomph-ac/oomph/proxy
 
 go 1.26.0
 

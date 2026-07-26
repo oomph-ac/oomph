@@ -10,7 +10,7 @@ import (
 	"github.com/oomph-ac/oomph/anticheat/player/component"
 	playercontext "github.com/oomph-ac/oomph/anticheat/player/context"
 	"github.com/oomph-ac/oomph/anticheat/player/detection"
-	proxycore "github.com/oomph-ac/oomph/transferproxy"
+	proxycore "github.com/oomph-ac/oomph/proxy"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
