@@ -21,6 +21,12 @@ PocketMine-MP servers must allow self-signed logins (`xbox-auth=false`). Apply t
    ./example-proxy
    ```
 
+   Use `-remote` to override `remote_addr` for one start:
+
+   ```sh
+   ./example-proxy -remote backend.example.com:19132
+   ```
+
 4. Connect Minecraft to `local_addr` instead of connecting directly to the backend server.
 
 To grant Oomph commands to a moderator, add their exact player name to `moderators.list`, one name per line.
@@ -29,6 +35,7 @@ To grant Oomph commands to a moderator, add their exact player name to `moderato
 
 - `local_addr` is the public listener.
 - `remote_addr` is the primary backend server.
+- `-remote` overrides `remote_addr` for the current start.
 - `backup_addr` is tried only when a new connection to the primary backend fails.
 - `reconnect_ip` and `reconnect_port` are sent to connected players in a Transfer packet when this proxy shuts down.
 - If `reconnect_ip` is empty or `reconnect_port` is invalid, players are disconnected with `shutdown_message` instead.

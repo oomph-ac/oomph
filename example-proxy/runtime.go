@@ -18,6 +18,13 @@ func loadModerators(r io.Reader) (map[string]struct{}, error) {
 	return moderators, scanner.Err()
 }
 
+func configuredRemoteAddress(configured, override string) string {
+	if override != "" {
+		return override
+	}
+	return configured
+}
+
 func backendAddresses(primary, backup string) []string {
 	addresses := make([]string, 0, 2)
 	if primary != "" {

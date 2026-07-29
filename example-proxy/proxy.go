@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,6 +27,8 @@ import (
 
 var moderators map[string]struct{}
 
+var remoteOverride = flag.String("remote", "", "override the remote address from the configuration")
+
 func init() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	if err := sentry.Init(sentry.ClientOptions{Dsn: os.Getenv("SENTRY_DSN")}); err != nil {
@@ -47,6 +50,7 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
 	if err := oconfig.ParseJSON("oomph_config.hjson"); err != nil {
 		if errors.Is(err, oconfig.ErrConfigCreated) || errors.Is(err, oconfig.ErrConfigUpdated) {
 			slog.Info(err.Error())
@@ -55,6 +59,7 @@ func main() {
 		slog.Error("unable to parse config", "error", err)
 		os.Exit(1)
 	}
+	remoteAddress := configuredRemoteAddress(oconfig.Global.RemoteAddress, *remoteOverride)
 	if err := os.MkdirAll("logs", 0o755); err != nil {
 		slog.Error("unable to create log directory", "error", err)
 		return
@@ -62,7 +67,7 @@ func main() {
 	startPprof()
 	configureRuntime()
 
-	status, err := minecraft.NewForeignStatusProvider(oconfig.Global.RemoteAddress)
+	status, err := minecraft.NewForeignStatusProvider(remoteAddress)
 	if err != nil {
 		slog.Error("unable to create status provider", "error", err)
 		return
@@ -74,7 +79,7 @@ func main() {
 	defer cancel()
 	p, err := proxy.Listen(ctx, proxy.Config{
 		LocalAddress:  oconfig.Global.LocalAddress,
-		RemoteAddress: oconfig.Global.RemoteAddress,
+		RemoteAddress: remoteAddress,
 		Log:           slog.Default(),
 		Listen: minecraft.ListenConfig{
 			ResourcePacks:        packs,
@@ -95,7 +100,7 @@ func main() {
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- p.Serve(ctx) }()
-	slog.Info("Oomph proxy is running", "address", oconfig.Global.LocalAddress, "remote", oconfig.Global.RemoteAddress)
+	slog.Info("Oomph proxy is running", "address", oconfig.Global.LocalAddress, "remote", remoteAddress)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)

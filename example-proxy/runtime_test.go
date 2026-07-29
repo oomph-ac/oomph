@@ -30,6 +30,15 @@ func TestBackendAddresses(t *testing.T) {
 	}
 }
 
+func TestConfiguredRemoteAddress(t *testing.T) {
+	if got, want := configuredRemoteAddress("configured:19132", ""), "configured:19132"; got != want {
+		t.Fatalf("configured remote address = %q, want %q", got, want)
+	}
+	if got, want := configuredRemoteAddress("configured:19132", "override:19132"), "override:19132"; got != want {
+		t.Fatalf("overridden remote address = %q, want %q", got, want)
+	}
+}
+
 func TestShutdownTarget(t *testing.T) {
 	address, port, ok := shutdownTarget("play.example.com", 19132)
 	if !ok || address != "play.example.com" || port != 19132 {
