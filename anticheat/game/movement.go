@@ -8,7 +8,7 @@ const (
 	LevitationGravityMultiplier = float32(0.05)
 	NormalGravity               = float32(0.08)
 	SlowFallingGravity          = float32(0.01)
-	StepHeight                  = float32(0.6)
+	StepHeight                  = float32(0.5625) // 9/16.0
 	SlideOffsetMultiplier       = float32(0.4)
 	SlimeBounceMultiplier       = float32(-1)
 	BedBounceMultiplier         = float32(-0.66)
