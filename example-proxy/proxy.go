@@ -181,6 +181,7 @@ func dialBackends(backup string, timeout time.Duration) proxy.DialFunc {
 				ClientData:          client,
 				KeepXBLIdentityData: true,
 				FlushRate:           -1,
+				EnableBatchReading:  true,
 			}).DialContext(dialCtx, "raknet", address)
 			cancel()
 			if err == nil {

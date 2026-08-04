@@ -43,7 +43,7 @@ func TestDefaultDialPreservesXBLIdentityData(t *testing.T) {
 		Identity:    uuid.NewString(),
 		XUID:        "2533274790395904",
 	}
-	backend, err := defaultDial(5*time.Second)(context.Background(), listener.Addr().String(), want, login.ClientData{}, "")
+	backend, err := defaultDial(5*time.Second, false)(context.Background(), listener.Addr().String(), want, login.ClientData{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestDefaultDialHonoursContextCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = defaultDial(time.Second)(ctx, conn.LocalAddr().String(), login.IdentityData{}, login.ClientData{}, "")
+	_, err = defaultDial(time.Second, false)(ctx, conn.LocalAddr().String(), login.IdentityData{}, login.ClientData{}, "")
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("defaultDial() error = %v, want context.Canceled", err)
 	}
@@ -98,7 +98,7 @@ func TestDefaultDialAutomaticallyFlushesPackets(t *testing.T) {
 		startErr <- server.StartGame(minecraft.GameData{EntityRuntimeID: 1, EntityUniqueID: 2})
 	}()
 
-	backend, err := defaultDial(5*time.Second)(context.Background(), listener.Addr().String(), login.IdentityData{}, login.ClientData{}, "")
+	backend, err := defaultDial(5*time.Second, false)(context.Background(), listener.Addr().String(), login.IdentityData{}, login.ClientData{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -720,11 +720,229 @@ func TestRunDoesNotReconnectAfterClientDisconnect(t *testing.T) {
 	}
 }
 
+func TestClientBatchLoopHonoursHandlerVerdicts(t *testing.T) {
+	var backendPackets []packet.Packet
+	backend := &fakeBackend{
+		data: minecraft.GameData{EntityRuntimeID: 1, EntityUniqueID: 2},
+		write: func(pk packet.Packet) error {
+			backendPackets = append(backendPackets, pk)
+			return nil
+		},
+	}
+	client := &fakeClient{batchQueue: make(chan []packet.Packet, 1)}
+	replacement := &packet.Text{Message: "replaced"}
+	handler := &recordingHandler{onClientBatch: func(batch []*PacketContext) {
+		for _, pkCtx := range batch {
+			text, ok := pkCtx.Packet().(*packet.Text)
+			if !ok {
+				continue
+			}
+			switch text.Message {
+			case "cancel me":
+				pkCtx.Cancel()
+			case "replace me":
+				pkCtx.SetPacket(replacement)
+			}
+		}
+	}}
+	s := &session{
+		proxy: &Proxy{batchReading: true}, handler: handler, client: client, backend: backend,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 1, backendUniqueID: 2,
+		state: newBackendStateTracker(),
+	}
+	client.batchQueue <- []packet.Packet{
+		&packet.Text{Message: "cancel me"},
+		&packet.Text{Message: "replace me"},
+		&packet.RequestChunkRadius{ChunkRadius: 8},
+	}
+	close(client.batchQueue)
+
+	if err := s.clientLoop(); err == nil {
+		t.Fatal("clientLoop() succeeded after the client closed")
+	}
+	if len(handler.clientBatchSizes) != 1 || handler.clientBatchSizes[0] != 3 {
+		t.Fatalf("handler batch sizes = %v, want one batch of 3", handler.clientBatchSizes)
+	}
+	if len(backendPackets) != 2 {
+		t.Fatalf("backend packets = %d, want the cancelled packet withheld", len(backendPackets))
+	}
+	if backendPackets[0] != packet.Packet(replacement) {
+		t.Fatalf("backend packet = %#v, want the handler replacement", backendPackets[0])
+	}
+	if _, ok := backendPackets[1].(*packet.RequestChunkRadius); !ok {
+		t.Fatalf("backend packet = %#v, want RequestChunkRadius", backendPackets[1])
+	}
+	if s.chunkRadius != 8 {
+		t.Fatalf("session chunk radius = %d, want the batch-read request radius 8", s.chunkRadius)
+	}
+}
+
+func TestBackendBatchLoopHonoursHandlerVerdicts(t *testing.T) {
+	replacement := &packet.Text{Message: "replaced"}
+	backend := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		readErr: errors.New("backend closed"),
+		batches: [][]packet.Packet{{
+			&packet.Text{Message: "cancel me"},
+			&packet.Text{Message: "replace me"},
+			&packet.Text{Message: "forward me"},
+		}},
+	}
+	client := &fakeClient{}
+	handler := &recordingHandler{onServerBatch: func(batch []*PacketContext) {
+		for _, pkCtx := range batch {
+			text, ok := pkCtx.Packet().(*packet.Text)
+			if !ok {
+				continue
+			}
+			switch text.Message {
+			case "cancel me":
+				pkCtx.Cancel()
+			case "replace me":
+				pkCtx.SetPacket(replacement)
+			}
+		}
+	}}
+	proxy := &Proxy{batchReading: true, cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(context.Context, string, login.IdentityData, login.ClientData, string) (Backend, error) {
+			return nil, errors.New("fallback unavailable")
+		},
+	}}
+	s := &session{
+		proxy: proxy, handler: handler, client: client, backend: backend,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 9, backendUniqueID: 10,
+		state: newBackendStateTracker(),
+	}
+
+	if err := s.backendLoop(context.Background()); err == nil {
+		t.Fatal("backendLoop() succeeded after the backend closed")
+	}
+	if len(client.packets) != 2 {
+		t.Fatalf("client packets = %d, want the cancelled packet withheld", len(client.packets))
+	}
+	if client.packets[0] != packet.Packet(replacement) {
+		t.Fatalf("client packet = %#v, want the handler replacement", client.packets[0])
+	}
+	text, ok := client.packets[1].(*packet.Text)
+	if !ok || text.Message != "forward me" {
+		t.Fatalf("client packet = %#v, want the forwarded text packet", client.packets[1])
+	}
+}
+
+func TestBackendBatchLoopDropsRemainderAfterTransfer(t *testing.T) {
+	primary := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		readErr: errors.New("primary backend closed"),
+		batches: [][]packet.Packet{{
+			&packet.Text{Message: "before transfer"},
+			&packet.Transfer{Address: "127.0.0.1", Port: 19134},
+			&packet.Text{Message: "after transfer"},
+		}},
+	}
+	replacement := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 11, EntityUniqueID: 12},
+		readErr: errors.New("replacement backend closed"),
+	}
+	client := &fakeClient{}
+	var addresses []string
+	proxy := &Proxy{batchReading: true, cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(_ context.Context, address string, _ login.IdentityData, _ login.ClientData, _ string) (Backend, error) {
+			addresses = append(addresses, address)
+			if len(addresses) == 1 {
+				return replacement, nil
+			}
+			return nil, errors.New("fallback unavailable")
+		},
+	}}
+	s := &session{
+		proxy: proxy, handler: NopHandler{}, client: client, backend: primary,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 9, backendUniqueID: 10,
+		state: newBackendStateTracker(),
+	}
+
+	if err := s.backendLoop(context.Background()); err == nil {
+		t.Fatal("backendLoop() succeeded after the fallback became unavailable")
+	}
+	if len(addresses) == 0 || addresses[0] != "127.0.0.1:19134" {
+		t.Fatalf("dialed addresses = %v, want the transfer target first", addresses)
+	}
+	var before, after bool
+	for _, pk := range client.packets {
+		if text, ok := pk.(*packet.Text); ok {
+			before = before || text.Message == "before transfer"
+			after = after || text.Message == "after transfer"
+		}
+	}
+	if !before || after {
+		t.Fatalf("client received before=%t after=%t, want only packets preceding the transfer", before, after)
+	}
+	backend, _ := s.currentBackend()
+	if backend != replacement {
+		t.Fatalf("current backend = %#v, want the transfer replacement", backend)
+	}
+}
+
+func TestBackendBatchLoopContinuesAfterFailedTransfer(t *testing.T) {
+	primary := &fakeBackend{
+		data:    minecraft.GameData{EntityRuntimeID: 9, EntityUniqueID: 10},
+		readErr: errors.New("primary backend closed"),
+		batches: [][]packet.Packet{{
+			&packet.Text{Message: "before transfer"},
+			&packet.Transfer{Address: "127.0.0.1", Port: 19134},
+			&packet.Text{Message: "after transfer"},
+		}},
+	}
+	client := &fakeClient{}
+	handler := &recordingHandler{}
+	proxy := &Proxy{batchReading: true, cfg: Config{
+		RemoteAddress: "127.0.0.1:19133",
+		Log:           slog.Default(),
+		Dial: func(context.Context, string, login.IdentityData, login.ClientData, string) (Backend, error) {
+			return nil, errors.New("transfer target unavailable")
+		},
+	}}
+	s := &session{
+		proxy: proxy, handler: handler, client: client, backend: primary,
+		clientRuntimeID: 1, clientUniqueID: 2,
+		backendRuntimeID: 9, backendUniqueID: 10,
+		state: newBackendStateTracker(),
+	}
+
+	if err := s.backendLoop(context.Background()); err == nil {
+		t.Fatal("backendLoop() succeeded after the backend closed")
+	}
+	if len(handler.transferFailed) != 1 || handler.transferFailed[0] != "127.0.0.1:19134" {
+		t.Fatalf("transfer failures = %v, want the transfer target", handler.transferFailed)
+	}
+	var before, after bool
+	for _, pk := range client.packets {
+		if text, ok := pk.(*packet.Text); ok {
+			before = before || text.Message == "before transfer"
+			after = after || text.Message == "after transfer"
+		}
+	}
+	if !before || !after {
+		t.Fatalf("client received before=%t after=%t, want the whole batch after a failed transfer", before, after)
+	}
+	backend, _ := s.currentBackend()
+	if backend != primary {
+		t.Fatalf("current backend = %#v, want the primary backend retained", backend)
+	}
+}
+
 type fakeBackend struct {
 	data     minecraft.GameData
 	flushErr error
 	readErr  error
 	write    func(packet.Packet) error
+	batches  [][]packet.Packet
 }
 
 type blockingReadBackend struct {
@@ -746,8 +964,41 @@ type radiusHandler struct {
 
 func (h radiusHandler) ChunkRadius() int32 { return h.radius }
 
+type recordingHandler struct {
+	NopHandler
+	clientBatchSizes []int
+	transferFailed   []string
+	onClientBatch    func([]*PacketContext)
+	onServerBatch    func([]*PacketContext)
+}
+
+func (h *recordingHandler) HandleClientBatch(batch []*PacketContext) {
+	h.clientBatchSizes = append(h.clientBatchSizes, len(batch))
+	if h.onClientBatch != nil {
+		h.onClientBatch(batch)
+	}
+}
+
+func (h *recordingHandler) HandleServerBatch(batch []*PacketContext) {
+	if h.onServerBatch != nil {
+		h.onServerBatch(batch)
+	}
+}
+
+func (h *recordingHandler) TransferFailed(address string, _ error) {
+	h.transferFailed = append(h.transferFailed, address)
+}
+
 func (f *fakeBackend) GameData() minecraft.GameData       { return f.data }
 func (f *fakeBackend) ReadPacket() (packet.Packet, error) { return nil, f.readErr }
+func (f *fakeBackend) ReadBatch() ([]packet.Packet, error) {
+	if len(f.batches) > 0 {
+		batch := f.batches[0]
+		f.batches = f.batches[1:]
+		return batch, nil
+	}
+	return nil, f.readErr
+}
 func (f *fakeBackend) WritePacket(pk packet.Packet) error {
 	if f.write != nil {
 		return f.write(pk)
@@ -759,15 +1010,24 @@ func (f *fakeBackend) Flush() error { return f.flushErr }
 func (*fakeBackend) Close() error   { return nil }
 
 type fakeClient struct {
-	packets   []packet.Packet
-	addr      net.Addr
-	readQueue chan packet.Packet
+	packets    []packet.Packet
+	addr       net.Addr
+	readQueue  chan packet.Packet
+	batchQueue chan []packet.Packet
 }
 
 func (f *fakeClient) ReadPacket() (packet.Packet, error) {
 	if f.readQueue != nil {
 		if pk, ok := <-f.readQueue; ok {
 			return pk, nil
+		}
+	}
+	return nil, errors.New("unused")
+}
+func (f *fakeClient) ReadBatch() ([]packet.Packet, error) {
+	if f.batchQueue != nil {
+		if batch, ok := <-f.batchQueue; ok {
+			return batch, nil
 		}
 	}
 	return nil, errors.New("unused")

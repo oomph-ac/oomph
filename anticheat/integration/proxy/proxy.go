@@ -24,6 +24,9 @@ type Backend = proxycore.Backend
 // DialFunc establishes and logs into a backend, stopping before DoSpawn.
 type DialFunc = proxycore.DialFunc
 
+// PacketContext carries a packet through handler processing.
+type PacketContext = proxycore.PacketContext
+
 // Config configures a standalone Oomph proxy.
 type Config struct {
 	LocalAddress  string
@@ -32,11 +35,18 @@ type Config struct {
 	Listen        minecraft.ListenConfig
 	DialTimeout   time.Duration
 	Configure     func(*player.Player)
-	Dial          DialFunc
+
+	// Dial may be set to customise backend connections. Backend connections must be dialed with
+	// batch reading enabled (minecraft.Dialer.EnableBatchReading), as the Oomph proxy always
+	// reads packets in batches.
+	Dial DialFunc
 }
 
 // Listen starts a native Oomph proxy.
 func Listen(ctx context.Context, cfg Config) (*Proxy, error) {
+	// Oomph always processes packets in batches so that each read batch is handled under a
+	// single processing lock acquisition.
+	cfg.Listen.EnableBatchReading = true
 	return proxycore.Listen(ctx, proxycore.Config{
 		LocalAddress: cfg.LocalAddress, RemoteAddress: cfg.RemoteAddress,
 		Log: cfg.Log, Listen: cfg.Listen, DialTimeout: cfg.DialTimeout, Dial: cfg.Dial,
@@ -63,16 +73,40 @@ func (h *oomphHandler) Start(backend Backend) error {
 	return nil
 }
 
-func (h *oomphHandler) HandleClientPacket(pk *packet.Packet) bool {
-	ctx := playercontext.NewHandlePacketContext(pk)
-	h.player.HandleClientPacket(ctx)
-	return !ctx.Cancelled()
+func (h *oomphHandler) HandleClientPacket(pkCtx *PacketContext) {
+	adaptPacketContexts([]*PacketContext{pkCtx}, h.player.HandleClientPackets)
 }
 
-func (h *oomphHandler) HandleServerPacket(pk *packet.Packet) bool {
-	ctx := playercontext.NewHandlePacketContext(pk)
-	h.player.HandleServerPacket(ctx)
-	return !ctx.Cancelled()
+func (h *oomphHandler) HandleServerPacket(pkCtx *PacketContext) {
+	adaptPacketContexts([]*PacketContext{pkCtx}, h.player.HandleServerPackets)
+}
+
+func (h *oomphHandler) HandleClientBatch(batch []*PacketContext) {
+	adaptPacketContexts(batch, h.player.HandleClientPackets)
+}
+
+func (h *oomphHandler) HandleServerBatch(batch []*PacketContext) {
+	adaptPacketContexts(batch, h.player.HandleServerPackets)
+}
+
+// adaptPacketContexts bridges proxy packet contexts to Oomph's handling contexts, runs handle on
+// the converted batch and copies cancellation and modification results back.
+func adaptPacketContexts(batch []*PacketContext, handle func([]*playercontext.HandlePacketContext)) {
+	pks := make([]packet.Packet, len(batch))
+	converted := make([]*playercontext.HandlePacketContext, len(batch))
+	for i, pkCtx := range batch {
+		pks[i] = pkCtx.Packet()
+		converted[i] = playercontext.NewHandlePacketContext(&pks[i])
+	}
+	handle(converted)
+	for i, ctx := range converted {
+		if ctx.Cancelled() {
+			batch[i].Cancel()
+		}
+		if ctx.Modified() {
+			batch[i].SetPacket(pks[i])
+		}
+	}
 }
 
 func (h *oomphHandler) TransferBackend(backend Backend) error {

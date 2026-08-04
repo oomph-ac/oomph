@@ -61,11 +61,24 @@ var ServerDecode = []uint32{
 	packet.IDAvailableCommands,
 }
 
-func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
-	defer p.recoverError()
-
+func (p *Player) HandleClientPackets(batch []*context.HandlePacketContext) {
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
+
+	for _, ctx := range batch {
+		p.handleClientPacket(ctx)
+	}
+}
+
+func (p *Player) HandleClientPacket(ctx *context.HandlePacketContext) {
+	p.procMu.Lock()
+	defer p.procMu.Unlock()
+
+	p.handleClientPacket(ctx)
+}
+
+func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
+	defer p.recoverError()
 
 	p.pkCtx = ctx
 	defer func() {
@@ -325,11 +338,24 @@ func splitCommandLine(s string) []string {
 	return args
 }
 
-func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
-	defer p.recoverError()
-
+func (p *Player) HandleServerPackets(batch []*context.HandlePacketContext) {
 	p.procMu.Lock()
 	defer p.procMu.Unlock()
+
+	for _, ctx := range batch {
+		p.handleServerPacket(ctx)
+	}
+}
+
+func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
+	p.procMu.Lock()
+	defer p.procMu.Unlock()
+
+	p.handleServerPacket(ctx)
+}
+
+func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
+	defer p.recoverError()
 
 	p.pkCtx = ctx
 	defer func() {
