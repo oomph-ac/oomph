@@ -470,6 +470,9 @@ func (p *Player) HandleServerPacket(ctx *context.HandlePacketContext) {
 		ctx.SetModified()
 
 		if pk.EntityRuntimeID == p.RuntimeId {
+			for idx, attr := range pk.Attributes {
+				pk.Attributes[idx] = stripAttributeModifiers(attr)
+			}
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.UpdateBlock:
