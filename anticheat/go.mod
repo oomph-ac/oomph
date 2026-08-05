@@ -17,7 +17,7 @@ require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/hjson/hjson-go/v4 v4.6.0
 	github.com/oomph-ac/oomph/transferproxy v0.1.2
-	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217
+	github.com/sandertv/go-raknet v1.15.2-0.20260705184311-0d1fd09e2cf6
 	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
