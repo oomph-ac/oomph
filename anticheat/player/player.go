@@ -112,7 +112,7 @@ type Player struct {
 	LastSetActorData *packet.SetActorData
 
 	// Recipies is a map of recipe network IDs to recipes.
-	Recipies map[uint32]protocol.Recipe
+	Recipies map[uint32]any
 	// CreativeItems is a map of creative item network IDs to creative items.
 	CreativeItems map[uint32]protocol.CreativeItem
 
@@ -239,7 +239,7 @@ func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener)
 		CloseChan: make(chan bool),
 		RunChan:   make(chan func(), 32),
 
-		Recipies:      make(map[uint32]protocol.Recipe),
+		Recipies:      make(map[uint32]any),
 		CreativeItems: make(map[uint32]protocol.CreativeItem),
 
 		deferredPackets: make([]packet.Packet, 0, 256),

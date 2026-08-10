@@ -6,8 +6,6 @@ import (
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/oomph-ac/oomph/anticheat/utils"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
-
-	_ "unsafe"
 )
 
 func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
@@ -29,7 +27,7 @@ func (p *Player) ConvertToStack(it protocol.ItemStack) item.Stack {
 		t = nbter.DecodeNBT(it.NBTData).(world.Item)
 	}
 	s := item.NewStack(t, int(it.Count))
-	return nbtconv_Item(it.NBTData, &s).AsUnbreakable()
+	return item.ReadNBT(it.NBTData, &s).AsUnbreakable()
 }
 
 func (p *Player) InstanceFromItem(it item.Stack) protocol.ItemInstance {
@@ -46,8 +44,3 @@ func (p *Player) StackToItem(it protocol.ItemStack) item.Stack {
 	}
 	return utils.StackToItem(p.World().BlockRegistry(), it)
 }
-
-// noinspection ALL
-//
-//go:linkname nbtconv_Item github.com/df-mc/dragonfly/server/internal/nbtconv.Item
-func nbtconv_Item(data map[string]any, s *item.Stack) item.Stack

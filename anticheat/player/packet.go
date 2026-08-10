@@ -134,7 +134,9 @@ func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
 		p.acks.Tick(true)
 
 		if pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
-			p.inventory.HandleSingleRequest(pk.ItemStackRequest)
+			if request, ok := pk.ItemStackRequest.Value(); ok {
+				p.inventory.HandleSingleRequest(request)
+			}
 		}
 
 		p.handleBlockActions(pk)
@@ -240,7 +242,7 @@ func (p *Player) handleClientPacket(ctx *context.HandlePacketContext) {
 			for _, action := range pk.Actions {
 				if action.SourceType == protocol.InventoryActionSourceWorld && action.InventorySlot == 0 {
 					droppedCount = int(action.NewItem.Stack.Count)
-				} else if action.SourceType == protocol.InventoryActionSourceContainer && action.WindowID == protocol.WindowIDInventory {
+				} else if windowID, ok := action.WindowID.Value(); action.SourceType == protocol.InventoryActionSourceContainer && ok && windowID == protocol.WindowIDInventory {
 					sourceSlot = int(action.InventorySlot)
 					foundClientItemStack = true
 				}
@@ -428,7 +430,8 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 		p.inventory.HandleItemStackResponse(pk)
 	case *packet.LevelChunk:
 		p.worldUpdater.HandleLevelChunk(pk)
-		fullChunk := !pk.CacheEnabled && pk.SubChunkCount != protocol.SubChunkRequestModeLimited && pk.SubChunkCount != protocol.SubChunkRequestModeLimitless
+		_, requestMode := pk.SubChunkLimit.Value()
+		fullChunk := !pk.CacheEnabled && !requestMode
 		if fullChunk && p.opts.Network.AttemptFixChunks {
 			if err := oworld.ReencodeLevelChunk(pk, p.BlockNetwork()); err != nil {
 				p.Log().Warn("unable to re-encode chunk", "error", err)
@@ -511,21 +514,39 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 		p.inventory.RemoveWindow(pk.WindowID)
 	case *packet.CraftingData:
 		if pk.ClearRecipes {
-			p.Recipies = make(map[uint32]protocol.Recipe)
+			p.Recipies = make(map[uint32]any)
 		}
-		for _, recp := range pk.Recipes {
-			switch recp := recp.(type) {
-			case *protocol.ShapedRecipe:
-				p.Recipies[recp.RecipeNetworkID] = recp
-			case *protocol.ShapelessRecipe:
-				p.Recipies[recp.RecipeNetworkID] = recp
-			case *protocol.MultiRecipe:
-				p.Recipies[recp.RecipeNetworkID] = recp
-			case *protocol.SmithingTransformRecipe:
-				p.Recipies[recp.RecipeNetworkID] = recp
-			case *protocol.SmithingTrimRecipe:
-				p.Recipies[recp.RecipeNetworkID] = recp
-			}
+		for i := range pk.ShapedRecipes {
+			recp := &pk.ShapedRecipes[i]
+			p.Recipies[recp.RecipeNetworkID] = recp
+		}
+		for i := range pk.ShapelessRecipes {
+			recp := &pk.ShapelessRecipes[i]
+			p.Recipies[recp.RecipeNetworkID] = recp
+		}
+		for i := range pk.UserDataShapelessRecipes {
+			recp := &pk.UserDataShapelessRecipes[i].ShapelessRecipe
+			p.Recipies[recp.RecipeNetworkID] = recp
+		}
+		for i := range pk.ShapelessChemistryRecipes {
+			recp := &pk.ShapelessChemistryRecipes[i].ShapelessRecipe
+			p.Recipies[recp.RecipeNetworkID] = recp
+		}
+		for i := range pk.ShapedChemistryRecipes {
+			recp := &pk.ShapedChemistryRecipes[i].ShapedRecipe
+			p.Recipies[recp.RecipeNetworkID] = recp
+		}
+		for i := range pk.MultiRecipes {
+			recp := &pk.MultiRecipes[i]
+			p.Recipies[recp.RecipeNetworkID] = recp
+		}
+		for i := range pk.SmithingTransformRecipes {
+			recp := &pk.SmithingTransformRecipes[i]
+			p.Recipies[recp.RecipeNetworkID] = recp
+		}
+		for i := range pk.SmithingTrimRecipes {
+			recp := &pk.SmithingTrimRecipes[i]
+			p.Recipies[recp.RecipeNetworkID] = recp
 		}
 	case *packet.CreativeContent:
 		p.CreativeItems = make(map[uint32]protocol.CreativeItem)

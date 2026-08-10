@@ -62,7 +62,8 @@ func (d *BadPacketC) Detect(pk packet.Packet) {
 		if pk.InputData.Load(packet.InputFlagPerformItemInteraction) && d.mPlayer.GameMode != packet.GameTypeCreative {
 			d.mPlayer.FailDetection(d)
 		}
-		for _, action := range pk.BlockActions {
+		actions, _ := pk.BlockActions.Value()
+		for _, action := range actions {
 			if action.Action == protocol.PlayerActionCreativePlayerDestroyBlock {
 				d.mPlayer.FailDetection(d)
 				break

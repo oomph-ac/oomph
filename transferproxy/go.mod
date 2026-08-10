@@ -8,7 +8,7 @@ replace github.com/sandertv/gophertunnel => ../gophertunnel
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
+	github.com/sandertv/gophertunnel v1.58.1
 )
 
 require (

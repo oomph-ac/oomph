@@ -223,8 +223,9 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 	}
 
 	if pk.InputData.Load(packet.InputFlagPerformBlockActions) {
-		newActions := make([]protocol.PlayerBlockAction, 0, len(pk.BlockActions))
-		for _, action := range pk.BlockActions {
+		actions, _ := pk.BlockActions.Value()
+		newActions := make([]protocol.PlayerBlockAction, 0, len(actions))
+		for _, action := range actions {
 			p.Dbg.Notify(DebugModeBlockBreaking, true, "blockAction=%v", action)
 			switch action.Action {
 			case protocol.PlayerActionPredictDestroyBlock:
@@ -316,7 +317,7 @@ func (p *Player) handleBlockActions(pk *packet.PlayerAuthInput) {
 			}
 			newActions = append(newActions, action)
 		}
-		pk.BlockActions = newActions
+		pk.BlockActions = protocol.Option(newActions)
 		if len(newActions) == 0 {
 			pk.InputData.Unset(packet.InputFlagPerformBlockActions)
 		}

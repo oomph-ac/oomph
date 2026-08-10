@@ -329,11 +329,11 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 		for index, desc := range recp.Input {
 			switch d := desc.Descriptor.(type) {
 			case *protocol.DefaultItemDescriptor:
-				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
+				if i, ok := world.ItemByName(d.Name, int16(d.MetadataValue)); ok {
 					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item found %T for index %d", i, index)
 					recpInput[index] = item.NewStack(i, int(desc.Count))
 				} else {
-					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %d %d (index %d)", d.NetworkID, d.MetadataValue, index)
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %s %d (index %d)", d.Name, d.MetadataValue, index)
 				}
 			case *protocol.ItemTagItemDescriptor:
 				c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item tag found %s for index %d", d.Tag, index)
@@ -350,11 +350,11 @@ func (c *InventoryComponent) handleCraftStackRequest(tx *invReq, action *protoco
 		for index, desc := range recp.Input {
 			switch d := desc.Descriptor.(type) {
 			case *protocol.DefaultItemDescriptor:
-				if i, ok := world.ItemByRuntimeID(int32(d.NetworkID), d.MetadataValue); ok {
+				if i, ok := world.ItemByName(d.Name, int16(d.MetadataValue)); ok {
 					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "item found %T for index %d", i, index)
 					recpInput[index] = item.NewStack(i, int(desc.Count))
 				} else {
-					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %d %d (index %d)", d.NetworkID, d.MetadataValue, index)
+					c.mPlayer.Dbg.Notify(player.DebugModeCrafting, true, "no item found %s %d (index %d)", d.Name, d.MetadataValue, index)
 				}
 			case *protocol.ItemTagItemDescriptor:
 				recpInput[index] = recipe.NewItemTag(d.Tag, int(desc.Count))

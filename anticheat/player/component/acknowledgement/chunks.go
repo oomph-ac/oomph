@@ -87,11 +87,16 @@ func (ack *SubChunkUpdate) Run() {
 
 		switch entry.Result {
 		case protocol.SubChunkResultSuccess:
+			payload, ok := entry.RawPayload.Value()
+			if !ok {
+				ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, "missing subchunk payload"))
+				continue
+			}
 			if bufUsed {
 				buf.Reset()
 			}
 			bufUsed = true
-			buf.Write(entry.RawPayload)
+			buf.Write(payload)
 
 			cachedSub, err := oworld.CacheSubChunk(buf, ch, chunkPos, ack.mPlayer.BlockNetwork())
 			if err != nil {
