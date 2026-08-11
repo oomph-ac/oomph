@@ -28,6 +28,12 @@ func HasDataFlag(flag uint64, data int64) bool {
 	return (data & (1 << (flag % 64))) > 0
 }
 
+// HasMetadataFlag ...
+func HasMetadataFlag[T byte | int64](metadata map[uint32]any, key uint32, flag uint64) bool {
+	v, ok := metadata[key].(T)
+	return ok && HasDataFlag(flag, int64(v))
+}
+
 // RemoveDataFlag removes the specified flag from the flags.
 func RemoveDataFlag(flags int64, flag uint64) int64 {
 	return flags &^ (1 << (flag % 64))

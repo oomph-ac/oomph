@@ -489,6 +489,9 @@ func (c *AuthoritativeCombatComponent) checkForMispredictedEntity() bool {
 	rewTick := c.mPlayer.ClientTick - 1
 	attackPos := c.endAttackPos
 	for rid, e := range c.entityTracker().All() {
+		if e.Type == entity.TypeItem {
+			continue
+		}
 		rewind, ok := e.Rewind(rewTick)
 		if !ok {
 			continue

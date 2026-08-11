@@ -18,8 +18,13 @@ const (
 	MaxSneakImpulse      = float32(0.3)
 	MaxNormalizedImpulse = float32(0.70710678118) // 1/sqrt(2)
 
-	DefaultPlayerHeightOffset  = float32(1.62)
+	DefaultPlayerHeightOffset  = float32(1.62001)
 	SneakingPlayerHeightOffset = float32(1.27)
+	SleepingPlayerHeightOffset = float32(0.2)
+
+	ItemAndMinecartNetworkOffset = float32(0.5)
+	BoatNetworkOffset            = float32(0.375)
+	PrimedTNTNetworkOffset       = float32(0.49)
 
 	JumpDelayTicks  = 10
 	GlideBoostTicks = 20

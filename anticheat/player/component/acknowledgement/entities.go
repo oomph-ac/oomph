@@ -4,18 +4,21 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/entity"
 	"github.com/oomph-ac/oomph/anticheat/player"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 )
 
-type EntitySize struct {
-	mEntity *entity.Entity
-	width   float32
-	height  float32
-	scale   float32
+type EntityData struct {
+	mEntity  *entity.Entity
+	metadata map[uint32]any
+	width    float32
+	height   float32
+	scale    float32
 }
 
-func NewEntitySizeACK(e *entity.Entity, width, height, scale float32) *EntitySize {
-	return &EntitySize{
-		mEntity: e,
+func NewEntityDataACK(e *entity.Entity, metadata map[uint32]any, width, height, scale float32) *EntityData {
+	return &EntityData{
+		mEntity:  e,
+		metadata: metadata,
 
 		width:  width,
 		height: height,
@@ -23,7 +26,8 @@ func NewEntitySizeACK(e *entity.Entity, width, height, scale float32) *EntitySiz
 	}
 }
 
-func (ack *EntitySize) Run() {
+func (ack *EntityData) Run() {
+	ack.mEntity.UpdateMetadata(ack.metadata)
 	ack.mEntity.Width = ack.width
 	ack.mEntity.Height = ack.height
 	ack.mEntity.Scale = ack.scale
@@ -52,6 +56,39 @@ func (ack *EntityPosition) Run() {
 		ack.runtimeID,
 		0,
 		ack.position,
+		ack.teleport,
+	)
+	ack.mPlayer = nil
+}
+
+type EntityDeltaPosition struct {
+	mPlayer *player.Player
+
+	positionX protocol.Optional[float32]
+	positionY protocol.Optional[float32]
+	positionZ protocol.Optional[float32]
+	runtimeID uint64
+	teleport  bool
+}
+
+func NewEntityDeltaPositionACK(p *player.Player, posX, posY, posZ protocol.Optional[float32], rid uint64, teleport bool) *EntityDeltaPosition {
+	return &EntityDeltaPosition{
+		mPlayer:   p,
+		positionX: posX,
+		positionY: posY,
+		positionZ: posZ,
+		runtimeID: rid,
+		teleport:  teleport,
+	}
+}
+
+func (ack *EntityDeltaPosition) Run() {
+	ack.mPlayer.ClientEntityTracker().MoveEntityDelta(
+		ack.runtimeID,
+		0,
+		ack.positionX,
+		ack.positionY,
+		ack.positionZ,
 		ack.teleport,
 	)
 	ack.mPlayer = nil

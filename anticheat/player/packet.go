@@ -36,6 +36,7 @@ var ClientDecode = []uint32{
 
 var ServerDecode = []uint32{
 	packet.IDAddActor,
+	packet.IDAddItemActor,
 	packet.IDAddPlayer,
 	packet.IDChunkRadiusUpdated,
 	packet.IDInventorySlot,
@@ -44,6 +45,7 @@ var ServerDecode = []uint32{
 	packet.IDLevelChunk,
 	packet.IDMobEffect,
 	packet.IDMoveActorAbsolute,
+	packet.IDMoveActorDelta,
 	packet.IDMovePlayer,
 	packet.IDRemoveActor,
 	packet.IDSetActorData,
@@ -370,56 +372,42 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 		p.initOomphCommand(pk)
 	case *packet.AddActor:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
-		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
-			pk.EntityRuntimeID,
-			pk.EntityType,
-			pk.EntityMetadata,
-			pk.Position,
-			p.Opts().Network.MaxEntityRewind,
-			false,
-			width,
-			height,
-			scale,
-			&p.log,
-		))
-		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
-			pk.EntityRuntimeID,
-			pk.EntityType,
-			pk.EntityMetadata,
-			pk.Position,
-			p.Opts().Network.MaxEntityRewind,
-			false,
-			width,
-			height,
-			scale,
-			&p.log,
-		))
+		p.trackEntity(entity.Config{
+			RuntimeID:       pk.EntityRuntimeID,
+			UniqueID:        pk.EntityUniqueID,
+			Type:            pk.EntityType,
+			Metadata:        pk.EntityMetadata,
+			NetworkPosition: pk.Position,
+			Width:           width,
+			Height:          height,
+			Scale:           scale,
+		})
+	case *packet.AddItemActor:
+		const itemEntitySize = 0.25
+		width, height, scale := calculateBBSize(pk.EntityMetadata, itemEntitySize, itemEntitySize, 1.0)
+		p.trackEntity(entity.Config{
+			RuntimeID:       pk.EntityRuntimeID,
+			UniqueID:        pk.EntityUniqueID,
+			Type:            entity.TypeItem,
+			Metadata:        pk.EntityMetadata,
+			NetworkPosition: pk.Position,
+			Width:           width,
+			Height:          height,
+			Scale:           scale,
+		})
 	case *packet.AddPlayer:
 		width, height, scale := calculateBBSize(pk.EntityMetadata, 0.6, 1.8, 1.0)
-		p.entTracker.AddEntity(pk.EntityRuntimeID, entity.New(
-			pk.EntityRuntimeID,
-			"",
-			pk.EntityMetadata,
-			pk.Position,
-			p.Opts().Network.MaxEntityRewind,
-			true,
-			width,
-			height,
-			scale,
-			&p.log,
-		))
-		p.clientEntTracker.AddEntity(pk.EntityRuntimeID, entity.New(
-			pk.EntityRuntimeID,
-			"",
-			pk.EntityMetadata,
-			pk.Position,
-			p.Opts().Network.MaxEntityRewind,
-			true,
-			width,
-			height,
-			scale,
-			&p.log,
-		))
+		p.trackEntity(entity.Config{
+			RuntimeID:       pk.EntityRuntimeID,
+			UniqueID:        pk.AbilityData.EntityUniqueID,
+			Type:            entity.TypePlayer,
+			Metadata:        pk.EntityMetadata,
+			NetworkPosition: pk.Position,
+			IsPlayer:        true,
+			Width:           width,
+			Height:          height,
+			Scale:           scale,
+		})
 	case *packet.ChunkRadiusUpdated:
 		p.worldUpdater.SetServerChunkRadius(pk.ChunkRadius + 4)
 	case *packet.InventorySlot:
@@ -452,6 +440,13 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 		} else {
 			p.movement.ServerUpdate(pk)
 		}
+	case *packet.MoveActorDelta:
+		if pk.EntityRuntimeID != p.RuntimeId {
+			p.entTracker.HandleMoveActorDelta(pk)
+			if p.opts.Combat.EnableClientEntityTracking {
+				p.clientEntTracker.HandleMoveActorDelta(pk)
+			}
+		}
 	case *packet.MovePlayer:
 		pk.Tick = 0
 		ctx.SetModified()
@@ -465,8 +460,8 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 			p.movement.ServerUpdate(pk)
 		}
 	case *packet.RemoveActor:
-		p.entTracker.RemoveEntity(uint64(pk.EntityUniqueID))
-		p.clientEntTracker.RemoveEntity(uint64(pk.EntityUniqueID))
+		p.entTracker.RemoveEntityByUniqueID(pk.EntityUniqueID)
+		p.clientEntTracker.RemoveEntityByUniqueID(pk.EntityUniqueID)
 	case *packet.SetActorData:
 		pk.Tick = 0
 		ctx.SetModified()
@@ -554,4 +549,13 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 			p.CreativeItems[item.CreativeItemNetworkID] = item
 		}
 	}
+}
+
+// trackEntity ...
+func (p *Player) trackEntity(c entity.Config) {
+	c.HistorySize = p.Opts().Network.MaxEntityRewind
+	c.Log = &p.log
+
+	p.entTracker.AddEntity(c.RuntimeID, entity.New(c))
+	p.clientEntTracker.AddEntity(c.RuntimeID, entity.New(c))
 }
