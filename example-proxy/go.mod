@@ -10,13 +10,13 @@ replace github.com/sandertv/go-raknet => ../go-raknet
 
 replace github.com/sandertv/gophertunnel => ../gophertunnel
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260719182426-f1fdb4d3c00c
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260808061924-6f1a550a1f2d
 
 require (
 	github.com/df-mc/dragonfly v0.10.14-0.20260508142332-b4a4d55303f9
 	github.com/getsentry/sentry-go v0.35.3
 	github.com/oomph-ac/oomph/anticheat v0.0.0-20260716201756-d5e22ec6b233
-	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
+	github.com/sandertv/gophertunnel v1.58.1
 )
 
 require (
@@ -55,7 +55,7 @@ require (
 	github.com/pion/transport/v4 v4.0.1 // indirect
 	github.com/pion/turn/v4 v4.1.4 // indirect
 	github.com/pion/webrtc/v4 v4.2.10-0.20260224155637-aa3b95c72dd2 // indirect
-	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217 // indirect
+	github.com/sandertv/go-raknet v1.15.2-0.20260705184311-0d1fd09e2cf6 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect

@@ -8,7 +8,7 @@ replace github.com/sandertv/gophertunnel => ../gophertunnel
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/sandertv/gophertunnel v1.57.2-0.20260714084219-654cd5f0bcb4
+	github.com/sandertv/gophertunnel v1.58.1
 )
 
 require (
@@ -36,7 +36,7 @@ require (
 	github.com/pion/transport/v4 v4.0.1 // indirect
 	github.com/pion/turn/v4 v4.1.4 // indirect
 	github.com/pion/webrtc/v4 v4.2.10-0.20260224155637-aa3b95c72dd2 // indirect
-	github.com/sandertv/go-raknet v1.15.1-0.20260112202637-beca0b10c217 // indirect
+	github.com/sandertv/go-raknet v1.15.2-0.20260705184311-0d1fd09e2cf6 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect

@@ -199,7 +199,7 @@ func TestBackendStateTrackerClearsSpectrumTransferState(t *testing.T) {
 	tracker.handle(&packet.BossEvent{BossEntityUniqueID: 14, EventType: packet.BossEventShow}, 27)
 	tracker.handle(&packet.MobEffect{EntityRuntimeID: 27, EffectType: 15, Operation: packet.MobEffectModify}, 27)
 	tracker.handle(&packet.MobEffect{EntityRuntimeID: 99, EffectType: 15, Operation: packet.MobEffectRemove}, 27)
-	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionAdd, Entries: []protocol.PlayerListEntry{{UUID: entryID}}}, 27)
+	tracker.handle(&packet.PlayerList{Entries: []protocol.PlayerListEntry{{ActionType: protocol.PlayerListActionAdd, UUID: entryID}}}, 27)
 	tracker.handle(&packet.SetDisplayObjective{ObjectiveName: "kills"}, 27)
 
 	packets := tracker.clearPackets(27)
@@ -219,7 +219,7 @@ func TestBackendStateTrackerClearsSpectrumTransferState(t *testing.T) {
 				effects++
 			}
 		case *packet.PlayerList:
-			if pk.ActionType == packet.PlayerListActionRemove && len(pk.Entries) == 1 && pk.Entries[0].UUID == entryID {
+			if len(pk.Entries) == 1 && pk.Entries[0].ActionType == protocol.PlayerListActionRemove && pk.Entries[0].UUID == entryID {
 				players++
 			}
 		case *packet.RemoveObjective:
@@ -241,8 +241,8 @@ func TestBackendStateTrackerHonoursRemovalPackets(t *testing.T) {
 	tracker := newBackendStateTracker()
 	tracker.handle(&packet.AddActor{EntityUniqueID: 11}, 1)
 	tracker.handle(&packet.RemoveActor{EntityUniqueID: 11}, 1)
-	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionAdd, Entries: []protocol.PlayerListEntry{{UUID: entryID}}}, 1)
-	tracker.handle(&packet.PlayerList{ActionType: packet.PlayerListActionRemove, Entries: []protocol.PlayerListEntry{{UUID: entryID}}}, 1)
+	tracker.handle(&packet.PlayerList{Entries: []protocol.PlayerListEntry{{ActionType: protocol.PlayerListActionAdd, UUID: entryID}}}, 1)
+	tracker.handle(&packet.PlayerList{Entries: []protocol.PlayerListEntry{{ActionType: protocol.PlayerListActionRemove, UUID: entryID}}}, 1)
 	tracker.handle(&packet.SetDisplayObjective{ObjectiveName: "kills"}, 1)
 	tracker.handle(&packet.RemoveObjective{ObjectiveName: "kills"}, 1)
 	if packets := tracker.clearPackets(1); len(packets) != 0 {

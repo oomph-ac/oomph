@@ -80,14 +80,14 @@ func (c *EntityTrackerComponent) HandleMovePlayer(pk *packet.MovePlayer) {
 // HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute) {
 	if !c.isClientTracker {
-		c.MoveEntity(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport))
+		c.MoveEntity(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.Position, utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport))
 		return
 	}
 	c.mPlayer.ACKs().Add(acknowledgement.NewEntityPositionACK(
 		c.mPlayer,
 		pk.Position,
 		pk.EntityRuntimeID,
-		utils.HasFlag(uint64(pk.Flags), packet.MoveActorDeltaFlagTeleport),
+		utils.HasFlag(uint64(pk.Flags), packet.MoveFlagTeleport),
 	))
 }
 

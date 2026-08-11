@@ -57,7 +57,7 @@ func (t *backendStateTracker) handle(pk packet.Packet, clientRuntimeID uint64) {
 		}
 	case *packet.PlayerList:
 		for _, entry := range pk.Entries {
-			if pk.ActionType == packet.PlayerListActionAdd {
+			if entry.ActionType == protocol.PlayerListActionAdd {
 				t.players[entry.UUID] = struct{}{}
 			} else {
 				delete(t.players, entry.UUID)
@@ -84,9 +84,9 @@ func (t *backendStateTracker) clearPackets(clientRuntimeID uint64) []packet.Pack
 	if len(t.players) != 0 {
 		entries := make([]protocol.PlayerListEntry, 0, len(t.players))
 		for id := range t.players {
-			entries = append(entries, protocol.PlayerListEntry{UUID: id})
+			entries = append(entries, protocol.PlayerListEntry{ActionType: protocol.PlayerListActionRemove, UUID: id})
 		}
-		packets = append(packets, &packet.PlayerList{ActionType: packet.PlayerListActionRemove, Entries: entries})
+		packets = append(packets, &packet.PlayerList{Entries: entries})
 	}
 	for objective := range t.scoreboards {
 		packets = append(packets, &packet.RemoveObjective{ObjectiveName: objective})

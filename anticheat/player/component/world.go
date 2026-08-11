@@ -63,7 +63,7 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 	}
 
 	// Check if this LevelChunk packet is compatiable with oomph's handling.
-	if pk.SubChunkCount == protocol.SubChunkRequestModeLimited || pk.SubChunkCount == protocol.SubChunkRequestModeLimitless {
+	if _, requestMode := pk.SubChunkLimit.Value(); requestMode {
 		//c.mPlayer.Log().Debug("cannot debug chunk due to subchunk request mode unsupported", "subChunkCount", pk.SubChunkCount)
 		return
 	}
