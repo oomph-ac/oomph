@@ -31,6 +31,10 @@ type session struct {
 	generation uint64
 	transferMu sync.Mutex
 
+	dispatchMu sync.Mutex
+	starting   bool
+	pending    []pendingPackets
+
 	clientRuntimeID      uint64
 	clientUniqueID       int64
 	clientDimension      int32
@@ -44,6 +48,11 @@ type session struct {
 	state                *backendStateTracker
 }
 
+type pendingPackets struct {
+	pks   []packet.Packet
+	batch bool
+}
+
 func newSession(proxy *Proxy, handler Handler, client clientConn, backend Backend, identity login.IdentityData, clientData login.ClientData, clientAddress string) *session {
 	data := backend.GameData()
 	return &session{
@@ -53,11 +62,11 @@ func newSession(proxy *Proxy, handler Handler, client clientConn, backend Backen
 		backendRuntimeID: data.EntityRuntimeID,
 		backendUniqueID:  data.EntityUniqueID, chunkRadius: data.ChunkRadius,
 		identity: identity, clientData: clientData, clientAddress: clientAddress,
-		state: newBackendStateTracker(),
+		state: newBackendStateTracker(), starting: true,
 	}
 }
 
-func (s *session) start() error {
+func (s *session) start(ctx context.Context) error {
 	data := s.backend.GameData()
 	data.PlayerMovementSettings.RewindHistorySize = 100
 	errCh := make(chan error, 2)
@@ -68,15 +77,43 @@ func (s *session) start() error {
 			return err
 		}
 	}
-	return s.handler.Start(s.backend)
+	if err := s.handler.Start(s.backend); err != nil {
+		return err
+	}
+
+	s.dispatchMu.Lock()
+	defer s.dispatchMu.Unlock()
+	s.starting = false
+	pending := s.pending
+	s.pending = nil
+	for _, p := range pending {
+		if err := s.dispatchServerPacketsLocked(ctx, p.pks, p.batch); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *session) run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errCh := make(chan error, 2)
-	go func() { errCh <- s.clientLoop() }()
 	go func() { errCh <- s.backendLoop(ctx) }()
+	if s.starting {
+		startCh := make(chan error, 1)
+		go func() { startCh <- s.start(ctx) }()
+		select {
+		case err := <-startCh:
+			if err != nil {
+				return err
+			}
+		case err := <-errCh:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	go func() { errCh <- s.clientLoop() }()
 	select {
 	case err := <-errCh:
 		return err
@@ -163,18 +200,7 @@ func (s *session) backendLoop(ctx context.Context) error {
 			continue
 		}
 		consecutiveReadFailures = 0
-		if transfer, ok := pk.(*packet.Transfer); ok {
-			if _, err := s.handleTransfer(ctx, transfer); err != nil {
-				return err
-			}
-			continue
-		}
-		s.routeMu.Lock()
-		pkCtx := NewPacketContext(pk)
-		s.handler.HandleServerPacket(pkCtx)
-		err = s.forwardServerPacketLocked(pkCtx)
-		s.routeMu.Unlock()
-		if err != nil {
+		if err := s.dispatchServerPackets(ctx, []packet.Packet{pk}, false); err != nil {
 			return err
 		}
 	}
@@ -196,32 +222,65 @@ func (s *session) backendBatchLoop(ctx context.Context) error {
 			continue
 		}
 		consecutiveReadFailures = 0
-
-		start := 0
-		for idx, pk := range pks {
-			transfer, ok := pk.(*packet.Transfer)
-			if !ok {
-				continue
-			}
-			if err := s.forwardServerBatch(pks[start:idx]); err != nil {
-				return err
-			}
-			start = idx + 1
-			transferred, err := s.handleTransfer(ctx, transfer)
-			if err != nil {
-				return err
-			}
-			if transferred {
-				// The remainder of the batch was sent by the replaced backend. Drop it, just
-				// like stale single-packet reads are dropped by the generation check.
-				start = len(pks)
-				break
-			}
-		}
-		if err := s.forwardServerBatch(pks[start:]); err != nil {
+		if err := s.dispatchServerPackets(ctx, pks, true); err != nil {
 			return err
 		}
 	}
+}
+
+func (s *session) dispatchServerPackets(ctx context.Context, pks []packet.Packet, batch bool) error {
+	s.dispatchMu.Lock()
+	defer s.dispatchMu.Unlock()
+	if s.starting {
+		s.pending = append(s.pending, pendingPackets{pks: pks, batch: batch})
+		return nil
+	}
+	return s.dispatchServerPacketsLocked(ctx, pks, batch)
+}
+
+func (s *session) dispatchServerPacketsLocked(ctx context.Context, pks []packet.Packet, batch bool) error {
+	if !batch {
+		for _, pk := range pks {
+			if transfer, ok := pk.(*packet.Transfer); ok {
+				if _, err := s.handleTransfer(ctx, transfer); err != nil {
+					return err
+				}
+				continue
+			}
+			s.routeMu.Lock()
+			pkCtx := NewPacketContext(pk)
+			s.handler.HandleServerPacket(pkCtx)
+			err := s.forwardServerPacketLocked(pkCtx)
+			s.routeMu.Unlock()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	start := 0
+	for idx, pk := range pks {
+		transfer, ok := pk.(*packet.Transfer)
+		if !ok {
+			continue
+		}
+		if err := s.forwardServerBatch(pks[start:idx]); err != nil {
+			return err
+		}
+		start = idx + 1
+		transferred, err := s.handleTransfer(ctx, transfer)
+		if err != nil {
+			return err
+		}
+		if transferred {
+			// The remainder of the batch was sent by the replaced backend. Drop it, just
+			// like stale single-packet reads are dropped by the generation check.
+			start = len(pks)
+			break
+		}
+	}
+	return s.forwardServerBatch(pks[start:])
 }
 
 // forwardServerBatch runs a batch of backend packets through the handler and forwards those that
@@ -272,6 +331,9 @@ func (s *session) recoverBackendRead(ctx context.Context, backend Backend, gener
 		}
 		return consecutiveReadFailures, readErr
 	}
+	if s.isStarting() {
+		return consecutiveReadFailures, readErr
+	}
 	committed, fallbackErr := s.recoverFallback(ctx, consecutiveReadFailures)
 	if fallbackErr != nil {
 		return consecutiveReadFailures, fmt.Errorf("proxy: backend read failed: %w; fallback failed after commit %t: %v", readErr, committed, fallbackErr)
@@ -295,6 +357,12 @@ func (s *session) handleTransfer(ctx context.Context, transfer *packet.Transfer)
 	s.proxy.cfg.Log.Warn("backend transfer failed", "address", address, "err", err)
 	s.handler.TransferFailed(address, err)
 	return false, nil
+}
+
+func (s *session) isStarting() bool {
+	s.dispatchMu.Lock()
+	defer s.dispatchMu.Unlock()
+	return s.starting
 }
 
 func (s *session) currentBackend() (Backend, uint64) {

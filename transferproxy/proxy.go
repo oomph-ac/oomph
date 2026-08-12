@@ -102,9 +102,6 @@ func (p *Proxy) serveClient(ctx context.Context, conn *minecraft.Conn) error {
 	}
 	s := newSession(p, handler, conn, backend, conn.IdentityData(), clientData, conn.RemoteAddr().String())
 	defer s.close()
-	if err := s.start(); err != nil {
-		return err
-	}
 	return s.run(ctx)
 }
 
