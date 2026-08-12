@@ -89,7 +89,7 @@ func main() {
 			AllowUnknownPackets:  true,
 			AllowInvalidPackets:  true,
 		},
-		Dial:      dialBackends(oconfig.Global.BackupAddress, 10*time.Second),
+		Dial:      dialBackends(oconfig.Global.BackupAddress, time.Minute),
 		Configure: configurePlayer,
 	})
 	if err != nil {
