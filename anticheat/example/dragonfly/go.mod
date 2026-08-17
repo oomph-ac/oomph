@@ -58,7 +58,7 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 )
 
-replace github.com/df-mc/dragonfly => github.com/NopeNotDark/dragonfly v0.0.0-20260817220931-1aac4952091d
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260817220931-1aac4952091d
 
 replace github.com/oomph-ac/oomph/anticheat => ../..
 
