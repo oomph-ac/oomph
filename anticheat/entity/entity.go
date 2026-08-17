@@ -2,6 +2,7 @@ package entity
 
 import (
 	"log/slog"
+	"maps"
 
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/go-gl/mathgl/mgl32"
@@ -15,6 +16,7 @@ const (
 
 type Entity struct {
 	RuntimeId uint64
+	UniqueId  int64
 
 	Metadata map[uint32]any
 	Type     string
@@ -39,43 +41,64 @@ type Entity struct {
 	Height float32
 	Scale  float32
 
+	NetworkOffset float32
+
 	IsPlayer bool
 
 	historySize int
 	log         **slog.Logger
 }
 
-// New creates and returns a new Entity instance.
-func New(
-	runtimeId uint64,
-	entType string,
-	metadata map[uint32]any,
-	pos mgl32.Vec3,
-	historySize int,
-	isPlayer bool,
-	width, height, scale float32,
-	log **slog.Logger,
-) *Entity {
-	e := &Entity{
-		RuntimeId: runtimeId,
+// Config ...
+type Config struct {
+	RuntimeID uint64
+	UniqueID  int64
 
-		Type:     entType,
+	Type     string
+	Metadata map[uint32]any
+
+	NetworkPosition mgl32.Vec3
+	HistorySize     int
+	IsPlayer        bool
+
+	Width, Height, Scale float32
+
+	Log **slog.Logger
+}
+
+// New creates and returns a new Entity instance.
+func New(c Config) *Entity {
+	metadata := maps.Clone(c.Metadata)
+	if metadata == nil {
+		metadata = make(map[uint32]any)
+	}
+	offset := networkOffset(c.Type, metadata)
+	pos := c.NetworkPosition
+	pos[1] -= offset
+
+	e := &Entity{
+		RuntimeId: c.RuntimeID,
+		UniqueId:  c.UniqueID,
+
+		Type:     c.Type,
 		Metadata: metadata,
 
 		Position:     pos,
 		PrevPosition: pos,
 		RecvPosition: pos,
 
-		Width:  width,
-		Height: height,
-		Scale:  scale,
+		Width:  c.Width,
+		Height: c.Height,
+		Scale:  c.Scale,
 
-		PositionHistory: utils.NewCircularQueue(historySize, func() (hp HistoricalPosition) { return }),
+		NetworkOffset: offset,
 
-		IsPlayer: isPlayer,
+		PositionHistory: utils.NewCircularQueue(c.HistorySize, func() (hp HistoricalPosition) { return }),
 
-		log:         log,
-		historySize: historySize,
+		IsPlayer: c.IsPlayer,
+
+		log:         c.Log,
+		historySize: c.HistorySize,
 	}
 	/* e.InterpolationTicks = EntityMobInterpolationTicks
 	if isPlayer {
@@ -86,16 +109,16 @@ func New(
 }
 
 // ReceivePosition updates the position of the entity, and adds the previous position to its position history.
-func (e *Entity) ReceivePosition(hp HistoricalPosition) {
+func (e *Entity) ReceivePosition(pos mgl32.Vec3, teleport bool) {
 	e.PrevRecvPosition = e.RecvPosition
-	e.RecvPosition = hp.Position
+	e.RecvPosition = pos
 
 	e.InterpolationTicks = EntityMobInterpolationTicks
 	if e.IsPlayer {
 		e.InterpolationTicks = EntityPlayerInterpolationTicks
 	}
 
-	if hp.Teleport {
+	if teleport {
 		e.TicksSinceTeleport = 0
 		e.InterpolationTicks = 1
 	}
@@ -118,6 +141,15 @@ func (e *Entity) UpdatePosition(hp HistoricalPosition) error {
 func (e *Entity) UpdateVelocity(vel mgl32.Vec3) {
 	e.PrevRecvVelocity = e.RecvVelocity
 	e.RecvVelocity = vel
+}
+
+// UpdateMetadata ...
+func (e *Entity) UpdateMetadata(metadata map[uint32]any) {
+	if e.Metadata == nil {
+		e.Metadata = make(map[uint32]any, len(metadata))
+	}
+	maps.Copy(e.Metadata, metadata)
+	e.NetworkOffset = networkOffset(e.Type, e.Metadata)
 }
 
 // Box returns the entity's bounding box.

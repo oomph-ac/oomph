@@ -5,9 +5,17 @@ const (
 	DataKeyOwnerID           = 5
 	DataKeyTargetID          = 6
 	DataKeyFireworkMetadata  = 16
+	DataKeyPlayerFlags       = 26
 	DataKeyScale             = 38
 	DataKeyBoundingBoxWidth  = 53
 	DataKeyBoundingBoxHeight = 54
+	DataKeyFlagsTwo          = 92
+)
+
+// DataPlayerFlag ...
+const (
+	DataPlayerFlagSleep = 1
+	DataPlayerFlagDead  = 2
 )
 
 const (

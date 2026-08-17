@@ -3,26 +3,28 @@ package component
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/entity"
-	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/anticheat/utils"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
 // EntityTrackerComponent is a component that handles entities that the member player is
 // viewing on their screen.
 type EntityTrackerComponent struct {
-	mPlayer  *player.Player
-	entities map[uint64]*entity.Entity
+	mPlayer    *player.Player
+	entities   map[uint64]*entity.Entity
+	runtimeIDs map[int64]uint64
 
 	isClientTracker bool
 }
 
 func NewEntityTrackerComponent(p *player.Player, clientTracker bool) *EntityTrackerComponent {
 	return &EntityTrackerComponent{
-		mPlayer:  p,
-		entities: make(map[uint64]*entity.Entity),
+		mPlayer:    p,
+		entities:   make(map[uint64]*entity.Entity),
+		runtimeIDs: make(map[int64]uint64),
 
 		isClientTracker: clientTracker,
 	}
@@ -30,12 +32,28 @@ func NewEntityTrackerComponent(p *player.Player, clientTracker bool) *EntityTrac
 
 // AddEntity adds an entity to the entity tracker component.
 func (c *EntityTrackerComponent) AddEntity(rid uint64, ent *entity.Entity) {
+	if previousRID, ok := c.runtimeIDs[ent.UniqueId]; ok && previousRID != rid {
+		c.RemoveEntity(previousRID)
+	}
+	c.RemoveEntity(rid)
 	c.entities[rid] = ent
+	c.runtimeIDs[ent.UniqueId] = rid
 }
 
 // RemoveEntity removes an entity from the entity tracker component.
 func (c *EntityTrackerComponent) RemoveEntity(rid uint64) {
-	delete(c.entities, rid)
+	if e, ok := c.entities[rid]; ok {
+		delete(c.runtimeIDs, e.UniqueId)
+		delete(c.entities, rid)
+	}
+}
+
+// RemoveEntityByUniqueID ...
+func (c *EntityTrackerComponent) RemoveEntityByUniqueID(uniqueID int64) {
+	if rid, ok := c.runtimeIDs[uniqueID]; ok {
+		delete(c.runtimeIDs, uniqueID)
+		delete(c.entities, rid)
+	}
 }
 
 // FindEntity searches for an entity in the entity tracker component from the given runtime ID.
@@ -51,16 +69,31 @@ func (c *EntityTrackerComponent) All() map[uint64]*entity.Entity {
 // MoveEntity moves an entity to the given position
 func (c *EntityTrackerComponent) MoveEntity(rid uint64, tick int64, pos mgl32.Vec3, teleport bool) {
 	if e, ok := c.entities[rid]; ok {
-		if e.IsPlayer {
-			pos[1] -= game.DefaultPlayerHeightOffset
-		}
-		e.ReceivePosition(entity.HistoricalPosition{
-			Position:     pos,
-			PrevPosition: e.RecvPosition,
-			Teleport:     teleport,
-			Tick:         tick,
-		})
+		pos[1] -= e.NetworkOffset
+		e.ReceivePosition(pos, teleport)
 	}
+}
+
+// MoveEntityDelta ...
+func (c *EntityTrackerComponent) MoveEntityDelta(rid uint64, tick int64, posX, posY, posZ protocol.Optional[float32], teleport bool) {
+	e, ok := c.entities[rid]
+	if !ok {
+		return
+	}
+	pos, moved := e.RecvPosition, false
+	if x, has := posX.Value(); has {
+		pos[0], moved = x, true
+	}
+	if y, has := posY.Value(); has {
+		pos[1], moved = y-e.NetworkOffset, true
+	}
+	if z, has := posZ.Value(); has {
+		pos[2], moved = z, true
+	}
+	if !moved {
+		return
+	}
+	e.ReceivePosition(pos, teleport)
 }
 
 // HandleMovePlayer is a function that handles entity position updates sent with MovePlayerPacket.
@@ -91,13 +124,30 @@ func (c *EntityTrackerComponent) HandleMoveActorAbsolute(pk *packet.MoveActorAbs
 	))
 }
 
+// HandleMoveActorDelta ...
+func (c *EntityTrackerComponent) HandleMoveActorDelta(pk *packet.MoveActorDelta) {
+	if !c.isClientTracker {
+		c.MoveEntityDelta(pk.EntityRuntimeID, c.mPlayer.ServerTick, pk.PositionX, pk.PositionY, pk.PositionZ, pk.ForceMove)
+		return
+	}
+	c.mPlayer.ACKs().Add(acknowledgement.NewEntityDeltaPositionACK(
+		c.mPlayer,
+		pk.PositionX,
+		pk.PositionY,
+		pk.PositionZ,
+		pk.EntityRuntimeID,
+		pk.ForceMove,
+	))
+}
+
 // HandleSetActorData is a function that handles entity data updates sent with SetActorDataPacket.
 func (c *EntityTrackerComponent) HandleSetActorData(pk *packet.SetActorData) {
 	if e := c.FindEntity(pk.EntityRuntimeID); e != nil {
 		width, height, scale := calculateBBSize(pk.EntityMetadata, e.Width, e.Height, e.Scale)
 		if c.isClientTracker {
-			c.mPlayer.ACKs().Add(acknowledgement.NewEntitySizeACK(e, width, height, scale))
+			c.mPlayer.ACKs().Add(acknowledgement.NewEntityDataACK(e, pk.EntityMetadata, width, height, scale))
 		} else {
+			e.UpdateMetadata(pk.EntityMetadata)
 			e.Width, e.Height, e.Scale = width, height, scale
 		}
 	}

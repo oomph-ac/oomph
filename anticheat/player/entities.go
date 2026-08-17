@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/oomph-ac/oomph/anticheat/entity"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -13,17 +14,23 @@ type EntityTrackerComponent interface {
 	AddEntity(rid uint64, ent *entity.Entity)
 	// RemoveEntity removes an entity from the entity tracker component.
 	RemoveEntity(rid uint64)
+	// RemoveEntityByUniqueID ...
+	RemoveEntityByUniqueID(uniqueID int64)
 	// FindEntity searches for an entity in the entity tracker component from the given runtime ID.
 	FindEntity(rid uint64) *entity.Entity
 	// All returns all the entities the entity tracker component is tracking.
 	All() map[uint64]*entity.Entity
 	// MoveEntity moves an entity to the given position.
 	MoveEntity(rid uint64, tick int64, pos mgl32.Vec3, teleport bool)
+	// MoveEntityDelta ...
+	MoveEntityDelta(rid uint64, tick int64, posX, posY, posZ protocol.Optional[float32], teleport bool)
 
 	// HandleMovePlayer is a function that handles entity position updates sent with MovePlayerPacket.
 	HandleMovePlayer(pk *packet.MovePlayer)
 	// HandleMoveActorAbsolute is a function that handles entity position updates sent with MoveActorAbsolutePacket.
 	HandleMoveActorAbsolute(pk *packet.MoveActorAbsolute)
+	// HandleMoveActorDelta ...
+	HandleMoveActorDelta(pk *packet.MoveActorDelta)
 	// HandleSetActorData is a function that handles entity data updates sent with SetActorDataPacket.
 	HandleSetActorData(pk *packet.SetActorData)
 
