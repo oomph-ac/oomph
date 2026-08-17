@@ -62,7 +62,7 @@ func (d *BadPacketD) Detect(pk packet.Packet) {
 }
 
 func (d *BadPacketD) checkRequestAction(action protocol.StackRequestAction) {
-	if _, ok := action.(*protocol.CraftCreativeStackRequestAction); ok && d.mPlayer.GameMode != packet.GameTypeCreative && d.mPlayer.GameMode != packet.GameTypeCreativeSpectator {
+	if _, ok := action.(*protocol.CraftCreativeStackRequestAction); ok && d.mPlayer.GameMode != packet.GameTypeCreative {
 		d.mPlayer.FailDetection(d)
 	}
 }
