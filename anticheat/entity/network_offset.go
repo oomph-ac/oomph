@@ -12,6 +12,15 @@ func networkOffset(entityType string, metadata map[uint32]any) float32 {
 		if utils.HasMetadataFlag[byte](metadata, DataKeyPlayerFlags, DataPlayerFlagSleep) || utils.HasMetadataFlag[int64](metadata, DataKeyFlagsTwo, DataFlagSleeping) {
 			return game.SleepingPlayerHeightOffset
 		}
+		if utils.HasMetadataFlag[int64](metadata, DataKeyFlags, DataFlagSwimming) ||
+			utils.HasMetadataFlag[int64](metadata, DataKeyFlags, DataFlagGliding) ||
+			utils.HasMetadataFlag[int64](metadata, DataKeyFlags, DataFlagSpinAttack) ||
+			utils.HasMetadataFlag[int64](metadata, DataKeyFlagsTwo, DataFlagCrawling) {
+			return game.PronePlayerNetworkOffset
+		}
+		if utils.HasMetadataFlag[int64](metadata, DataKeyFlags, DataFlagSneaking) {
+			return game.SneakingPlayerNetworkOffset
+		}
 		return game.DefaultPlayerHeightOffset
 	case TypeItem, TypeFallingBlock, TypeMinecart, TypeChestMinecart, TypeCommandBlockMinecart, TypeHopperMinecart, TypeTNTMinecart:
 		return game.ItemAndMinecartNetworkOffset
