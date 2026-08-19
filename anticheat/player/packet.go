@@ -39,6 +39,7 @@ var ServerDecode = []uint32{
 	packet.IDAddItemActor,
 	packet.IDAddPlayer,
 	packet.IDChunkRadiusUpdated,
+	packet.IDChangeDimension,
 	packet.IDInventorySlot,
 	packet.IDInventoryContent,
 	packet.IDItemStackResponse,
@@ -410,6 +411,8 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 		})
 	case *packet.ChunkRadiusUpdated:
 		p.worldUpdater.SetServerChunkRadius(pk.ChunkRadius + 4)
+	case *packet.ChangeDimension:
+		p.setDimension(pk.Dimension)
 	case *packet.InventorySlot:
 		p.inventory.HandleInventorySlot(pk)
 	case *packet.InventoryContent:

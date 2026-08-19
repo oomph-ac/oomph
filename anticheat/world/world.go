@@ -164,6 +164,10 @@ func (w *World) PurgeChunks() {
 	for chunkPos, cInfo := range w.chunks {
 		w.removeChunk(cInfo, chunkPos)
 	}
+	clear(w.chunks)
+	clear(w.subChunks)
+	clear(w.exemptedChunks)
+	clear(w.blockUpdates)
 }
 
 func (w *World) removeChunk(info ChunkInfo, chunkPos protocol.ChunkPos) {

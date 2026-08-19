@@ -73,6 +73,19 @@ func (p *Player) World() *oworld.World {
 	return p.world
 }
 
+// Dimension returns the dimension the player is currently in.
+func (p *Player) Dimension() int32 {
+	return p.dimension
+}
+
+func (p *Player) setDimension(dimension int32) {
+	if p.dimension == dimension {
+		return
+	}
+	p.dimension = dimension
+	p.world.PurgeChunks()
+}
+
 // DecodeBlockRuntimeID converts a network block ID to Oomph's canonical registry runtime ID.
 // Unknown values are preserved so callers can retain their existing fallback.
 func (p *Player) DecodeBlockRuntimeID(id uint32) uint32 {

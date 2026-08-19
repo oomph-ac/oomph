@@ -34,6 +34,7 @@ func (p *Player) SetConn(conn *minecraft.Conn) {
 	p.IdentityDat = conn.IdentityData()
 	p.GameDat = conn.GameData()
 	p.Version = conn.Proto().ID()
+	p.dimension = p.GameDat.Dimension
 }
 
 // SetServerConn sets the connection to the server.
@@ -54,6 +55,7 @@ func (p *Player) SetServerConn(conn ServerConn) {
 	}
 
 	p.GameDat = conn.GameData()
+	p.setDimension(p.GameDat.Dimension)
 	p.serverConn = conn
 	p.RuntimeId = conn.GameData().EntityRuntimeID
 	p.UniqueId = conn.GameData().EntityUniqueID

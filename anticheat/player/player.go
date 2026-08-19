@@ -71,6 +71,7 @@ type Player struct {
 	IdentityDat login.IdentityData
 	GameDat     minecraft.GameData
 	Version     int32
+	dimension   int32
 
 	// blockNetwork is fixed by the initial backend's StartGame. All backends reachable through an instant transfer
 	// must use the same block-network representation because the client does not receive another StartGame packet.
