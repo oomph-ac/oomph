@@ -93,15 +93,16 @@ func BlockCollisions(b world.Block, pos cube.Pos, src world.BlockSource) []cube.
 		return collisions.ForBlock(b)
 	}
 
+	bModel := b.Model()
 	switch b.(type) {
-	case block.Wall, block.WoodFence, block.NetherBrickFence, block.IronBars, block.GlassPane, block.StainedGlassPane:
-		// TODO: Have these bounding boxes fixed in DF
+	case block.Wall:
 		return collisions.ForBlock(b)
-	}
-
-	var bModel = b.Model()
-	if _, isIronBar := b.(block.IronBars); isIronBar {
-		bModel = blockmodel.IronBars{}
+	case block.WoodFence:
+		bModel = blockmodel.Fence{Wood: true}
+	case block.NetherBrickFence:
+		bModel = blockmodel.Fence{}
+	case block.IronBars, block.GlassPane, block.StainedGlassPane:
+		bModel = blockmodel.Thin{}
 	}
 
 	dfBoxes := bModel.BBox(df_cube.Pos(pos), src)
