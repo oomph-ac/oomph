@@ -18,6 +18,7 @@ import (
 	"github.com/oomph-ac/oomph/anticheat/utils"
 	"github.com/oomph-ac/oomph/anticheat/world"
 	"github.com/oomph-ac/oomph/anticheat/world/blocknetwork"
+	"github.com/oomph-ac/oomph/anticheat/world/chunk_obfuscator"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -224,6 +225,7 @@ type Player struct {
 // New creates and returns a new Player instance.
 func New(log *slog.Logger, mState MonitoringState, listener *minecraft.Listener) *Player {
 	world.FinalizeBlockRegistry()
+	chunkobfuscator.Init()
 
 	p := &Player{
 		MState: mState,

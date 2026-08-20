@@ -20,7 +20,8 @@ import (
 
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
 type WorldUpdaterComponent struct {
-	mPlayer *player.Player
+	mPlayer    *player.Player
+	obfuscator *chunkObfuscator
 
 	chunkRadius       int32
 	serverChunkRadius int32
@@ -37,7 +38,9 @@ type WorldUpdaterComponent struct {
 
 func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 	return &WorldUpdaterComponent{
-		mPlayer:     p,
+		mPlayer:    p,
+		obfuscator: newChunkObfuscator(p),
+
 		chunkRadius: 1_000_000_000,
 
 		clientPlacedBlocks:  make(map[df_cube.Pos]*chainedBlockPlacement),
@@ -49,15 +52,16 @@ func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 }
 
 // HandleSubChunk handles a SubChunk packet from the server.
-func (c *WorldUpdaterComponent) HandleSubChunk(pk *packet.SubChunk) {
+func (c *WorldUpdaterComponent) HandleSubChunk(pk *packet.SubChunk) bool {
 	if !c.mPlayer.Ready {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
-	acknowledgement.NewSubChunkUpdateACK(c.mPlayer, pk).Run()
+	results := acknowledgement.NewSubChunkUpdateACK(c.mPlayer, pk).Run()
+	return c.obfuscator.obfuscateSubChunks(pk, results)
 }
 
 // HandleLevelChunk handles a LevelChunk packet from the server.
-func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
+func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) bool {
 	if !c.mPlayer.Ready {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
@@ -65,9 +69,13 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 	// Check if this LevelChunk packet is compatiable with oomph's handling.
 	if _, requestMode := pk.SubChunkLimit.Value(); requestMode {
 		//c.mPlayer.Log().Debug("cannot debug chunk due to subchunk request mode unsupported", "subChunkCount", pk.SubChunkCount)
-		return
+		return false
 	}
-	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
+	cInfo, ok := acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
+	if !ok {
+		return false
+	}
+	return c.obfuscator.obfuscateLevelChunk(pk, cInfo)
 }
 
 // HandleUpdateBlock handles an UpdateBlock packet from the server.
@@ -77,7 +85,12 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 		c.mPlayer.Log().Debug("unsupported layer update block", "layer", pk.Layer, "block", pk.NewBlockRuntimeID, "pos", pos)
 		return
 	}
-	c.AddPendingUpdate(pos, c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID))
+	runtimeID := c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID)
+	oldRuntimeID := df_world.BlockRuntimeID(c.mPlayer.World().Block(pos))
+	c.AddPendingUpdate(pos, runtimeID)
+	if c.obfuscator.exposesBlocks(oldRuntimeID, runtimeID) {
+		c.obfuscator.showAround([]df_cube.Pos{pos})
+	}
 }
 
 // HandleUpdateSubChunkBlocks handles an UpdateSubChunkBlocks packet from the server.
@@ -85,12 +98,28 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 	if !c.mPlayer.Ready {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
-	for _, entry := range pk.Blocks {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
+	changed := c.addBlockUpdates(pk.Blocks, make([]df_cube.Pos, 0, len(pk.Blocks)+len(pk.Extra)))
+	changed = c.addBlockUpdates(pk.Extra, changed)
+	if len(changed) != 0 {
+		c.obfuscator.showAround(changed)
 	}
-	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
+}
+
+func (c *WorldUpdaterComponent) addBlockUpdates(entries []protocol.BlockChangeEntry, changed []df_cube.Pos) []df_cube.Pos {
+	for _, entry := range entries {
+		pos := df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}
+		runtimeID := c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID)
+		oldRuntimeID := df_world.BlockRuntimeID(c.mPlayer.World().Block(pos))
+		c.AddPendingUpdate(pos, runtimeID)
+		if c.obfuscator.exposesBlocks(oldRuntimeID, runtimeID) {
+			changed = append(changed, pos)
+		}
 	}
+	return changed
+}
+
+func (c *WorldUpdaterComponent) ShowBlocksAround(pos protocol.BlockPos) {
+	c.obfuscator.showAroundBlock(pos)
 }
 
 // AttemptItemInteractionWithBlock attempts a block placement request from the client. It returns false if the simulation is unable

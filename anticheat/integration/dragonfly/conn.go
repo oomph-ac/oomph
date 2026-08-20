@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/df-mc/dragonfly/server/session"
+	"github.com/oomph-ac/oomph/anticheat/oconfig"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	playercontext "github.com/oomph-ac/oomph/anticheat/player/context"
 	"github.com/sandertv/gophertunnel/minecraft"
@@ -110,6 +111,9 @@ func (*sessionConn) ClientCacheEnabled() bool { return false }
 func (c *sessionConn) StartGameContext(ctx context.Context, data minecraft.GameData) error {
 	data.PlayerMovementSettings.RewindHistorySize = 100
 	c.gameData = data
+	if oconfig.ChunkObfuscator().Enabled {
+		data.WorldSeed = 0
+	}
 	if c.player != nil {
 		c.player.SetServerConn(&embeddedServerConn{conn: c})
 	}

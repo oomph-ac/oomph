@@ -24,18 +24,19 @@ func NewChunkUpdateACK(p *player.Player, pk *packet.LevelChunk) *ChunkUpdate {
 	return &ChunkUpdate{mPlayer: p, pk: pk}
 }
 
-func (ack *ChunkUpdate) Run() {
+func (ack *ChunkUpdate) Run() (oworld.ChunkInfo, bool) {
 	if ack.pk.CacheEnabled {
 		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
-		return
+		return oworld.ChunkInfo{}, false
 	}
 	cInfo, err := oworld.CacheChunk(ack.pk, ack.mPlayer.BlockNetwork())
 	if err != nil {
 		ack.mPlayer.Disconnect(fmt.Sprintf(game.ErrorInternalDecodeChunk, err))
-		return
+		return oworld.ChunkInfo{}, false
 	}
 	ack.mPlayer.World().AddChunk(ack.pk.Position, cInfo)
 	ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "added chunk at %v", ack.pk.Position)
+	return cInfo, true
 }
 
 // SubChunkUpdate is an acknowledgment that runs when a player receives a SubChunk packet.
@@ -44,14 +45,21 @@ type SubChunkUpdate struct {
 	pk      *packet.SubChunk
 }
 
+type SubChunkUpdateResult struct {
+	Entry         int
+	Position      protocol.ChunkPos
+	Layer         int
+	PayloadOffset int
+}
+
 func NewSubChunkUpdateACK(p *player.Player, pk *packet.SubChunk) *SubChunkUpdate {
 	return &SubChunkUpdate{mPlayer: p, pk: pk}
 }
 
-func (ack *SubChunkUpdate) Run() {
+func (ack *SubChunkUpdate) Run() []SubChunkUpdateResult {
 	if ack.pk.CacheEnabled {
 		ack.mPlayer.Disconnect(game.ErrorChunkCacheUnsupported)
-		return
+		return nil
 	}
 
 	buf := internal.BufferPool.Get().(*bytes.Buffer)
@@ -62,7 +70,8 @@ func (ack *SubChunkUpdate) Run() {
 	var bufUsed bool
 
 	newChunks := make(map[protocol.ChunkPos]*chunk.Chunk)
-	for _, entry := range ack.pk.SubChunkEntries {
+	results := make([]SubChunkUpdateResult, 0, len(ack.pk.SubChunkEntries))
+	for entryIndex, entry := range ack.pk.SubChunkEntries {
 		chunkPos := protocol.ChunkPos{
 			ack.pk.Position[0] + int32(entry.Offset[0]),
 			ack.pk.Position[2] + int32(entry.Offset[2]),
@@ -105,6 +114,7 @@ func (ack *SubChunkUpdate) Run() {
 			}
 			ch.Sub()[cachedSub.Layer()] = cachedSub.SubChunk()
 			ack.mPlayer.World().AddSubChunk(chunkPos, cachedSub.Hash())
+			results = append(results, SubChunkUpdateResult{Entry: entryIndex, Position: chunkPos, Layer: int(cachedSub.Layer()), PayloadOffset: cachedSub.PayloadOffset()})
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "cached subchunk %d at %v", cachedSub.Layer(), chunkPos)
 		case protocol.SubChunkResultSuccessAllAir:
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all-air chunk at %v", chunkPos)
@@ -118,4 +128,5 @@ func (ack *SubChunkUpdate) Run() {
 		ack.mPlayer.World().AddChunk(pos, oworld.ChunkInfo{Chunk: newChunk, Cached: false})
 		ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "(sub) added chunk at %v", pos)
 	}
+	return results
 }

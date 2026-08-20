@@ -85,7 +85,7 @@ func TestParseRawJSONMigratesVersionFiveWithoutLosingValues(t *testing.T) {
 
 func TestParseRawJSONRejectsNewerConfigVersion(t *testing.T) {
 	_, err := ParseRawJSON([]byte(`{
-		version: 8
+		version: 9
 		prefix: future-prefix
 	}`))
 	if !errors.Is(err, ErrConfigTooNew) {
@@ -127,7 +127,7 @@ func TestParseRawJSONVersionZeroDoesNotShareDefaultDetections(t *testing.T) {
 func TestParseJSONDoesNotRewriteNewerConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oomph.hjson")
 	original := []byte(`{
-		version: 8
+		version: 9
 		future_setting: keep-me
 	}`)
 	if err := os.WriteFile(path, original, 0o600); err != nil {
@@ -204,7 +204,7 @@ func TestParseJSONSetsGlobalForCurrentConfig(t *testing.T) {
 func TestParseJSONLeavesCurrentConfigFileUnchanged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "oomph.hjson")
 	original := []byte(`{
-		version: 7
+		version: 8
 		prefix: current-prefix
 		third_party_setting: keep-me
 		# preserve this comment and formatting

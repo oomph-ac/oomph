@@ -21,9 +21,9 @@ import (
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
 type WorldUpdaterComponent interface {
 	// HandleLevelChunk allows the world updater component to handle a LevelChunk packet sent by the server.
-	HandleLevelChunk(pk *packet.LevelChunk)
+	HandleLevelChunk(pk *packet.LevelChunk) bool
 	// HandleSubChunk allows the world updater component to handle a SubChunk packet sent by the server.
-	HandleSubChunk(pk *packet.SubChunk)
+	HandleSubChunk(pk *packet.SubChunk) bool
 	// HandleUpdateBlock allows the world updater component to handle an UpdateBlock packet sent by the server.
 	HandleUpdateBlock(pk *packet.UpdateBlock)
 	// HandleUpdateSubChunkBlocks allows the world updater component to handle a UpdateSubChunkBlocks packet sent by the server.
@@ -54,6 +54,8 @@ type WorldUpdaterComponent interface {
 	HasPendingUpdate(pos df_cube.Pos) bool
 	// RemovePendingUpdate removes a pending block update.
 	RemovePendingUpdate(pos df_cube.Pos, blockRuntimeID uint32)
+	// ShowBlocksAround shows blocks obfuscated around a successfully broken block.
+	ShowBlocksAround(pos protocol.BlockPos)
 
 	// Tick ticks the world updater component.
 	Tick()
@@ -434,6 +436,7 @@ func (p *Player) tryBreakBlock(interactFace cube.Face) bool {
 		p.blockBreakProgress = 0.0
 		return false
 	}
+	p.WorldUpdater().ShowBlocksAround(breakPos)
 	return true
 }
 

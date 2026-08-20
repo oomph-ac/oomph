@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/df-mc/dragonfly/server/world"
+	"github.com/oomph-ac/oomph/anticheat/oconfig"
 	"github.com/oomph-ac/oomph/anticheat/world/blocknetwork"
 	"github.com/sandertv/gophertunnel/minecraft"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -165,5 +166,8 @@ func (p *Player) Latency() time.Duration {
 func (p *Player) StartGameContext(ctx context.Context, data minecraft.GameData) error {
 	//data.PlayerMovementSettings.MovementType = protocol.PlayerMovementModeServerWithRewind
 	data.PlayerMovementSettings.RewindHistorySize = 100
+	if oconfig.ChunkObfuscator().Enabled {
+		data.WorldSeed = 0
+	}
 	return p.conn.StartGameContext(ctx, data)
 }

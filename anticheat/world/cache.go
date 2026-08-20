@@ -59,21 +59,42 @@ func CacheSubChunk(payload *bytes.Buffer, c *chunk.Chunk, pos protocol.ChunkPos,
 		return sc, nil
 	}
 
+	payloadLen := payload.Len()
 	var index byte
 	decodedSC, err := decodeSubChunk(payload, c, &index, chunk.NetworkEncoding)
 	if err != nil {
 		return nil, err
 	}
-	if codec.Mode() == blocknetwork.Hashes {
+
+	switch codec.Mode() {
+	case blocknetwork.RuntimeIDs:
+	case blocknetwork.Hashes:
 		decodedSC.ConvertBlockNetworkHashesToRuntimeIDs(BlockRegistry)
+	default:
+		return nil, fmt.Errorf("unknown block network mode %d", codec.Mode())
 	}
 
-	cachedSC := &CachedSubChunk{hash: hash, layer: index, sc: decodedSC}
+	cachedSC := &CachedSubChunk{hash: hash, layer: index, sc: decodedSC, payloadOffset: payloadLen - payload.Len()}
 	cachedSC.subs.Add(1)
 	subChunkCache[hash] = cachedSC
 
 	//fmt.Println("newly cached subchunk", hash)
 	return cachedSC, nil
+}
+
+func EncodeSubChunk(c *chunk.Chunk, index int, codec blocknetwork.Codec) ([]byte, error) {
+	if index < 0 || index >= len(c.Sub()) {
+		return nil, fmt.Errorf("invalid subchunk index %d", index)
+	}
+
+	switch codec.Mode() {
+	case blocknetwork.RuntimeIDs:
+		return chunk.EncodeSubChunk(c, chunk.NetworkEncoding, index), nil
+	case blocknetwork.Hashes:
+		return chunk.EncodeSubChunkWithBlockNetworkHashes(c, index), nil
+	default:
+		return nil, fmt.Errorf("unknown block network mode %d", codec.Mode())
+	}
 }
 
 func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, error) {
@@ -84,7 +105,7 @@ func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, 
 	if c, ok := chunkCache[hash]; ok {
 		c.subs.Add(1)
 		//fmt.Println("returning cached chunk", hash)
-		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true}, nil
+		return ChunkInfo{Hash: hash, Chunk: c.chunk, Cached: true, PayloadOffset: c.payloadOffset}, nil
 	}
 
 	dimension, ok := world.DimensionByID(int(input.Dimension))
@@ -92,24 +113,55 @@ func CacheChunk(input *packet.LevelChunk, codec blocknetwork.Codec) (ChunkInfo, 
 		return ChunkInfo{}, fmt.Errorf("unknown dimension %v", input.Dimension)
 	}
 
-	decodedChunk, err := chunk.NetworkDecode(
+	buf := bytes.NewBuffer(input.RawPayload)
+	decodedChunk, _, err := chunk.NetworkDecodeBuffer(
 		BlockRegistry,
-		input.RawPayload,
+		buf,
 		int(input.SubChunkCount),
 		dimension.Range(),
 	)
 	if err != nil {
 		return ChunkInfo{}, err
 	}
-	if codec.Mode() == blocknetwork.Hashes {
+
+	switch codec.Mode() {
+	case blocknetwork.RuntimeIDs:
+	case blocknetwork.Hashes:
 		decodedChunk.ConvertBlockNetworkHashesToRuntimeIDs()
+	default:
+		return ChunkInfo{}, fmt.Errorf("unknown block network mode %d", codec.Mode())
 	}
 	decodedChunk.CompactForRuntimeCache()
 
-	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk}
+	cachedChunk := &CachedChunk{hash: hash, chunk: decodedChunk, payloadOffset: len(input.RawPayload) - buf.Len()}
 	cachedChunk.subs.Add(1)
 	chunkCache[hash] = cachedChunk
-	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true}, nil
+	return ChunkInfo{Hash: hash, Chunk: cachedChunk.chunk, Cached: true, PayloadOffset: cachedChunk.payloadOffset}, nil
+}
+
+func EncodeLevelChunk(input *packet.LevelChunk, c *chunk.Chunk, payloadOffset int, codec blocknetwork.Codec) error {
+	if payloadOffset < 0 || payloadOffset > len(input.RawPayload) {
+		return fmt.Errorf("invalid level chunk payload offset %d", payloadOffset)
+	}
+
+	var data chunk.SerialisedData
+	switch codec.Mode() {
+	case blocknetwork.RuntimeIDs:
+		data = chunk.Encode(c, chunk.NetworkEncoding)
+	case blocknetwork.Hashes:
+		data = chunk.EncodeWithBlockNetworkHashes(c)
+	default:
+		return fmt.Errorf("unknown block network mode %d", codec.Mode())
+	}
+	out := bytes.NewBuffer(make([]byte, 0, len(input.RawPayload)))
+	for _, sub := range data.SubChunks {
+		out.Write(sub)
+	}
+	out.Write(data.Biomes)
+	out.Write(input.RawPayload[payloadOffset:])
+	input.RawPayload = out.Bytes()
+	input.SubChunkCount = uint32(len(data.SubChunks))
+	return nil
 }
 
 // ReencodeLevelChunk fully re-encodes the block palettes in input while preserving the session's block-network
@@ -119,36 +171,29 @@ func ReencodeLevelChunk(input *packet.LevelChunk, codec blocknetwork.Codec) erro
 	if !ok {
 		return fmt.Errorf("unknown dimension %v", input.Dimension)
 	}
+
 	buf := bytes.NewBuffer(input.RawPayload)
 	decoded, _, err := chunk.NetworkDecodeBuffer(BlockRegistry, buf, int(input.SubChunkCount), dimension.Range())
 	if err != nil {
 		return err
 	}
-	if codec.Mode() == blocknetwork.Hashes {
+
+	switch codec.Mode() {
+	case blocknetwork.RuntimeIDs:
+	case blocknetwork.Hashes:
 		decoded.ConvertBlockNetworkHashesToRuntimeIDs()
+	default:
+		return fmt.Errorf("unknown block network mode %d", codec.Mode())
 	}
-	var data chunk.SerialisedData
-	if codec.Mode() == blocknetwork.Hashes {
-		data = chunk.EncodeWithBlockNetworkHashes(decoded)
-	} else {
-		data = chunk.Encode(decoded, chunk.NetworkEncoding)
-	}
-	out := bytes.NewBuffer(make([]byte, 0, len(input.RawPayload)))
-	for _, sub := range data.SubChunks {
-		out.Write(sub)
-	}
-	out.Write(data.Biomes)
-	out.Write(buf.Bytes())
-	input.RawPayload = out.Bytes()
-	input.SubChunkCount = uint32(len(data.SubChunks))
-	return nil
+	return EncodeLevelChunk(input, decoded, len(input.RawPayload)-buf.Len(), codec)
 }
 
 type CachedSubChunk struct {
-	layer byte
-	hash  xxh3.Uint128
-	subs  atomic.Int64
-	sc    *chunk.SubChunk
+	layer         byte
+	hash          xxh3.Uint128
+	subs          atomic.Int64
+	sc            *chunk.SubChunk
+	payloadOffset int
 }
 
 func (csc *CachedSubChunk) Layer() byte {
@@ -163,10 +208,15 @@ func (csc *CachedSubChunk) SubChunk() *chunk.SubChunk {
 	return csc.sc
 }
 
+func (csc *CachedSubChunk) PayloadOffset() int {
+	return csc.payloadOffset
+}
+
 type CachedChunk struct {
-	hash  xxh3.Uint128
-	subs  atomic.Int64
-	chunk *chunk.Chunk
+	hash          xxh3.Uint128
+	subs          atomic.Int64
+	chunk         *chunk.Chunk
+	payloadOffset int
 }
 
 // Chunk returns a dereferenced copy of the chunk stored.

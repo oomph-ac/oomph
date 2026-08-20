@@ -1,9 +1,12 @@
 package oconfig
 
-import "maps"
+import (
+	"maps"
+	"slices"
+)
 
 const (
-	ConfigVersion          uint64 = 7
+	ConfigVersion          uint64 = 8
 	DefaultShutdownMessage        = "§cServer is restarting."
 )
 
@@ -27,10 +30,11 @@ type Config struct {
 
 	UseLegacyEvents bool `json:"use_legacy_events" comment:"This option signifies wether the proxy should use the legacy event system to allow the remote server to handle punishments/flags.\nThis option is recommended to be set to false as the system will be removed in the future."`
 
-	Resource ResourceOpts `json:"resource_opts" comment:"Options for your resource packs."`
-	Network  NetworkOpts  `json:"network_opts" comment:"Options for configuring the network settings for Oomph."`
-	Movement MovementOpts `json:"movement_opts" comment:"Options for configuring movement policies and strictness for Oomph."`
-	Combat   CombatOpts   `json:"combat_opts" comment:"Options for configuring combat policies and strictness for Oomph."`
+	Resource        ResourceOpts        `json:"resource_opts" comment:"Options for your resource packs."`
+	Network         NetworkOpts         `json:"network_opts" comment:"Options for configuring the network settings for Oomph."`
+	Movement        MovementOpts        `json:"movement_opts" comment:"Options for configuring movement policies and strictness for Oomph."`
+	Combat          CombatOpts          `json:"combat_opts" comment:"Options for configuring combat policies and strictness for Oomph."`
+	ChunkObfuscator ChunkObfuscatorOpts `json:"chunk_obfuscator" comment:"Options for configuring chunk obfuscation."`
 
 	Detections map[string]Detection `json:"detections" comment:"The configuration for each detection used by the proxy.\nThe allowed punishment types are:\n- none: No punishment will be applied to the player.\n- kick: The player will be kicked when they reach the maximum amount of violations allowed by the detection.\n- ban: The player will be banned when the maximum amount of violations is reached. A ban provider is required for this option to be applied.\nThe tags that can be applied in the flag message are:\n- {player}: The player's username.\n- {xuid}: The player's XBOX Live ID.\n- {violations}: The amount of violations that have been reached on the detection.\n- {prefix}: The prefix defined in the Oomph configuration."`
 }
@@ -100,6 +104,41 @@ var (
 			ReachLeniency:              0,
 			LerpSteps:                  10,
 			EntitySearchRadius:         6,
+		},
+
+		ChunkObfuscator: ChunkObfuscatorOpts{
+			Enabled:     true,
+			BlockRadius: 4,
+			Dimensions: ChunkObfuscatorDimensionsOpts{
+				Overworld: ChunkObfuscatorDimensionOpts{
+					Enabled: true,
+					Mode:    ObfuscationModeHide,
+					MaxY:    64,
+					HiddenBlocks: []string{
+						"minecraft:coal_ore", "minecraft:deepslate_coal_ore", "minecraft:copper_ore", "minecraft:deepslate_copper_ore",
+						"minecraft:diamond_ore", "minecraft:deepslate_diamond_ore", "minecraft:emerald_ore", "minecraft:deepslate_emerald_ore",
+						"minecraft:gold_ore", "minecraft:deepslate_gold_ore", "minecraft:iron_ore", "minecraft:deepslate_iron_ore",
+						"minecraft:lapis_ore", "minecraft:deepslate_lapis_ore", "minecraft:redstone_ore", "minecraft:deepslate_redstone_ore",
+						"minecraft:raw_copper_block", "minecraft:raw_iron_block",
+					},
+					TerrainBlocks: []string{
+						"minecraft:stone", "minecraft:deepslate", "minecraft:andesite", "minecraft:diorite", "minecraft:granite",
+						"minecraft:tuff", "minecraft:calcite", "minecraft:dirt", "minecraft:gravel", "minecraft:smooth_basalt",
+						"minecraft:amethyst_block", "minecraft:budding_amethyst", "minecraft:oak_planks",
+					},
+					ReplacementBlock:     "minecraft:stone",
+					DeepReplacementBlock: "minecraft:deepslate",
+				},
+				Nether: ChunkObfuscatorDimensionOpts{
+					Enabled:              true,
+					Mode:                 ObfuscationModeLayered,
+					MaxY:                 128,
+					HiddenBlocks:         []string{"minecraft:ancient_debris", "minecraft:nether_gold_ore", "minecraft:quartz_ore"},
+					TerrainBlocks:        []string{"minecraft:netherrack", "minecraft:magma", "minecraft:blackstone", "minecraft:basalt", "minecraft:crimson_nylium", "minecraft:warped_nylium", "minecraft:gravel", "minecraft:soul_sand", "minecraft:soul_soil"},
+					ReplacementBlock:     "minecraft:netherrack",
+					DeepReplacementBlock: "minecraft:netherrack",
+				},
+			},
 		},
 
 		Detections: map[string]Detection{
@@ -233,5 +272,9 @@ var (
 
 func cloneConfig(cfg Config) Config {
 	cfg.Detections = maps.Clone(cfg.Detections)
+	cfg.ChunkObfuscator.Dimensions.Overworld.HiddenBlocks = slices.Clone(cfg.ChunkObfuscator.Dimensions.Overworld.HiddenBlocks)
+	cfg.ChunkObfuscator.Dimensions.Overworld.TerrainBlocks = slices.Clone(cfg.ChunkObfuscator.Dimensions.Overworld.TerrainBlocks)
+	cfg.ChunkObfuscator.Dimensions.Nether.HiddenBlocks = slices.Clone(cfg.ChunkObfuscator.Dimensions.Nether.HiddenBlocks)
+	cfg.ChunkObfuscator.Dimensions.Nether.TerrainBlocks = slices.Clone(cfg.ChunkObfuscator.Dimensions.Nether.TerrainBlocks)
 	return cfg
 }

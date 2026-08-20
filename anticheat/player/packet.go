@@ -420,15 +420,18 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.ItemStackResponse:
 		p.inventory.HandleItemStackResponse(pk)
 	case *packet.LevelChunk:
-		p.worldUpdater.HandleLevelChunk(pk)
+		modified := p.worldUpdater.HandleLevelChunk(pk)
 		_, requestMode := pk.SubChunkLimit.Value()
 		fullChunk := !pk.CacheEnabled && !requestMode
-		if fullChunk && p.opts.Network.AttemptFixChunks {
+		if !modified && fullChunk && p.opts.Network.AttemptFixChunks {
 			if err := oworld.ReencodeLevelChunk(pk, p.BlockNetwork()); err != nil {
 				p.Log().Warn("unable to re-encode chunk", "error", err)
 			} else {
-				ctx.SetModified()
+				modified = true
 			}
+		}
+		if modified {
+			ctx.SetModified()
 		}
 	case *packet.MobEffect:
 		pk.Tick = 0
@@ -487,7 +490,9 @@ func (p *Player) handleServerPacket(ctx *context.HandlePacketContext) {
 	case *packet.SetPlayerGameType:
 		p.gamemodeHandle.Handle(pk)
 	case *packet.SubChunk:
-		p.worldUpdater.HandleSubChunk(pk)
+		if p.worldUpdater.HandleSubChunk(pk) {
+			ctx.SetModified()
+		}
 	case *packet.UpdateAbilities:
 		if pk.AbilityData.EntityUniqueID == p.UniqueId {
 			p.movement.ServerUpdate(pk)

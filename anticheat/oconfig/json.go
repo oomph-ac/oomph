@@ -17,8 +17,7 @@ var (
 
 // ParseRawJSON parses a raw JSON string and returns a Config struct.
 func ParseRawJSON(data []byte) (Config, error) {
-	parsedCfg := DefaultConfig
-	parsedCfg.Detections = maps.Clone(DefaultConfig.Detections)
+	parsedCfg := cloneConfig(DefaultConfig)
 	if err := hjson.Unmarshal(data, &parsedCfg); err != nil {
 		return Config{}, fmt.Errorf("unable to parse config: %w", err)
 	}

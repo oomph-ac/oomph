@@ -16,9 +16,10 @@ import (
 )
 
 type ChunkInfo struct {
-	Cached bool
-	Hash   xxh3.Uint128
-	Chunk  *chunk.Chunk
+	Cached        bool
+	Hash          xxh3.Uint128
+	Chunk         *chunk.Chunk
+	PayloadOffset int
 }
 
 type World struct {
