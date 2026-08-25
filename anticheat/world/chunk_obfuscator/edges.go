@@ -12,25 +12,24 @@ const (
 	EastEdge
 	NorthEdge
 	SouthEdge
+	BottomEdge
+	TopEdge
 )
 
 type BlockChange struct {
-	X         byte
-	Y         int16
-	Z         byte
 	RuntimeID uint32
+	Y         int16
+	X         byte
+	Z         byte
 }
 
-// EdgeChanges ...
-func (x *Obfuscator) EdgeChanges(c *chunk.Chunk, neighbors NeighborChunks, dimensionID int32, seed uint64, edge Edge) []BlockChange {
-	return x.edgeChanges(c, neighbors, dimensionID, seed, edge, nil)
+func (x *Obfuscator) EdgesEnabled(dimensionID int32) bool {
+	d := x.dimension(dimensionID)
+	return x.enabled && d != nil && d.enabled && d.mode != oconfig.ObfuscationModeHide && d.candidates() != 0
 }
 
-func (x *Obfuscator) EdgeChangesForLayers(c *chunk.Chunk, neighbors NeighborChunks, dimensionID int32, seed uint64, edge Edge, layers []int) []BlockChange {
-	return x.edgeChanges(c, neighbors, dimensionID, seed, edge, layers)
-}
-
-func (x *Obfuscator) edgeChanges(c *chunk.Chunk, neighbors NeighborChunks, dimensionID int32, seed uint64, edge Edge, layers []int) []BlockChange {
+// EdgeChanges returns updates for the chunk edge, optionally limited to selected layers.
+func (x *Obfuscator) EdgeChanges(c *chunk.Chunk, neighbors NeighborChunks, dimensionID int32, seed uint64, edge Edge, layers ...int) []BlockChange {
 	d := x.dimension(dimensionID)
 	if !x.enabled || d == nil || !d.enabled || d.mode == oconfig.ObfuscationModeHide {
 		return nil
@@ -47,32 +46,86 @@ func (x *Obfuscator) edgeChanges(c *chunk.Chunk, neighbors NeighborChunks, dimen
 	}
 
 	minY, maxY := c.Range().Min()+1, min(d.maxY, c.Range().Max()-1)
+	capacity := edgeCapacity(c, d, candidates, edge, layers, minY, maxY, minX, maxX, minZ, maxZ)
+	if capacity == 0 {
+		return nil
+	}
+
+	changes := make([]BlockChange, 0, capacity)
 	if layers == nil {
-		var changes []BlockChange
 		for index, sub := range c.Sub() {
-			changes = edgeChangesForLayer(changes, c, neighbors, d, candidates, seed, index, sub, minY, maxY, minX, maxX, minZ, maxZ)
+			changes = appendLayerEdgeChanges(changes, c, neighbors, d, candidates, seed, edge, index, sub, minY, maxY, minX, maxX, minZ, maxZ)
 		}
 		return changes
 	}
 
-	var changes []BlockChange
 	for _, index := range layers {
 		if index >= 0 && index < len(c.Sub()) {
-			changes = edgeChangesForLayer(changes, c, neighbors, d, candidates, seed, index, c.Sub()[index], minY, maxY, minX, maxX, minZ, maxZ)
+			changes = appendLayerEdgeChanges(changes, c, neighbors, d, candidates, seed, edge, index, c.Sub()[index], minY, maxY, minX, maxX, minZ, maxZ)
 		}
 	}
 	return changes
 }
 
-func edgeChangesForLayer(changes []BlockChange, c *chunk.Chunk, neighbors NeighborChunks, d *dimension, candidates blockType, seed uint64, index int, sub *chunk.SubChunk, minY, maxY int, minX, maxX, minZ, maxZ byte) []BlockChange {
+func edgeCapacity(c *chunk.Chunk, d *dimension, candidates blockType, edge Edge, layers []int, minY, maxY int, minX, maxX, minZ, maxZ byte) int {
+	if minY > maxY {
+		return 0
+	}
+	area := int(maxX-minX+1) * int(maxZ-minZ+1)
+	if layers == nil {
+		capacity := 0
+		for index, sub := range c.Sub() {
+			if layerHasCandidates(c, d, candidates, index, sub, minY, maxY) {
+				fromY, toY, ok := edgeYRange(c, edge, index, minY, maxY)
+				if ok {
+					capacity += (toY - fromY + 1) * area
+				}
+			}
+		}
+		return capacity
+	}
+
+	capacity := 0
+	for _, layer := range layers {
+		if layer < 0 || layer >= len(c.Sub()) {
+			continue
+		}
+		if layerHasCandidates(c, d, candidates, layer, c.Sub()[layer], minY, maxY) {
+			fromY, toY, ok := edgeYRange(c, edge, layer, minY, maxY)
+			if ok {
+				capacity += (toY - fromY + 1) * area
+			}
+		}
+	}
+	return capacity
+}
+
+func edgeYRange(c *chunk.Chunk, edge Edge, layer, minY, maxY int) (fromY, toY int, ok bool) {
+	subMinY := ((c.Range().Min() >> 4) + layer) << 4
+	fromY, toY = max(minY, subMinY), min(maxY, subMinY+15)
+	switch edge {
+	case BottomEdge:
+		fromY, toY = subMinY, subMinY
+	case TopEdge:
+		fromY, toY = subMinY+15, subMinY+15
+	}
+
+	return fromY, toY, fromY >= minY && toY <= maxY && fromY <= toY
+}
+
+func appendLayerEdgeChanges(changes []BlockChange, c *chunk.Chunk, neighbors NeighborChunks, d *dimension, candidates blockType, seed uint64, edge Edge, index int, sub *chunk.SubChunk, minY, maxY int, minX, maxX, minZ, maxZ byte) []BlockChange {
 	layers := sub.Layers()
 	if sub.Empty() || len(layers) == 0 || !d.paletteContains(layers[0], candidates) {
 		return changes
 	}
 
 	storage := layers[0]
-	subMinY := ((c.Range().Min() >> 4) + index) << 4
-	for y, toY := max(minY, subMinY), min(maxY, subMinY+15); y <= toY; y++ {
+	fromY, toY, ok := edgeYRange(c, edge, index, minY, maxY)
+	if !ok {
+		return changes
+	}
+
+	for y := fromY; y <= toY; y++ {
 		layerBlock := uint32(0)
 		if d.mode == oconfig.ObfuscationModeLayered {
 			layerBlock = d.decoy(seed ^ uint64(int64(y)))
@@ -80,7 +133,7 @@ func edgeChangesForLayer(changes []BlockChange, c *chunk.Chunk, neighbors Neighb
 		for x := minX; x <= maxX; x++ {
 			for z := minZ; z <= maxZ; z++ {
 				runtimeID := storage.At(x, byte(y), z)
-				if !d.has(runtimeID, candidates) || !d.enclosed(c, neighbors, storage, x, int16(y), z) {
+				if !d.has(runtimeID, candidates) || !d.enclosedInStorage(c, neighbors, storage, x, int16(y), z) {
 					continue
 				}
 				replacement := layerBlock
@@ -134,6 +187,20 @@ func edgeBounds(neighbors NeighborChunks, edge Edge) (minX, maxX, minZ, maxZ byt
 		}
 		if neighbors.East != nil {
 			maxX = 15
+		}
+	case BottomEdge, TopEdge:
+		ok = true
+		if neighbors.West != nil {
+			minX = 0
+		}
+		if neighbors.East != nil {
+			maxX = 15
+		}
+		if neighbors.North != nil {
+			minZ = 0
+		}
+		if neighbors.South != nil {
+			maxZ = 15
 		}
 	}
 	return

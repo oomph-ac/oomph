@@ -20,8 +20,8 @@ import (
 
 // WorldUpdaterComponent is a component that handles block and chunk updates to the world of the member player.
 type WorldUpdaterComponent struct {
-	mPlayer    *player.Player
-	obfuscator *chunkObfuscator
+	mPlayer     *player.Player
+	obfuscation *chunkObfuscation
 
 	chunkRadius       int32
 	serverChunkRadius int32
@@ -38,8 +38,8 @@ type WorldUpdaterComponent struct {
 
 func NewWorldUpdaterComponent(p *player.Player) *WorldUpdaterComponent {
 	return &WorldUpdaterComponent{
-		mPlayer:    p,
-		obfuscator: newChunkObfuscator(p),
+		mPlayer:     p,
+		obfuscation: newChunkObfuscation(p),
 
 		chunkRadius: 1_000_000_000,
 
@@ -57,7 +57,7 @@ func (c *WorldUpdaterComponent) HandleSubChunk(pk *packet.SubChunk) bool {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
 	results := acknowledgement.NewSubChunkUpdateACK(c.mPlayer, pk).Run()
-	return c.obfuscator.obfuscateSubChunks(pk, results)
+	return c.obfuscation.obfuscateSubChunks(pk, results)
 }
 
 // HandleLevelChunk handles a LevelChunk packet from the server.
@@ -75,7 +75,7 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) bool {
 	if !ok {
 		return false
 	}
-	return c.obfuscator.obfuscateLevelChunk(pk, cInfo)
+	return c.obfuscation.obfuscateLevelChunk(pk, cInfo)
 }
 
 // HandleUpdateBlock handles an UpdateBlock packet from the server.
@@ -88,8 +88,8 @@ func (c *WorldUpdaterComponent) HandleUpdateBlock(pk *packet.UpdateBlock) {
 	runtimeID := c.mPlayer.DecodeBlockRuntimeID(pk.NewBlockRuntimeID)
 	oldRuntimeID := df_world.BlockRuntimeID(c.mPlayer.World().Block(pos))
 	c.AddPendingUpdate(pos, runtimeID)
-	if c.obfuscator.exposesBlocks(oldRuntimeID, runtimeID) {
-		c.obfuscator.showAround([]df_cube.Pos{pos})
+	if c.obfuscation.exposesBlocks(oldRuntimeID, runtimeID) {
+		c.obfuscation.revealAround([]df_cube.Pos{pos})
 	}
 }
 
@@ -101,7 +101,7 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 	changed := c.addBlockUpdates(pk.Blocks, make([]df_cube.Pos, 0, len(pk.Blocks)+len(pk.Extra)))
 	changed = c.addBlockUpdates(pk.Extra, changed)
 	if len(changed) != 0 {
-		c.obfuscator.showAround(changed)
+		c.obfuscation.revealAround(changed)
 	}
 }
 
@@ -111,7 +111,7 @@ func (c *WorldUpdaterComponent) addBlockUpdates(entries []protocol.BlockChangeEn
 		runtimeID := c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID)
 		oldRuntimeID := df_world.BlockRuntimeID(c.mPlayer.World().Block(pos))
 		c.AddPendingUpdate(pos, runtimeID)
-		if c.obfuscator.exposesBlocks(oldRuntimeID, runtimeID) {
+		if c.obfuscation.exposesBlocks(oldRuntimeID, runtimeID) {
 			changed = append(changed, pos)
 		}
 	}
@@ -119,7 +119,11 @@ func (c *WorldUpdaterComponent) addBlockUpdates(entries []protocol.BlockChangeEn
 }
 
 func (c *WorldUpdaterComponent) ShowBlocksAround(pos protocol.BlockPos) {
-	c.obfuscator.showAroundBlock(pos)
+	c.obfuscation.revealAround([]df_cube.Pos{{int(pos.X()), int(pos.Y()), int(pos.Z())}})
+}
+
+func (c *WorldUpdaterComponent) ShowBlocksAhead(pos protocol.BlockPos, face df_cube.Face, depth int) {
+	c.obfuscation.revealAhead(df_cube.Pos{int(pos.X()), int(pos.Y()), int(pos.Z())}, face, depth)
 }
 
 // AttemptItemInteractionWithBlock attempts a block placement request from the client. It returns false if the simulation is unable

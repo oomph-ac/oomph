@@ -117,6 +117,8 @@ func (ack *SubChunkUpdate) Run() []SubChunkUpdateResult {
 			results = append(results, SubChunkUpdateResult{Entry: entryIndex, Position: chunkPos, Layer: int(cachedSub.Layer()), PayloadOffset: cachedSub.PayloadOffset()})
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "cached subchunk %d at %v", cachedSub.Layer(), chunkPos)
 		case protocol.SubChunkResultSuccessAllAir:
+			layer := int(ack.pk.Position[1]) + int(entry.Offset[1]) - (ch.Range().Min() >> 4)
+			results = append(results, SubChunkUpdateResult{Entry: entryIndex, Position: chunkPos, Layer: layer, PayloadOffset: -1})
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "all-air chunk at %v", chunkPos)
 		default:
 			ack.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "no subchunk data for %v (result=%d)", chunkPos, entry.Result)

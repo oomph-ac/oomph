@@ -2,6 +2,7 @@ package player
 
 import (
 	"math"
+	"time"
 
 	"github.com/chewxy/math32"
 	"github.com/df-mc/dragonfly/server/block"
@@ -56,6 +57,8 @@ type WorldUpdaterComponent interface {
 	RemovePendingUpdate(pos df_cube.Pos, blockRuntimeID uint32)
 	// ShowBlocksAround shows blocks obfuscated around a successfully broken block.
 	ShowBlocksAround(pos protocol.BlockPos)
+	// ShowBlocksAhead shows blocks obfuscated ahead of a successfully broken block.
+	ShowBlocksAhead(pos protocol.BlockPos, face df_cube.Face, depth int)
 
 	// Tick ticks the world updater component.
 	Tick()
@@ -436,7 +439,13 @@ func (p *Player) tryBreakBlock(interactFace cube.Face) bool {
 		p.blockBreakProgress = 0.0
 		return false
 	}
+
 	p.WorldUpdater().ShowBlocksAround(breakPos)
+
+	breakTicks := max(p.expectedBlockBreakTime(breakPos), 1)
+	latencyTicks := float64(p.StackLatency) / float64(50*time.Millisecond)
+	lookahead := min(int(math.Ceil(latencyTicks/float64(breakTicks)))+4, 12)
+	p.WorldUpdater().ShowBlocksAhead(breakPos, df_cube.Face(interactFace), lookahead)
 	return true
 }
 
