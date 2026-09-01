@@ -8,12 +8,14 @@ import (
 	df_cube "github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/item"
 	df_world "github.com/df-mc/dragonfly/server/world"
+	"github.com/df-mc/dragonfly/server/world/chunk"
 	"github.com/ethaniccc/float32-cube/cube"
 	"github.com/ethaniccc/float32-cube/cube/trace"
 	"github.com/oomph-ac/oomph/anticheat/game"
 	"github.com/oomph-ac/oomph/anticheat/player"
 	"github.com/oomph-ac/oomph/anticheat/player/component/acknowledgement"
 	"github.com/oomph-ac/oomph/anticheat/utils"
+	oworld "github.com/oomph-ac/oomph/anticheat/world"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -62,9 +64,17 @@ func (c *WorldUpdaterComponent) HandleLevelChunk(pk *packet.LevelChunk) {
 		c.mPlayer.ACKs().Add(acknowledgement.NewPlayerInitalizedACK(c.mPlayer))
 	}
 
-	// Check if this LevelChunk packet is compatiable with oomph's handling.
-	if _, requestMode := pk.SubChunkLimit.Value(); requestMode {
-		//c.mPlayer.Log().Debug("cannot debug chunk due to subchunk request mode unsupported", "subChunkCount", pk.SubChunkCount)
+	if limit, requestMode := pk.SubChunkLimit.Value(); requestMode {
+		if limit == 0 {
+			dimension, ok := df_world.DimensionByID(int(pk.Dimension))
+			if !ok {
+				dimension = df_world.Overworld
+			}
+			c.mPlayer.World().AddChunk(pk.Position, oworld.ChunkInfo{
+				Chunk: chunk.New(oworld.BlockRegistry, dimension.Range()),
+			})
+			c.mPlayer.Dbg.Notify(player.DebugModeChunks, true, "added all-air chunk at %v", pk.Position)
+		}
 		return
 	}
 	acknowledgement.NewChunkUpdateACK(c.mPlayer, pk).Run()
