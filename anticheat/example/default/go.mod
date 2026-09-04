@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/oomph-ac/oomph/anticheat v0.0.0-20260208201834-bff025a3d827
-	github.com/sandertv/gophertunnel v1.59.0
+	github.com/sandertv/gophertunnel v1.61.0
 )
 
 require (
@@ -62,7 +62,7 @@ replace github.com/oomph-ac/oomph/anticheat => ../..
 
 replace github.com/oomph-ac/oomph/transferproxy => ../../../transferproxy
 
-replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260817220931-1aac4952091d
+replace github.com/df-mc/dragonfly => github.com/oomph-ac/dragonfly v0.0.0-20260904153233-9221758c1eee
 
 replace github.com/sandertv/go-raknet => ../../../go-raknet
 
