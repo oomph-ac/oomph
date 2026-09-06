@@ -54,6 +54,9 @@ func Listener(ctx context.Context, cfg Config) func(server.Config) (server.Liste
 			AcceptedProtocols:      cfg.AcceptedProtocols,
 			FlushRate:              -1,
 		}
+		if conf.Allower != nil {
+			listenCfg.Allow = conf.Allower.Allow
+		}
 		if log.Enabled(ctx, slog.LevelDebug) {
 			listenCfg.ErrorLog = log.With("net_origin", "gophertunnel")
 		}
