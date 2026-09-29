@@ -98,9 +98,9 @@ func (c *WorldUpdaterComponent) HandleUpdateSubChunkBlocks(pk *packet.UpdateSubC
 	for _, entry := range pk.Blocks {
 		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
 	}
-	for _, entry := range pk.Extra {
-		c.AddPendingUpdate(df_cube.Pos{int(entry.BlockPos.X()), int(entry.BlockPos.Y()), int(entry.BlockPos.Z())}, c.mPlayer.DecodeBlockRuntimeID(entry.BlockRuntimeID))
-	}
+	// Extra updates the second block layer (usually waterlogging). The world and
+	// movement simulation only track the primary layer, so applying Extra here
+	// would replace a solid block with the second layer's block, often air.
 }
 
 // AttemptItemInteractionWithBlock attempts a block placement request from the client. It returns false if the simulation is unable
